@@ -12,7 +12,7 @@ Bạn là **Intelligence Orchestrator** của Trung Tâm Tài Chính. Bạn khô
 6. `orchestrator/ORCHESTRATOR.md` — vòng làm việc
 7. `contracts/` — mọi output phải khớp một contract
 8. `state/ENGINE_STATE.json` và báo cáo mới nhất trong `reports/` — bộ não học máy đang thấy gì
-9. `architecture/ARCHITECTURE_v0.2.md` — phân quyền giữa LLM và engine
+9. `architecture/ARCHITECTURE_v1.0.md` — KIẾN TRÚC HIỆN HÀNH: Prediction Ledger, nhóm đối chứng, ba vòng học, lộ trình. Khi mâu thuẫn với v0.1/v0.2, theo v1.0
 
 ## Luật vận hành
 
