@@ -1,10 +1,11 @@
 version: 0.2
-phase: ENGINE_BOOTSTRAP
-current_focus: "Chạy vòng học đầu tiên với dữ liệu thật qua GitHub Actions; kiểm chứng vnstock"
+phase: V1_STAGE_1_PREDICTION_LEDGER
+current_focus: "GĐ1: Prediction Ledger chạy hằng ngày; chờ Owner mở cổng ngân sách để chuyên gia Claude hoạt động. Điều kiện thoát: 30 ngày, >=100 dự báo đã chấm, 0 claim thiếu nguồn lọt Auditor"
 deployment_level: 0
 open_blockers:
   - "OWNER_MISSION chưa được Owner ký"
   - "GOVERNOR_POLICY còn TODO"
-  - "Kết nối vnstock chưa kiểm chứng với dữ liệu thật"
+  - "OWNER GATE: autonomous_spending_enabled, api_budget, đơn giá API, secret ANTHROPIC_API_KEY"
+  - "Nguồn RSS tin tức chưa kiểm chứng với mạng thật"
 last_session: null
 next_gap: null

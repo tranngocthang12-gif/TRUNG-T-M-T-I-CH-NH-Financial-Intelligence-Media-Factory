@@ -35,3 +35,21 @@ paper:
 llm_review:
   enabled: true
   model: claude-sonnet-5
+# ---- v1.0 Giai đoạn 1 ----
+ledger:
+  horizons: [5, 20]
+  min_p: 0.05
+  max_p: 0.95
+  min_n_for_verdict: 30
+experts:
+  model: claude-sonnet-5
+  max_predictions_per_day: 6
+  max_tokens: 1500
+  price_input_per_mtok: 0     # Owner điền theo bảng giá API hiện hành (USD / 1 triệu token). 0 = chưa đặt → chuyên gia TẮT
+  price_output_per_mtok: 0
+news:
+  max_items: 40
+  feeds:
+    - https://vnexpress.net/rss/kinh-doanh.rss
+    - https://cafef.vn/thi-truong-chung-khoan.rss
+    - https://vietstock.vn/830/chung-khoan/co-phieu.rss

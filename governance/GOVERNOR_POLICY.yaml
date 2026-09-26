@@ -31,3 +31,7 @@ authority:
     - capital_authority
     - major_risk_limits
     - legal_compliance_policy
+api_budget:                        # Budget Governor (v1.0) — chỉ Owner sửa
+  daily_cap_usd: 0                 # 0 = không cho chi → chuyên gia Claude không chạy
+  monthly_cap_usd: 0
+  on_cap_reached: skip_experts     # engine tất định vẫn chạy

@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/resolution.schema.json",
+  "title": "RESOLUTION",
+  "description": "Kết quả do code chấm khi dự báo đến hạn",
+  "type": "object",
+  "required": [
+    "prediction_id",
+    "resolved_at",
+    "outcome"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "prediction_id": {
+      "type": "string"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "entry_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "exit_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "excess_return": {
+      "type": "number"
+    },
+    "outcome": {
+      "type": "integer",
+      "enum": [
+        0,
+        1
+      ]
+    }
+  },
+  "additionalProperties": true
+}

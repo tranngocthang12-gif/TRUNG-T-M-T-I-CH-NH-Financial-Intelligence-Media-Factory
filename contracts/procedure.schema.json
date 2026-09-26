@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/procedure.schema.json",
+  "title": "PROCEDURE",
+  "description": "Một quy trình tạo dự báo (chuyên gia + prompt + phiên bản) — đơn vị được chấm điểm và thay thế",
+  "type": "object",
+  "required": [
+    "name",
+    "version",
+    "role",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string"
+    },
+    "prompt_ref": {
+      "type": "string"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "SHADOW",
+        "RETIRED"
+      ]
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date"
+    },
+    "parent": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

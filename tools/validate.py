@@ -3,7 +3,7 @@ import json, sys, pathlib
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 REQUIRED = ["BOOT.md","governance/OWNER_MISSION.md","governance/GOVERNOR_POLICY.yaml","governance/SAFETY_STATE.yaml",
             "governance/GATES.md","orchestrator/ORCHESTRATOR.md","state/PROJECT_STATE.yaml","state/CAPABILITY_STATE.yaml",
-            "config.yaml","engine/run_cycle.py",".github/workflows/daily_cycle.yml"]
+            "config.yaml","engine/run_cycle.py","engine/ledger.py","engine/experts.py","engine/budget.py",".github/workflows/daily_cycle.yml"]
 SAFE = {"live_trading_enabled":"false","autonomous_order_execution":"false","autonomous_spending_enabled":"false","auto_publish_enabled":"false"}
 errors = []
 for f in REQUIRED:
@@ -15,7 +15,7 @@ for s in schemas:
         for k in d["required"]:
             if k not in d["properties"]: errors.append(f"{s.name}: required '{k}' không có trong properties")
     except Exception as e: errors.append(f"{s.name}: JSON lỗi ({e})")
-if len(schemas) != 18: errors.append(f"Cần 18 contract, đang có {len(schemas)}")
+if len(schemas) < 21: errors.append(f"Cần ít nhất 21 contract, đang có {len(schemas)}")
 safety = (ROOT/"governance/SAFETY_STATE.yaml").read_text(encoding="utf-8")
 for k,v in SAFE.items():
     if f"{k}: {v}" not in safety: print(f"CẢNH BÁO: {k} không còn = {v} — phải có Owner duyệt")
