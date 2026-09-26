@@ -17,3 +17,8 @@ Trạng thái: ✅ đã có · 🟡 một phần · ⬜ chưa có. Cập nhật 
 | 9 | **Lịch sự kiện** | ĐHCĐ, GDKHQ, KQKD, đáo hạn phái sinh, cơ cấu chỉ số, IPO, thoái vốn | HOSE/HNX, VSDC, nhà cung cấp chỉ số | Tuần | ⬜ |
 | 10 | **Ảnh hưởng & tâm lý** | Phát biểu người có ảnh hưởng (có nguồn), độ nóng mã trên truyền thông, tài khoản mở mới | Báo chí, VSDC | Ngày | ⬜ |
 | 11 | **Tin tức** | Tin doanh nghiệp, ngành, thị trường | RSS báo chí (Fact Layer) | Làn NHANH | 🟡 code có, chưa kiểm chứng mạng |
+| 12 | **Chuỗi giá trị — đầu ra** | Sức mua, doanh số bán lẻ, khuyến mãi/chiến tranh giá, thị phần, chuyển kênh, sức mạnh định giá, đơn hàng xuất khẩu | Tổng cục Thống kê, hiệp hội ngành, BCTC đối thủ, quan sát Owner | Tháng / sự kiện | ⬜ |
+| 13 | **Chuỗi giá trị — đầu vào** | Giá nguyên liệu chính theo ngành, cước vận tải, tỷ trọng trong giá vốn, độ trễ, phòng ngừa | Sàn hàng hóa quốc tế, thuyết minh BCTC | Ngày / quý | ⬜ |
+| 14 | **Quan sát thực địa Owner** | Hành vi người tiêu dùng, cạnh tranh tại điểm bán | `library/owner_observations/` | Khi có | ⬜ |
+| 15 | **Đồng thuận AI (nhóm B)** | Điều AI thông thường đang nghĩ = điều đã vào giá | Nhóm đối chứng | Theo dự báo | ⬜ |
+

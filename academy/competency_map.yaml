@@ -1,19 +1,85 @@
 # BẢN ĐỒ NĂNG LỰC — NOT_STARTED → STUDYING → SYNTHESIZED → PRACTICED → VALIDATED → READY → PRODUCTION_PROVEN
 # Chuyên gia chỉ được dự báo thật (có trọng số) khi năng lực >= VALIDATED.
 competencies:
-  doc_bctc:            {level: NOT_STARTED, library: [foundations/playbooks/doc_bctc], exam: tinh_chi_so}
-  ngan_hang:           {level: NOT_STARTED, library: [vietnam/sectors/ngan_hang], exam: ca_mu_ngan_hang}
-  bat_dong_san:        {level: NOT_STARTED, library: [vietnam/sectors/bat_dong_san], exam: ca_mu_bds}
-  vi_mo:               {level: NOT_STARTED, library: [foundations/playbooks/vi_mo_truyen_dan]}
-  chinh_sach_phap_luat:{level: NOT_STARTED, library: [vietnam/policy], added_by: owner_2026-09-26}
-  dia_chinh_tri:       {level: NOT_STARTED, library: [vietnam/policy], added_by: owner_2026-09-26}
-  anh_huong_nguoi_noi_tieng: {level: NOT_STARTED, library: [influence], added_by: owner_2026-09-26}
-  lich_su_kien:        {level: NOT_STARTED, added_by: architect_review_2026-09-26}
-  dong_tien_etf_chi_so:{level: NOT_STARTED, added_by: architect_review_2026-09-26}
-  tam_ly_margin:       {level: NOT_STARTED, added_by: architect_review_2026-09-26}
-  hang_hoa:            {level: NOT_STARTED, added_by: architect_review_2026-09-26}
-  he_sinh_thai_tap_doan: {level: NOT_STARTED, added_by: architect_review_2026-09-26}
-  nhan_dien_thu_doan:  {level: NOT_STARTED, library: [casebook/manipulation]}
-  dinh_gia:            {level: NOT_STARTED, library: [foundations/playbooks/dinh_gia]}
-  tin_tuc_su_kien:     {level: PRACTICED, note: "news@v1 đã có code, chưa chạy dữ liệu thật"}
-  dinh_luong:          {level: PRACTICED, note: "engine v0.2, mới kiểm trên dữ liệu giả lập"}
+  doc_bctc:
+    level: NOT_STARTED
+    library:
+    - foundations/playbooks/doc_bctc
+    exam: tinh_chi_so
+  ngan_hang:
+    level: NOT_STARTED
+    library:
+    - vietnam/sectors/ngan_hang
+    exam: ca_mu_ngan_hang
+  bat_dong_san:
+    level: NOT_STARTED
+    library:
+    - vietnam/sectors/bat_dong_san
+    exam: ca_mu_bds
+  vi_mo:
+    level: NOT_STARTED
+    library:
+    - foundations/playbooks/vi_mo_truyen_dan
+  chinh_sach_phap_luat:
+    level: NOT_STARTED
+    library:
+    - vietnam/policy
+    added_by: owner_2026-09-26
+  dia_chinh_tri:
+    level: NOT_STARTED
+    library:
+    - vietnam/policy
+    added_by: owner_2026-09-26
+  anh_huong_nguoi_noi_tieng:
+    level: NOT_STARTED
+    library:
+    - influence
+    added_by: owner_2026-09-26
+  lich_su_kien:
+    level: NOT_STARTED
+    added_by: architect_review_2026-09-26
+  dong_tien_etf_chi_so:
+    level: NOT_STARTED
+    added_by: architect_review_2026-09-26
+  tam_ly_margin:
+    level: NOT_STARTED
+    added_by: architect_review_2026-09-26
+  hang_hoa:
+    level: NOT_STARTED
+    added_by: architect_review_2026-09-26
+  he_sinh_thai_tap_doan:
+    level: NOT_STARTED
+    added_by: architect_review_2026-09-26
+  nhan_dien_thu_doan:
+    level: NOT_STARTED
+    library:
+    - casebook/manipulation
+  dinh_gia:
+    level: NOT_STARTED
+    library:
+    - foundations/playbooks/dinh_gia
+  tin_tuc_su_kien:
+    level: PRACTICED
+    note: news@v1 đã có code, chưa chạy dữ liệu thật
+  dinh_luong:
+    level: PRACTICED
+    note: engine v0.2, mới kiểm trên dữ liệu giả lập
+  chuoi_gia_tri_dau_ra:
+    level: NOT_STARTED
+    library:
+    - value_chain
+    added_by: owner_2026-09-26
+  chuoi_gia_tri_dau_vao:
+    level: NOT_STARTED
+    library:
+    - value_chain
+    added_by: owner_2026-09-26
+  quan_sat_thuc_dia:
+    level: NOT_STARTED
+    library:
+    - owner_observations
+    added_by: owner_2026-09-26
+  bat_dong_voi_dong_thuan:
+    level: NOT_STARTED
+    note: độ đúng khi bất đồng với nhóm B — chỉ số lợi thế cốt lõi
+    added_by: architect_2026-09-26
