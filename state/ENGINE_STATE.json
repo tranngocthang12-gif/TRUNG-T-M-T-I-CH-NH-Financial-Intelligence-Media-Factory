@@ -1,0 +1,38 @@
+{
+  "as_of": "2026-09-25",
+  "regime": "DOWN_LOWVOL",
+  "total_trials": 16,
+  "current_t_threshold": 3.0,
+  "models": {
+    "ACTIVE": 0,
+    "WATCH": 0,
+    "DEGRADING": 0,
+    "PAUSED": 0,
+    "INVALIDATED": 0,
+    "RETIRED": 0
+  },
+  "paper_nav": 1000000000,
+  "alerts": [],
+  "bandit": {
+    "single_family": {
+      "trials": 3,
+      "survivors": 0,
+      "posterior_mean": 0.2
+    },
+    "cross_family": {
+      "trials": 3,
+      "survivors": 0,
+      "posterior_mean": 0.2
+    },
+    "random_subset": {
+      "trials": 6,
+      "survivors": 0,
+      "posterior_mean": 0.125
+    },
+    "mutate_best": {
+      "trials": 4,
+      "survivors": 0,
+      "posterior_mean": 0.167
+    }
+  }
+}
