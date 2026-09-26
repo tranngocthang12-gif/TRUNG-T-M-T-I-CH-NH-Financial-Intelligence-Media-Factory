@@ -13,7 +13,21 @@ costs:                     # chi phí thực tế thị trường VN
   sell_fee: 0.0015
   sell_tax: 0.001
   slippage: 0.001
+  dividend_tax: 0.05       # thuế TNCN trên cổ tức tiền (paper trading)
 lot_size: 100
+corporate_actions:         # sự kiện quyền → hệ số điều chỉnh giá (dữ liệu dẫn xuất)
+  manual: data/corporate_actions.csv            # nhập tay, có nguồn, ưu tiên hơn Yahoo
+  yahoo_cache: data/derived/yahoo_actions.csv   # tải lại toàn bộ mỗi lần ingest
+  derived: data/derived/adjustment_factors.csv  # tính lại toàn bộ mỗi lần, có computed_at
+quality:                   # kiểm tra chất lượng: biến động vượt biên độ sàn mà không có sự kiện quyền = lỗi dữ liệu
+  price_limit: 0.07        # biên độ HOSE
+  tolerance: 0.003         # dung sai làm tròn bước giá
+  limit_overrides:         # mã từng niêm yết sàn khác trong kỳ dữ liệu
+    - {ticker: SHB, until: "2023-12-31", limit: 0.10, note: "SHB niêm yết HNX (±10%) trước khi chuyển HOSE; ngày chuyển cần đối chiếu CBTT — dữ liệu cho thấy |biến động| tới 9,4% năm 2022, ≤ 6,8% từ 2023"}
+  window_sessions: 20      # cửa sổ tính tỷ lệ lỗi gần nhất
+  max_error_rate: 0.01     # vượt ngưỡng → hôm đó KHÔNG nghiên cứu, KHÔNG dự báo
+  feature_lookback: 121    # feature của một mã bị loại nếu có cờ lỗi trong ngần này phiên gần nhất
+  flags_file: data/derived/quality_flags.csv
 research:
   trials_per_cycle: 6
   min_train_days: 500

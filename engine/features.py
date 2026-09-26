@@ -1,5 +1,8 @@
-"""Feature Library. Mọi feature tại ngày t chỉ dùng dữ liệu đến hết ngày t (kiểm tra bởi tests/test_no_lookahead.py)."""
+"""Feature Library. Mọi feature tại ngày t chỉ dùng dữ liệu đến hết ngày t (kiểm tra bởi tests/test_no_lookahead.py).
+Đầu vào là GIÁ ĐIỀU CHỈNH. `bad` = cờ lỗi dữ liệu (adjust.quality): feature/nhãn chạm vào ô lỗi bị loại (NaN)."""
 import numpy as np, pandas as pd
+from .adjust import contamination
+from .config import CFG
 
 def _ret(c, n): return c / c.shift(n) - 1
 def _lr(c): return np.log(c).diff()
@@ -21,22 +24,35 @@ FEATURES = {
 }
 FAMILIES = sorted({f for f, _ in FEATURES.values()})
 
-def build_wide(close, volume):
+def _bad(bad, close):
+    if bad is None: return None
+    b = bad.reindex(index=close.index, columns=close.columns).fillna(False).astype(bool)
+    return b if b.values.any() else None
+
+def build_wide(close, volume, bad=None):
     out = {}
+    b = _bad(bad, close)
+    contam = contamination(b, CFG["quality"]["feature_lookback"]) if b is not None else None
     for name, (_, f) in FEATURES.items():
         x = f(close, volume).replace([np.inf, -np.inf], np.nan)
+        if contam is not None:
+            x = x.mask(contam)                           # cửa sổ nhìn lại chứa ô lỗi dữ liệu → loại
         out[name] = x.rank(axis=1, pct=True) - 0.5      # chuẩn hóa xếp hạng chéo theo ngày
     return out
 
-def labels_wide(close, h):
-    """Nhãn: lợi nhuận vượt trội trung bình universe, VÀO LỆNH ở close t+1 (không dùng giá t)."""
+def labels_wide(close, h, bad=None):
+    """Nhãn: lợi nhuận vượt trội trung bình universe, VÀO LỆNH ở close t+1 (không dùng giá t).
+    Nếu cửa sổ nắm giữ (t+1, t+1+h] của một mã có ô lỗi dữ liệu → nhãn mã đó bị loại."""
     fwd = close.shift(-(1 + h)) / close.shift(-1) - 1
+    b = _bad(bad, close)
+    if b is not None:
+        fwd = fwd.mask(contamination(b, h).shift(-(1 + h)).fillna(False).astype(bool))
     return fwd.sub(fwd.mean(axis=1), axis=0)
 
-def dataset(close, volume, h):
-    wide = build_wide(close, volume)
+def dataset(close, volume, h, bad=None):
+    wide = build_wide(close, volume, bad)
     idx = pd.MultiIndex.from_product([close.index, close.columns], names=["date", "ticker"])
     ds = pd.DataFrame({n: w.values.ravel() for n, w in wide.items()}, index=idx)
-    ds["y"] = labels_wide(close, h).values.ravel()
+    ds["y"] = labels_wide(close, h, bad).values.ravel()
     ds["yr"] = ds["y"].groupby(level=0).rank(pct=True) - 0.5
     return ds

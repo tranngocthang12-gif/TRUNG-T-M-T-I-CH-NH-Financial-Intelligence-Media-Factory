@@ -1,7 +1,9 @@
-"""Data Engine: kho du lieu append-only, giu ban quan sat dau tien (point-in-time)."""
+"""Data Engine: kho du lieu append-only, giu ban quan sat dau tien (point-in-time).
+Kho giu GIA GOC lam bang chung. Moi tinh toan (feature, nhan, paper, Ledger) dung GIA DIEU CHINH tu load_market()."""
 import datetime as dt
 import numpy as np, pandas as pd
 from .config import CFG, path
+from . import adjust
 
 COLS = ["date", "ticker", "open", "high", "low", "close", "volume", "observed_at", "source"]
 
@@ -84,18 +86,82 @@ def ingest_vnstock(end=None):
         frames.append(q)
     new = pd.concat(frames, ignore_index=True) if frames else None
     store = append_rows(store, new)
+    errors += fetch_yahoo_actions()
     if store.empty:
         raise RuntimeError("Khong lay duoc du lieu tu nguon nao.\n" + "\n".join(errors[:20]))
     save_store(store)
     return {"new_rows": 0 if new is None else len(new), "errors": errors[:20]}
 
-def load_panel(as_of=None):
+def fetch_yahoo_actions():
+    """Tai lai TOAN BO lich su co tuc tien / chia tach tu Yahoo (du lieu dan xuat, ghi de moi lan, ghi ngay tai)."""
+    try:
+        import yfinance as yf
+    except Exception as e:
+        return [f"yahoo_actions: khong co yfinance ({e})"]
+    now = pd.Timestamp.now(tz="UTC").tz_localize(None).isoformat()
+    rows, errors = [], []
+    for t in CFG["universe"]:
+        try:
+            a = yf.Ticker(f"{t}.VN").actions
+        except Exception as e:
+            errors.append(f"{t} [yahoo_actions]: {str(e)[:160]}"); continue
+        if a is None or a.empty:
+            continue
+        for d, r in a.iterrows():
+            ex = pd.Timestamp(d).tz_localize(None).normalize() if pd.Timestamp(d).tzinfo else pd.Timestamp(d).normalize()
+            if r.get("Dividends", 0) > 0:
+                rows.append({"ticker": t, "ex_date": ex.date(), "type": adjust.CASH, "ratio": None,
+                             "cash_per_share": float(r["Dividends"]), "source": "yahoo", "source_status": "TU_DONG",
+                             "note": "", "fetched_at": now})
+            if r.get("Stock Splits", 0) > 0:
+                rows.append({"ticker": t, "ex_date": ex.date(), "type": "stock_split", "ratio": float(r["Stock Splits"]),
+                             "cash_per_share": None, "source": "yahoo", "source_status": "TU_DONG",
+                             "note": "", "fetched_at": now})
+    if rows or not errors:
+        pd.DataFrame(rows, columns=adjust.EV_COLS + ["fetched_at"]).to_csv(
+            path(CFG["corporate_actions"]["yahoo_cache"]), index=False)
+    return errors
+
+def load_market(as_of=None):
+    """Bang gia DIEU CHINH point-in-time + co loi du lieu + bao cao chat luong.
+    Tra ve dict: close, volume (dieu chinh), raw_close, bad (co loi), events, quality, flags."""
     s = load_store()
     if s.empty:
         raise RuntimeError("Kho du lieu trong. Chay ingest hoac tao du lieu synthetic.")
     if as_of is not None:
         s = s[s.date <= pd.Timestamp(as_of)]
-    close = s.pivot(index="date", columns="ticker", values="close").sort_index().ffill(limit=5)
-    volume = s.pivot(index="date", columns="ticker", values="volume").sort_index().fillna(0)
-    keep = close.columns[close.notna().sum() > 250]
-    return close[keep], volume[keep]
+    raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
+    vol = s.pivot(index="date", columns="ticker", values="volume").sort_index()
+    obs = s.pivot(index="date", columns="ticker", values="observed_at").sort_index()
+    keep = raw.columns[raw.notna().sum() > 250]
+    raw, vol, obs = raw[keep], vol[keep], obs[keep]
+    events = adjust.build_events(raw, obs, adjust.load_manual(), adjust.load_yahoo())
+    F, S = adjust.factors(raw.index, raw.columns, events)
+    adj = raw * F
+    bad, rep, flags = adjust.quality(adj)
+    rep["events"] = events.status.value_counts().to_dict() if len(events) else {}
+    rep["events_not_applied"] = [f"{e.ticker} {e.ex_date.date()} {e.type} ({e.source}): {e.status}"
+                                 for e in events.itertuples() if e.status not in ("APPLIED", "CHUA_DEN_HAN",
+                                                                                  "DA_NAM_TRONG_GIA_NGUON")]
+    rep["events_applied"] = [f"{e.ticker} {e.trade_date.date()} {e.type} ({e.source}, {e.source_status}): "
+                             f"gốc {e.raw_return:+.2%} → điều chỉnh {e.adj_return:+.2%}"
+                             for e in events.itertuples() if e.status == "APPLIED"]
+    return {"close": adj.ffill(limit=5), "volume": (vol / S).fillna(0), "raw_close": raw, "bad": bad,
+            "events": events, "quality": rep, "flags": flags}
+
+def write_derived(mk=None):
+    """Ghi du lieu DAN XUAT (tinh lai toan bo, ghi de, co ngay tinh): he so dieu chinh + co loi du lieu."""
+    mk = mk or load_market()
+    now = pd.Timestamp.now(tz="UTC").tz_localize(None).isoformat()
+    ev = mk["events"].copy()
+    ev["computed_at"] = now
+    ev.to_csv(path(CFG["corporate_actions"]["derived"]), index=False)
+    fl = pd.DataFrame(mk["flags"], columns=["date", "ticker", "return", "allowed"])
+    fl["computed_at"] = now
+    fl.to_csv(path(CFG["quality"]["flags_file"]), index=False)
+    return now
+
+def load_panel(as_of=None):
+    """Tuong thich nguoc: (close, volume) DA DIEU CHINH."""
+    mk = load_market(as_of)
+    return mk["close"], mk["volume"]

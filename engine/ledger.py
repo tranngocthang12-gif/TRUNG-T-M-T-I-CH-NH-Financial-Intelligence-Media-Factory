@@ -60,7 +60,9 @@ def record(preds, as_of, universe, fact_ids, close):
     return ok, rejected
 
 # ---------------- RESOLUTION (code) ----------------
-def resolve(close, as_of):
+def resolve(close, as_of, bad=None):
+    """Chấm bằng GIÁ ĐIỀU CHỈNH. Mã có ô lỗi dữ liệu trong cửa sổ chấm → VOID (không tính điểm);
+    mã khác có lỗi trong cửa sổ bị loại khỏi bình quân universe."""
     done = {r["prediction_id"] for r in _load(RES)}
     idx = close.index
     new = []
@@ -72,6 +74,14 @@ def resolve(close, as_of):
         if pos + h >= len(idx): continue                 # chưa đến hạn
         t0, t1 = idx[pos], idx[pos + h]
         ret = close.loc[t1] / close.loc[t0] - 1
+        if bad is not None:
+            dirty = bad.loc[(bad.index > t0) & (bad.index <= t1)].any()
+            if bool(dirty.get(rr["ticker"], False)):
+                new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
+                            "exit_date": str(t1.date()), "excess_return": None, "outcome": None,
+                            "void": "lỗi dữ liệu giá trong cửa sổ chấm"})
+                continue
+            ret = ret[~dirty.reindex(ret.index).fillna(False).astype(bool)]
         if pd.isna(ret.get(rr["ticker"])): continue
         excess = float(ret[rr["ticker"]] - ret.mean())
         new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
@@ -83,8 +93,9 @@ def resolve(close, as_of):
 def scorecard(as_of):
     P = {p["id"]: p for p in _load(PRED)}
     R = _load(RES)
-    rows = [{**P[r["prediction_id"]], **r} for r in R if r["prediction_id"] in P]
-    out = {"as_of": as_of, "total_predictions": len(P), "resolved": len(rows), "procedures": {}}
+    rows = [{**P[r["prediction_id"]], **r} for r in R if r["prediction_id"] in P and r.get("outcome") is not None]
+    void = sum(1 for r in R if r.get("outcome") is None)
+    out = {"as_of": as_of, "total_predictions": len(P), "resolved": len(rows), "void_data_error": void, "procedures": {}}
     if rows:
         df = pd.DataFrame(rows)
         for proc, g in df.groupby("procedure"):

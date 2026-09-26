@@ -12,13 +12,15 @@ def load_ledger():
     return pd.read_csv(p) if p.exists() else None
 
 def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, live=False):
-    close, volume = data.load_panel(as_of)
+    mk = data.load_market(as_of)                    # GIÁ ĐIỀU CHỈNH point-in-time + cờ lỗi dữ liệu
+    close, volume, bad, quality = mk["close"], mk["volume"], mk["bad"], mk["quality"]
     as_of = str((pd.Timestamp(as_of) if as_of else close.index[-1]).date())
-    close, volume = close.loc[:as_of], volume.loc[:as_of]
+    close, volume, bad = close.loc[:as_of], volume.loc[:as_of], bad.loc[:as_of]
+    skip = quality["skip"]                          # lỗi dữ liệu vượt ngưỡng → không nghiên cứu, không dự báo
     udates = close.index
     h = CFG["horizon_days"]
-    ds = features.dataset(close, volume, h)
-    reg_lab = regime.regimes(close)
+    ds = features.dataset(close, volume, h, bad)
+    reg_lab = regime.regimes(close, bad)
     regime_now = str(reg_lab.iloc[-1])
 
     # RESEARCH — meta-learning phân bổ ngân sách thử nghiệm
@@ -26,7 +28,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
     bandit, ledger_df = meta.load(), load_ledger()
     registry = knowledge.load_registry()
     done = []
-    n_trials = CFG["research"]["trials_per_cycle"] if trials is None else trials
+    n_trials = 0 if skip else (CFG["research"]["trials_per_cycle"] if trials is None else trials)
     for _ in range(n_trials):
         method, spec = meta.next_spec(bandit, rng, ledger_df)
         if spec is None:
@@ -55,24 +57,31 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
     meta.save(bandit)
 
     # LIVE PREDICTION + DECAY
-    preds_today, allp = knowledge.live_predict(ds, registry, as_of, udates)
-    alerts = knowledge.decay(registry, allp, ds, as_of)
+    if skip:
+        preds_today, alerts = pd.DataFrame(columns=["date", "model_id", "ticker", "score"]), []
+    else:
+        preds_today, allp = knowledge.live_predict(ds, registry, as_of, udates)
+        alerts = knowledge.decay(registry, allp, ds, as_of)
     knowledge.save_registry(registry)
 
     # PAPER + ATTRIBUTION
-    nav, decision = paper.run(as_of, close, preds_today, registry, udates)
-    attr = attribution.run(close)
+    nav, decision = paper.run(as_of, close, preds_today, registry, udates, events=mk["events"], frozen=skip)
+    attr = attribution.run(close, bad)
     n_total = 0 if ledger_df is None else len(ledger_df)
 
     # ---- v1.0 GĐ1: PREDICTION LEDGER ----
-    resolved = ledger.resolve(close, as_of)
+    resolved = ledger.resolve(close, as_of, bad)
     news = facts.ingest_news(as_of) if live else {"new_items": 0, "errors": []}
-    ex = experts.run(as_of, close) if use_llm else {"ran": False, "reasons": ["tắt bởi --no-llm"]}
+    if skip:
+        ex = {"ran": False, "reasons": [f"tạm dừng: tỷ lệ lỗi dữ liệu {quality['error_rate_window']:.2%} "
+                                        f"> ngưỡng {quality['max_error_rate']:.2%}"]}
+    else:
+        ex = experts.run(as_of, close) if use_llm else {"ran": False, "reasons": ["tắt bởi --no-llm"]}
     sc = ledger.scorecard(as_of)
 
     if write_report:
         report.write(as_of, regime_now, done, bandit, registry, nav, decision, attr, alerts,
-                     research.threshold(max(1, n_total)), n_total)
+                     research.threshold(max(1, n_total)), n_total, quality=quality)
         L = ["", "## Prediction Ledger (v1.0)", f"- Tin mới vào Fact Layer: {news['new_items']}"
              + (f" | lỗi nguồn: {len(news['errors'])}" if news["errors"] else ""),
              f"- Chuyên gia: " + (f"ghi {ex.get('recorded', 0)} dự báo, loại {ex.get('rejected', 0)}, "
@@ -86,7 +95,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         with open(path(f"reports/cycle_{as_of}.md"), "a", encoding="utf-8") as f:
             f.write("\n".join(L) + "\n")
     return {"as_of": as_of, "trials": done, "alerts": alerts, "nav": nav, "decision": decision,
-            "experts": ex, "resolved": len(resolved)}
+            "experts": ex, "resolved": len(resolved), "quality": quality}
 
 def main():
     ap = argparse.ArgumentParser()
@@ -98,6 +107,7 @@ def main():
     a = ap.parse_args()
     if a.source == "vnstock":
         print("[ingest]", data.ingest_vnstock())
+        print("[derived] tính lại hệ số điều chỉnh + cờ lỗi dữ liệu lúc", data.write_derived())
     elif a.source == "synthetic" and not (ROOT / CFG["data"]["store"]).exists():
         from .synthetic import make_store
         make_store()

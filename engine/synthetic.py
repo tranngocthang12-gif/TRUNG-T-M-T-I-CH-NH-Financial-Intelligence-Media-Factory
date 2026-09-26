@@ -15,7 +15,8 @@ def make_store(n_days=1560, n=30, seed=7, break_day=1250, strength=0.002):
             mom = logp[d - 1] - logp[d - 61]
             r = (pd.Series(mom).rank(pct=True).values - 0.5)
             drift = (strength if d < break_day else -0.5 * strength) * r
-        logp[d] = logp[d - 1] + mkt + drift + rng.normal(0, 0.02, n)
+        step = mkt + drift + rng.normal(0, 0.02, n)
+        logp[d] = logp[d - 1] + np.clip(step, np.log(0.935), np.log(1.065))   # tôn trọng biên độ HOSE ±7%
     close = np.round(np.exp(logp), -1)
     rows = []
     vol = rng.lognormal(13, 0.5, (n_days, n))

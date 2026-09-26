@@ -1,4 +1,6 @@
-"""Paper Trading: quyết định tại close ngày d, KHỚP tại close ngày giao dịch kế tiếp, lô 100, phí + thuế + trượt giá VN."""
+"""Paper Trading: quyết định tại close ngày d, KHỚP tại close ngày giao dịch kế tiếp, lô 100, phí + thuế + trượt giá VN.
+Giá dùng là GIÁ ĐIỀU CHỈNH neo tại as_of (= giá gốc ngày as_of). Sự kiện quyền xảy ra khi đang nắm giữ được áp vào vị thế:
+cổ tức cổ phiếu/chia tách → nhân số cổ phiếu; cổ tức tiền → cộng tiền (sau thuế)."""
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
 
@@ -9,14 +11,39 @@ def _append(rel, row):
     df = pd.DataFrame([row])
     df.to_csv(path(rel), mode="a", header=not p.exists(), index=False)
 
-def run(as_of, close, preds_today, reg, udates):
+def apply_corporate_actions(st, events, as_of, d):
+    """Áp sự kiện quyền có ngày GDKHQ trong (phiên đã xử lý gần nhất, as_of] vào vị thế đang nắm giữ."""
+    last = st.get("last_date")
+    if events is None or not len(events) or last is None:
+        return
+    ev = events[(events.status == "APPLIED") & (events.trade_date > pd.Timestamp(last))
+                & (events.trade_date <= pd.Timestamp(as_of))]
+    for e in ev.itertuples(index=False):
+        sh = st["positions"].get(e.ticker)
+        if not sh:
+            continue
+        if e.type == "cash_dividend":
+            amt = sh * float(e.cash_per_share) * (1 - CFG["costs"].get("dividend_tax", 0.0))
+            st["cash"] += amt
+            _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": e.ticker, "side": "CASH_DIVIDEND",
+                                         "quantity": sh, "price": float(e.cash_per_share), "fees": 0})
+        else:
+            new = int(sh * float(e.ratio))                  # phần lẻ cổ phiếu bị bỏ (thực tế VN trả tiền, bỏ qua)
+            st["positions"][e.ticker] = new
+            _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": e.ticker, "side": "STOCK_ADJUST",
+                                         "quantity": new - sh, "price": 0, "fees": 0})
+
+def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
+    """frozen=True (dữ liệu lỗi vượt ngưỡng): chỉ định giá, không khớp lệnh chờ, không ra quyết định mới."""
     c, lot, P = CFG["costs"], CFG["lot_size"], CFG["paper"]
     st = load_json(ST, {"cash": P["initial_cash"], "positions": {}, "pending": None,
                         "last_rebalance": None, "costs_paid": 0.0, "n_rebalance": 0})
     px = close.loc[pd.Timestamp(as_of)]
     d = str(pd.Timestamp(as_of).date())
+    apply_corporate_actions(st, events, as_of, d)
+    st["last_date"] = d
     # 1) Khớp lệnh đã quyết định phiên trước
-    if st["pending"] is not None:
+    if st["pending"] is not None and not frozen:
         target = st["pending"]
         traded = False
         for t in [t for t in st["positions"] if t not in target]:
@@ -49,7 +76,11 @@ def run(as_of, close, preds_today, reg, udates):
     pos = udates.get_loc(pd.Timestamp(as_of))
     due = st["last_rebalance"] is None or pos - udates.get_loc(pd.Timestamp(st["last_rebalance"])) >= P["rebalance_days"]
     decision = None
-    if due:
+    if frozen:
+        decision = {"date": d, "action": "NO_DECISION_DATA_QUALITY", "targets": "",
+                    "models": "tỷ lệ lỗi dữ liệu vượt ngưỡng — không khớp lệnh, không ra quyết định"}
+        _append("paper/decisions.csv", decision)
+    elif due:
         active = [k for k, v in reg.items() if v["state"] == "ACTIVE"]
         p = preds_today[preds_today.model_id.isin(active)] if len(preds_today) else preds_today
         if len(active) and len(p):
