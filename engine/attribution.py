@@ -3,7 +3,7 @@ import numpy as np, pandas as pd
 from .config import CFG, ROOT, save_json, load_json
 from .regime import market_returns
 
-def run(close):
+def run(close, bad=None):
     p = ROOT / "paper/nav.csv"
     if not p.exists():
         return None
@@ -11,7 +11,7 @@ def run(close):
     if len(nav) < 20:
         return {"status": "CHƯA ĐỦ DỮ LIỆU", "n_days": int(len(nav))}
     r = nav.pct_change().dropna()
-    m = market_returns(close).reindex(r.index).fillna(0)
+    m = market_returns(close, bad).reindex(r.index).fillna(0)
     beta = float(np.cov(r, m)[0, 1] / m.var()) if m.var() > 0 else 0.0
     resid = r - beta * m
     t_alpha = float(resid.mean() / resid.std() * np.sqrt(len(resid))) if resid.std() > 0 else 0.0

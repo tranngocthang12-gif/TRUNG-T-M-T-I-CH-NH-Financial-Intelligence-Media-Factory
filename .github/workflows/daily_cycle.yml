@@ -29,7 +29,7 @@ jobs:
       - name: Cai thu vien
         run: |
           pip install -r requirements.txt
-          pip install vnstock || echo "Khong cai duoc vnstock, se dung Yahoo"
+          # Khong cai vnstock: PyPI dang cach ly (quarantined) vnstock va vnai. Nguon gia chinh: Yahoo (config data.sources)
       - name: Kiem tra chong nhin truoc tuong lai
         run: python -m tests.test_no_lookahead
       - name: Kiem tra cau truc bo nao
@@ -37,7 +37,7 @@ jobs:
       - name: Chay vong hoc
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python -m engine.run_cycle --source vnstock --trials ${{ github.event.inputs.trials || '6' }}
+        run: python -m engine.run_cycle --source live --trials ${{ github.event.inputs.trials || '6' }}
       - name: Ghi ket qua vao bo nao
         run: |
           git config user.name "ttc-engine"

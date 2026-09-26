@@ -1,11 +1,25 @@
-version: 0.2
+version: 0.3
 phase: V1_STAGE_1_PREDICTION_LEDGER
-current_focus: "GĐ1: Prediction Ledger chạy hằng ngày; chờ Owner mở cổng ngân sách để chuyên gia Claude hoạt động. Điều kiện thoát: 30 ngày, >=100 dự báo đã chấm, 0 claim thiếu nguồn lọt Auditor"
+current_focus: "GĐ1: Prediction Ledger chạy hằng ngày trên GIÁ ĐIỀU CHỈNH có kiểm tra chất lượng; chờ Owner mở cổng ngân sách để chuyên gia Claude hoạt động. Điều kiện thoát: 30 ngày, >=100 dự báo đã chấm, 0 claim thiếu nguồn lọt Auditor"
 deployment_level: 0
 open_blockers:
   - "OWNER_MISSION chưa được Owner ký"
   - "GOVERNOR_POLICY còn TODO"
   - "OWNER GATE: autonomous_spending_enabled, api_budget, đơn giá API, secret ANTHROPIC_API_KEY"
   - "Nguồn RSS tin tức chưa kiểm chứng với mạng thật"
-last_session: null
-next_gap: null
+  - "OWNER GATE: chưa có nguồn giá chính thức — vnstock bị PyPI cách ly (quarantined), Yahoo là nguồn tạm có lỗi; SSI FastConnect / DNSE cần tài khoản Owner"
+  - "Sự kiện quyền TCB 11/06/2024 và VCB 03/03/2025 trong data/corporate_actions.csv ở trạng thái CAN_DOI_CHIEU — cần đường dẫn CBTT chính thức"
+  - "147 ô giá Yahoo vượt biên độ sàn chưa giải thích (0,20%; phần lớn phiên 09/07/2021, 25/08/2025, 20/10/2025) — đang bị loại khỏi feature/nhãn; một số có thể là cổ tức cổ phiếu chưa nhập"
+last_session:
+  date: 2026-09-26
+  type: "KIỂM TRA + SỬA 🔴/🟠"
+  done:
+    - "Giá điều chỉnh point-in-time (engine/adjust.py) + kiểm tra chất lượng + cổng dừng khi lỗi > 1%"
+    - "Xóa kết quả nghiên cứu học trên giá sai (research/trials.csv, state/bandit.json, state/model_registry.json)"
+    - "Bỏ vnstock (PyPI cách ly); Yahoo là nguồn chính; lỗi nguồn ghi vào báo cáo + ENGINE_STATE"
+    - "llm_review đi qua Budget Governor"
+    - "ARCHITECTURE_v2.0.md vào architecture/"
+    - "tools/validate.py kiểm cấu trúc v2.x"
+    - "Hạ tin_tuc_su_kien, dinh_luong về SYNTHESIZED"
+  tests: "7/7 đạt: validate, test_adjustment, test_ingest_errors, test_ledger_pipeline, test_llm_review_budget, test_no_lookahead, test_quality_gate"
+next_gap: "GĐ1 còn thiếu (mục 🟡): khung library/ (INDEX, foundations/playbooks, vietnam/*, dossiers, lessons), academy/curriculum.md + exams/ + results/, 3 contract knowledge_note / exam_item / dossier, playbook doc_bctc + phan_bien. Song song: theo dõi vòng Actions đầu tiên chạy code mới (Ledger lần đầu với dữ liệu thật)."

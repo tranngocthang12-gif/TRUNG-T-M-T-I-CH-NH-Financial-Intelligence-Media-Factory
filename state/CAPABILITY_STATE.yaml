@@ -3,7 +3,7 @@ version: 0.1
 capabilities:
   data_ingestion:
     level: SYNTHESIZED
-    evidence: [engine/data.py — chưa chạy với vnstock thật]
+    evidence: ["vòng thật 26/09: 72.202 dòng, 100% Yahoo (vnstock bị PyPI cách ly)", "engine/adjust.py + tests/test_adjustment.py: giá điều chỉnh, kiểm tra chất lượng", "tests/test_ingest_errors.py: ghi lỗi nguồn"]
     updated: 2026-09-26
   point_in_time_control:
     level: PRACTICED

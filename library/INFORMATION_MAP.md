@@ -12,7 +12,7 @@ Trạng thái: ✅ đã có · 🟡 một phần · ⬜ chưa có. Cập nhật 
 | 4 | **BCTC** | KQKD, cân đối, lưu chuyển tiền, thuyết minh, ý kiến kiểm toán — 3–5 năm, theo quý | HOSE/HNX công bố thông tin, IR doanh nghiệp | Quý | ⬜ |
 | 5 | **Định tính doanh nghiệp** | Mô hình, lãnh đạo, cổ đông lớn, giao dịch nội bộ, % hoàn thành kế hoạch, cổ tức/phát hành | CBTT, ĐHCĐ | Sự kiện | ⬜ |
 | 6 | **Định giá** | P/E, P/B, EV/EBITDA so lịch sử & ngành; kỳ vọng hàm ý trong giá | Code tính từ BCTC + giá | Ngày | ⬜ |
-| 7 | **Giao dịch** | Giá, khối lượng, thanh khoản, khối ngoại, tự doanh, ETF, margin | API SSI/DNSE, vnstock/Yahoo (tạm) | Ngày / làn NHANH | 🟡 giá & KL |
+| 7 | **Giao dịch** | Giá, khối lượng, thanh khoản, khối ngoại, tự doanh, ETF, margin | API SSI/DNSE; hiện dùng Yahoo (tạm, tự điều chỉnh giá); vnstock bị gỡ (PyPI cách ly) | Ngày / làn NHANH | 🟡 giá & KL |
 | 8 | **Rủi ro & bất thường** | Biến động không tin, khối lượng đột biến, BCTC bất thường, cảnh báo/kiểm soát, xử phạt | Code + Casebook + UBCKNN | Làn NHANH | ⬜ |
 | 9 | **Lịch sự kiện** | ĐHCĐ, GDKHQ, KQKD, đáo hạn phái sinh, cơ cấu chỉ số, IPO, thoái vốn | HOSE/HNX, VSDC, nhà cung cấp chỉ số | Tuần | ⬜ |
 | 10 | **Ảnh hưởng & tâm lý** | Phát biểu người có ảnh hưởng (có nguồn), độ nóng mã trên truyền thông, tài khoản mở mới | Báo chí, VSDC | Ngày | ⬜ |
