@@ -24,10 +24,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
           cache: pip
       - name: Cai thu vien
-        run: pip install -r requirements.txt
+        run: |
+          pip install -r requirements.txt
+          pip install vnstock || echo "Khong cai duoc vnstock, se dung Yahoo"
       - name: Kiem tra chong nhin truoc tuong lai
         run: python -m tests.test_no_lookahead
       - name: Kiem tra cau truc bo nao
