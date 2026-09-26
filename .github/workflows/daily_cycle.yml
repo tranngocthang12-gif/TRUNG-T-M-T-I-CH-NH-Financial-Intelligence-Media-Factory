@@ -1,0 +1,45 @@
+name: Vong hoc hang ngay
+
+on:
+  schedule:
+    - cron: "30 9 * * 1-5"
+  workflow_dispatch:
+    inputs:
+      trials:
+        description: "So thu nghiem nghien cuu"
+        default: "6"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-cycle
+  cancel-in-progress: false
+
+jobs:
+  cycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Cai thu vien
+        run: pip install -r requirements.txt
+      - name: Kiem tra chong nhin truoc tuong lai
+        run: python -m tests.test_no_lookahead
+      - name: Kiem tra cau truc bo nao
+        run: python tools/validate.py
+      - name: Chay vong hoc
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python -m engine.run_cycle --source vnstock --trials ${{ github.event.inputs.trials || '6' }}
+      - name: Ghi ket qua vao bo nao
+        run: |
+          git config user.name "ttc-engine"
+          git config user.email "ttc-engine@users.noreply.github.com"
+          git add -A data state research knowledge paper reports
+          git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F)"
+          git push
