@@ -1,0 +1,93 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/media_story.schema.json",
+  "title": "MEDIA_STORY",
+  "description": "Câu chuyện truyền thông",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "event",
+    "verified_facts",
+    "fact_refs",
+    "bear_view",
+    "conflict_disclosure_ref",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "event": {
+      "type": "string"
+    },
+    "verified_facts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "fact_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "financial_context": {
+      "type": "string"
+    },
+    "bull_view": {
+      "type": "string"
+    },
+    "bear_view": {
+      "type": "string"
+    },
+    "alternative_view": {
+      "type": "string"
+    },
+    "editorial_angle": {
+      "type": "string"
+    },
+    "uncertainty_statement": {
+      "type": "string"
+    },
+    "conflict_disclosure_ref": {
+      "type": "string"
+    },
+    "editorial_review_ref": {
+      "type": "string"
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "LONG_FORM",
+        "SHORT",
+        "TIKTOK",
+        "ARTICLE"
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "FACT_CHECKED",
+        "APPROVED",
+        "PUBLISHED",
+        "RETRACTED"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

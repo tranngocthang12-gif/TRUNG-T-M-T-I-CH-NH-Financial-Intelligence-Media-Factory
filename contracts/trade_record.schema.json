@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/trade_record.schema.json",
+  "title": "TRADE_RECORD",
+  "description": "Bản ghi giao dịch",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "decision_ref",
+    "mode",
+    "asset",
+    "side",
+    "quantity",
+    "price",
+    "executed_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "decision_ref": {
+      "type": "string"
+    },
+    "mode": {
+      "type": "string",
+      "enum": [
+        "SIMULATION",
+        "PAPER",
+        "LIVE"
+      ]
+    },
+    "asset": {
+      "type": "string"
+    },
+    "side": {
+      "type": "string",
+      "enum": [
+        "BUY",
+        "SELL"
+      ]
+    },
+    "quantity": {
+      "type": "number"
+    },
+    "price": {
+      "type": "number"
+    },
+    "executed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "fees": {
+      "type": "number"
+    },
+    "slippage": {
+      "type": "number"
+    }
+  },
+  "additionalProperties": false
+}

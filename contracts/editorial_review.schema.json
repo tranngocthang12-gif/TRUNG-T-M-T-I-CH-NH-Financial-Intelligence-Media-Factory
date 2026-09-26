@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/editorial_review.schema.json",
+  "title": "EDITORIAL_REVIEW",
+  "description": "Duyệt biên tập",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "story_ref",
+    "reviewer",
+    "accuracy",
+    "balance",
+    "decision"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "story_ref": {
+      "type": "string"
+    },
+    "reviewer": {
+      "type": "string"
+    },
+    "accuracy": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "clarity": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "context": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "balance": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "uncertainty_disclosed": {
+      "type": "boolean"
+    },
+    "clickbait_check": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "decision": {
+      "type": "string",
+      "enum": [
+        "APPROVE",
+        "REVISE",
+        "REJECT"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

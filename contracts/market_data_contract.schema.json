@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/market_data_contract.schema.json",
+  "title": "MARKET_DATA_CONTRACT",
+  "description": "Bản ghi dữ liệu thị trường có kiểm soát point-in-time",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "source",
+    "published_at",
+    "effective_at",
+    "observed_at",
+    "quality"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "source": {
+      "type": "string"
+    },
+    "dataset": {
+      "type": "string"
+    },
+    "symbol": {
+      "type": "string"
+    },
+    "published_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "effective_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "revision": {
+      "type": "integer"
+    },
+    "version": {
+      "type": "string"
+    },
+    "universe": {
+      "type": "string"
+    },
+    "quality": {
+      "type": "string",
+      "enum": [
+        "HIGH",
+        "MEDIUM",
+        "LOW",
+        "UNKNOWN"
+      ]
+    },
+    "known_limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "payload": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

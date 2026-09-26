@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/attribution_report.schema.json",
+  "title": "ATTRIBUTION_REPORT",
+  "description": "Phân rã kết quả — Learning chỉ học sau báo cáo này",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "decision_ref",
+    "actual_return",
+    "counterfactuals",
+    "components"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "decision_ref": {
+      "type": "string"
+    },
+    "period": {
+      "type": "object"
+    },
+    "actual_return": {
+      "type": "number"
+    },
+    "counterfactuals": {
+      "type": "object",
+      "properties": {
+        "no_trade": {
+          "type": "number"
+        },
+        "index": {
+          "type": "number"
+        },
+        "sector": {
+          "type": "number"
+        },
+        "entry_plus_1d": {
+          "type": "number"
+        },
+        "half_size": {
+          "type": "number"
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "properties": {
+        "market_beta": {
+          "type": "number"
+        },
+        "sector": {
+          "type": "number"
+        },
+        "factor": {
+          "type": "number"
+        },
+        "security_selection": {
+          "type": "number"
+        },
+        "timing": {
+          "type": "number"
+        },
+        "position_size": {
+          "type": "number"
+        },
+        "leverage": {
+          "type": "number"
+        },
+        "execution": {
+          "type": "number"
+        },
+        "residual_luck": {
+          "type": "number"
+        }
+      }
+    },
+    "estimated_alpha": {
+      "type": "number"
+    },
+    "skill_assessment": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

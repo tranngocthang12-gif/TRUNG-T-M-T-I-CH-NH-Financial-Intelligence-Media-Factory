@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/valuation_case.schema.json",
+  "title": "VALUATION_CASE",
+  "description": "Trường hợp định giá",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "asset",
+    "method",
+    "scenarios"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "asset": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string",
+      "enum": [
+        "DCF",
+        "RELATIVE",
+        "REVERSE_DCF",
+        "SCENARIO",
+        "OTHER"
+      ]
+    },
+    "inputs": {
+      "type": "object"
+    },
+    "scenarios": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "probability",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "probability": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "value": {
+            "type": "number"
+          },
+          "key_assumptions": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    },
+    "implied_expectations": {
+      "type": "string"
+    },
+    "fair_value_range": {
+      "type": "object",
+      "properties": {
+        "low": {
+          "type": "number"
+        },
+        "mid": {
+          "type": "number"
+        },
+        "high": {
+          "type": "number"
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

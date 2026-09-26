@@ -1,0 +1,87 @@
+# NOT_STARTED → STUDYING → SYNTHESIZED → PRACTICED → VALIDATED → READY → PRODUCTION_PROVEN
+version: 0.1
+capabilities:
+  data_ingestion:
+    level: SYNTHESIZED
+    evidence: [engine/data.py — chưa chạy với vnstock thật]
+    updated: 2026-09-26
+  point_in_time_control:
+    level: PRACTICED
+    evidence: [tests/demo_synthetic.py — chỉ trên dữ liệu giả lập]
+    updated: 2026-09-26
+  evidence_graph:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  fundamental_analysis:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  valuation:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  quant_research:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  macro_analysis:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  market_regime:
+    level: PRACTICED
+    evidence: [tests/demo_synthetic.py — chỉ trên dữ liệu giả lập]
+    updated: 2026-09-26
+  backtesting:
+    level: PRACTICED
+    evidence: [tests/demo_synthetic.py — chỉ trên dữ liệu giả lập]
+    updated: 2026-09-26
+  adversarial_review:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  uncertainty_calibration:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  portfolio_construction:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  risk_management:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  attribution:
+    level: PRACTICED
+    evidence: [tests/demo_synthetic.py — chỉ trên dữ liệu giả lập]
+    updated: 2026-09-26
+  model_decay_monitoring:
+    level: PRACTICED
+    evidence: [tests/demo_synthetic.py — chỉ trên dữ liệu giả lập]
+    updated: 2026-09-26
+  paper_trading:
+    level: PRACTICED
+    evidence: [tests/demo_synthetic.py — chỉ trên dữ liệu giả lập]
+    updated: 2026-09-26
+  live_execution:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  financial_media_production:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  fact_checking:
+    level: NOT_STARTED
+    evidence: []
+    updated: null
+  meta_learning:
+    level: PRACTICED
+    evidence: [tests/demo_synthetic.py — chỉ trên dữ liệu giả lập]
+    updated: 2026-09-26
+  self_repair:
+    level: NOT_STARTED
+    evidence: []
+    updated: null

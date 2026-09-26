@@ -1,0 +1,10 @@
+version: 0.2
+phase: ENGINE_BOOTSTRAP
+current_focus: "Chạy vòng học đầu tiên với dữ liệu thật qua GitHub Actions; kiểm chứng vnstock"
+deployment_level: 0
+open_blockers:
+  - "OWNER_MISSION chưa được Owner ký"
+  - "GOVERNOR_POLICY còn TODO"
+  - "Kết nối vnstock chưa kiểm chứng với dữ liệu thật"
+last_session: null
+next_gap: null

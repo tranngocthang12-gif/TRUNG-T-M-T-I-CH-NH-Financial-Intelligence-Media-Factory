@@ -1,0 +1,10 @@
+# SAFETY STATE — trạng thái an toàn ban đầu. Chỉ Owner được đổi.
+version: 0.1
+live_trading_enabled: false
+autonomous_order_execution: false
+autonomous_spending_enabled: false
+paper_trading_enabled: true
+self_learning_enabled: true
+meta_learning_enabled: true
+financial_media_learning_enabled: true
+auto_publish_enabled: false

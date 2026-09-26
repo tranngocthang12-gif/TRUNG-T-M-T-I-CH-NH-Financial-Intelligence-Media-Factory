@@ -1,0 +1,164 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/risk_assessment.schema.json",
+  "title": "RISK_ASSESSMENT",
+  "description": "Đánh giá của Risk Officer — có quyền chặn",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "subject_ref",
+    "checks",
+    "gate"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "subject_ref": {
+      "type": "string"
+    },
+    "checks": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "portfolio": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "sector_exposure": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "factor_exposure": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "correlation": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "liquidity": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "volatility": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "drawdown": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "tail": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "leverage": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "counterparty": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        },
+        "data_model": {
+          "type": "string",
+          "enum": [
+            "PASS",
+            "WARN",
+            "FAIL",
+            "N/A"
+          ]
+        }
+      }
+    },
+    "limit_breaches": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "gate": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ]
+    },
+    "notes": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

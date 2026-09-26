@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/backtest_run.schema.json",
+  "title": "BACKTEST_RUN",
+  "description": "Một lần chạy backtest",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "hypothesis_ref",
+    "baseline",
+    "transaction_cost_model",
+    "bias_checks",
+    "verdict"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "hypothesis_ref": {
+      "type": "string"
+    },
+    "data_contract_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "universe": {
+      "type": "string"
+    },
+    "period": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date"
+        },
+        "end": {
+          "type": "string",
+          "format": "date"
+        }
+      }
+    },
+    "baseline": {
+      "type": "string"
+    },
+    "transaction_cost_model": {
+      "type": "string"
+    },
+    "slippage_model": {
+      "type": "string"
+    },
+    "in_sample": {
+      "type": "object"
+    },
+    "out_of_sample": {
+      "type": "object"
+    },
+    "walk_forward": {
+      "type": "object"
+    },
+    "regime_results": {
+      "type": "object"
+    },
+    "robustness_checks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "bias_checks": {
+      "type": "object",
+      "properties": {
+        "look_ahead": {
+          "type": "boolean"
+        },
+        "survivorship": {
+          "type": "boolean"
+        },
+        "revised_data": {
+          "type": "boolean"
+        },
+        "target_leakage": {
+          "type": "boolean"
+        },
+        "universe_leakage": {
+          "type": "boolean"
+        }
+      }
+    },
+    "overfit_risk": {
+      "type": "string",
+      "enum": [
+        "LOW",
+        "MEDIUM",
+        "HIGH"
+      ]
+    },
+    "verdict": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL",
+        "INCONCLUSIVE"
+      ]
+    }
+  },
+  "additionalProperties": false
+}

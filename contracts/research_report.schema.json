@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/research_report.schema.json",
+  "title": "RESEARCH_REPORT",
+  "description": "Báo cáo nghiên cứu của một chuyên gia",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "expert",
+    "subject",
+    "findings",
+    "evidence_refs"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "expert": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string"
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "verified_facts": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "inferences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unknowns": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "adversarial_review": {
+      "type": "object",
+      "properties": {
+        "weakest_assumption": {
+          "type": "string"
+        },
+        "contrary_evidence_refs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "alternative_explanations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "priced_in_assessment": {
+          "type": "string"
+        }
+      }
+    },
+    "audit_note": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

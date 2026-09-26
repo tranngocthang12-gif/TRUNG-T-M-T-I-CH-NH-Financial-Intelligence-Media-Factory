@@ -1,0 +1,33 @@
+# FINANCIAL GOVERNOR — chính sách ràng buộc toàn hệ thống
+# Governor không nghiên cứu cổ phiếu. Nó bảo đảm mọi subsystem phục vụ cùng mục tiêu và không vượt quyền.
+# Giá trị TODO do Owner điền. Chỉ Owner được sửa file này.
+version: 0.1
+owner: Trần Ngọc Thắng
+capital:
+  total: TODO
+  currency: VND
+  max_deployment_level: 0          # xem CAPITAL DEPLOYMENT LADDER trong GATES.md
+risk_limits:
+  max_position_pct: TODO
+  max_sector_pct: TODO
+  max_portfolio_drawdown_pct: TODO
+  max_leverage: 1.0
+  min_liquidity_days_to_exit: TODO
+investment_universe:
+  markets: [TODO]
+  asset_classes: [TODO]
+  excluded: []
+time_horizon: TODO
+liquidity_requirements: TODO
+legal_constraints: [TODO]
+business_goals: [TODO]
+media_goals: [TODO]
+spending_authority:
+  autonomous_spend_limit: 0
+authority:
+  can_modify_by_ai: false
+  immutable_by_self_repair:
+    - owner_mission
+    - capital_authority
+    - major_risk_limits
+    - legal_compliance_policy

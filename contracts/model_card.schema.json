@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/model_card.schema.json",
+  "title": "MODEL_CARD",
+  "description": "Thẻ mô hình",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "name",
+    "version",
+    "purpose",
+    "state"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    },
+    "purpose": {
+      "type": "string"
+    },
+    "features": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "training_data": {
+      "type": "string"
+    },
+    "metrics": {
+      "type": "object"
+    },
+    "valid_regimes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "unverified_regimes": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "state": {
+      "type": "string",
+      "enum": [
+        "ACTIVE",
+        "WATCH",
+        "DEGRADING",
+        "REGIME_LIMITED",
+        "PAUSED",
+        "RETIRED",
+        "INVALIDATED"
+      ]
+    },
+    "decay_monitoring": {
+      "type": "object"
+    },
+    "limitations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "additionalProperties": false
+}

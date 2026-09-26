@@ -1,0 +1,123 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/hypothesis.schema.json",
+  "title": "HYPOTHESIS",
+  "description": "Ý tưởng đầu tư dạng giả thuyết kiểm chứng được",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "asset",
+    "thesis",
+    "time_horizon",
+    "expected_effect",
+    "invalidation_conditions",
+    "confidence",
+    "status"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "asset": {
+      "type": "string"
+    },
+    "thesis": {
+      "type": "string"
+    },
+    "catalyst": {
+      "type": "string"
+    },
+    "time_horizon": {
+      "type": "string"
+    },
+    "expected_effect": {
+      "type": "string"
+    },
+    "conditions_if": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "expectation_then": {
+      "type": "string"
+    },
+    "invalidation_unless": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "assumptions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "risks": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "invalidation_conditions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "object",
+      "required": [
+        "value",
+        "basis"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "basis": {
+          "type": "string"
+        }
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "DRAFT",
+        "UNDER_REVIEW",
+        "TESTING",
+        "SUPPORTED",
+        "REJECTED",
+        "INVALIDATED"
+      ]
+    },
+    "deployment_level": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 6
+    }
+  },
+  "additionalProperties": false
+}

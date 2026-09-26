@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/market_regime.schema.json",
+  "title": "MARKET_REGIME",
+  "description": "Phân loại regime thị trường",
+  "type": "object",
+  "required": [
+    "id",
+    "schema_version",
+    "created_at",
+    "as_of",
+    "labels",
+    "confidence"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "string",
+      "const": "0.1"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_by": {
+      "type": "string"
+    },
+    "as_of": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "labels": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "RISK_ON",
+          "RISK_OFF",
+          "HIGH_VOL",
+          "LOW_VOL",
+          "INFLATIONARY",
+          "DISINFLATIONARY",
+          "TIGHTENING",
+          "EASING",
+          "TRENDING",
+          "RANGING",
+          "LIQUID",
+          "ILLIQUID",
+          "CRISIS",
+          "NORMAL"
+        ]
+      }
+    },
+    "features": {
+      "type": "object"
+    },
+    "confidence": {
+      "type": "object",
+      "required": [
+        "value",
+        "basis"
+      ],
+      "properties": {
+        "value": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "basis": {
+          "type": "string"
+        }
+      }
+    },
+    "strategy_compatibility": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

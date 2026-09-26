@@ -1,0 +1,37 @@
+# Cấu hình ML Engine — TRUNG TÂM TÀI CHÍNH v0.2
+market: VN
+data:
+  source: vnstock          # vnstock | store | synthetic
+  vnstock_source: VCI
+  start: "2016-01-01"
+  store: data/store/prices.csv.gz
+universe: [ACB, BCM, BID, BVH, CTG, FPT, GAS, GVR, HDB, HPG, MBB, MSN, MWG, PLX, POW,
+           SAB, SHB, SSB, SSI, STB, TCB, TPB, VCB, VHM, VIB, VIC, VJC, VNM, VPB, VRE]
+horizon_days: 20           # dự báo lợi nhuận vượt trội 20 phiên
+costs:                     # chi phí thực tế thị trường VN
+  buy_fee: 0.0015
+  sell_fee: 0.0015
+  sell_tax: 0.001
+  slippage: 0.001
+lot_size: 100
+research:
+  trials_per_cycle: 6
+  min_train_days: 500
+  test_days: 120
+  top_k: 5
+  min_t: 3.0               # ngưỡng t tối thiểu
+  family_wise_alpha: 0.05  # ngưỡng tăng dần theo tổng số thử nghiệm (chống data mining)
+  min_fold_positive: 0.6
+registry:
+  max_active: 5
+  refit_days: 20
+decay:
+  min_realized_days: 40
+  window_days: 120
+paper:
+  initial_cash: 1000000000
+  top_k: 5
+  rebalance_days: 20
+llm_review:
+  enabled: true
+  model: claude-sonnet-5
