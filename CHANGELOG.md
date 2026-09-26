@@ -26,6 +26,8 @@
   cảnh báo, chưa chặn). Thiếu file bắt buộc / YAML hỏng / cấp độ sai → LỖI.
 - `ARCHITECTURE_v2.0.md` chuyển vào `architecture/` cho khớp BOOT.md. `llm_review.py` đi qua Budget Governor
   (`tests/test_llm_review_budget.py`).
+- `academy/competency_map.yaml`: hạ `tin_tuc_su_kien` và `dinh_luong` từ PRACTICED về SYNTHESIZED cho tới khi có bằng chứng
+  dữ liệu thật.
 - Test mới: `tests/test_adjustment.py` (TCB/VCB trên dữ liệu thật, point-in-time, loại ô lỗi, VOID, paper),
   `tests/test_quality_gate.py` (cổng chất lượng); `tests/test_no_lookahead.py` kiểm thêm trường hợp có cờ lỗi.
   Dữ liệu giả lập nay tôn trọng biên độ ±7%.

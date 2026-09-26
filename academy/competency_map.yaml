@@ -59,11 +59,13 @@ competencies:
     library:
     - foundations/playbooks/dinh_gia
   tin_tuc_su_kien:
-    level: PRACTICED
+    level: SYNTHESIZED
     note: news@v1 đã có code, chưa chạy dữ liệu thật
+    changed: "2026-09-26: hạ PRACTICED → SYNTHESIZED — chưa có bằng chứng dữ liệu thật (Ledger chưa chấm dự báo thật nào; RSS chưa kiểm chứng mạng)"
   dinh_luong:
-    level: PRACTICED
-    note: engine v0.2, mới kiểm trên dữ liệu giả lập
+    level: SYNTHESIZED
+    note: engine có walk-forward, giá điều chỉnh, kiểm tra chất lượng; mới kiểm trên dữ liệu giả lập
+    changed: "2026-09-26: hạ PRACTICED → SYNTHESIZED — vòng thật duy nhất (25/09) học trên giá chưa điều chỉnh, kết quả đã xóa; chưa có phát hiện nào sống sót trên dữ liệu thật"
   chuoi_gia_tri_dau_ra:
     level: NOT_STARTED
     library:
