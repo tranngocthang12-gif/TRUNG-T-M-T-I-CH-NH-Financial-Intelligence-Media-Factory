@@ -48,7 +48,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         was_new = mid not in registry
         knowledge.promote(registry, mid, spec, m, status, as_of)
         if was_new and mid in registry and use_llm:
-            llm_review.review(mid, load_json(f"knowledge/candidates/{mid}.json", {}), m)
+            llm_review.review(mid, load_json(f"knowledge/candidates/{mid}.json", {}), m, as_of)
         done.append(row)
     if ledger_df is not None:
         ledger_df.to_csv(path("research/trials.csv"), index=False)
