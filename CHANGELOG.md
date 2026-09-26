@@ -20,6 +20,12 @@
   Lỗi nguồn dữ liệu (từng mã, từng nguồn, kể cả sự kiện quyền Yahoo và RSS) ghi đầy đủ vào báo cáo chu kỳ và
   `state/ENGINE_STATE.json` (`data_ingest`, `news_errors`), kể cả ngày bỏ qua vòng học. Cập nhật `governance/DATA_SOURCES.yaml`.
   Test: `tests/test_ingest_errors.py`.
+- **tools/validate.py** kiểm cấu trúc v2.x: file/thư mục bắt buộc (library/, academy/, DATA_SOURCES.yaml, OWNER_PROFILE.md,
+  3 bản kiến trúc hiện hành), MỌI file YAML trong repo, cấp độ hợp lệ trong competency_map, đường dẫn `library:` của
+  competency_map (cảnh báo nếu chưa có), contract đếm theo kiến trúc v2.0 (21/24 — thiếu knowledge_note, exam_item, dossier:
+  cảnh báo, chưa chặn). Thiếu file bắt buộc / YAML hỏng / cấp độ sai → LỖI.
+- `ARCHITECTURE_v2.0.md` chuyển vào `architecture/` cho khớp BOOT.md. `llm_review.py` đi qua Budget Governor
+  (`tests/test_llm_review_budget.py`).
 - Test mới: `tests/test_adjustment.py` (TCB/VCB trên dữ liệu thật, point-in-time, loại ô lỗi, VOID, paper),
   `tests/test_quality_gate.py` (cổng chất lượng); `tests/test_no_lookahead.py` kiểm thêm trường hợp có cờ lỗi.
   Dữ liệu giả lập nay tôn trọng biên độ ±7%.
