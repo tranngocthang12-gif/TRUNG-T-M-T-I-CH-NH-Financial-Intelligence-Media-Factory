@@ -1,0 +1,19 @@
+# DANH MỤC NGUỒN DỮ LIỆU — trạng thái pháp lý và cách dùng. Owner duyệt trước khi thêm nguồn "automated".
+# usage: automated | manual_reference | forbidden
+sources:
+  - {name: vnstock (VCI/TCBS), type: prices, usage: automated, note: "thư viện bên thứ ba, API có thể đổi; đang dùng tạm"}
+  - {name: Yahoo Finance (.VN), type: prices, usage: automated, note: "dự phòng; kiểm tra điều khoản khi mở rộng"}
+  - {name: SSI FastConnect Data, type: prices+fundamentals, usage: automated, note: "cần tài khoản SSI; nguồn ưu tiên khi Owner mở"}
+  - {name: DNSE Lightspeed API, type: prices, usage: automated, note: "cần tài khoản DNSE"}
+  - {name: HOSE/HNX công bố thông tin, type: disclosures, usage: automated, note: "nguồn chính thức"}
+  - {name: UBCKNN, type: sanctions+regulation, usage: automated, note: "nguồn chính thức cho Casebook"}
+  - {name: NHNN / Tổng cục Thống kê / Bộ Tài chính, type: macro+policy, usage: automated, note: "nguồn chính thức"}
+  - {name: Công báo / Cổng TTĐT Chính phủ, type: law, usage: automated, note: "nguồn chính thức"}
+  - {name: RSS báo chí (VnExpress, CafeF, Vietstock), type: news, usage: automated, note: "tin tức; đối chiếu nguồn chính thức"}
+  - {name: Investing.com, type: prices+news, usage: manual_reference, note: "điều khoản cấm sao chép/lưu trữ; dữ liệu không đảm bảo cho giao dịch"}
+  - {name: Mạng xã hội (Facebook/Zalo/Telegram/TikTok), type: sentiment, usage: forbidden, note: "chưa quét trực tiếp; chỉ dùng qua báo chí đưa tin, cho tới khi Owner duyệt cách làm hợp pháp"}
+  - {name: SSI/DNSE API đặt lệnh, type: trading, usage: forbidden, note: "cấm tới cấp vốn 4 + Owner duyệt (SAFETY_STATE)"}
+virtual_trading:
+  - {name: Đấu trường Chứng khoán Vietstock, how: "Owner nhập tay theo paper/decisions.csv"}
+  - {name: Vnstockgame, how: "Owner nhập tay theo paper/decisions.csv"}
+  - {name: Paper trading nội bộ, how: "tự động hằng ngày"}
