@@ -11,6 +11,7 @@ INVESTMENT RESEARCH ──shared factual data──▶ FACT LAYER ◀── FINA
 ## Bắt buộc với mọi MEDIA_STORY
 1. **CONFLICT CHECK** — story có chạm tài sản đang nắm/đang nghiên cứu không? (`contracts/conflict_disclosure`)
 2. **DISCLOSURE** — công bố xung đột lợi ích nếu có.
-3. **EDITORIAL REVIEW** — Editor-in-Chief duyệt (`contracts/editorial_review`).
+3. **LEGAL CHECK** — đạt `governance/MEDIA_LEGAL_POLICY.md` (cấm mọi mã đang trong danh mục giấy/thật, cấm khuyến nghị, có miễn trừ + công bố AI).
+4. **EDITORIAL REVIEW** — Editor-in-Chief duyệt (`contracts/editorial_review`), ghi kết quả LEGAL CHECK.
 
 Media được hỏi: *"Khán giả muốn hiểu điều gì?"* — không được quyết định *"Điều gì là sự thật?"*

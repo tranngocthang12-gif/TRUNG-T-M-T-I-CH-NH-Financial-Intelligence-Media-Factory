@@ -12,7 +12,10 @@
     "reviewer",
     "accuracy",
     "balance",
-    "decision"
+    "decision",
+    "legal_policy_check",
+    "disclaimer_present",
+    "ai_disclosure"
   ],
   "properties": {
     "id": {
@@ -20,7 +23,7 @@
     },
     "schema_version": {
       "type": "string",
-      "const": "0.1"
+      "const": "0.2"
     },
     "created_at": {
       "type": "string",
@@ -83,6 +86,34 @@
     },
     "notes": {
       "type": "string"
+    },
+    "legal_policy_check": {
+      "type": "string",
+      "enum": [
+        "PASS",
+        "FAIL"
+      ],
+      "description": "Đạt governance/MEDIA_LEGAL_POLICY.md: không khuyến nghị (kể cả ngầm), không phân tích mã kèm định giá, không kéo vào nhóm kín/dịch vụ trả phí, không nhắc mã trong danh mục"
+    },
+    "legal_violations": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "Câu/đoạn vi phạm và điều cấm tương ứng (1-4)"
+    },
+    "disclaimer_present": {
+      "type": "boolean",
+      "description": "Có câu: 'Nội dung chỉ nhằm mục đích thông tin và giáo dục, không phải khuyến nghị đầu tư'"
+    },
+    "ai_disclosure": {
+      "type": "string",
+      "enum": [
+        "PRESENT",
+        "NOT_APPLICABLE",
+        "MISSING"
+      ],
+      "description": "Công bố dùng AI nếu có giọng/người dẫn AI"
     }
   },
   "additionalProperties": false

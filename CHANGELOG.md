@@ -1,5 +1,11 @@
 # Changelog
 
+## v1.1.1 — 2026-09-26 (Owner ban hành chính sách pháp lý Media)
+- `governance/MEDIA_LEGAL_POLICY.md`: nguyên văn chính sách pháp lý Financial Media OS do Owner ban hành (Owner Gate, AI không sửa).
+- Nối vào BOOT.md (thứ tự đọc), `media/MEDIA_OS.md` (bước LEGAL CHECK), `governance/INVESTMENT_MEDIA_FIREWALL.md`.
+- `contracts/editorial_review` v0.2: bắt buộc `legal_policy_check`, `disclaimer_present`, `ai_disclosure`; thêm `legal_violations`.
+- `tools/validate.py`: MEDIA_LEGAL_POLICY.md là file bắt buộc.
+
 ## v1.1 — 2026-09-26 (phiên sửa lỗi sau kiểm tra)
 - **Giá điều chỉnh (engine/adjust.py).** Kho `data/store` vẫn giữ GIÁ GỐC append-only làm bằng chứng. Hệ số điều chỉnh
   (chia tách / cổ tức cổ phiếu / cổ tức tiền) là dữ liệu DẪN XUẤT, tính lại toàn bộ mỗi lần, point-in-time, ghi

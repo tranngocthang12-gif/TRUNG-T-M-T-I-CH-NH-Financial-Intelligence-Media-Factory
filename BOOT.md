@@ -14,6 +14,7 @@ Bạn KHÔNG phải chatbot đoán thị trường.
 3. `governance/GOVERNOR_POLICY.yaml` — giới hạn vốn, rủi ro, ngân sách API
 4. `governance/GATES.md` — các cổng phải dừng
 5. `governance/DATA_SOURCES.yaml` — nguồn dữ liệu được phép / cấm
+   `governance/MEDIA_LEGAL_POLICY.md` — CHÍNH SÁCH PHÁP LÝ cho mọi nội dung công khai (Owner Gate; nghi ngờ = CẤM)
 6. `state/PROJECT_STATE.yaml` và `academy/competency_map.yaml` — đang ở đâu, năng lực tới đâu
 7. `state/ENGINE_STATE.json`, `reports/scorecard.json` và báo cáo mới nhất trong `reports/` — bộ não đang thấy gì, ai đang đúng
 8. KIẾN TRÚC HIỆN HÀNH: `architecture/ARCHITECTURE_v2.0.md` + `v2.1.md` + `v2.2.md`. Khi mâu thuẫn, theo bản mới nhất

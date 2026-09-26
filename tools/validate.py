@@ -9,7 +9,7 @@ errors, warnings = [], []
 # ---------- 1) File/thư mục bắt buộc (đã có — mất là LỖI) ----------
 REQUIRED = ["BOOT.md", "CHANGELOG.md", "config.yaml", ".github/workflows/daily_cycle.yml",
             "governance/OWNER_MISSION.md", "governance/OWNER_PROFILE.md", "governance/GOVERNOR_POLICY.yaml",
-            "governance/SAFETY_STATE.yaml", "governance/GATES.md", "governance/DATA_SOURCES.yaml",
+            "governance/SAFETY_STATE.yaml", "governance/GATES.md", "governance/DATA_SOURCES.yaml", "governance/MEDIA_LEGAL_POLICY.md",
             "orchestrator/ORCHESTRATOR.md", "state/PROJECT_STATE.yaml", "state/CAPABILITY_STATE.yaml",
             "academy/competency_map.yaml", "library/INFORMATION_MAP.md",
             "architecture/ARCHITECTURE_v2.0.md", "architecture/ARCHITECTURE_v2.1.md", "architecture/ARCHITECTURE_v2.2.md",
