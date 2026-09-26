@@ -58,29 +58,33 @@ def _fetch_yahoo(t, start, end):
     e = (pd.Timestamp(end) + pd.Timedelta(days=1)).date().isoformat()
     return yf.download(f"{t}.VN", start=start, end=e, auto_adjust=False, progress=False)
 
-def ingest_vnstock(end=None):
-    """Thu vnstock truoc, khong duoc thi dung Yahoo Finance (ma .VN). Ghi ro nguon cua tung dong."""
+FETCHERS = {"vnstock": lambda t, s, e: _fetch_vnstock(t, s, e, CFG["data"]["vnstock_source"]),
+            "yahoo": _fetch_yahoo}
+
+def ingest(end=None):
+    """Tai gia theo thu tu nguon trong config (data.sources); nguon sau chi dung khi nguon truoc loi.
+    Ghi ro nguon cua tung dong. Tra ve nhat ky DAY DU: loi tung ma, tung nguon (khong chi in ra log)."""
     store = load_store()
     now = pd.Timestamp.now(tz="UTC").tz_localize(None)
     end = (end or dt.date.today()).isoformat()
-    src = CFG["data"]["vnstock_source"]
-    frames, errors = [], []
+    sources = list(CFG["data"]["sources"])
+    frames, errors, no_new = [], [], []
     for t in CFG["universe"]:
         last = store.loc[store.ticker == t, "date"].max() if len(store) else pd.NaT
         start = (last + pd.Timedelta(days=1)).date().isoformat() if pd.notna(last) else CFG["data"]["start"]
         if start > end:
             continue
         q, used = None, None
-        for name, fn in (("vnstock:" + src, lambda: _fetch_vnstock(t, start, end, src)),
-                         ("yahoo", lambda: _fetch_yahoo(t, start, end))):
+        for name in sources:
             try:
-                q = _norm(fn(), t)
+                q = _norm(FETCHERS[name](t, start, end), t)
                 if q is not None and len(q):
                     used = name
                     break
             except Exception as e:
-                errors.append(f"{t} [{name}]: {str(e)[:160]}")
+                errors.append({"ticker": t, "source": name, "error": str(e)[:300]})
         if q is None or not len(q):
+            no_new.append(t)
             continue
         q["observed_at"], q["source"] = now, used
         frames.append(q)
@@ -88,23 +92,29 @@ def ingest_vnstock(end=None):
     store = append_rows(store, new)
     errors += fetch_yahoo_actions()
     if store.empty:
-        raise RuntimeError("Khong lay duoc du lieu tu nguon nao.\n" + "\n".join(errors[:20]))
+        raise RuntimeError("Khong lay duoc du lieu tu nguon nao.\n" + "\n".join(map(str, errors[:20])))
     save_store(store)
-    return {"new_rows": 0 if new is None else len(new), "errors": errors[:20]}
+    return {"at": now.isoformat(), "end": end, "sources": sources,
+            "new_rows": 0 if new is None else len(new),
+            "rows_by_source": {} if new is None else new.source.value_counts().to_dict(),
+            "tickers_no_new_data": no_new, "errors": errors,
+            "last_date_by_ticker": {t: str(d.date()) for t, d in store.groupby("ticker").date.max().items()}}
+
+ingest_vnstock = ingest          # ten cu, giu de tuong thich
 
 def fetch_yahoo_actions():
     """Tai lai TOAN BO lich su co tuc tien / chia tach tu Yahoo (du lieu dan xuat, ghi de moi lan, ghi ngay tai)."""
     try:
         import yfinance as yf
     except Exception as e:
-        return [f"yahoo_actions: khong co yfinance ({e})"]
+        return [{"ticker": "*", "source": "yahoo_actions", "error": f"khong co yfinance ({e})"}]
     now = pd.Timestamp.now(tz="UTC").tz_localize(None).isoformat()
     rows, errors = [], []
     for t in CFG["universe"]:
         try:
             a = yf.Ticker(f"{t}.VN").actions
         except Exception as e:
-            errors.append(f"{t} [yahoo_actions]: {str(e)[:160]}"); continue
+            errors.append({"ticker": t, "source": "yahoo_actions", "error": str(e)[:300]}); continue
         if a is None or a.empty:
             continue
         for d, r in a.iterrows():

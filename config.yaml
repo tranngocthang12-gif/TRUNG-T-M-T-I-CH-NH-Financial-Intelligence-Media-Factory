@@ -1,8 +1,9 @@
 # Cấu hình ML Engine — TRUNG TÂM TÀI CHÍNH v0.2
 market: VN
 data:
-  source: vnstock          # vnstock | store | synthetic
-  vnstock_source: VCI
+  source: live             # live (tải theo `sources`) | store | synthetic
+  sources: [yahoo]         # thứ tự thử. vnstock BỊ GỠ: PyPI cách ly (quarantined) gói vnstock và vnai — xem governance/DATA_SOURCES.yaml
+  vnstock_source: VCI      # chỉ dùng nếu Owner duyệt đưa vnstock trở lại `sources`
   start: "2016-01-01"
   store: data/store/prices.csv.gz
 universe: [ACB, BCM, BID, BVH, CTG, FPT, GAS, GVR, HDB, HPG, MBB, MSN, MWG, PLX, POW,

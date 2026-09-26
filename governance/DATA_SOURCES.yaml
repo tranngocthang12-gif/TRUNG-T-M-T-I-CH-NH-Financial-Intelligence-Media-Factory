@@ -1,9 +1,10 @@
 # DANH MỤC NGUỒN DỮ LIỆU — trạng thái pháp lý và cách dùng. Owner duyệt trước khi thêm nguồn "automated".
 # usage: automated | manual_reference | forbidden
 sources:
-  - {name: vnstock (VCI/TCBS), type: prices, usage: automated, note: "thư viện bên thứ ba, API có thể đổi; đang dùng tạm"}
-  - {name: Yahoo Finance (.VN), type: prices, usage: automated, note: "dự phòng; kiểm tra điều khoản khi mở rộng"}
-  - {name: SSI FastConnect Data, type: prices+fundamentals, usage: automated, note: "cần tài khoản SSI; nguồn ưu tiên khi Owner mở"}
+  - {name: vnstock (VCI/TCBS), type: prices, usage: forbidden, note: "26/09/2026: PyPI đánh dấu gói vnstock và phụ thuộc vnai là QUARANTINED (nghi độc hại/bị chiếm quyền) — không cài từ PyPI hay nguồn khác cho tới khi PyPI gỡ cách ly và Owner duyệt lại. Chưa từng lấy được dòng dữ liệu nào (vòng 26/09: 100% Yahoo)."}
+  - {name: Yahoo Finance (.VN), type: prices+corporate_actions, usage: automated, note: "NGUỒN GIÁ CHÍNH thực tế (tạm thời, chưa có nguồn chính thức). Giá KHÔNG điều chỉnh cổ tức cổ phiếu (vd TCB 11/06/2024 −49,5%) và có phiên biến động vượt biên độ sàn (vd 09/07/2021, 20/10/2025) → hệ thống tự điều chỉnh (engine/adjust.py) và cờ lỗi dữ liệu. Sự kiện quyền Yahoo thiếu nhiều cổ tức cổ phiếu VN. Kiểm tra điều khoản khi mở rộng."}
+  - {name: "Sự kiện quyền nhập tay (data/corporate_actions.csv)", type: corporate_actions, usage: manual_reference, note: "nhập tay từ CBTT HOSE/HNX/VSD, mỗi dòng có nguồn và trạng thái (CAN_DOI_CHIEU / DA_KIEM_CHUNG); code đọc để điều chỉnh giá; ưu tiên hơn Yahoo"}
+  - {name: SSI FastConnect Data, type: prices+fundamentals, usage: automated, note: "cần tài khoản SSI; nguồn ưu tiên khi Owner mở — nên thay Yahoo làm nguồn chính (giá + sự kiện quyền chính thức)"}
   - {name: DNSE Lightspeed API, type: prices, usage: automated, note: "cần tài khoản DNSE"}
   - {name: HOSE/HNX công bố thông tin, type: disclosures, usage: automated, note: "nguồn chính thức"}
   - {name: UBCKNN, type: sanctions+regulation, usage: automated, note: "nguồn chính thức cho Casebook"}

@@ -15,6 +15,11 @@
   03/03/2025 là cú rơi giả) và còn ~145 ô biến động vượt biên độ không có sự kiện → feature/nhãn của vòng 25/09 bị nhiễm.
   `knowledge/candidates/` chưa từng được tạo (không phát hiện nào sống sót) nên không có gì để xóa. `data/store` KHÔNG bị xóa.
   `state/ENGINE_STATE.json` và báo cáo 25/09 giữ làm lịch sử, sẽ được vòng kế tiếp ghi đè.
+- **Nguồn dữ liệu.** PyPI đang cách ly (quarantined) gói `vnstock` và phụ thuộc `vnai` → không cài; bỏ bước
+  `pip install vnstock` khỏi workflow. Yahoo là nguồn giá chính (`config.yaml: data.sources: [yahoo]`, `--source live`).
+  Lỗi nguồn dữ liệu (từng mã, từng nguồn, kể cả sự kiện quyền Yahoo và RSS) ghi đầy đủ vào báo cáo chu kỳ và
+  `state/ENGINE_STATE.json` (`data_ingest`, `news_errors`), kể cả ngày bỏ qua vòng học. Cập nhật `governance/DATA_SOURCES.yaml`.
+  Test: `tests/test_ingest_errors.py`.
 - Test mới: `tests/test_adjustment.py` (TCB/VCB trên dữ liệu thật, point-in-time, loại ô lỗi, VOID, paper),
   `tests/test_quality_gate.py` (cổng chất lượng); `tests/test_no_lookahead.py` kiểm thêm trường hợp có cờ lỗi.
   Dữ liệu giả lập nay tôn trọng biên độ ±7%.

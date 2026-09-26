@@ -22,13 +22,32 @@ def _quality_lines(q):
               for f in q["flags_window"][:40]]
     return L + [""]
 
-def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, thr, n_total, quality=None):
+def _ingest_lines(ing, news_errors):
+    if not ing and not news_errors:
+        return []
+    L = ["## Nguồn dữ liệu", ""]
+    if ing:
+        L += [f"- Tải lúc {ing['at']} (UTC) | thứ tự nguồn: {', '.join(ing['sources'])} | dòng mới: {ing['new_rows']} "
+              f"{ing['rows_by_source'] or ''}",
+              f"- Mã không có dữ liệu mới: {', '.join(ing['tickers_no_new_data']) or 'không'}"]
+        if ing["errors"]:
+            L += ["", f"**Lỗi nguồn dữ liệu ({len(ing['errors'])}):**", "", "| Mã | Nguồn | Lỗi |", "|---|---|---|"]
+            L += [f"| {e['ticker']} | {e['source']} | {str(e['error']).replace('|', '/')[:200]} |" for e in ing["errors"]]
+        else:
+            L.append("- Không có lỗi nguồn giá")
+    if news_errors:
+        L += ["", f"**Lỗi nguồn tin tức ({len(news_errors)}):**", *[f"- {e}" for e in news_errors]]
+    return L + [""]
+
+def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, thr, n_total, quality=None,
+          ingest=None, news_errors=None):
     act = {s: sum(1 for v in reg.values() if v["state"] == s) for s in
            ["ACTIVE", "WATCH", "DEGRADING", "PAUSED", "INVALIDATED", "RETIRED"]}
     state = {"as_of": as_of, "regime": regime_now, "total_trials": n_total, "current_t_threshold": round(thr, 2),
              "models": act, "paper_nav": nav, "alerts": alerts,
              "data_quality": {k: v for k, v in (quality or {}).items() if k != "flags_window"} | (
                  {"flags_window": (quality or {}).get("flags_window", [])[:50]} if quality else {}),
+             "data_ingest": ingest, "news_errors": news_errors or [],
              "bandit": {m: {"trials": v["trials"], "survivors": v["survivors"],
                             "posterior_mean": round(v["a"] / (v["a"] + v["b"]), 3)} for m, v in bandit.items()}}
     save_json("state/ENGINE_STATE.json", state)
@@ -36,6 +55,7 @@ def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, t
          f"- Tổng số thử nghiệm từ trước tới nay: {n_total} → ngưỡng t hiện hành: **{thr:.2f}**",
          f"- Mô hình: " + ", ".join(f"{k} {v}" for k, v in act.items()),
          f"- NAV giao dịch giấy: {nav:,.0f} VND" if nav else "- Chưa có giao dịch giấy", ""]
+    L += _ingest_lines(ingest, news_errors)
     L += _quality_lines(quality)
     if decision:
         L += [f"**Quyết định giao dịch giấy:** {decision['action']} {decision['targets']}", ""]
