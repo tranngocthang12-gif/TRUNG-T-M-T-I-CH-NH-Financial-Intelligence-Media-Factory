@@ -31,6 +31,10 @@
 - Test mới: `tests/test_adjustment.py` (TCB/VCB trên dữ liệu thật, point-in-time, loại ô lỗi, VOID, paper),
   `tests/test_quality_gate.py` (cổng chất lượng); `tests/test_no_lookahead.py` kiểm thêm trường hợp có cờ lỗi.
   Dữ liệu giả lập nay tôn trọng biên độ ±7%.
+- **Chưa làm được / còn mở:** sự kiện quyền TCB, VCB nhập từ hiểu biết + khớp tỷ lệ với bước nhảy giá, CHƯA gắn đường dẫn CBTT
+  (không truy cập được HOSE/VSD từ môi trường phiên này); 147 ô Yahoo vượt biên độ chưa giải thích (đang bị loại);
+  phần tải sự kiện quyền Yahoo chưa chạy với mạng thật (Yahoo bị chặn trong môi trường phiên, sẽ chạy lần đầu trên Actions);
+  3 contract v2.0 và khung Thư viện/Học viện GĐ1 chưa có.
 
 ## v1.0-GĐ1 — 2026-09-26 (AUTO HỌC)
 - Prediction Ledger: dự báo ghi trước khi biết kết quả (ledger/predictions.jsonl), kết quả ghi riêng (ledger/resolutions.jsonl).

@@ -1,5 +1,6 @@
 # BẢN ĐỒ NĂNG LỰC — NOT_STARTED → STUDYING → SYNTHESIZED → PRACTICED → VALIDATED → READY → PRODUCTION_PROVEN
 # Chuyên gia chỉ được dự báo thật (có trọng số) khi năng lực >= VALIDATED.
+last_reviewed: 2026-09-26   # phiên kiểm tra + sửa lỗi dữ liệu; xem CHANGELOG v1.1
 competencies:
   doc_bctc:
     level: NOT_STARTED
