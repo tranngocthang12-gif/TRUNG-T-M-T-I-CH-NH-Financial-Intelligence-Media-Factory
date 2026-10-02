@@ -1,8 +1,8 @@
 {
-  "as_of": "2026-10-01",
+  "as_of": "2026-10-02",
   "regime": "DOWN_LOWVOL",
-  "total_trials": 24,
-  "current_t_threshold": 3.08,
+  "total_trials": 30,
+  "current_t_threshold": 3.14,
   "models": {
     "ACTIVE": 0,
     "WATCH": 0,
@@ -14,8 +14,8 @@
   "paper_nav": 1000000000,
   "alerts": [],
   "data_quality": {
-    "as_of": "2026-10-01",
-    "checked": 72292,
+    "as_of": "2026-10-02",
+    "checked": 72322,
     "flagged_total": 142,
     "error_rate_total": 0.00196,
     "window_sessions": 20,
@@ -37,7 +37,7 @@
       "2026": 3
     },
     "events": {
-      "APPLIED": 220,
+      "APPLIED": 222,
       "DA_NAM_TRONG_GIA_NGUON": 121,
       "NGOAI_DU_LIEU": 86
     },
@@ -292,6 +292,8 @@
       "TPB 2023-03-20 cash_dividend (yahoo, TU_DONG): gốc -14.62% → điều chỉnh -5.26%",
       "TPB 2024-06-20 cash_dividend (yahoo, TU_DONG): gốc -1.62% → điều chỉnh +1.11%",
       "TPB 2025-05-13 cash_dividend (yahoo, TU_DONG): gốc +0.00% → điều chỉnh +7.27%",
+      "TPB 2026-10-02 cash_dividend (yahoo, TU_DONG): gốc -17.36% → điều chỉnh -14.39%",
+      "TPB 2026-10-02 stock_split (yahoo, TU_DONG): gốc -17.36% → điều chỉnh -4.97%",
       "VCB 2016-09-09 cash_dividend (yahoo, TU_DONG): gốc +3.46% → điều chỉnh +4.84%",
       "VCB 2017-09-28 cash_dividend (yahoo, TU_DONG): gốc -1.19% → điều chỉnh +0.23%",
       "VCB 2018-10-05 cash_dividend (yahoo, TU_DONG): gốc -1.43% → điều chỉnh -0.58%",
@@ -354,8 +356,8 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-10-01T16:38:52.812331",
-    "end": "2026-10-01",
+    "at": "2026-10-02T15:56:07.031898",
+    "end": "2026-10-02",
     "sources": [
       "yahoo"
     ],
@@ -366,44 +368,44 @@
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
-      "ACB": "2026-10-01",
-      "BCM": "2026-10-01",
-      "BID": "2026-10-01",
-      "BVH": "2026-10-01",
-      "CTG": "2026-10-01",
-      "FPT": "2026-10-01",
-      "GAS": "2026-10-01",
-      "GVR": "2026-10-01",
-      "HDB": "2026-10-01",
-      "HPG": "2026-10-01",
-      "MBB": "2026-10-01",
-      "MSN": "2026-10-01",
-      "MWG": "2026-10-01",
-      "PLX": "2026-10-01",
-      "POW": "2026-10-01",
-      "SAB": "2026-10-01",
-      "SHB": "2026-10-01",
-      "SSB": "2026-10-01",
-      "SSI": "2026-10-01",
-      "STB": "2026-10-01",
-      "TCB": "2026-10-01",
-      "TPB": "2026-10-01",
-      "VCB": "2026-10-01",
-      "VHM": "2026-10-01",
-      "VIB": "2026-10-01",
-      "VIC": "2026-10-01",
-      "VJC": "2026-10-01",
-      "VNM": "2026-10-01",
-      "VPB": "2026-10-01",
-      "VRE": "2026-10-01"
+      "ACB": "2026-10-02",
+      "BCM": "2026-10-02",
+      "BID": "2026-10-02",
+      "BVH": "2026-10-02",
+      "CTG": "2026-10-02",
+      "FPT": "2026-10-02",
+      "GAS": "2026-10-02",
+      "GVR": "2026-10-02",
+      "HDB": "2026-10-02",
+      "HPG": "2026-10-02",
+      "MBB": "2026-10-02",
+      "MSN": "2026-10-02",
+      "MWG": "2026-10-02",
+      "PLX": "2026-10-02",
+      "POW": "2026-10-02",
+      "SAB": "2026-10-02",
+      "SHB": "2026-10-02",
+      "SSB": "2026-10-02",
+      "SSI": "2026-10-02",
+      "STB": "2026-10-02",
+      "TCB": "2026-10-02",
+      "TPB": "2026-10-02",
+      "VCB": "2026-10-02",
+      "VHM": "2026-10-02",
+      "VIB": "2026-10-02",
+      "VIC": "2026-10-02",
+      "VJC": "2026-10-02",
+      "VNM": "2026-10-02",
+      "VPB": "2026-10-02",
+      "VRE": "2026-10-02"
     }
   },
   "news_errors": [],
   "bandit": {
     "single_family": {
-      "trials": 5,
+      "trials": 7,
       "survivors": 0,
-      "posterior_mean": 0.143
+      "posterior_mean": 0.111
     },
     "cross_family": {
       "trials": 7,
@@ -411,14 +413,14 @@
       "posterior_mean": 0.111
     },
     "random_subset": {
-      "trials": 5,
-      "survivors": 0,
-      "posterior_mean": 0.143
-    },
-    "mutate_best": {
       "trials": 7,
       "survivors": 0,
       "posterior_mean": 0.111
+    },
+    "mutate_best": {
+      "trials": 9,
+      "survivors": 0,
+      "posterior_mean": 0.091
     }
   }
 }
