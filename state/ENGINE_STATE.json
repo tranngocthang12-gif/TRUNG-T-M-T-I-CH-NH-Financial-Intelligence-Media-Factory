@@ -1,8 +1,8 @@
 {
-  "as_of": "2026-10-06",
+  "as_of": "2026-10-07",
   "regime": "DOWN_LOWVOL",
-  "total_trials": 42,
-  "current_t_threshold": 3.24,
+  "total_trials": 48,
+  "current_t_threshold": 3.28,
   "models": {
     "ACTIVE": 0,
     "WATCH": 0,
@@ -14,8 +14,8 @@
   "paper_nav": 1000000000,
   "alerts": [],
   "data_quality": {
-    "as_of": "2026-10-06",
-    "checked": 72382,
+    "as_of": "2026-10-07",
+    "checked": 72412,
     "flagged_total": 142,
     "error_rate_total": 0.00196,
     "window_sessions": 20,
@@ -37,7 +37,7 @@
       "2026": 3
     },
     "events": {
-      "APPLIED": 222,
+      "APPLIED": 223,
       "DA_NAM_TRONG_GIA_NGUON": 121,
       "NGOAI_DU_LIEU": 86
     },
@@ -240,6 +240,7 @@
       "MWG 2024-06-28 cash_dividend (yahoo, TU_DONG): gốc -1.58% → điều chỉnh -0.79%",
       "MWG 2025-07-24 cash_dividend (yahoo, TU_DONG): gốc +0.14% → điều chỉnh +1.59%",
       "MWG 2026-07-29 cash_dividend (yahoo, TU_DONG): gốc +1.99% → điều chỉnh +3.58%",
+      "MWG 2026-10-07 cash_dividend (yahoo, TU_DONG): gốc +1.18% → điều chỉnh +2.53%",
       "PLX 2017-07-20 cash_dividend (yahoo, TU_DONG): gốc -5.48% → điều chỉnh -0.87%",
       "PLX 2018-06-25 cash_dividend (yahoo, TU_DONG): gốc -2.84% → điều chỉnh +1.99%",
       "PLX 2019-05-30 cash_dividend (yahoo, TU_DONG): gốc -2.99% → điều chỉnh +0.93%",
@@ -356,8 +357,8 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-10-06T16:08:03.838554",
-    "end": "2026-10-06",
+    "at": "2026-10-07T16:48:07.062333",
+    "end": "2026-10-07",
     "sources": [
       "yahoo"
     ],
@@ -368,36 +369,36 @@
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
-      "ACB": "2026-10-06",
-      "BCM": "2026-10-06",
-      "BID": "2026-10-06",
-      "BVH": "2026-10-06",
-      "CTG": "2026-10-06",
-      "FPT": "2026-10-06",
-      "GAS": "2026-10-06",
-      "GVR": "2026-10-06",
-      "HDB": "2026-10-06",
-      "HPG": "2026-10-06",
-      "MBB": "2026-10-06",
-      "MSN": "2026-10-06",
-      "MWG": "2026-10-06",
-      "PLX": "2026-10-06",
-      "POW": "2026-10-06",
-      "SAB": "2026-10-06",
-      "SHB": "2026-10-06",
-      "SSB": "2026-10-06",
-      "SSI": "2026-10-06",
-      "STB": "2026-10-06",
-      "TCB": "2026-10-06",
-      "TPB": "2026-10-06",
-      "VCB": "2026-10-06",
-      "VHM": "2026-10-06",
-      "VIB": "2026-10-06",
-      "VIC": "2026-10-06",
-      "VJC": "2026-10-06",
-      "VNM": "2026-10-06",
-      "VPB": "2026-10-06",
-      "VRE": "2026-10-06"
+      "ACB": "2026-10-07",
+      "BCM": "2026-10-07",
+      "BID": "2026-10-07",
+      "BVH": "2026-10-07",
+      "CTG": "2026-10-07",
+      "FPT": "2026-10-07",
+      "GAS": "2026-10-07",
+      "GVR": "2026-10-07",
+      "HDB": "2026-10-07",
+      "HPG": "2026-10-07",
+      "MBB": "2026-10-07",
+      "MSN": "2026-10-07",
+      "MWG": "2026-10-07",
+      "PLX": "2026-10-07",
+      "POW": "2026-10-07",
+      "SAB": "2026-10-07",
+      "SHB": "2026-10-07",
+      "SSB": "2026-10-07",
+      "SSI": "2026-10-07",
+      "STB": "2026-10-07",
+      "TCB": "2026-10-07",
+      "TPB": "2026-10-07",
+      "VCB": "2026-10-07",
+      "VHM": "2026-10-07",
+      "VIB": "2026-10-07",
+      "VIC": "2026-10-07",
+      "VJC": "2026-10-07",
+      "VNM": "2026-10-07",
+      "VPB": "2026-10-07",
+      "VRE": "2026-10-07"
     }
   },
   "news_errors": [],
@@ -408,19 +409,19 @@
       "posterior_mean": 0.091
     },
     "cross_family": {
+      "trials": 13,
+      "survivors": 0,
+      "posterior_mean": 0.067
+    },
+    "random_subset": {
       "trials": 11,
       "survivors": 0,
       "posterior_mean": 0.077
     },
-    "random_subset": {
-      "trials": 9,
-      "survivors": 0,
-      "posterior_mean": 0.091
-    },
     "mutate_best": {
-      "trials": 13,
+      "trials": 15,
       "survivors": 0,
-      "posterior_mean": 0.067
+      "posterior_mean": 0.059
     }
   }
 }
