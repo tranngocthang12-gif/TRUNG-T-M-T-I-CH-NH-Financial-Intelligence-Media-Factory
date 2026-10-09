@@ -1,47 +1,12 @@
-name: Vong hoc hang ngay
-
+name: Legacy financial daily cycle (disabled for Factory migration)
 on:
-  schedule:
-    - cron: "30 9 * * 1-5"
   workflow_dispatch:
-    inputs:
-      trials:
-        description: "So thu nghiem nghien cuu"
-        default: "6"
-
 permissions:
-  contents: write
-
-concurrency:
-  group: daily-cycle
-  cancel-in-progress: false
-
+  contents: read
 jobs:
-  cycle:
+  disabled:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 3
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - name: Cai thu vien
-        run: |
-          pip install -r requirements.txt
-          # Khong cai vnstock: PyPI dang cach ly (quarantined) vnstock va vnai. Nguon gia chinh: Yahoo (config data.sources)
-      - name: Kiem tra chong nhin truoc tuong lai
-        run: python -m tests.test_no_lookahead
-      - name: Kiem tra cau truc bo nao
-        run: python tools/validate.py
-      - name: Chay vong hoc
-        env:
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python -m engine.run_cycle --source live --trials ${{ github.event.inputs.trials || '6' }}
-      - name: Ghi ket qua vao bo nao
-        run: |
-          git config user.name "ttc-engine"
-          git config user.email "ttc-engine@users.noreply.github.com"
-          git add -A data state research knowledge paper reports fact ledger memory
-          git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F)"
-          git push
+      - name: Historical financial cycle disabled
+        run: echo "Financial research scheduler is disabled in the Factory migration candidate; no data fetch, spend, model promotion, trade simulation or git push."
