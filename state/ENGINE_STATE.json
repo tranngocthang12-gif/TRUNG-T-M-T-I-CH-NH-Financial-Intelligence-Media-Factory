@@ -1,8 +1,8 @@
 {
-  "as_of": "2026-10-12",
+  "as_of": "2026-10-13",
   "regime": "DOWN_LOWVOL",
-  "total_trials": 66,
-  "current_t_threshold": 3.37,
+  "total_trials": 72,
+  "current_t_threshold": 3.39,
   "models": {
     "ACTIVE": 0,
     "WATCH": 0,
@@ -14,8 +14,8 @@
   "paper_nav": 1000000000,
   "alerts": [],
   "data_quality": {
-    "as_of": "2026-10-12",
-    "checked": 72502,
+    "as_of": "2026-10-13",
+    "checked": 72532,
     "flagged_total": 142,
     "error_rate_total": 0.00196,
     "window_sessions": 20,
@@ -358,8 +358,8 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-10-12T19:13:37.860670",
-    "end": "2026-10-12",
+    "at": "2026-10-13T17:04:16.354864",
+    "end": "2026-10-13",
     "sources": [
       "yahoo"
     ],
@@ -370,59 +370,59 @@
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
-      "ACB": "2026-10-12",
-      "BCM": "2026-10-12",
-      "BID": "2026-10-12",
-      "BVH": "2026-10-12",
-      "CTG": "2026-10-12",
-      "FPT": "2026-10-12",
-      "GAS": "2026-10-12",
-      "GVR": "2026-10-12",
-      "HDB": "2026-10-12",
-      "HPG": "2026-10-12",
-      "MBB": "2026-10-12",
-      "MSN": "2026-10-12",
-      "MWG": "2026-10-12",
-      "PLX": "2026-10-12",
-      "POW": "2026-10-12",
-      "SAB": "2026-10-12",
-      "SHB": "2026-10-12",
-      "SSB": "2026-10-12",
-      "SSI": "2026-10-12",
-      "STB": "2026-10-12",
-      "TCB": "2026-10-12",
-      "TPB": "2026-10-12",
-      "VCB": "2026-10-12",
-      "VHM": "2026-10-12",
-      "VIB": "2026-10-12",
-      "VIC": "2026-10-12",
-      "VJC": "2026-10-12",
-      "VNM": "2026-10-12",
-      "VPB": "2026-10-12",
-      "VRE": "2026-10-12"
+      "ACB": "2026-10-13",
+      "BCM": "2026-10-13",
+      "BID": "2026-10-13",
+      "BVH": "2026-10-13",
+      "CTG": "2026-10-13",
+      "FPT": "2026-10-13",
+      "GAS": "2026-10-13",
+      "GVR": "2026-10-13",
+      "HDB": "2026-10-13",
+      "HPG": "2026-10-13",
+      "MBB": "2026-10-13",
+      "MSN": "2026-10-13",
+      "MWG": "2026-10-13",
+      "PLX": "2026-10-13",
+      "POW": "2026-10-13",
+      "SAB": "2026-10-13",
+      "SHB": "2026-10-13",
+      "SSB": "2026-10-13",
+      "SSI": "2026-10-13",
+      "STB": "2026-10-13",
+      "TCB": "2026-10-13",
+      "TPB": "2026-10-13",
+      "VCB": "2026-10-13",
+      "VHM": "2026-10-13",
+      "VIB": "2026-10-13",
+      "VIC": "2026-10-13",
+      "VJC": "2026-10-13",
+      "VNM": "2026-10-13",
+      "VPB": "2026-10-13",
+      "VRE": "2026-10-13"
     }
   },
   "news_errors": [],
   "bandit": {
     "single_family": {
-      "trials": 16,
-      "survivors": 0,
-      "posterior_mean": 0.056
-    },
-    "cross_family": {
       "trials": 17,
       "survivors": 0,
       "posterior_mean": 0.053
     },
-    "random_subset": {
-      "trials": 14,
-      "survivors": 0,
-      "posterior_mean": 0.062
-    },
-    "mutate_best": {
+    "cross_family": {
       "trials": 19,
       "survivors": 0,
       "posterior_mean": 0.048
+    },
+    "random_subset": {
+      "trials": 15,
+      "survivors": 0,
+      "posterior_mean": 0.059
+    },
+    "mutate_best": {
+      "trials": 21,
+      "survivors": 0,
+      "posterior_mean": 0.043
     }
   }
 }
