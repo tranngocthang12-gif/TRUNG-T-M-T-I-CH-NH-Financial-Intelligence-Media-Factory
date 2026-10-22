@@ -1,0 +1,21 @@
+{
+  "period": {
+    "start": "2026-09-25",
+    "end": "2026-10-22",
+    "n_days": 19
+  },
+  "actual_return": 0.0,
+  "counterfactuals": {
+    "no_trade": 0.0,
+    "index": -0.014636288755507265
+  },
+  "components": {
+    "market_beta": 0.0,
+    "beta_return": 0.0,
+    "residual_alpha_ann": 0.0,
+    "alpha_t": 0.0
+  },
+  "costs_paid": 0.0,
+  "n_rebalance": 0,
+  "skill_assessment": "CHƯA ĐỦ MẪU (0 lần tái cơ cấu < 12) — không kết luận về kỹ năng"
+}
