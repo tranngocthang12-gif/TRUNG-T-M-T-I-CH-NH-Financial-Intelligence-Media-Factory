@@ -1,0 +1,216 @@
+{
+ "schema": "ttc-reading-queue/v1",
+ "note": "Mien hep dau tien (ARCHITECTURE v3.0 §5): ke toan + BCTC ngan hang VN30 + luat thi truong. Thu tu: van ban nen → BCTC. Trang thai: QUEUED | SOURCED | NOTE_WRITTEN | CARD_EXISTS. 10 ngan hang la cac ma ngan hang trong config.yaml universe; them SHB, SSB, VIB o dot sau. Muc danh dau KIEM/XAC DINH phai doi chieu van ban goc truoc khi chep.",
+ "items": [
+  {
+   "doc_id": "luat_ke_toan_88_2015",
+   "title": "Luật Kế toán số 88/2015/QH13",
+   "issuer": "Quốc hội",
+   "kind": "LAW",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "vas_01",
+   "title": "Chuẩn mực kế toán Việt Nam số 01 — Chuẩn mực chung",
+   "issuer": "Bộ Tài chính",
+   "kind": "STANDARD",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "vas_21",
+   "title": "VAS 21 — Trình bày báo cáo tài chính",
+   "issuer": "Bộ Tài chính",
+   "kind": "STANDARD",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "vas_24",
+   "title": "VAS 24 — Báo cáo lưu chuyển tiền tệ",
+   "issuer": "Bộ Tài chính",
+   "kind": "STANDARD",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "vas_22",
+   "title": "VAS 22 — Trình bày bổ sung BCTC của ngân hàng và tổ chức tài chính tương tự",
+   "issuer": "Bộ Tài chính",
+   "kind": "STANDARD",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "tt_99_2025",
+   "title": "Thông tư 99/2025/TT-BTC hướng dẫn chế độ kế toán doanh nghiệp (hiệu lực 01/01/2026, thay TT 200)",
+   "issuer": "Bộ Tài chính",
+   "kind": "CIRCULAR",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "tt_200_2014",
+   "title": "Thông tư 200/2014/TT-BTC (dùng cho BCTC đến hết 2025)",
+   "issuer": "Bộ Tài chính",
+   "kind": "CIRCULAR",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "qd_345_2020_ifrs",
+   "title": "Quyết định 345/QĐ-BTC phê duyệt Đề án áp dụng IFRS tại Việt Nam",
+   "issuer": "Bộ Tài chính",
+   "kind": "DECISION",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "luat_ck_54_2019",
+   "title": "Luật Chứng khoán số 54/2019/QH14",
+   "issuer": "Quốc hội",
+   "kind": "LAW",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "luat_56_2024",
+   "title": "Luật số 56/2024/QH15 sửa đổi Luật Chứng khoán và một số luật",
+   "issuer": "Quốc hội",
+   "kind": "LAW",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "nd_155_2020",
+   "title": "Nghị định 155/2020/NĐ-CP quy định chi tiết Luật Chứng khoán",
+   "issuer": "Chính phủ",
+   "kind": "DECREE",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "nd_245_2025",
+   "title": "Nghị định 245/2025/NĐ-CP sửa đổi NĐ 155/2020",
+   "issuer": "Chính phủ",
+   "kind": "DECREE",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "nd_156_2020",
+   "title": "Nghị định 156/2020/NĐ-CP xử phạt vi phạm hành chính lĩnh vực chứng khoán",
+   "issuer": "Chính phủ",
+   "kind": "DECREE",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "tt_96_2020",
+   "title": "Thông tư 96/2020/TT-BTC hướng dẫn công bố thông tin",
+   "issuer": "Bộ Tài chính",
+   "kind": "CIRCULAR",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "luat_tctd_32_2024",
+   "title": "Luật Các tổ chức tín dụng số 32/2024/QH15",
+   "issuer": "Quốc hội",
+   "kind": "LAW",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "tt_41_2016_car",
+   "title": "Thông tư 41/2016/TT-NHNN tỷ lệ an toàn vốn (KIỂM HIỆU LỰC trước khi chép)",
+   "issuer": "NHNN",
+   "kind": "CIRCULAR",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "nhnn_phan_loai_no",
+   "title": "Văn bản NHNN hiện hành về phân loại nợ và trích lập dự phòng (XÁC ĐỊNH SỐ HIỆU)",
+   "issuer": "NHNN",
+   "kind": "CIRCULAR",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "nhnn_che_do_ke_toan_tctd",
+   "title": "Chế độ kế toán và mẫu BCTC áp dụng cho TCTD (XÁC ĐỊNH SỐ HIỆU)",
+   "issuer": "NHNN",
+   "kind": "CIRCULAR",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "blhs_2015_d209_211",
+   "title": "Bộ luật Hình sự 2015 (sửa 2017) — Điều 209, 210, 211",
+   "issuer": "Quốc hội",
+   "kind": "LAW",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "hose_quy_che_giao_dich",
+   "title": "Quy chế giao dịch chứng khoán tại HOSE (bản hiện hành)",
+   "issuer": "HOSE",
+   "kind": "REGULATION",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_vcb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — VCB",
+   "issuer": "VCB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_bid_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — BID",
+   "issuer": "BID",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_ctg_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — CTG",
+   "issuer": "CTG",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_tcb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — TCB",
+   "issuer": "TCB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_mbb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — MBB",
+   "issuer": "MBB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_vpb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — VPB",
+   "issuer": "VPB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_acb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — ACB",
+   "issuer": "ACB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_hdb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — HDB",
+   "issuer": "HDB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_stb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — STB",
+   "issuer": "STB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  },
+  {
+   "doc_id": "bctc_tpb_2025",
+   "title": "BCTC hợp nhất kiểm toán năm 2025 — TPB",
+   "issuer": "TPB",
+   "kind": "FINANCIAL_STATEMENT",
+   "status": "QUEUED"
+  }
+ ]
+}

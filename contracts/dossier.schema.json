@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/dossier.schema.json",
+  "title": "DOSSIER",
+  "description": "Hồ sơ doanh nghiệp (Thư viện tầng 3). Mọi số liệu trỏ tới KNOWLEDGE_NOTE có địa chỉ.",
+  "type": "object",
+  "required": ["ticker", "as_of", "sources", "notes", "red_flags", "status"],
+  "properties": {
+    "ticker": {"type": "string", "pattern": "^[A-Z0-9]{3,5}$"},
+    "as_of": {"type": "string", "format": "date"},
+    "sources": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+    "financials_ref": {"type": "string"},
+    "notes": {"type": "array", "items": {"type": "string", "pattern": "^KN-T[1-4]-[a-z0-9_-]+$"}},
+    "red_flags": {"type": "array", "items": {"type": "object", "required": ["flag", "note_id"],
+      "properties": {"flag": {"type": "string"}, "note_id": {"type": "string"}}, "additionalProperties": false}},
+    "status": {"type": "string", "enum": ["DRAFT", "CITED", "TESTED"]}
+  },
+  "additionalProperties": false
+}

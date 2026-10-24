@@ -1,0 +1,67 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/knowledge_note.schema.json",
+  "title": "KNOWLEDGE_NOTE",
+  "description": "Ghi chú tri thức có địa chỉ nguồn, trích nguyên văn, self_check. DRAFT không dùng cho quyết định. (v2.0 III + cỗ máy học hiểu MINH TRÍ)",
+  "type": "object",
+  "required": ["id", "tier", "topic", "doc_ids", "applies_to", "effective_date", "points", "not_said", "testable_implications", "status", "review_by", "read_by", "self_check"],
+  "properties": {
+    "id": {"type": "string", "pattern": "^KN-T[1-4]-[a-z0-9_-]+$"},
+    "tier": {"type": "integer", "minimum": 1, "maximum": 4},
+    "topic": {"type": "string", "minLength": 1},
+    "doc_ids": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z0-9_-]+$"}},
+    "applies_to": {"type": "string", "minLength": 1},
+    "effective_date": {"type": ["string", "null"], "format": "date", "description": "Bắt buộc (không null) với T2 văn bản luật và chuẩn mực; null với T1/T3 kèm lý do trong doubts"},
+    "points": {
+      "type": "array", "minItems": 3, "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["id", "vi", "addresses", "quote", "kind"],
+        "properties": {
+          "id": {"type": "string", "pattern": "^P[0-9]+$"},
+          "vi": {"type": "string", "minLength": 1, "maxLength": 600},
+          "addresses": {"type": "array", "minItems": 1, "items": {"type": "string", "pattern": "^[a-z0-9_-]+:(p[0-9]+:[0-9]+|t[0-9]+:[0-9]+)$"}},
+          "quote": {"type": "string", "minLength": 1},
+          "kind": {"type": "string", "enum": ["TEXT_ATTESTED", "CROSS_TEXT_SYNTHESIS"]}
+        },
+        "additionalProperties": false
+      }
+    },
+    "counts": {
+      "type": "array",
+      "items": {"type": "object", "required": ["what", "n", "addresses"],
+        "properties": {"what": {"type": "string"}, "n": {"type": "integer", "minimum": 1},
+          "addresses": {"type": "array", "minItems": 1, "items": {"type": "string"}}},
+        "additionalProperties": false}
+    },
+    "not_said": {"type": "array", "minItems": 2, "items": {"type": "string", "minLength": 1}},
+    "testable_implications": {
+      "type": "array",
+      "items": {"type": "object", "required": ["statement", "data_needed", "threshold", "check_by"],
+        "properties": {"statement": {"type": "string"}, "data_needed": {"type": "string"},
+          "threshold": {"type": "string"}, "check_by": {"type": "string", "format": "date"}},
+        "additionalProperties": false}
+    },
+    "reading_flags": {
+      "type": "array",
+      "items": {"type": "object", "required": ["addresses", "note", "material"],
+        "properties": {"addresses": {"type": "array", "minItems": 1, "items": {"type": "string"}},
+          "note": {"type": "string"}, "material": {"type": "boolean"},
+          "criterion": {"type": "string", "enum": ["SPEAKER", "COUNT", "NEGATION", "SUBJECT_OBJECT", "CAUSE_EFFECT"]}},
+        "additionalProperties": false,
+        "if": {"properties": {"material": {"const": true}}}, "then": {"required": ["criterion"]}}
+    },
+    "status": {"type": "string", "enum": ["DRAFT", "CITED", "TESTED", "PROVEN", "DISPUTED", "OUTDATED"]},
+    "review_by": {"type": "string", "format": "date"},
+    "read_by": {"type": "string", "minLength": 1},
+    "self_check": {
+      "type": "object",
+      "required": ["parallelism", "one_word_one_meaning", "contrast_pairs", "question_answer", "counts_from_source", "doubts"],
+      "properties": {"parallelism": {"type": "boolean"}, "one_word_one_meaning": {"type": "boolean"},
+        "contrast_pairs": {"type": "boolean"}, "question_answer": {"type": "boolean"},
+        "counts_from_source": {"type": "boolean"}, "doubts": {"type": "array", "items": {"type": "string"}}},
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}
