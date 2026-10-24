@@ -1,0 +1,69 @@
+name: Ledger intake (Forecast issue)
+
+on:
+  issues:
+    types: [opened, labeled]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: ledger-intake
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    if: contains(github.event.issue.labels.*.name, 'forecast')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Cai jsonschema
+        run: pip install "jsonschema>=4"
+      - name: Nhan du bao
+        id: intake
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_CREATED_AT: ${{ github.event.issue.created_at }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          set +e
+          out=$(python tools/ledger_intake.py)
+          code=$?
+          echo "result=$out" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "$out"
+          exit 0
+      - name: Ghi vao Ledger
+        if: steps.intake.outputs.code == '0'
+        run: |
+          git config user.name "ttc-ledger"
+          git config user.email "ttc-ledger@users.noreply.github.com"
+          git add ledger/predictions.jsonl
+          git diff --cached --quiet || git commit -m "ledger: forecast #${{ github.event.issue.number }}"
+          git pull --rebase origin main
+          git push
+      - name: Binh luan ket qua
+        if: steps.intake.outputs.code != '3'
+        uses: actions/github-script@v7
+        env:
+          RESULT: ${{ steps.intake.outputs.result }}
+          CODE: ${{ steps.intake.outputs.code }}
+        with:
+          script: |
+            const r = JSON.parse(process.env.RESULT || '{"ok":false,"message":"khong co ket qua"}');
+            await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body: (r.ok ? "✅ " : "❌ ") + r.message});
+            if (!r.ok) {
+              await github.rest.issues.addLabels({owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, labels: ["rejected"]});
+            } else {
+              await github.rest.issues.addLabels({owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: context.issue.number, labels: ["ledgered"]});
+            }
