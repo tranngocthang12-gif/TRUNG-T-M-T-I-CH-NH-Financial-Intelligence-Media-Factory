@@ -1,0 +1,45 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    name: Test bat buoc (chan merge)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Cai thu vien
+        run: pip install -r requirements.txt pytest
+      - name: Luat van hanh + Ledger (L-02, L-05, L-07, hash chuoi)
+        run: python -m pytest -q tests/test_laws_validate.py
+      - name: Chong nhin truoc tuong lai
+        run: python -m tests.test_no_lookahead
+      - name: Kiem cau truc bo nao
+        run: python tools/validate.py
+
+  full-suite:
+    name: Du bo test engine (thong tin, chua chan — C5 ban hieu)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Cai thu vien
+        run: pip install -r requirements.txt pytest
+      - name: Chay du bo test
+        run: python -m pytest -q tests
