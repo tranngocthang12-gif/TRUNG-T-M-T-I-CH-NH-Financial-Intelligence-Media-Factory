@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/forecast_issue.schema.json",
+  "title": "FORECAST_ISSUE",
+  "description": "Dự báo ghi qua GitHub Issue 'Forecast' (ARCHITECTURE v3.0 §4.1). Tương thích prediction.schema.json: question, resolution_rule, probability, base_rate; mở rộng seat, resolution_source, resolve_at, invalidation_conditions.",
+  "type": "object",
+  "required": ["seat", "question", "resolution_source", "resolution_rule", "resolve_at", "p", "base_rate", "invalidation_conditions", "author_seat", "model_cutoff"],
+  "properties": {
+    "seat": {"type": "string", "enum": ["A", "B"]},
+    "question": {"type": "string", "minLength": 10},
+    "resolution_source": {"type": "string", "minLength": 5, "description": "URL hoặc địa chỉ văn bản công khai dùng để phân định"},
+    "resolution_rule": {"type": "string", "enum": ["excess_return_positive", "numeric_range", "event_before_date", "comparison"]},
+    "resolve_at": {"type": "string", "format": "date"},
+    "p": {"type": "number", "minimum": 0.05, "maximum": 0.95},
+    "base_rate": {"type": "number", "minimum": 0, "maximum": 1},
+    "invalidation_conditions": {"type": "string", "minLength": 5},
+    "author_seat": {"type": "string", "minLength": 1},
+    "model_cutoff": {"type": "string", "minLength": 4},
+    "library_refs": {"type": "string"},
+    "prompt_hash": {"type": "string"}
+  },
+  "additionalProperties": false
+}

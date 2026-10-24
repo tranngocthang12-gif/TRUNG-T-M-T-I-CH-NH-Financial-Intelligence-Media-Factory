@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "trung-tam-tai-chinh/contracts/exam_item.schema.json",
+  "title": "EXAM_ITEM",
+  "description": "Một câu thi của Học viện. Đề giữ ngoài kho tới khi thi (L-10); sau kỳ thi commit cùng bài làm và điểm.",
+  "type": "object",
+  "required": ["exam_id", "kind", "question", "competency", "answer_key", "authored_by", "held_out", "released_at", "grading"],
+  "properties": {
+    "exam_id": {"type": "string", "pattern": "^EX-[0-9]{4}-[0-9]{3}$"},
+    "kind": {"type": "integer", "enum": [1, 2, 3], "description": "1 tự luận có địa chỉ; 2 bài tập số đáp án do mã tính; 3 ca mù ẩn danh"},
+    "question": {"type": "string", "minLength": 1},
+    "competency": {"type": "string", "minLength": 1, "description": "khóa trong academy/competency_map.yaml"},
+    "answer_key": {"type": ["object", "null"], "description": "bắt buộc khi kind=2"},
+    "authored_by": {"type": "string"},
+    "held_out": {"type": "boolean"},
+    "released_at": {"type": ["string", "null"], "format": "date"},
+    "grading": {"type": "string", "enum": ["CHAIN", "NUMERIC", "BLIND_CASE"]}
+  },
+  "if": {"properties": {"kind": {"const": 2}}}, "then": {"properties": {"answer_key": {"type": "object"}}},
+  "additionalProperties": false
+}

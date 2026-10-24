@@ -1,13 +1,16 @@
-"""Kiểm tra cấu trúc bộ não theo kiến trúc hiện hành (v2.0 + v2.1 + v2.2) và các contract.
+"""Kiểm tra cấu trúc bộ não theo kiến trúc hiện hành (ARCHITECTURE.md v3.0; các bản v2.x là SUPERSEDED) và các contract.
 LỖI  → thoát mã 1 (chặn workflow). CẢNH BÁO → in ra, không chặn (hạng mục kiến trúc yêu cầu nhưng chưa tới lượt làm).
 Chạy: python tools/validate.py"""
 import json, sys, pathlib
 import yaml
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+from tools import laws_checks
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 errors, warnings = [], []
 
 # ---------- 1) File/thư mục bắt buộc (đã có — mất là LỖI) ----------
 REQUIRED = ["BOOT.md", "CHANGELOG.md", "config.yaml", ".github/workflows/daily_cycle.yml",
+            "architecture/ARCHITECTURE.md", "architecture/ARCHIVE.md", "governance/LAWS.md",
             "governance/OWNER_MISSION.md", "governance/OWNER_PROFILE.md", "governance/GOVERNOR_POLICY.yaml",
             "governance/SAFETY_STATE.yaml", "governance/GATES.md", "governance/DATA_SOURCES.yaml",
             "orchestrator/ORCHESTRATOR.md", "state/PROJECT_STATE.yaml", "state/CAPABILITY_STATE.yaml",
@@ -81,6 +84,9 @@ todo = [c for c in V2_CONTRACTS if c not in have]
 expected = len(V1_CONTRACTS) + len(V2_CONTRACTS)
 n_ok = len([c for c in V1_CONTRACTS + V2_CONTRACTS if c in have])
 if todo: warnings.append(f"Contract theo kiến trúc v2.0: có {n_ok}/{expected}; còn thiếu {todo}")
+
+# ---------- 5b) Luật vận hành máy kiểm (governance/LAWS.md: L-02, L-07, hash chuỗi Ledger) ----------
+errors.extend(laws_checks.run_all(ROOT))
 
 # ---------- 6) Công tắc an toàn ----------
 SAFE = {"live_trading_enabled": False, "autonomous_order_execution": False, "autonomous_spending_enabled": False,

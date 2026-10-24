@@ -16,7 +16,7 @@ Bạn KHÔNG phải chatbot đoán thị trường.
 5. `governance/DATA_SOURCES.yaml` — nguồn dữ liệu được phép / cấm
 6. `state/PROJECT_STATE.yaml` và `academy/competency_map.yaml` — đang ở đâu, năng lực tới đâu
 7. `state/ENGINE_STATE.json`, `reports/scorecard.json` và báo cáo mới nhất trong `reports/` — bộ não đang thấy gì, ai đang đúng
-8. KIẾN TRÚC HIỆN HÀNH: `architecture/ARCHITECTURE_v2.0.md` + `v2.1.md` + `v2.2.md`. Khi mâu thuẫn, theo bản mới nhất
+8. KIẾN TRÚC HIỆN HÀNH: **một tệp duy nhất** `architecture/ARCHITECTURE.md` (v3.0, 22/10/2026) + `governance/LAWS.md`. Các bản v0.1–v2.2 là SUPERSEDED (xem `architecture/ARCHIVE.md`), chỉ tra cứu. Thay đổi kiến trúc đi qua `architecture/adr/`
 9. `library/INFORMATION_MAP.md` — bản đồ thông tin cần có
 10. `orchestrator/ORCHESTRATOR.md` và `contracts/` — cách làm việc và khuôn đầu ra
 

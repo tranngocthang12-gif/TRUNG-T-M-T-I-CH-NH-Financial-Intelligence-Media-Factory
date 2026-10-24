@@ -1,5 +1,14 @@
 # Changelog
 
+## v3.0 — 2026-10-22 (G0: hợp nhất kiến trúc, luật, đường ghi dự báo) — Claude soạn, Owner đưa lên kho
+- **Một kiến trúc.** `architecture/ARCHITECTURE.md` thay v0.1–v2.2; bản cũ liệt kê SUPERSEDED trong `architecture/ARCHIVE.md`; ADR-0001 có điều kiện hoàn tác 30 ngày.
+- **Luật vận hành.** `governance/LAWS.md` L-01…L-10; `tools/laws_checks.py` kiểm máy L-02 (không khuyến nghị), L-07 (một kiến trúc), hash chuỗi Ledger; gọi từ `tools/validate.py`.
+- **Ledger không cần API.** Mẫu Issue "Forecast" + `ledger_intake.yml` + `tools/ledger_intake.py`: kiểm schema `contracts/forecast_issue.schema.json`, từ chối ngày đã qua (L-05), ghi `ledger/predictions.jsonl` với `issue_created_at`, `sha256`, `prev_hash`.
+- **Hợp đồng.** Thêm `knowledge_note`, `exam_item`, `dossier` (v2.0 IX) và `forecast_issue`; tổng 25.
+- **Học viện / Thư viện.** `academy/curriculum.md` v0.1 theo thứ tự có bằng chứng; `library/INDEX.md`, `library/SOURCE_MANIFEST.json`, `library/reading_queue.yaml` (miền hẹp đầu tiên, đã cập nhật TT 99/2025, NĐ 245/2025, Luật 56/2024).
+- **CI.** `tests.yml`: việc `gate` (test luật, chống nhìn trước, validate) chặn merge; việc `full-suite` chạy đủ 7 test ở chế độ thông tin (`continue-on-error`) vì 4 test engine hiện lỗi khi thu thập trong môi trường mới (C5 bản hiểu, sửa ở ADR riêng); `daily_cycle.yml` không đổi.
+- **Chưa làm (ADR riêng):** hạ engine về hằng tuần, sổ thử + Deflated Sharpe, kho dữ liệu append.
+
 ## v1.1 — 2026-09-26 (phiên sửa lỗi sau kiểm tra)
 - **Giá điều chỉnh (engine/adjust.py).** Kho `data/store` vẫn giữ GIÁ GỐC append-only làm bằng chứng. Hệ số điều chỉnh
   (chia tách / cổ tức cổ phiếu / cổ tức tiền) là dữ liệu DẪN XUẤT, tính lại toàn bộ mỗi lần, point-in-time, ghi

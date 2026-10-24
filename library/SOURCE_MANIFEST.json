@@ -1,0 +1,1 @@
+{"schema": "ttc-source-manifest/v1", "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day: sha256, bytes, issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08)", "files": {}}
