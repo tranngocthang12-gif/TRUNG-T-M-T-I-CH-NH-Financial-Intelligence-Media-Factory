@@ -1,0 +1,57 @@
+{
+  "schema_version": "umlf-project-state/v2",
+  "project": "NHA MAY HOC MAY - UNIVERSAL ML FACTORY",
+  "state_date": "2026-10-09",
+  "architecture_law_version": "1.1",
+  "owner_directive": "Repurpose existing Financial Intelligence & Media Factory repository; retain useful parts and critique/exclude unsuitable parts",
+  "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
+  "source_branch": "main",
+  "observed_parent_commit": "a55651dd1e2f8eef7625f904a7b55f20272c1b22",
+  "migration_branch": "auto/umlf-refactor-v0-2",
+  "migration_status": "REVIEW_CANDIDATE_NOT_MERGED",
+  "canonical_truth_until_merge": "Library:/UNIVERSAL_ML_FACTORY/PROJECT_STATE.json",
+  "latest_decision": "ADR-003_FINANCE_REPO_REPURPOSING",
+  "self_learning_architecture": "CORE_REQUIRED",
+  "knowledge_model": "STABLE_CORE_VOLATILE_VERSIONED_KNOWLEDGE",
+  "knowledge_promotion_gate": "EXTERNAL_APPROVAL_REQUIRED",
+  "supreme_laws_modified": false,
+  "learning_governance": {
+    "version": "v0.1",
+    "status": "READ_ONLY_REFERENCE_IMPORTED_CANDIDATE",
+    "core_source_sha256": "eedb726ac103e684901cdb9583df0971fff587d8da3a02e74bd24ba47a8a492f",
+    "independent_critic_proven": false,
+    "automatic_knowledge_promotion": false,
+    "automatic_model_activation": false,
+    "autonomous_learning_runtime": false,
+    "model_retraining": false,
+    "model_deployment": false
+  },
+  "task_templates": {
+    "tabular_classification": {
+      "status": "SYNTHETIC_CONTRACT_AND_MAJORITY_BASELINE_ONLY",
+      "holdout_required": true,
+      "group_or_temporal_split_required": true,
+      "real_data_validation": false
+    },
+    "time_series_forecasting": "PLANNED",
+    "image_classification": "PLANNED"
+  },
+  "offline_tests": {
+    "total": 83,
+    "passed": 83,
+    "evidence": "Local deterministic unit run; no real data or GitHub CI results implied"
+  },
+  "legacy_finance": {
+    "scope": "PRESERVED_IN_EXISTING_DIRECTORIES_AND_GIT_HISTORY",
+    "scheduled_workflow_on_candidate": "DISABLED_MANUAL_NON_WRITING",
+    "scheduled_workflow_on_main": "UNCHANGED_UNTIL_MERGE",
+    "owner_finance_mission_modified": false,
+    "finance_safety_state_modified": false,
+    "finance_meta_learning_imported": false,
+    "financial_model_auto_activation_imported": false,
+    "legacy_cleanup_deletions": false
+  },
+  "repo_public": true,
+  "production_ready": false,
+  "next_required_action": "Open draft PR; run exact-commit CI and independent review; require explicit merge decision before the financial scheduler and root bootstrap change on default main. Then test real task data and extract a versioned finance adapter."
+}

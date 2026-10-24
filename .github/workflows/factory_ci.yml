@@ -1,0 +1,23 @@
+name: Factory contract CI (read only)
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches:
+      - "auto/umlf-refactor-*"
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  offline-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check factory boundaries and legacy schedule off
+        run: python tools/validate_factory.py
+      - name: Check bounded governance and tabular baseline contracts
+        run: python -m unittest discover -s tests -p 'test_factory_*.py' -v

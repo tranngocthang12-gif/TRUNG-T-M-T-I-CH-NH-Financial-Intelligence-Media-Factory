@@ -1,0 +1,40 @@
+{
+  "schema": "umlf-handoff/v2",
+  "project": "UNIVERSAL ML FACTORY",
+  "as_of": "2026-10-09",
+  "status": "OWNER_DIRECTED_REPURPOSING_REVIEW_CANDIDATE",
+  "authority": "Owner assigned preexisting public financial repository as reuse/migration host; no auto release or destructive deletion authority",
+  "target_repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
+  "base_commit": "a55651dd1e2f8eef7625f904a7b55f20272c1b22",
+  "candidate_branch": "auto/umlf-refactor-v0-2",
+  "prior_factory_canonical": "Library:/UNIVERSAL_ML_FACTORY/PROJECT_STATE.json",
+  "code": {
+    "governance_path": "learning_governance/core.py",
+    "governance_source_sha256": "eedb726ac103e684901cdb9583df0971fff587d8da3a02e74bd24ba47a8a492f",
+    "task_adapter_path": "task_templates/tabular_classification/contract.py",
+    "local_synthetic_test_count": 83,
+    "github_ci_status": "NOT_YET_OBSERVED"
+  },
+  "completed": [
+    "Review finance mission, architecture v2.2, current state, scheduled workflow and source/test implementation",
+    "Document adversarial P0/P1 risks and classify keep/extract/exclude legacy parts",
+    "Stage Factory Charter, Architecture, Read-only Learning Governance and first tabular contract with local tests",
+    "Stage manual non-writing legacy workflow and Factory read-only CI"
+  ],
+  "blocked": [
+    "No owner-approved public disclosure of private Factory Library documents",
+    "No trusted external critic exact commit review yet",
+    "No real holdout/task metric proof yet",
+    "No finance engine migration as domain adapter verified yet",
+    "No model registry/deployment/drift/retraining production gating"
+  ],
+  "owner_or_independent_gate": "Review/merge migration PR before changing main scheduler, default bootstrap or official runtime",
+  "next_action": "Validate branch+PR CI, obtain independent exact-commit review, decide merger scope, then extract task/domain adapters and real data benchmark",
+  "hard_rules": [
+    "Never change finance OWNER_MISSION, SAFETY_STATE, GOVERNOR_POLICY in automated migration",
+    "Never treat legacy financial finance-model ACTIVE as Factory production approval",
+    "No automatic VERIFIED knowledge, model promotion, retraining, trading, publishing or spending",
+    "Do not claim synthetic tests prove learning, independent criticism or general ML correctness",
+    "Factory public repo is not permission to publish private data"
+  ]
+}
