@@ -1,0 +1,76 @@
+name: Forecast
+description: Ghi một dự báo vào Prediction Ledger (ARCHITECTURE v3.0 §4.1). Workflow sẽ kiểm, đóng dấu thời gian và ghi hash chuỗi.
+title: "[Forecast] "
+labels: ["forecast"]
+body:
+  - type: dropdown
+    id: seat
+    attributes:
+      label: seat
+      description: A = có thư viện; B = Claude trần (nhóm đối chứng)
+      options: ["A", "B"]
+    validations: {required: true}
+  - type: textarea
+    id: question
+    attributes:
+      label: question
+      description: Câu hỏi có/không, có luật phân định rõ. Không phải khuyến nghị mua bán.
+    validations: {required: true}
+  - type: input
+    id: resolution_source
+    attributes:
+      label: resolution_source
+      description: URL hoặc địa chỉ văn bản công khai dùng để phân định
+    validations: {required: true}
+  - type: dropdown
+    id: resolution_rule
+    attributes:
+      label: resolution_rule
+      options: ["numeric_range", "event_before_date", "comparison", "excess_return_positive"]
+    validations: {required: true}
+  - type: input
+    id: resolve_at
+    attributes:
+      label: resolve_at
+      description: Ngày phân định, YYYY-MM-DD, phải sau hôm nay
+    validations: {required: true}
+  - type: input
+    id: p
+    attributes:
+      label: p
+      description: Xác suất mệnh đề đúng, từ 0.05 đến 0.95
+    validations: {required: true}
+  - type: input
+    id: base_rate
+    attributes:
+      label: base_rate
+      description: Xác suất nền, từ 0 đến 1
+    validations: {required: true}
+  - type: textarea
+    id: invalidation_conditions
+    attributes:
+      label: invalidation_conditions
+      description: Điều gì xảy ra thì luận điểm sai
+    validations: {required: true}
+  - type: input
+    id: author_seat
+    attributes:
+      label: author_seat
+      description: Ghế và mô hình đã trả lời (ví dụ "Claude Project TTC" hoặc "Claude trần")
+    validations: {required: true}
+  - type: input
+    id: model_cutoff
+    attributes:
+      label: model_cutoff
+      description: Ngày cắt dữ liệu của mô hình theo mô hình tự khai (L-05)
+    validations: {required: true}
+  - type: textarea
+    id: library_refs
+    attributes:
+      label: library_refs
+      description: Chỉ với seat A — id KNOWLEDGE_NOTE/mệnh đề đã dùng
+  - type: input
+    id: prompt_hash
+    attributes:
+      label: prompt_hash
+      description: Chỉ với seat B — sha256 khối prompt trong governance/CONTROL_B_PROMPT.md
