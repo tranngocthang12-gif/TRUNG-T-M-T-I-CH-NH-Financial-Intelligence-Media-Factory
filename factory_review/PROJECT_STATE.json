@@ -1,0 +1,27 @@
+{
+  "schema": "umlf-auto05-review-state/v1",
+  "project": "UNIVERSAL ML FACTORY",
+  "as_of": "2026-10-30",
+  "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
+  "review_branch": "review/umlf-auto05-abc-20261030",
+  "main_observed_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
+  "factory_candidate_source_sha": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
+  "authority": "REVIEW_ONLY_NO_MERGE_NO_FINANCE_CONTROL",
+  "source_status": "DRAFT_STACK_2_5_6_7_NOT_MERGED",
+  "steps": {
+    "AUTO-05A": "RECONCILIATION_CANDIDATE_STAGED",
+    "AUTO-05B": "PENDING",
+    "AUTO-05C": "PENDING"
+  },
+  "canonical_finance_boot": "BOOT.md",
+  "canonical_finance_architecture": "architecture/ARCHITECTURE.md",
+  "factory_architecture_status": "NAMESPACED_REVIEW_NOT_CANONICAL",
+  "auto_model_promotion": false,
+  "auto_deployment": false,
+  "auto_retraining": false,
+  "provider_api_calls_allowed": false,
+  "model_benchmark_authenticity_proven": false,
+  "independent_critic_proven": false,
+  "owner_merge_approval": false,
+  "next_gate": "BUILD_BOUND_CROSS_STAGE_EVIDENCE_AND_RUN_DUAL_CI_BEFORE_INDEPENDENT_REVIEW"
+}
