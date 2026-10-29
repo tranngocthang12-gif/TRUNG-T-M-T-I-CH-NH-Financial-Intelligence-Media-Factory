@@ -72,3 +72,11 @@ production state is mutated. Factory migration PR #2 remains DRAFT and requires
 its separate main reconciliation and Owner review; this ADR does not approve it.
 A later implementation must compare the exact candidate head against evolving
 finance `main` before the Owner decides whether to merge the migration.
+
+## Candidate audit amendment - mock provider label confusion
+
+An adversarial test found that the initial receipt validator accepted a
+mock-claude result re-labelled as mock-gpt. The boundary now requires
+`expected_provider_id` supplied separately from the trusted invocation context
+and blocks a mismatch or absent context. This guards mock-context consistency,
+not the authenticity of any real provider. No API or production authority added.
