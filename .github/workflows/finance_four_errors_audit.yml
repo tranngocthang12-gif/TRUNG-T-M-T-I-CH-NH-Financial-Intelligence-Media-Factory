@@ -53,5 +53,5 @@ jobs:
         run: |
           git rev-parse HEAD
           python -c 'import pandas,numpy,pytest;print("PANDAS",pandas.__version__,"NUMPY",numpy.__version__,"PYTEST",pytest.__version__)'
-      - name: Independent-process pytest on exact main
-        run: python -m pytest -q tests/${{ matrix.module }}.py
+      - name: Execute legacy script in isolated Python process
+        run: python -m tests.${{ matrix.module }}
