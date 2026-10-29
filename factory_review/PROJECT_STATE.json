@@ -11,7 +11,7 @@
   "steps": {
     "AUTO-05A": "STAGED_REVIEW_ONLY_NO_AUTHORITY_CHANGE",
     "AUTO-05B": "STAGED_CROSS_STAGE_SYNTHETIC_BRIDGE_AND_ADR009",
-    "AUTO-05C": "CI_WORKFLOW_ADDED_TEST_RESULTS_PENDING"
+    "AUTO-05C": "REQUIRED_FACTORY_AND_FINANCE_GATES_PASS; FINANCE_FULL_SUITE_FOUR_COLLECTION_ERRORS; NOT_ACCEPTED"
   },
   "canonical_finance_boot": "BOOT.md",
   "canonical_finance_architecture": "architecture/ARCHITECTURE.md",
@@ -23,10 +23,26 @@
   "model_benchmark_authenticity_proven": false,
   "independent_critic_proven": false,
   "owner_merge_approval": false,
-  "next_gate": "EXACT_HEAD_FACTORY_AND_FINANCE_CI_PLUS_INDEPENDENT_REVIEW",
+  "next_gate": "ISOLATE_FINANCE_FULL_SUITE_FAILURES_AND_INDEPENDENT_REVIEW_BEFORE_OWNER_MERGE_DECISION",
   "review_ready": false,
   "main_modified": false,
   "main_merge_authorized": false,
   "bridge_provenance_authenticated": false,
-  "integrated_tests_expected": 13
+  "integrated_tests_expected": 13,
+  "validation": {
+    "factory_unittest": 164,
+    "factory_unittest_passed": 164,
+    "factory_ci": "PASS",
+    "finance_required_gates": "PASS",
+    "finance_full_suite": "INFORMATIONAL_FAILED_4_COLLECTION_ERRORS",
+    "finance_full_suite_files": [
+      "tests/test_adjustment.py",
+      "tests/test_ingest_errors.py",
+      "tests/test_ledger_pipeline.py",
+      "tests/test_quality_gate.py"
+    ],
+    "ci_sha": "10a10d36fe88f377391259bec462c284c4210a89",
+    "real_provider_benchmarks": false
+  },
+  "production_ready": false
 }
