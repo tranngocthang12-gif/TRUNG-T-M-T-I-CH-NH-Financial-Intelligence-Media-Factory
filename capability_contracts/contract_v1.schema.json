@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.invalid/umlf/capability-contract-v1.schema.json",
+  "title": "Factory provider-neutral offline capability wire contract v1",
+  "description": "Structural contract for read-only simulations, not provider parity or production authorization.",
+  "oneOf": [{"$ref": "#/$defs/request"}, {"$ref": "#/$defs/result"}],
+  "$defs": {
+    "identifier": {"type": "string", "pattern": "^[A-Za-z][A-Za-z0-9_.:-]{0,79}$"},
+    "digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "context": {
+      "type": "object", "additionalProperties": false,
+      "required": ["task_family", "domain", "dataset_version", "data_role"],
+      "properties": {
+        "task_family": {"$ref": "#/$defs/identifier"},
+        "domain": {"$ref": "#/$defs/identifier"},
+        "dataset_version": {"$ref": "#/$defs/identifier"},
+        "data_role": {"enum": ["SYNTHETIC", "TRAINING"]}
+      }
+    },
+    "constraints": {
+      "type": "object", "additionalProperties": false,
+      "required": ["allow_network", "allow_mutation", "max_cost_usd"],
+      "properties": {
+        "allow_network": {"const": false},
+        "allow_mutation": {"const": false},
+        "max_cost_usd": {"const": 0, "type": "integer"}
+      }
+    },
+    "validate_data_payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["records", "required_fields"],
+      "properties": {
+        "records": {"type": "array", "minItems": 1, "maxItems": 64, "items": {"type": "object"}},
+        "required_fields": {"type": "array", "minItems": 1, "maxItems": 32, "uniqueItems": true, "items": {"$ref": "#/$defs/identifier"}}
+      }
+    },
+    "analyze_errors_payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["cases"],
+      "properties": {
+        "cases": {
+          "type": "array", "minItems": 1, "maxItems": 64,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["case_id", "actual", "predicted"],
+            "properties": {
+              "case_id": {"$ref": "#/$defs/identifier"},
+              "actual": {"type": ["string", "integer", "boolean"]},
+              "predicted": {"type": ["string", "integer", "boolean"]}
+            }
+          }
+        }
+      }
+    },
+    "inspect_experiment_payload": {
+      "type": "object", "additionalProperties": false,
+      "required": ["declarations"],
+      "properties": {
+        "declarations": {
+          "type": "object", "additionalProperties": false,
+          "required": ["preregistered", "baseline_present", "holdout_frozen"],
+          "properties": {
+            "preregistered": {"type": "boolean"},
+            "baseline_present": {"type": "boolean"},
+            "holdout_frozen": {"type": "boolean"}
+          }
+        }
+      }
+    },
+    "request": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "request_id", "capability", "context", "constraints", "payload"],
+      "properties": {
+        "schema": {"const": "umlf-capability-request/v1"},
+        "request_id": {"$ref": "#/$defs/identifier"},
+        "capability": {"enum": ["validate_data", "analyze_errors", "inspect_experiment"]},
+        "context": {"$ref": "#/$defs/context"},
+        "constraints": {"$ref": "#/$defs/constraints"},
+        "payload": {"type": "object"}
+      },
+      "allOf": [
+        {"if": {"properties": {"capability": {"const": "validate_data"}}},
+         "then": {"properties": {"payload": {"$ref": "#/$defs/validate_data_payload"}}}},
+        {"if": {"properties": {"capability": {"const": "analyze_errors"}}},
+         "then": {"properties": {"payload": {"$ref": "#/$defs/analyze_errors_payload"}}}},
+        {"if": {"properties": {"capability": {"const": "inspect_experiment"}}},
+         "then": {"properties": {"payload": {"$ref": "#/$defs/inspect_experiment_payload"}}}}
+      ]
+    },
+    "result": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema", "request_id", "request_sha256", "capability", "provider_id", "status",
+                   "output", "output_sha256", "api_calls", "cost_usd", "state_changed",
+                   "approval_performed", "model_promoted", "production_ready"],
+      "properties": {
+        "schema": {"const": "umlf-capability-result/v1"},
+        "request_id": {"$ref": "#/$defs/identifier"},
+        "request_sha256": {"$ref": "#/$defs/digest"},
+        "capability": {"enum": ["validate_data", "analyze_errors", "inspect_experiment"]},
+        "provider_id": {"enum": ["mock-claude", "mock-gemini", "mock-grok", "mock-gpt"]},
+        "status": {"const": "SIMULATED_ONLY"},
+        "output": {"type": "object"},
+        "output_sha256": {"$ref": "#/$defs/digest"},
+        "api_calls": {"const": 0, "type": "integer"},
+        "cost_usd": {"const": 0, "type": "integer"},
+        "state_changed": {"const": false},
+        "approval_performed": {"const": false},
+        "model_promoted": {"const": false},
+        "production_ready": {"const": false}
+      }
+    }
+  }
+}
