@@ -173,12 +173,18 @@ class MockCapabilityAdapter:
             "model_promoted": False,
             "production_ready": False,
         }
-        validate_mock_result(request, result)
+        validate_mock_result(request, result, expected_provider_id=self.provider_id)
         return result
 
 
-def validate_mock_result(request: Any, result: Any) -> None:
-    """Verify receipt invariants, but do not treat mock results as real evidence."""
+def validate_mock_result(request: Any, result: Any, *, expected_provider_id: str) -> None:
+    """Check the receipt against the trusted mock invocation context.
+
+    The expected provider must come from the caller, not from the receipt.
+    This does not authenticate any external provider.
+    """
+    if type(expected_provider_id) is not str or expected_provider_id not in PROVIDERS:
+        raise CapabilityContractError("trusted mock provider context required")
     validate_request(request)
     _json_bytes(result)
     _exact(result, {"schema", "request_id", "request_sha256", "capability",
@@ -189,7 +195,7 @@ def validate_mock_result(request: Any, result: Any) -> None:
             result["request_id"] != request["request_id"] or
             result["request_sha256"] != _digest(request) or
             result["capability"] != request["capability"] or
-            (type(result["provider_id"]) is not str or result["provider_id"] not in PROVIDERS) or
+            (type(result["provider_id"]) is not str or result["provider_id"] != expected_provider_id) or
             result["status"] != "SIMULATED_ONLY" or
             result["output"] != _evaluate(request) or
             result["output_sha256"] != _digest(result["output"])):
