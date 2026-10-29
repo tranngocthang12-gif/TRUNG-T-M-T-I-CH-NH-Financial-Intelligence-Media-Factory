@@ -1,0 +1,25 @@
+{
+  "schema": "umlf-auto05-handoff/v1",
+  "as_of": "2026-10-30",
+  "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
+  "branch": "review/umlf-auto05-abc-20261030",
+  "baseline_main_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
+  "candidate_head_origin": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
+  "scope": "AUTO-05A -> AUTO-05B -> AUTO-05C, OFFLINE DRAFT",
+  "protected": [
+    "BOOT.md",
+    "architecture/ARCHITECTURE.md",
+    "governance/",
+    "engine/",
+    ".github/workflows/daily_cycle.yml",
+    ".github/workflows/ledger_intake.yml"
+  ],
+  "merge_authority": "OWNER_ONLY",
+  "validation_production_ready": false,
+  "next_action": "Stage read-only A/B/C reference files without changing finance; implement source-pinned bridge; run both Factory and finance tests on exact review head.",
+  "blocked": [
+    "Independent authenticated review pending",
+    "Real dataset rights/performance not established",
+    "Owner migration/main merge decision pending"
+  ]
+}
