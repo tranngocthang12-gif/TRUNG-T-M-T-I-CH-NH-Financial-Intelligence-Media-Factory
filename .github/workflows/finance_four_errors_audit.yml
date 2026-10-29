@@ -1,0 +1,57 @@
+name: Finance four-error baseline diagnosis (read only)
+on:
+  push:
+    branches: ["audit/finance-four-errors-*"]
+permissions:
+  contents: read
+jobs:
+  full-suite-baseline:
+    name: Baseline main — full pytest collection
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Switch to exact finance main source
+        run: |
+          git checkout --detach 6bace5fe82ef92393c81d44af714a087e37869d3
+          test "$(git rev-parse HEAD)" = "6bace5fe82ef92393c81d44af714a087e37869d3"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install existing finance dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Versions and source SHA
+        run: |
+          git rev-parse HEAD
+          python -c 'import pandas,numpy,pytest;print("PANDAS",pandas.__version__,"NUMPY",numpy.__version__,"PYTEST",pytest.__version__)'
+      - name: Reproduce original full suite on unmodified main
+        run: python -m pytest -q tests
+  fresh-process-modules:
+    name: Isolated main — ${{ matrix.module }}
+    strategy:
+      fail-fast: false
+      matrix:
+        module: [test_adjustment, test_ingest_errors, test_ledger_pipeline, test_quality_gate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Switch to exact finance main source
+        run: |
+          git checkout --detach 6bace5fe82ef92393c81d44af714a087e37869d3
+          test "$(git rev-parse HEAD)" = "6bace5fe82ef92393c81d44af714a087e37869d3"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install existing finance dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Version proof
+        run: |
+          git rev-parse HEAD
+          python -c 'import pandas,numpy,pytest;print("PANDAS",pandas.__version__,"NUMPY",numpy.__version__,"PYTEST",pytest.__version__)'
+      - name: Independent-process pytest on exact main
+        run: python -m pytest -q tests/${{ matrix.module }}.py
