@@ -1,8 +1,8 @@
 {
-  "as_of": "2026-10-28",
+  "as_of": "2026-10-29",
   "regime": "DOWN_LOWVOL",
-  "total_trials": 138,
-  "current_t_threshold": 3.57,
+  "total_trials": 144,
+  "current_t_threshold": 3.58,
   "models": {
     "ACTIVE": 0,
     "WATCH": 0,
@@ -14,8 +14,8 @@
   "paper_nav": 1000000000,
   "alerts": [],
   "data_quality": {
-    "as_of": "2026-10-28",
-    "checked": 72862,
+    "as_of": "2026-10-29",
+    "checked": 72892,
     "flagged_total": 142,
     "error_rate_total": 0.00195,
     "window_sessions": 20,
@@ -37,7 +37,7 @@
       "2026": 3
     },
     "events": {
-      "APPLIED": 224,
+      "APPLIED": 225,
       "DA_NAM_TRONG_GIA_NGUON": 121,
       "NGOAI_DU_LIEU": 86
     },
@@ -287,10 +287,11 @@
       "SSI 2024-09-23 cash_dividend (yahoo, TU_DONG): gốc +0.03% → điều chỉnh +3.94%",
       "SSI 2025-09-25 cash_dividend (yahoo, TU_DONG): gốc +2.16% → điều chỉnh +4.82%",
       "SSI 2026-08-17 cash_dividend (yahoo, TU_DONG): gốc -3.02% → điều chỉnh +1.97%",
-      "TCB 2024-05-21 cash_dividend (yahoo, TU_DONG): gốc -5.03% → điều chỉnh -3.58%",
+      "TCB 2024-05-21 cash_dividend (yahoo, TU_DONG): gốc -5.03% → điều chỉnh -4.07%",
       "TCB 2024-06-11 stock_dividend (CBTT HOSE/VSD: TCB phát hành cổ phiếu tăng vốn tỷ lệ 100% (1 cũ : 1 mới) năm 2024, CAN_DOI_CHIEU): gốc -49.54% → điều chỉnh +0.92%",
-      "TCB 2025-09-30 cash_dividend (yahoo, TU_DONG): gốc +0.00% → điều chỉnh +2.65%",
-      "TCB 2026-05-19 cash_dividend (yahoo, TU_DONG): gốc -4.12% → điều chỉnh -2.10%",
+      "TCB 2025-09-30 cash_dividend (yahoo, TU_DONG): gốc +0.00% → điều chỉnh +1.75%",
+      "TCB 2026-05-19 cash_dividend (yahoo, TU_DONG): gốc -4.12% → điều chỉnh -2.78%",
+      "TCB 2026-10-29 stock_split (yahoo, TU_DONG): gốc -33.28% → điều chỉnh +0.07%",
       "TPB 2023-03-20 cash_dividend (yahoo, TU_DONG): gốc -14.62% → điều chỉnh -6.60%",
       "TPB 2024-06-20 cash_dividend (yahoo, TU_DONG): gốc -1.62% → điều chỉnh +0.74%",
       "TPB 2025-05-13 cash_dividend (yahoo, TU_DONG): gốc +0.00% → điều chỉnh +6.26%",
@@ -358,8 +359,8 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-10-28T16:13:15.826628",
-    "end": "2026-10-28",
+    "at": "2026-10-29T16:21:18.975328",
+    "end": "2026-10-29",
     "sources": [
       "yahoo"
     ],
@@ -370,59 +371,59 @@
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
-      "ACB": "2026-10-28",
-      "BCM": "2026-10-28",
-      "BID": "2026-10-28",
-      "BVH": "2026-10-28",
-      "CTG": "2026-10-28",
-      "FPT": "2026-10-28",
-      "GAS": "2026-10-28",
-      "GVR": "2026-10-28",
-      "HDB": "2026-10-28",
-      "HPG": "2026-10-28",
-      "MBB": "2026-10-28",
-      "MSN": "2026-10-28",
-      "MWG": "2026-10-28",
-      "PLX": "2026-10-28",
-      "POW": "2026-10-28",
-      "SAB": "2026-10-28",
-      "SHB": "2026-10-28",
-      "SSB": "2026-10-28",
-      "SSI": "2026-10-28",
-      "STB": "2026-10-28",
-      "TCB": "2026-10-28",
-      "TPB": "2026-10-28",
-      "VCB": "2026-10-28",
-      "VHM": "2026-10-28",
-      "VIB": "2026-10-28",
-      "VIC": "2026-10-28",
-      "VJC": "2026-10-28",
-      "VNM": "2026-10-28",
-      "VPB": "2026-10-28",
-      "VRE": "2026-10-28"
+      "ACB": "2026-10-29",
+      "BCM": "2026-10-29",
+      "BID": "2026-10-29",
+      "BVH": "2026-10-29",
+      "CTG": "2026-10-29",
+      "FPT": "2026-10-29",
+      "GAS": "2026-10-29",
+      "GVR": "2026-10-29",
+      "HDB": "2026-10-29",
+      "HPG": "2026-10-29",
+      "MBB": "2026-10-29",
+      "MSN": "2026-10-29",
+      "MWG": "2026-10-29",
+      "PLX": "2026-10-29",
+      "POW": "2026-10-29",
+      "SAB": "2026-10-29",
+      "SHB": "2026-10-29",
+      "SSB": "2026-10-29",
+      "SSI": "2026-10-29",
+      "STB": "2026-10-29",
+      "TCB": "2026-10-29",
+      "TPB": "2026-10-29",
+      "VCB": "2026-10-29",
+      "VHM": "2026-10-29",
+      "VIB": "2026-10-29",
+      "VIC": "2026-10-29",
+      "VJC": "2026-10-29",
+      "VNM": "2026-10-29",
+      "VPB": "2026-10-29",
+      "VRE": "2026-10-29"
     }
   },
   "news_errors": [],
   "bandit": {
     "single_family": {
-      "trials": 33,
+      "trials": 34,
       "survivors": 0,
-      "posterior_mean": 0.029
+      "posterior_mean": 0.028
     },
     "cross_family": {
+      "trials": 38,
+      "survivors": 0,
+      "posterior_mean": 0.025
+    },
+    "random_subset": {
       "trials": 37,
       "survivors": 0,
       "posterior_mean": 0.026
     },
-    "random_subset": {
+    "mutate_best": {
       "trials": 35,
       "survivors": 0,
       "posterior_mean": 0.027
-    },
-    "mutate_best": {
-      "trials": 33,
-      "survivors": 0,
-      "posterior_mean": 0.029
     }
   }
 }
