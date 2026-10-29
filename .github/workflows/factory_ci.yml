@@ -1,7 +1,7 @@
 name: Factory contract CI (read only)
 on:
   pull_request:
-    branches: [main, auto/umlf-refactor-v0-2]
+    branches: [main, auto/umlf-refactor-v0-2, candidate/umlf-capability-contracts-v1-20261030]
   push:
     branches:
       - "auto/umlf-refactor-*"
