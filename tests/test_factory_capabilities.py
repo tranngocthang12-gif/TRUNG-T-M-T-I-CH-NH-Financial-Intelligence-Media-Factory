@@ -56,7 +56,7 @@ class ContractTests(unittest.TestCase):
                 self.assertFalse(result["approval_performed"])
                 self.assertFalse(result["model_promoted"])
                 self.assertFalse(result["production_ready"])
-                validate_mock_result(request, result)
+                validate_mock_result(request, result, expected_provider_id=provider)
                 outputs.append(result["output"])
             self.assertEqual(outputs, [outputs[0]] * 4)
 
@@ -165,13 +165,13 @@ class ContractTests(unittest.TestCase):
         req = specimen(); result = MockCapabilityAdapter("mock-gpt").invoke(req)
         result["request_sha256"] = "a" * 64
         with self.assertRaises(CapabilityContractError):
-            validate_mock_result(req, result)
+            validate_mock_result(req, result, expected_provider_id="mock-gpt")
 
     def test_tamper_output_is_detected(self):
         req = specimen(); result = MockCapabilityAdapter("mock-gpt").invoke(req)
         result["output"]["checked_records"] = 99
         with self.assertRaises(CapabilityContractError):
-            validate_mock_result(req, result)
+            validate_mock_result(req, result, expected_provider_id="mock-gpt")
 
     def test_cannot_forge_approval_or_network_calls(self):
         req = specimen(); before = MockCapabilityAdapter("mock-gpt").invoke(req)
@@ -180,7 +180,23 @@ class ContractTests(unittest.TestCase):
                          ("api_calls", 1), ("cost_usd", 1)):
             result = copy.deepcopy(before); result[key] = bad
             with self.subTest(key=key), self.assertRaises(CapabilityContractError):
-                validate_mock_result(req, result)
+                validate_mock_result(req, result, expected_provider_id="mock-gpt")
+
+    def test_provider_relabeling_requires_trusted_call_context(self):
+        req = specimen()
+        result = MockCapabilityAdapter("mock-claude").invoke(req)
+        result["provider_id"] = "mock-gpt"
+        with self.assertRaises(CapabilityContractError):
+            validate_mock_result(req, result, expected_provider_id="mock-claude")
+
+    def test_missing_or_invalid_provider_context_fails_closed(self):
+        req = specimen()
+        result = MockCapabilityAdapter("mock-gpt").invoke(req)
+        with self.assertRaises(TypeError):
+            validate_mock_result(req, result)
+        for provider_id in (None, "gpt", ["mock-gpt"], True):
+            with self.subTest(provider_id=provider_id), self.assertRaises(CapabilityContractError):
+                validate_mock_result(req, result, expected_provider_id=provider_id)
 
     def test_schema_declares_exact_contract_versions(self):
         schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
