@@ -1,7 +1,7 @@
 name: Factory plus Finance P1 integration CI (read only)
 on:
   push:
-    branches: ["review/umlf-finance-factory-integration-p1-*", "review/umlf-auto07b-*", "review/umlf-auto08-*"]
+    branches: ["review/umlf-finance-factory-integration-p1-*", "review/umlf-auto07b-*", "review/umlf-auto08-*", "review/umlf-auto09-*"]
   pull_request:
     branches: [main]
 permissions:
