@@ -243,7 +243,8 @@ class PromotionTests(unittest.TestCase):
 
     def test_eligible_only_for_external_approval(self):
         verdict = self.check()
-        self.assertTrue(verdict["ready_for_external_approval"], verdict)
+        self.assertTrue(verdict["structurally_eligible_for_external_review"], verdict)
+        self.assertFalse(verdict["ready_for_external_approval"])
         for k in ("state_changed", "verified", "critic_independence_proven", "source_authenticity_proven", "production_ready"):
             self.assertFalse(verdict[k])
         self.assertEqual(self.rec["state"], "EXPERIMENTAL")
@@ -277,7 +278,8 @@ class PromotionTests(unittest.TestCase):
         review = dict(self.c, findings=[{"severity": "HIGH", "status": "RESOLVED"}])
         self.assertFalse(self.check(review=review)["ready_for_external_approval"])
         review["findings"][0]["disposition_ref"] = "review/disposition-1"
-        self.assertTrue(self.check(review=review)["ready_for_external_approval"])
+        self.assertTrue(self.check(review=review)["structurally_eligible_for_external_review"])
+        self.assertFalse(self.check(review=review)["ready_for_external_approval"])
 
     def test_no_baseline_or_holdout_blocks(self):
         e = dict(self.e, baseline_present=False)

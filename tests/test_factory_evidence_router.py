@@ -136,6 +136,12 @@ class RouterTests(unittest.TestCase):
         p["min_accuracy"] = float("nan")
         with self.assertRaises(RouterContractError): run(p, r, "a"*64)
 
+    def test_partial_coverage_policy_is_not_a_supported_v1_claim(self):
+        p, receipts = fixture()
+        p["min_coverage"] = 0.5
+        with self.assertRaisesRegex(RouterContractError, "complete coverage"):
+            run(p, receipts)
+
     def test_stable_under_input_reordering(self):
         p, r = fixture()
         self.assertEqual(run(p, r), run(p, list(reversed(r))))

@@ -363,7 +363,9 @@ def inspect_promotion(
                 elif not _nonempty(item.get("disposition_ref")):
                     errors.append("resolved material finding missing disposition evidence")
     return {
-        "ready_for_external_approval": not errors,
+        # Caller-controlled identifiers and receipts prove structure, not reviewer identity.
+        "ready_for_external_approval": False,
+        "structurally_eligible_for_external_review": not errors,
         "reasons": sorted(set(errors)),
         "proposed_transition": "EXPERIMENTAL_TO_CURRENT",
         "state_changed": False,
