@@ -15,6 +15,8 @@ FINANCE_BASE = "6bace5fe82ef92393c81d44af714a087e37869d3"
 FACTORY_REVIEW_HEAD = "9140ee4e97c46dcc1c3523324997af20f3b4e070"
 PR13_FROZEN_REVIEW_HEAD = "b1a9012ff55c916d53183c44b52cf503f3222fbb"
 PR14_FROZEN_REVIEW_HEAD = "ad4d145e0cfadb7ad185c9f977956f42d563dd46"
+AUTO08_FROZEN_REVIEW_HEAD = "e1e2e97ab851966c65072ad643f24273daf4826d"
+MAIN_REMOTE_REF = "refs/remotes/origin/main"
 
 FACTORY_ADDITIONS = frozenset({
     ".github/workflows/factory_review_ci.yml",
@@ -31,6 +33,7 @@ FACTORY_ADDITIONS = frozenset({
     "factory_review/adr/ADR-011_DUAL_DOMAIN_PINNED_INTEGRATION.md",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md",
     "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md",
+    "factory_review/adr/ADR-014_AUTO09_PR_MERGE_BASE_ATTRIBUTION.md",
     "factory_review/evidence_bridge.py",
     "learning_governance/__init__.py",
     "learning_governance/core.py",
@@ -69,6 +72,7 @@ INTEGRATION_DELTA = {
     "tools/validate_factory_review.py": "M",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md": "A",
     "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md": "A",
+    "factory_review/adr/ADR-014_AUTO09_PR_MERGE_BASE_ATTRIBUTION.md": "A",
     "factory_review/evidence_bridge.py": "M",
     "tests/test_factory_integrated_review.py": "M",
 }
@@ -81,6 +85,7 @@ AUTO07B_DELTA = {
     "factory_review/PROJECT_STATE.json": "M",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md": "A",
     "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md": "A",
+    "factory_review/adr/ADR-014_AUTO09_PR_MERGE_BASE_ATTRIBUTION.md": "A",
     "factory_review/evidence_bridge.py": "M",
     "tests/test_factory_integrated_review.py": "M",
     "tests/test_factory_review_protections.py": "M",
@@ -90,12 +95,23 @@ AUTO07B_DELTA = {
 AUTO08_DELTA = {
     ".github/workflows/factory_review_ci.yml": "M",
     "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md": "A",
+    "factory_review/adr/ADR-014_AUTO09_PR_MERGE_BASE_ATTRIBUTION.md": "A",
     "factory_review/evidence_bridge.py": "M",
     "tests/test_factory_integrated_review.py": "M",
     "tests/test_factory_review_protections.py": "M",
     "tools/validate_factory_review.py": "M",
     "factory_review/PROJECT_HANDOFF.json": "M",
     "factory_review/PROJECT_STATE.json": "M",
+}
+
+# The patch under review is constrained against the exact, unchanged AUTO-08 head.
+AUTO09_DELTA = {
+    ".github/workflows/factory_review_ci.yml": "M",
+    "factory_review/PROJECT_HANDOFF.json": "M",
+    "factory_review/PROJECT_STATE.json": "M",
+    "factory_review/adr/ADR-014_AUTO09_PR_MERGE_BASE_ATTRIBUTION.md": "A",
+    "tests/test_factory_review_protections.py": "M",
+    "tools/validate_factory_review.py": "M",
 }
 
 REQUIRED_REVIEW = (
@@ -105,6 +121,7 @@ REQUIRED_REVIEW = (
     "factory_review/adr/ADR-011_DUAL_DOMAIN_PINNED_INTEGRATION.md",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md",
     "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md",
+    "factory_review/adr/ADR-014_AUTO09_PR_MERGE_BASE_ATTRIBUTION.md",
     "factory_review/evidence_bridge.py",
     "capability_contracts/core.py",
     "capability_contracts/evidence_router.py",
@@ -190,6 +207,20 @@ def check_auto08_delta(diff_lines):
     return errors
 
 
+def check_auto09_delta(diff_lines):
+    """Describe the whole frozen AUTO-08 -> AUTO-09 change, without exceptions."""
+    changes, errors = _parse_changes(diff_lines)
+    found = set()
+    for status, path in changes:
+        if AUTO09_DELTA.get(path) != status:
+            errors.append("unreviewed AUTO-09 change: " + status + " " + path)
+        else:
+            found.add(path)
+    for missing in sorted(set(AUTO09_DELTA) - found):
+        errors.append("required AUTO-09 delta missing: " + missing)
+    return errors
+
+
 def check_pinned_blobs(observed):
     """Observed maps paths to (mode, type, git blob SHA)."""
     errors = []
@@ -203,6 +234,26 @@ def _git(*args):
     return subprocess.run(
         ["git", *args], cwd=ROOT, text=True, capture_output=True, check=False,
     )
+
+
+def _review_merge_base(main_ref=MAIN_REMOTE_REF):
+    """Identify PR-owned changes independently of commits added to main later.
+
+    The known finance SHA remains an ancestry floor, not the moving PR diff base.
+    This check is still self-modifiable and does NOT attest to reviewer authority.
+    """
+    proc = _git("merge-base", main_ref, "HEAD")
+    bases = proc.stdout.strip().splitlines()
+    if proc.returncode or len(bases) != 1:
+        return None, ["cannot determine PR merge-base against " + main_ref]
+    base = bases[0]
+    if len(base) != 40 or any(c not in "0123456789abcdef" for c in base):
+        return None, ["malformed PR merge-base"]
+    if _git("merge-base", "--is-ancestor", FINANCE_BASE, main_ref).returncode:
+        return None, ["current main is outside the frozen finance lineage"]
+    if _git("merge-base", "--is-ancestor", FINANCE_BASE, base).returncode:
+        return None, ["PR merge-base predates the frozen finance anchor"]
+    return base, []
 
 
 def _diff(base):
@@ -236,14 +287,18 @@ def main():
     for name, sha in (("finance main", FINANCE_BASE),
                       ("Factory PR #12", FACTORY_REVIEW_HEAD),
                       ("Frozen PR #13 source", PR13_FROZEN_REVIEW_HEAD),
-                      ("Frozen PR #14 source", PR14_FROZEN_REVIEW_HEAD)):
+                      ("Frozen PR #14 source", PR14_FROZEN_REVIEW_HEAD),
+                      ("Frozen AUTO-08 source", AUTO08_FROZEN_REVIEW_HEAD)):
         if _git("merge-base", "--is-ancestor", sha, "HEAD").returncode:
             errors.append("missing exact ancestry: " + name + " " + sha)
 
-    finance_diff, diff_errors = _diff(FINANCE_BASE)
-    errors.extend(diff_errors)
-    if finance_diff is not None:
-        errors.extend(check_changes(finance_diff))
+    pr_base, base_errors = _review_merge_base()
+    errors.extend(base_errors)
+    if pr_base is not None:
+        pr_diff, diff_errors = _diff(pr_base)
+        errors.extend(diff_errors)
+        if pr_diff is not None:
+            errors.extend(check_changes(pr_diff))
 
     factory_diff, diff_errors = _diff(FACTORY_REVIEW_HEAD)
     errors.extend(diff_errors)
@@ -260,12 +315,18 @@ def main():
     if auto08_diff is not None:
         errors.extend(check_auto08_delta(auto08_diff))
 
+    auto09_diff, diff_errors = _diff(AUTO08_FROZEN_REVIEW_HEAD)
+    errors.extend(diff_errors)
+    if auto09_diff is not None:
+        errors.extend(check_auto09_delta(auto09_diff))
+
     errors.extend(check_pinned_blobs(_observed_finance_blobs()))
     if errors:
         for error in errors:
             print("FAIL:", error)
         return 1
-    print("PASS: pinned Finance #11 blobs, Factory #12/PR13 lineage, AUTO-07B scoped diff")
+    print("PASS: PR-owned merge-base delta, pinned Finance #11 blobs and AUTO-09 scope")
+    print("PR merge-base:", pr_base)
     print("REVIEW ONLY: validator is self-modifiable and NOT a trusted external gate")
     print("Owner branch ruleset and independent exact-HEAD review remain required")
     return 0

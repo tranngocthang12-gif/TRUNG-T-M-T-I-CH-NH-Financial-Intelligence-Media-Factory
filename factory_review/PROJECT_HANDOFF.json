@@ -2,10 +2,10 @@
   "schema": "umlf-auto05-handoff/v1",
   "as_of": "2026-10-30",
   "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
-  "branch": "review/umlf-auto08-final-integration-20261030",
+  "branch": "review/umlf-auto09-critic-remediation-20261030",
   "baseline_main_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
   "candidate_head_origin": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
-  "scope": "AUTO08 integrates PR15 evaluator source consistency into frozen PR14 dual-domain tree; no main changes",
+  "scope": "AUTO09 fixes PR-only diff attribution against moving main using merge-base, retaining frozen exact parent and finance blob pins; no main changes",
   "protected": [
     "BOOT.md",
     "architecture/ARCHITECTURE.md",
@@ -16,9 +16,9 @@
   ],
   "merge_authority": "OWNER_ONLY",
   "validation_production_ready": false,
-  "next_action": "Run exact-head Factory and blocking finance+Factory CI then independent adversarial audit before Owner merge choice",
+  "next_action": "Validate AUTO09 exact-commit push CI, audit new delta and obtain independent exact-SHA criticism; HOLD MERGE",
   "blocked": [
-    "AUTO08 exact-head CI and independent external review pending",
+    "AUTO09 exact-head CI and independent external review pending",
     "New AUTO07B exact-head CI and independent audit pending",
     "GitHub main reports protected=false and rulesets=[]; Owner-enforced required checks absent",
     "Validator/workflow proposed within a PR cannot independently attest their own integrity",
@@ -43,8 +43,15 @@
   "auto08": {
     "source_integration_pr14_sha": "ad4d145e0cfadb7ad185c9f977956f42d563dd46",
     "source_evaluator_pr15_sha": "2b194a9997af3a2a9abbfba88cb79df9ccd5558c",
-    "status": "DRAFT_PENDING_EXACT_HEAD_CI",
+    "status": "EXACT_HEAD_CI_OBSERVED_SUCCESS_RUN_41012695974_NOT_INDEPENDENT_SIGNOFF",
     "attested_execution": false,
     "owner_merge_approval": false
+  },
+  "auto09": {
+    "parent_sha": "e1e2e97ab851966c65072ad643f24273daf4826d",
+    "status": "DRAFT_REVIEW_BRANCH_PENDING_EXACT_HEAD_CI",
+    "pr_base": "AUTO08_HEAD_e1e2e97",
+    "main_comparison": "GIT_MERGE_BASE",
+    "merge_authorized": false
   }
 }
