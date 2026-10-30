@@ -23,7 +23,7 @@
   "model_benchmark_authenticity_proven": false,
   "independent_critic_proven": false,
   "owner_merge_approval": false,
-  "next_gate": "ISOLATE_FINANCE_FULL_SUITE_FAILURES_AND_INDEPENDENT_REVIEW_BEFORE_OWNER_MERGE_DECISION",
+  "next_gate": "FINANCE_P1_EXACT_HEAD_FULL_SUITE_AND_INDEPENDENT_REVIEW_OF_STAGED_PR_11_PR_12",
   "review_ready": false,
   "main_modified": false,
   "main_merge_authorized": false,
@@ -41,8 +41,13 @@
       "tests/test_ledger_pipeline.py",
       "tests/test_quality_gate.py"
     ],
-    "ci_sha": "10a10d36fe88f377391259bec462c284c4210a89",
-    "real_provider_benchmarks": false
+    "real_provider_benchmarks": false,
+    "prior_verified_ci_sha": "10a10d36fe88f377391259bec462c284c4210a89",
+    "remediation_branch": "review/umlf-critic-remediation-p1-20261030",
+    "remediation_test_count": 170,
+    "remediation_run_id": 40995059973,
+    "remediation_exact_head": "643e350077e997c7dc3249100b48d522a4d9d81b",
+    "remediation_ci_scope": "Factory 170 tests and finance required gates PASS; finance informational full-suite FAIL (baseline main four errors)"
   },
   "production_ready": false
 }
