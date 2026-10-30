@@ -1,9 +1,9 @@
 name: Factory AUTO-05 review CI (read only)
 on:
   pull_request:
-    branches: [main]
+    branches: [main, review/umlf-auto05-abc-20261030]
   push:
-    branches: ["review/umlf-auto05-*"]
+    branches: ["review/umlf-auto05-*", "review/umlf-critic-remediation-*"]
 permissions:
   contents: read
 jobs:
