@@ -33,7 +33,15 @@ mk0 = data.load_market("2024-06-10")
 assert abs(mk0["close"]["TCB"].iloc[-1] - mk0["raw_close"]["TCB"].iloc[-1]) < 1e-9  # as-of price anchor; earlier legitimate corporate actions may exist
 assert _single_event_status(mk0["events"], "TCB", "2024-06-11", "stock_dividend") == "CHUA_DEN_HAN"
 d9 = pd.Timestamp("2024-06-10")
-assert abs(mk["close"].at[d9, "TCB"] - mk["raw_close"].at[d9, "TCB"] / 2) < 1e-6
+# Isolate the target event's contribution while retaining every other valid event.
+target_mask = (
+    (mk["events"]["ticker"] == "TCB")
+    & (pd.to_datetime(mk["events"]["ex_date"]) == pd.Timestamp("2024-06-11"))
+    & (mk["events"]["type"] == "stock_dividend")
+)
+with_target, _ = adjust.factors(raw.index, raw.columns, mk["events"])
+without_target, _ = adjust.factors(raw.index, raw.columns, mk["events"].loc[~target_mask])
+assert abs(with_target.at[d9, "TCB"] - without_target.at[d9, "TCB"] / 2) < 1e-9
 print("OK 2: point-in-time — tại 10/06/2024 chưa điều chỉnh; tính tại hôm nay thì giá 10/06/2024 = gốc / 2")
 
 # Nhãn 20 phiên của TCB quanh ngày GDKHQ không còn chứa cú rơi -50%
