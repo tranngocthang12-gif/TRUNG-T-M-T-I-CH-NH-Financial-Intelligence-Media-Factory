@@ -14,6 +14,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 FINANCE_BASE = "6bace5fe82ef92393c81d44af714a087e37869d3"
 FACTORY_REVIEW_HEAD = "9140ee4e97c46dcc1c3523324997af20f3b4e070"
 PR13_FROZEN_REVIEW_HEAD = "b1a9012ff55c916d53183c44b52cf503f3222fbb"
+PR14_FROZEN_REVIEW_HEAD = "ad4d145e0cfadb7ad185c9f977956f42d563dd46"
 
 FACTORY_ADDITIONS = frozenset({
     ".github/workflows/factory_review_ci.yml",
@@ -29,6 +30,7 @@ FACTORY_ADDITIONS = frozenset({
     "factory_review/adr/ADR-010_INDEPENDENT_CRITIC_P1_REMEDIATION.md",
     "factory_review/adr/ADR-011_DUAL_DOMAIN_PINNED_INTEGRATION.md",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md",
+    "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md",
     "factory_review/evidence_bridge.py",
     "learning_governance/__init__.py",
     "learning_governance/core.py",
@@ -66,6 +68,7 @@ INTEGRATION_DELTA = {
     "tests/test_factory_review_protections.py": "M",
     "tools/validate_factory_review.py": "M",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md": "A",
+    "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md": "A",
     "factory_review/evidence_bridge.py": "M",
     "tests/test_factory_integrated_review.py": "M",
 }
@@ -77,10 +80,22 @@ AUTO07B_DELTA = {
     "factory_review/PROJECT_HANDOFF.json": "M",
     "factory_review/PROJECT_STATE.json": "M",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md": "A",
+    "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md": "A",
     "factory_review/evidence_bridge.py": "M",
     "tests/test_factory_integrated_review.py": "M",
     "tests/test_factory_review_protections.py": "M",
     "tools/validate_factory_review.py": "M",
+}
+
+AUTO08_DELTA = {
+    ".github/workflows/factory_review_ci.yml": "M",
+    "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md": "A",
+    "factory_review/evidence_bridge.py": "M",
+    "tests/test_factory_integrated_review.py": "M",
+    "tests/test_factory_review_protections.py": "M",
+    "tools/validate_factory_review.py": "M",
+    "factory_review/PROJECT_HANDOFF.json": "M",
+    "factory_review/PROJECT_STATE.json": "M",
 }
 
 REQUIRED_REVIEW = (
@@ -89,6 +104,7 @@ REQUIRED_REVIEW = (
     "factory_review/adr/ADR-010_INDEPENDENT_CRITIC_P1_REMEDIATION.md",
     "factory_review/adr/ADR-011_DUAL_DOMAIN_PINNED_INTEGRATION.md",
     "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md",
+    "factory_review/adr/ADR-013_AUTO08_SOURCE_BINDING_INTEGRATION.md",
     "factory_review/evidence_bridge.py",
     "capability_contracts/core.py",
     "capability_contracts/evidence_router.py",
@@ -160,6 +176,20 @@ def check_auto07b_delta(diff_lines):
     return errors
 
 
+def check_auto08_delta(diff_lines):
+    """Freeze the exact PR14 -> AUTO08 changes; no extra path permitted."""
+    changes, errors = _parse_changes(diff_lines)
+    found = set()
+    for status, path in changes:
+        if AUTO08_DELTA.get(path) != status:
+            errors.append("unreviewed AUTO08 change: " + status + " " + path)
+        else:
+            found.add(path)
+    for missing in sorted(set(AUTO08_DELTA) - found):
+        errors.append("required AUTO08 delta missing: " + missing)
+    return errors
+
+
 def check_pinned_blobs(observed):
     """Observed maps paths to (mode, type, git blob SHA)."""
     errors = []
@@ -205,7 +235,8 @@ def main():
 
     for name, sha in (("finance main", FINANCE_BASE),
                       ("Factory PR #12", FACTORY_REVIEW_HEAD),
-                      ("Frozen PR #13 source", PR13_FROZEN_REVIEW_HEAD)):
+                      ("Frozen PR #13 source", PR13_FROZEN_REVIEW_HEAD),
+                      ("Frozen PR #14 source", PR14_FROZEN_REVIEW_HEAD)):
         if _git("merge-base", "--is-ancestor", sha, "HEAD").returncode:
             errors.append("missing exact ancestry: " + name + " " + sha)
 
@@ -223,6 +254,11 @@ def main():
     errors.extend(diff_errors)
     if auto07_diff is not None:
         errors.extend(check_auto07b_delta(auto07_diff))
+
+    auto08_diff, diff_errors = _diff(PR14_FROZEN_REVIEW_HEAD)
+    errors.extend(diff_errors)
+    if auto08_diff is not None:
+        errors.extend(check_auto08_delta(auto08_diff))
 
     errors.extend(check_pinned_blobs(_observed_finance_blobs()))
     if errors:
