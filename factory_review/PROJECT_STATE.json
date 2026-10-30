@@ -3,7 +3,7 @@
   "project": "UNIVERSAL ML FACTORY",
   "as_of": "2026-10-30",
   "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
-  "review_branch": "review/umlf-auto05-abc-20261030",
+  "review_branch": "review/umlf-finance-factory-integration-p1-20261030",
   "main_observed_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
   "factory_candidate_source_sha": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
   "authority": "REVIEW_ONLY_NO_MERGE_NO_FINANCE_CONTROL",
@@ -11,7 +11,7 @@
   "steps": {
     "AUTO-05A": "STAGED_REVIEW_ONLY_NO_AUTHORITY_CHANGE",
     "AUTO-05B": "STAGED_CROSS_STAGE_SYNTHETIC_BRIDGE_AND_ADR009",
-    "AUTO-05C": "REQUIRED_FACTORY_AND_FINANCE_GATES_PASS; FINANCE_FULL_SUITE_FOUR_COLLECTION_ERRORS; NOT_ACCEPTED"
+    "AUTO-05C": "DUAL_DOMAIN_REVIEW_BRANCH_STAGED; EXACT_HEAD_CI_REQUIRED; NOT_ACCEPTED"
   },
   "canonical_finance_boot": "BOOT.md",
   "canonical_finance_architecture": "architecture/ARCHITECTURE.md",
@@ -23,18 +23,18 @@
   "model_benchmark_authenticity_proven": false,
   "independent_critic_proven": false,
   "owner_merge_approval": false,
-  "next_gate": "FINANCE_P1_EXACT_HEAD_FULL_SUITE_AND_INDEPENDENT_REVIEW_OF_STAGED_PR_11_PR_12",
+  "next_gate": "INTEGRATED_EXACT_HEAD_BLOCKING_CI_AND_INDEPENDENT_CRITIC_THEN_OWNER_DECISION",
   "review_ready": false,
   "main_modified": false,
   "main_merge_authorized": false,
   "bridge_provenance_authenticated": false,
   "integrated_tests_expected": 13,
   "validation": {
-    "factory_unittest": 164,
-    "factory_unittest_passed": 164,
-    "factory_ci": "PASS",
+    "factory_unittest": 170,
+    "factory_unittest_passed": 170,
+    "factory_ci": "PR12_EXACT_HEAD_9140ee4_GREEN; INTEGRATED_PENDING",
     "finance_required_gates": "PASS",
-    "finance_full_suite": "INFORMATIONAL_FAILED_4_COLLECTION_ERRORS",
+    "finance_full_suite": "PR12_LEGACY_4_COLLECTION_ERRORS; PR11_ISOLATED_12_PASS; INTEGRATED_PENDING",
     "finance_full_suite_files": [
       "tests/test_adjustment.py",
       "tests/test_ingest_errors.py",
@@ -47,7 +47,20 @@
     "remediation_test_count": 170,
     "remediation_run_id": 40995059973,
     "remediation_exact_head": "643e350077e997c7dc3249100b48d522a4d9d81b",
-    "remediation_ci_scope": "Factory 170 tests and finance required gates PASS; finance informational full-suite FAIL (baseline main four errors)"
+    "remediation_ci_scope": "Factory 170 tests and finance required gates PASS; finance informational full-suite FAIL (baseline main four errors)",
+    "finance_p1_source_head": "52972ff9e55dbe3e1c9c16f88a04fb52266cf8db",
+    "finance_p1_run_id": 40995106655,
+    "factory_p1_source_head": "9140ee4e97c46dcc1c3523324997af20f3b4e070",
+    "factory_p1_run_id": 40995175552,
+    "integrated": {
+      "branch": "review/umlf-finance-factory-integration-p1-20261030",
+      "ci": "PENDING_EXACT_HEAD",
+      "independent_review": "PENDING",
+      "finance_full_suite_blocking": true,
+      "source_finance_pr": 11,
+      "source_factory_pr": 12,
+      "source_blob_pins": true
+    }
   },
   "production_ready": false
 }

@@ -1,9 +1,9 @@
-name: Factory AUTO-05 review CI (read only)
+name: Factory plus Finance P1 integration CI (read only)
 on:
-  pull_request:
-    branches: [main, review/umlf-auto05-abc-20261030]
   push:
-    branches: ["review/umlf-auto05-*", "review/umlf-critic-remediation-*"]
+    branches: ["review/umlf-finance-factory-integration-p1-*"]
+  pull_request:
+    branches: [main]
 permissions:
   contents: read
 jobs:
@@ -17,11 +17,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Verify financial protected paths and review assets
+      - name: Verify exact-sourced finance patch and protected Factory code
         run: python tools/validate_factory_review.py
-      - name: Offline Factory contracts and A-B-C adversarial integration
+      - name: Factory contracts and adversarial A-B-C integration tests
         run: python -m unittest discover -s tests -p 'test_factory_*.py' -v
-  finance-existing-gates:
+  finance-and-factory-full-regression:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -29,14 +29,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install finance test dependencies (no provider APIs)
-        run: pip install -r requirements.txt pytest
-      - name: Finance law and ledger regression
+      - name: Install declared finance dependencies (no model provider APIs)
+        run: python -m pip install -r requirements.txt pytest
+      - name: Finance law and Ledger tests
         run: python -m pytest -q tests/test_laws_validate.py
-      - name: Financial lookahead regression
+      - name: Finance lookahead regression
         run: python -m tests.test_no_lookahead
-      - name: Finance architecture and law validation
+      - name: Finance architecture and laws validation
         run: python tools/validate.py
-      - name: Full finance and Factory tests (informational parity with existing main workflow)
-        continue-on-error: true
+      - name: Full finance plus Factory regression (BLOCKING, no continue-on-error)
         run: python -m pytest -q tests
+      - name: Verify test did not change tracked finance source or data
+        if: always()
+        run: git diff --exit-code -- engine/ governance/ data/ ledger/ state/ config.yaml
