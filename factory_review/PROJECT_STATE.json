@@ -3,7 +3,7 @@
   "project": "UNIVERSAL ML FACTORY",
   "as_of": "2026-10-30",
   "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
-  "review_branch": "review/umlf-auto07b-r3-remediation-20261030",
+  "review_branch": "review/umlf-auto08-final-integration-20261030",
   "main_observed_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
   "factory_candidate_source_sha": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
   "authority": "REVIEW_ONLY_NO_MERGE_NO_FINANCE_CONTROL",
@@ -12,7 +12,8 @@
     "AUTO-05A": "STAGED_REVIEW_ONLY_NO_AUTHORITY_CHANGE",
     "AUTO-05B": "STAGED_CROSS_STAGE_SYNTHETIC_BRIDGE_AND_ADR009",
     "AUTO-05C": "DUAL_DOMAIN_REVIEW_BRANCH_STAGED; EXACT_HEAD_CI_REQUIRED; NOT_ACCEPTED",
-    "AUTO-07B": "STAGED_R3_CONTRACT_CI_SCOPE_FIXES; NEW_HEAD_TEST_AND_EXTERNAL_REVIEW_PENDING"
+    "AUTO-07B": "STAGED_R3_CONTRACT_CI_SCOPE_FIXES; NEW_HEAD_TEST_AND_EXTERNAL_REVIEW_PENDING",
+    "AUTO-08": "STAGED_PR15_SOURCE_BINDING_ON_PR14_TREE; EXACT_HEAD_CI_AND_INDEPENDENT_AUDIT_PENDING"
   },
   "canonical_finance_boot": "BOOT.md",
   "canonical_finance_architecture": "architecture/ARCHITECTURE.md",
@@ -24,7 +25,7 @@
   "model_benchmark_authenticity_proven": false,
   "independent_critic_proven": false,
   "owner_merge_approval": false,
-  "next_gate": "AUTO07B_NEW_HEAD_BLOCKING_CI_EXTERNAL_REVIEW_AND_OWNER_MAIN_RULESET_DECISION",
+  "next_gate": "AUTO08_EXACT_HEAD_BLOCKING_DUAL_CI_THEN_INDEPENDENT_EXACT_SHA_REVIEW",
   "review_ready": false,
   "main_modified": false,
   "main_merge_authorized": false,
@@ -78,6 +79,14 @@
       "owner_merge_approval": false,
       "main_branch_protected_observed": false,
       "real_evaluator_provenance_authenticated": false
+    },
+    "auto08": {
+      "parent_sha": "ad4d145e0cfadb7ad185c9f977956f42d563dd46",
+      "source_pr15_sha": "2b194a9997af3a2a9abbfba88cb79df9ccd5558c",
+      "ci": "PENDING_EXACT_HEAD",
+      "independent_review": "PENDING",
+      "trusted_issuer_attestation": false,
+      "owner_merge_approval": false
     }
   },
   "production_ready": false
