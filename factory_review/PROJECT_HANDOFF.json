@@ -2,10 +2,10 @@
   "schema": "umlf-auto05-handoff/v1",
   "as_of": "2026-10-30",
   "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
-  "branch": "review/umlf-auto07b-r3-remediation-20261030",
+  "branch": "review/umlf-auto08-final-integration-20261030",
   "baseline_main_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
   "candidate_head_origin": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
-  "scope": "AUTO-07B R3 review-only contract and CI hardening on pinned Draft PR13; finance PR11 blobs untouched",
+  "scope": "AUTO08 integrates PR15 evaluator source consistency into frozen PR14 dual-domain tree; no main changes",
   "protected": [
     "BOOT.md",
     "architecture/ARCHITECTURE.md",
@@ -16,8 +16,9 @@
   ],
   "merge_authority": "OWNER_ONLY",
   "validation_production_ready": false,
-  "next_action": "Verify AUTO07B exact HEAD push/full-suite CI and independent review; Owner must configure trustworthy main protection before any merge",
+  "next_action": "Run exact-head Factory and blocking finance+Factory CI then independent adversarial audit before Owner merge choice",
   "blocked": [
+    "AUTO08 exact-head CI and independent external review pending",
     "New AUTO07B exact-head CI and independent audit pending",
     "GitHub main reports protected=false and rulesets=[]; Owner-enforced required checks absent",
     "Validator/workflow proposed within a PR cannot independently attest their own integrity",
@@ -38,5 +39,12 @@
     "original_pr13_ci": "FACTORY_173_PASS_FINANCE_185_PASS_38_SUBTESTS",
     "target_status": "DRAFT_NEW_HEAD_UNTESTED",
     "owner_gate": "RULESET_PLUS_INDEPENDENT_REVIEW_PLUS_EXPLICIT_MERGE_DECISION"
+  },
+  "auto08": {
+    "source_integration_pr14_sha": "ad4d145e0cfadb7ad185c9f977956f42d563dd46",
+    "source_evaluator_pr15_sha": "2b194a9997af3a2a9abbfba88cb79df9ccd5558c",
+    "status": "DRAFT_PENDING_EXACT_HEAD_CI",
+    "attested_execution": false,
+    "owner_merge_approval": false
   }
 }
