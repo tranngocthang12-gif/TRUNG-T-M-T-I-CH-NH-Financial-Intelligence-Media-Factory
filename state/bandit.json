@@ -13,14 +13,14 @@
   },
   "random_subset": {
     "a": 1.0,
-    "b": 38.0,
-    "trials": 37,
+    "b": 42.0,
+    "trials": 41,
     "survivors": 0
   },
   "mutate_best": {
     "a": 1.0,
-    "b": 36.0,
-    "trials": 35,
+    "b": 38.0,
+    "trials": 37,
     "survivors": 0
   }
 }
