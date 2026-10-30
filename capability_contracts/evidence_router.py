@@ -62,6 +62,9 @@ def inspect_router(packet: Any, receipts: Any, *, trusted_packet_sha256: str) ->
             not _number(packet["max_latency_ms"]) or
             not _number(packet["max_cost_usd"])):
         raise RouterContractError("invalid frozen synthetic policy")
+    # V1 requires full-case coverage. Partial counts must be rejected, not ranked.
+    if packet["min_coverage"] != 1:
+        raise RouterContractError("v1 requires complete coverage")
     expected = _digest(packet)
     if type(trusted_packet_sha256) is not str or trusted_packet_sha256 != expected:
         raise RouterContractError("packet SHA mismatch with caller pin")
@@ -109,8 +112,6 @@ def inspect_router(packet: Any, receipts: Any, *, trusted_packet_sha256: str) ->
             reasons.append("LATENCY_LIMIT")
         if receipt["cost_usd"] > packet["max_cost_usd"]:
             reasons.append("COST_LIMIT")
-        if receipt["evaluated_case_count"] / packet["case_count"] < packet["min_coverage"]:
-            reasons.append("COVERAGE_LIMIT")
         if reasons:
             rejected.append({"provider_id": provider, "reasons": reasons})
         else:
