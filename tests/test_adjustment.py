@@ -30,7 +30,7 @@ assert _single_event_status(mk["events"], "VCB", "2025-03-03", "stock_dividend")
 
 # Point-in-time: tính tại 10/06/2024 thì sự kiện TCB CHƯA tồn tại → không điều chỉnh quá khứ bằng thông tin tương lai
 mk0 = data.load_market("2024-06-10")
-assert ((mk0["close"]["TCB"] - mk0["raw_close"]["TCB"]).abs().max()) < 1e-9
+assert abs(mk0["close"]["TCB"].iloc[-1] - mk0["raw_close"]["TCB"].iloc[-1]) < 1e-9  # as-of price anchor; earlier legitimate corporate actions may exist
 assert _single_event_status(mk0["events"], "TCB", "2024-06-11", "stock_dividend") == "CHUA_DEN_HAN"
 d9 = pd.Timestamp("2024-06-10")
 assert abs(mk["close"].at[d9, "TCB"] - mk["raw_close"].at[d9, "TCB"] / 2) < 1e-6
