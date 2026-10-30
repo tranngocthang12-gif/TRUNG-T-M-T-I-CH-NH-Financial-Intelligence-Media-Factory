@@ -21,6 +21,7 @@ ALLOWED_ADDITIONS = frozenset({
     "factory_review/adr/ADR-008_AUTO05A_FINANCE_RECONCILIATION.md",
     "factory_review/adr/ADR-009_AUTO05BC_EVIDENCE_BRIDGE.md",
     "factory_review/adr/ADR-010_INDEPENDENT_CRITIC_P1_REMEDIATION.md",
+    "factory_review/adr/ADR-011_EVALUATOR_SOURCE_BINDING.md",
     "factory_review/evidence_bridge.py",
     "learning_governance/__init__.py",
     "learning_governance/core.py",
