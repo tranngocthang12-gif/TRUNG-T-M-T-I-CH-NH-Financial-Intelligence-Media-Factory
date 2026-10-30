@@ -5,7 +5,9 @@ from tools.validate_factory_review import (
     FACTORY_ADDITIONS,
     FINANCE_PINNED_PATCH,
     INTEGRATION_DELTA,
+    AUTO07B_DELTA,
     check_changes,
+    check_auto07b_delta,
     check_integration_delta,
     check_pinned_blobs,
 )
@@ -24,6 +26,18 @@ class FactoryProtectionTests(unittest.TestCase):
             path: ("100644", "blob", sha)
             for path, (_status, sha) in FINANCE_PINNED_PATCH.items()
         }), [])
+
+    def test_auto07b_scoped_changes_reject_unreviewed_paths(self):
+        expected = [f"{status}\t{path}" for path, status in AUTO07B_DELTA.items()]
+        self.assertEqual(check_auto07b_delta(expected), [])
+        self.assertTrue(check_auto07b_delta(expected[:-1]))
+        for rogue in ("M\ttests/test_laws_validate.py",
+                      "M\tgovernance/LAWS.md",
+                      "M\tengine/adjust.py",
+                      "A\tnew_competing_governor.py",
+                      "M\trequirements.txt"):
+            with self.subTest(path=rogue):
+                self.assertTrue(check_auto07b_delta(expected + [rogue]))
 
     def test_required_finance_change_cannot_be_omitted(self):
         self.assertTrue(check_changes(["A\tfactory_review/evidence_bridge.py"]))

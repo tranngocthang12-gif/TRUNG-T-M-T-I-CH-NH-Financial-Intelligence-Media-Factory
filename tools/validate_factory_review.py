@@ -13,7 +13,7 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 FINANCE_BASE = "6bace5fe82ef92393c81d44af714a087e37869d3"
 FACTORY_REVIEW_HEAD = "9140ee4e97c46dcc1c3523324997af20f3b4e070"
-FINANCE_FIX_HEAD = "52972ff9e55dbe3e1c9c16f88a04fb52266cf8db"
+PR13_FROZEN_REVIEW_HEAD = "b1a9012ff55c916d53183c44b52cf503f3222fbb"
 
 FACTORY_ADDITIONS = frozenset({
     ".github/workflows/factory_review_ci.yml",
@@ -28,6 +28,7 @@ FACTORY_ADDITIONS = frozenset({
     "factory_review/adr/ADR-009_AUTO05BC_EVIDENCE_BRIDGE.md",
     "factory_review/adr/ADR-010_INDEPENDENT_CRITIC_P1_REMEDIATION.md",
     "factory_review/adr/ADR-011_DUAL_DOMAIN_PINNED_INTEGRATION.md",
+    "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md",
     "factory_review/evidence_bridge.py",
     "learning_governance/__init__.py",
     "learning_governance/core.py",
@@ -64,6 +65,22 @@ INTEGRATION_DELTA = {
     "factory_review/adr/ADR-011_DUAL_DOMAIN_PINNED_INTEGRATION.md": "A",
     "tests/test_factory_review_protections.py": "M",
     "tools/validate_factory_review.py": "M",
+    "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md": "A",
+    "factory_review/evidence_bridge.py": "M",
+    "tests/test_factory_integrated_review.py": "M",
+}
+
+# Narrow, separately reviewable changes relative to the immutable PR #13 head.
+# This scope check is NOT a trusted root: a PR can change this validator.
+AUTO07B_DELTA = {
+    ".github/workflows/factory_review_ci.yml": "M",
+    "factory_review/PROJECT_HANDOFF.json": "M",
+    "factory_review/PROJECT_STATE.json": "M",
+    "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md": "A",
+    "factory_review/evidence_bridge.py": "M",
+    "tests/test_factory_integrated_review.py": "M",
+    "tests/test_factory_review_protections.py": "M",
+    "tools/validate_factory_review.py": "M",
 }
 
 REQUIRED_REVIEW = (
@@ -71,6 +88,7 @@ REQUIRED_REVIEW = (
     "factory_review/adr/ADR-009_AUTO05BC_EVIDENCE_BRIDGE.md",
     "factory_review/adr/ADR-010_INDEPENDENT_CRITIC_P1_REMEDIATION.md",
     "factory_review/adr/ADR-011_DUAL_DOMAIN_PINNED_INTEGRATION.md",
+    "factory_review/adr/ADR-012_AUTO07B_R3_CONTRACT_AND_RELEASE_GATES.md",
     "factory_review/evidence_bridge.py",
     "capability_contracts/core.py",
     "capability_contracts/evidence_router.py",
@@ -128,6 +146,20 @@ def check_integration_delta(diff_lines):
     return errors
 
 
+def check_auto07b_delta(diff_lines):
+    """Describe the complete AUTO-07B review-only diff against frozen PR #13."""
+    changes, errors = _parse_changes(diff_lines)
+    found = set()
+    for status, path in changes:
+        if AUTO07B_DELTA.get(path) != status:
+            errors.append("unreviewed AUTO-07B source change: " + status + " " + path)
+        else:
+            found.add(path)
+    for missing in sorted(set(AUTO07B_DELTA) - found):
+        errors.append("required AUTO-07B delta missing: " + missing)
+    return errors
+
+
 def check_pinned_blobs(observed):
     """Observed maps paths to (mode, type, git blob SHA)."""
     errors = []
@@ -172,7 +204,8 @@ def main():
                   for path in REQUIRED_REVIEW if not (ROOT / path).is_file())
 
     for name, sha in (("finance main", FINANCE_BASE),
-                      ("Factory PR #12", FACTORY_REVIEW_HEAD)):
+                      ("Factory PR #12", FACTORY_REVIEW_HEAD),
+                      ("Frozen PR #13 source", PR13_FROZEN_REVIEW_HEAD)):
         if _git("merge-base", "--is-ancestor", sha, "HEAD").returncode:
             errors.append("missing exact ancestry: " + name + " " + sha)
 
@@ -186,13 +219,19 @@ def main():
     if factory_diff is not None:
         errors.extend(check_integration_delta(factory_diff))
 
+    auto07_diff, diff_errors = _diff(PR13_FROZEN_REVIEW_HEAD)
+    errors.extend(diff_errors)
+    if auto07_diff is not None:
+        errors.extend(check_auto07b_delta(auto07_diff))
+
     errors.extend(check_pinned_blobs(_observed_finance_blobs()))
     if errors:
         for error in errors:
             print("FAIL:", error)
         return 1
-    print("PASS: exact Finance #11 blobs + Factory #12 lineage; no other diff")
-    print("REVIEW ONLY: not an authenticated critic or Owner merge approval")
+    print("PASS: pinned Finance #11 blobs, Factory #12/PR13 lineage, AUTO-07B scoped diff")
+    print("REVIEW ONLY: validator is self-modifiable and NOT a trusted external gate")
+    print("Owner branch ruleset and independent exact-HEAD review remain required")
     return 0
 
 

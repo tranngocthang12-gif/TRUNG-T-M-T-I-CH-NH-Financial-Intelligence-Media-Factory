@@ -74,6 +74,9 @@ class IntegratedFactoryReviewTests(unittest.TestCase):
         self.assertFalse(x["benchmark_provenance_authenticated"])
         self.assertFalse(x["deployment_approved"])
         self.assertTrue(x["external_review_required"])
+        self.assertFalse(x["production_ready"])
+        self.assertFalse(x["holdout_access_isolation_proven"])
+        self.assertFalse(x["integrity_declarations_authenticated"])
 
     def test_all_four_mock_labels_supported_but_no_real_provider(self):
         for provider in ("mock-gpt", "mock-claude", "mock-gemini", "mock-grok"):
@@ -87,6 +90,53 @@ class IntegratedFactoryReviewTests(unittest.TestCase):
         x = inspect(f)
         self.assertEqual(x["status"], "BLOCKED_BY_EVALUATION")
         self.assertIsNone(x["router_result"])
+
+    def test_blocked_path_has_all_denied_authority_flags(self):
+        f = fixture()
+        f[3]["predictions"] = copy.deepcopy(f[2]["predictions"])
+        result = inspect(f)
+        self.assertEqual(result["status"], "BLOCKED_BY_EVALUATION")
+        self.assertIsNone(result["router_result"])
+        for name in ("api_called", "state_changed", "model_promoted",
+                     "deployment_approved", "production_ready",
+                     "provider_authenticity_proven",
+                     "benchmark_provenance_authenticated",
+                     "holdout_access_isolation_proven",
+                     "integrity_declarations_authenticated",
+                     "real_world_improvement_proven"):
+            with self.subTest(field=name):
+                self.assertIs(result[name], False)
+
+    def test_packet_types_are_normalized_to_bridge_contract(self):
+        for which, invalid in ((4, None), (4, []), (5, None), (5, [])):
+            f = list(fixture())
+            f[which] = invalid
+            with self.subTest(which=which, invalid=invalid), self.assertRaises(BridgeContractError):
+                inspect_synthetic_chain(
+                    *f, expected_evaluation_sha256="0" * 64,
+                    expected_router_sha256="0" * 64, expected_provider_id="mock-gpt")
+
+    def test_context_none_rejected_as_contract_error(self):
+        f = list(fixture())
+        f[0]["context"] = None
+        with self.assertRaises(BridgeContractError):
+            inspect(f)
+
+    def test_bridge_explicitly_rejects_eighty_cases_before_mock(self):
+        f = list(fixture())
+        f[1] = f[1] * 4
+        with self.assertRaisesRegex(BridgeContractError, "case count"):
+            inspect(f)
+
+    def test_forged_evaluator_digest_remains_untrusted_synthetic_only(self):
+        f = list(fixture())
+        f[5]["evaluator_sha256"] = "a" * 64
+        result = inspect(f)
+        self.assertEqual(result["status"], "SYNTHETIC_CHAIN_PROPOSAL_ONLY")
+        self.assertIs(result["benchmark_provenance_authenticated"], False)
+        self.assertIs(result["model_promoted"], False)
+        self.assertIs(result["deployment_approved"], False)
+        self.assertIs(result["production_ready"], False)
 
     def test_bad_integrity_counter_blocks_router(self):
         f = fixture(); f[3]["critical_failures"]["leakage"] = 1

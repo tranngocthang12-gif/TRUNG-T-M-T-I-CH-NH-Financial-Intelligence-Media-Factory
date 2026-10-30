@@ -3,7 +3,7 @@
   "project": "UNIVERSAL ML FACTORY",
   "as_of": "2026-10-30",
   "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
-  "review_branch": "review/umlf-finance-factory-integration-p1-20261030",
+  "review_branch": "review/umlf-auto07b-r3-remediation-20261030",
   "main_observed_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
   "factory_candidate_source_sha": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
   "authority": "REVIEW_ONLY_NO_MERGE_NO_FINANCE_CONTROL",
@@ -11,7 +11,8 @@
   "steps": {
     "AUTO-05A": "STAGED_REVIEW_ONLY_NO_AUTHORITY_CHANGE",
     "AUTO-05B": "STAGED_CROSS_STAGE_SYNTHETIC_BRIDGE_AND_ADR009",
-    "AUTO-05C": "DUAL_DOMAIN_REVIEW_BRANCH_STAGED; EXACT_HEAD_CI_REQUIRED; NOT_ACCEPTED"
+    "AUTO-05C": "DUAL_DOMAIN_REVIEW_BRANCH_STAGED; EXACT_HEAD_CI_REQUIRED; NOT_ACCEPTED",
+    "AUTO-07B": "STAGED_R3_CONTRACT_CI_SCOPE_FIXES; NEW_HEAD_TEST_AND_EXTERNAL_REVIEW_PENDING"
   },
   "canonical_finance_boot": "BOOT.md",
   "canonical_finance_architecture": "architecture/ARCHITECTURE.md",
@@ -23,18 +24,18 @@
   "model_benchmark_authenticity_proven": false,
   "independent_critic_proven": false,
   "owner_merge_approval": false,
-  "next_gate": "INTEGRATED_EXACT_HEAD_BLOCKING_CI_AND_INDEPENDENT_CRITIC_THEN_OWNER_DECISION",
+  "next_gate": "AUTO07B_NEW_HEAD_BLOCKING_CI_EXTERNAL_REVIEW_AND_OWNER_MAIN_RULESET_DECISION",
   "review_ready": false,
   "main_modified": false,
   "main_merge_authorized": false,
   "bridge_provenance_authenticated": false,
   "integrated_tests_expected": 13,
   "validation": {
-    "factory_unittest": 170,
-    "factory_unittest_passed": 170,
-    "factory_ci": "PR12_EXACT_HEAD_9140ee4_GREEN; INTEGRATED_PENDING",
+    "factory_unittest": 173,
+    "factory_unittest_passed": 173,
+    "factory_ci": "PR13_PARENT_b1a9012_GITHUB_RUN_40997925582_173_PASS; AUTO07B_NEW_HEAD_UNVERIFIED",
     "finance_required_gates": "PASS",
-    "finance_full_suite": "PR12_LEGACY_4_COLLECTION_ERRORS; PR11_ISOLATED_12_PASS; INTEGRATED_PENDING",
+    "finance_full_suite": "PR13_PARENT_b1a9012_GITHUB_RUN_40997925582_185_PASS_38_SUBTESTS; AUTO07B_NEW_HEAD_UNVERIFIED",
     "finance_full_suite_files": [
       "tests/test_adjustment.py",
       "tests/test_ingest_errors.py",
@@ -54,12 +55,29 @@
     "factory_p1_run_id": 40995175552,
     "integrated": {
       "branch": "review/umlf-finance-factory-integration-p1-20261030",
-      "ci": "PENDING_EXACT_HEAD",
-      "independent_review": "PENDING",
+      "ci": "PR13_PARENT_VERIFIED; AUTO07B_NEW_HEAD_PENDING",
+      "independent_review": "R3_REVISE_AND_REVIEW_NO_SIGNOFF_ON_AUTO07B",
       "finance_full_suite_blocking": true,
       "source_finance_pr": 11,
       "source_factory_pr": 12,
       "source_blob_pins": true
+    },
+    "pr13_parent_verified": {
+      "head": "b1a9012ff55c916d53183c44b52cf503f3222fbb",
+      "git_tree_sha": "1bf48b1d522648cb0fe2f5fe328e91a44336b136",
+      "run_id": 40997925582,
+      "factory_unittest_passed": 173,
+      "full_pytest_passed": 185,
+      "full_pytest_subtests": 38,
+      "evidence_classification": "GITHUB_CI_LOG_OBSERVATION_NOT_REVIEWER_ATTESTATION"
+    },
+    "auto07b_current": {
+      "parent_sha": "b1a9012ff55c916d53183c44b52cf503f3222fbb",
+      "ci": "PENDING_EXACT_NEW_HEAD",
+      "external_review": "PENDING",
+      "owner_merge_approval": false,
+      "main_branch_protected_observed": false,
+      "real_evaluator_provenance_authenticated": false
     }
   },
   "production_ready": false

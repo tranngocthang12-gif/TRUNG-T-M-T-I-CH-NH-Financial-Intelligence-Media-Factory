@@ -6,6 +6,10 @@ from capability_contracts.evidence_router import inspect_router, RouterContractE
 from task_templates.tabular_classification.evidence_pilot import inspect_synthetic_paired_trial, EvidencePilotError
 from learning_governance import digest
 
+# The integrated mock A -> B -> C chain is limited by A's 64-case payload.
+# The B pilot's standalone 128-case capability is not a bridge entitlement.
+MAX_SYNTHETIC_CHAIN_CASES = 64
+
 
 class BridgeContractError(ValueError):
     pass
@@ -19,15 +23,22 @@ def inspect_synthetic_chain(
 ) -> dict[str, Any]:
     """Recompute mock and paired metrics; never accept caller-provided benchmark scores.
 
-    Both frozen-packet pins must originate from an external trusted caller. This
-    demo cannot authenticate that caller, the benchmark origin or real execution.
+    Frozen-packet pins and evaluator digests are caller-provided declarations.
+    No external issuer, independent holdout, real execution or reviewer is
+    authenticated here. All outcomes stay synthetic and non-authoritative.
     """
     if type(expected_provider_id) is not str:
         raise BridgeContractError("provider identity must be a trusted invocation argument")
     if type(request) is not dict or request.get("capability") != "analyze_errors":
         raise BridgeContractError("only the mock error-analysis capability is allowed")
-    if not isinstance(cases, list) or not isinstance(baseline, dict):
-        raise BridgeContractError("invalid paired fixture")
+    if type(evaluation_packet) is not dict or type(router_packet) is not dict:
+        raise BridgeContractError("synthetic policies must be objects")
+    if (type(cases) is not list or not 12 <= len(cases) <= MAX_SYNTHETIC_CHAIN_CASES
+            or type(baseline) is not dict):
+        raise BridgeContractError("invalid paired fixture or unsupported mock case count")
+    context = request.get("context")
+    if type(context) is not dict:
+        raise BridgeContractError("mock request context must be an object")
     predicted = baseline.get("predictions")
     if not isinstance(predicted, list) or not isinstance(request.get("payload"), dict):
         raise BridgeContractError("invalid mock prediction payload")
@@ -35,6 +46,8 @@ def inspect_synthetic_chain(
     for item in predicted:
         if type(item) is not dict or set(item) != {"case_id", "predicted"}:
             raise BridgeContractError("malformed baseline prediction")
+        if type(item["case_id"]) is not str:
+            raise BridgeContractError("baseline case ID must be text")
         if item["case_id"] in by_id:
             raise BridgeContractError("duplicated baseline prediction")
         by_id[item["case_id"]] = item["predicted"]
@@ -43,6 +56,8 @@ def inspect_synthetic_chain(
         if type(item) is not dict or set(item) != {"case_id", "label", "critical"}:
             raise BridgeContractError("malformed synthetic case")
         case_id = item["case_id"]
+        if type(case_id) is not str:
+            raise BridgeContractError("synthetic case ID must be text")
         if case_id not in by_id:
             raise BridgeContractError("incomplete baseline prediction coverage")
         expected_cases.append({"case_id": case_id, "actual": item["label"],
@@ -50,9 +65,9 @@ def inspect_synthetic_chain(
     if len(by_id) != len(expected_cases):
         raise BridgeContractError("incomplete or foreign baseline predictions")
     if (request["payload"] != {"cases": expected_cases} or
-            request.get("context", {}).get("data_role") != "SYNTHETIC" or
-            request.get("context", {}).get("task_family") != "TABULAR_CLASSIFICATION" or
-            request.get("context", {}).get("dataset_version") != evaluation_packet.get("dataset_version")):
+            context.get("data_role") != "SYNTHETIC" or
+            context.get("task_family") != "TABULAR_CLASSIFICATION" or
+            context.get("dataset_version") != evaluation_packet.get("dataset_version")):
         raise BridgeContractError("mock request not bound to the exact synthetic baseline")
     try:
         adapter = MockCapabilityAdapter(expected_provider_id)
@@ -68,7 +83,14 @@ def inspect_synthetic_chain(
     if evaluated["status"] != "SYNTHETIC_REVIEW_ELIGIBLE":
         return {"status": "BLOCKED_BY_EVALUATION", "mock_receipt": mock_receipt,
                 "evaluation": evaluated, "router_result": None,
-                "state_changed": False, "external_review_required": True}
+                "provider_authenticity_proven": False,
+                "benchmark_provenance_authenticated": False,
+                "holdout_access_isolation_proven": False,
+                "integrity_declarations_authenticated": False,
+                "real_world_improvement_proven": False,
+                "api_called": False, "state_changed": False,
+                "model_promoted": False, "deployment_approved": False,
+                "production_ready": False, "external_review_required": True}
 
     if (router_packet.get("mode") != "SYNTHETIC_ONLY" or
             router_packet.get("task_family") != evaluation_packet["task_family"] or
@@ -79,7 +101,7 @@ def inspect_synthetic_chain(
     receipt = {
         "provider_id": expected_provider_id,
         "packet_sha256": expected_router_sha256,
-        "evaluator_sha256": router_packet["evaluator_sha256"],
+        "evaluator_sha256": router_packet.get("evaluator_sha256"),
         "case_set_sha256": evaluated["cases_sha256"],
         "evaluated_case_count": evaluated["case_count"],
         "accuracy": evaluated["challenger_metrics"]["accuracy"],
@@ -101,8 +123,10 @@ def inspect_synthetic_chain(
         "router_result": routed, "receipt_origin": "DERIVED_IN_THIS_SYNTHETIC_CALL",
         "provider_authenticity_proven": False,
         "benchmark_provenance_authenticated": False,
+        "holdout_access_isolation_proven": False,
+        "integrity_declarations_authenticated": False,
         "real_world_improvement_proven": False,
         "api_called": False, "state_changed": False,
         "model_promoted": False, "deployment_approved": False,
-        "external_review_required": True,
+        "production_ready": False, "external_review_required": True,
     }

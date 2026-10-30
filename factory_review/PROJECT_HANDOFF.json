@@ -2,10 +2,10 @@
   "schema": "umlf-auto05-handoff/v1",
   "as_of": "2026-10-30",
   "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
-  "branch": "review/umlf-finance-factory-integration-p1-20261030",
+  "branch": "review/umlf-auto07b-r3-remediation-20261030",
   "baseline_main_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
   "candidate_head_origin": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
-  "scope": "AUTO-05A/B/C plus Finance PR11 and Factory PR12 P1 reconciliation; offline Draft",
+  "scope": "AUTO-07B R3 review-only contract and CI hardening on pinned Draft PR13; finance PR11 blobs untouched",
   "protected": [
     "BOOT.md",
     "architecture/ARCHITECTURE.md",
@@ -16,12 +16,13 @@
   ],
   "merge_authority": "OWNER_ONLY",
   "validation_production_ready": false,
-  "next_action": "Check exact-head dual-domain blocking CI and independent adversarial review, then Owner decides; NEVER auto-merge",
+  "next_action": "Verify AUTO07B exact HEAD push/full-suite CI and independent review; Owner must configure trustworthy main protection before any merge",
   "blocked": [
-    "Integrated exact-head blocking CI not yet independently verified",
-    "Independent exact-head reviewer absent",
-    "Owner migration/main merge decision absent",
-    "Real dataset/evaluator provenance and production rights unproved"
+    "New AUTO07B exact-head CI and independent audit pending",
+    "GitHub main reports protected=false and rulesets=[]; Owner-enforced required checks absent",
+    "Validator/workflow proposed within a PR cannot independently attest their own integrity",
+    "Owner main merge authorization absent",
+    "Real benchmark evaluator/label custody, production rights and dependency lock unproved"
   ],
   "pinned_sources": {
     "finance_baseline_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
@@ -30,5 +31,12 @@
   },
   "reviewed_engine_exception": {
     "engine/adjust.py": "exact Git blob d3e84f01748410336191553999063c6ded31e41c from Finance PR11; no general engine permission"
+  },
+  "auto07b": {
+    "frozen_pr13_parent_sha": "b1a9012ff55c916d53183c44b52cf503f3222fbb",
+    "original_pr13_ci_run": 40997925582,
+    "original_pr13_ci": "FACTORY_173_PASS_FINANCE_185_PASS_38_SUBTESTS",
+    "target_status": "DRAFT_NEW_HEAD_UNTESTED",
+    "owner_gate": "RULESET_PLUS_INDEPENDENT_REVIEW_PLUS_EXPLICIT_MERGE_DECISION"
   }
 }
