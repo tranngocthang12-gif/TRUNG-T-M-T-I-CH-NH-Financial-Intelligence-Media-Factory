@@ -6,6 +6,8 @@ from tools.validate_factory_review import (
     FINANCE_PINNED_PATCH,
     INTEGRATION_DELTA,
     AUTO07B_DELTA,
+    AUTO08_DELTA,
+    check_auto08_delta,
     check_changes,
     check_auto07b_delta,
     check_integration_delta,
@@ -38,6 +40,18 @@ class FactoryProtectionTests(unittest.TestCase):
                       "M\trequirements.txt"):
             with self.subTest(path=rogue):
                 self.assertTrue(check_auto07b_delta(expected + [rogue]))
+
+    def test_auto08_exact_diff_rejects_rogue_finance_or_factory_files(self):
+        expected = [f"{status}\t{path}" for path, status in AUTO08_DELTA.items()]
+        self.assertEqual(check_auto08_delta(expected), [])
+        self.assertTrue(check_auto08_delta(expected[:-1]))
+        for changed in ("M\tengine/adjust.py",
+                        "M\trequirements.txt",
+                        "M\tgovernance/LAWS.md",
+                        "M\tlearning_governance/core.py",
+                        "A\ttools/secret_promoter.py"):
+            with self.subTest(changed=changed):
+                self.assertTrue(check_auto08_delta(expected + [changed]))
 
     def test_required_finance_change_cannot_be_omitted(self):
         self.assertTrue(check_changes(["A\tfactory_review/evidence_bridge.py"]))
