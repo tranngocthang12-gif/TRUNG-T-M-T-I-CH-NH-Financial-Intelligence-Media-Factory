@@ -1,6 +1,10 @@
 """Audit-only A -> B -> C integration with strictly synthetic, non-authoritative receipts."""
 from __future__ import annotations
+import hashlib
+from pathlib import Path
 from typing import Any
+from learning_governance import core as _governance_source
+from task_templates.tabular_classification import evidence_pilot as _evaluation_source
 from capability_contracts import MockCapabilityAdapter, validate_mock_result
 from capability_contracts.evidence_router import inspect_router, RouterContractError
 from task_templates.tabular_classification.evidence_pilot import inspect_synthetic_paired_trial, EvidencePilotError
@@ -11,11 +15,35 @@ class BridgeContractError(ValueError):
     pass
 
 
+def evaluator_source_sha256() -> str:
+    """Bind the declared evaluator to bytes of the two actually imported sources.
+
+    This is a runtime consistency check, NOT an external issuer attestation.
+    """
+    root = Path(__file__).resolve().parents[1]
+    sources = {
+        "task_templates/tabular_classification/evidence_pilot.py": _evaluation_source,
+        "learning_governance/core.py": _governance_source,
+    }
+    file_hashes = {}
+    for rel, module in sorted(sources.items()):
+        expected_path = (root / rel).resolve()
+        try:
+            actual_path = Path(module.__file__).resolve()
+            if actual_path != expected_path:
+                raise BridgeContractError("evaluator imported from an unexpected source path")
+            file_hashes[rel] = hashlib.sha256(actual_path.read_bytes()).hexdigest()
+        except (TypeError, OSError, AttributeError) as exc:
+            raise BridgeContractError("unable to bind actual evaluator source bytes") from exc
+    return digest({"schema": "umlf-evaluator-source-set/v1", "files": file_hashes})
+
+
 def inspect_synthetic_chain(
     request: dict[str, Any], cases: list[dict[str, Any]], baseline: dict[str, Any],
     challenger: dict[str, Any], evaluation_packet: dict[str, Any],
     router_packet: dict[str, Any], *, expected_evaluation_sha256: str,
     expected_router_sha256: str, expected_provider_id: str,
+    expected_evaluator_sha256: str,
 ) -> dict[str, Any]:
     """Recompute mock and paired metrics; never accept caller-provided benchmark scores.
 
@@ -24,10 +52,18 @@ def inspect_synthetic_chain(
     """
     if type(expected_provider_id) is not str:
         raise BridgeContractError("provider identity must be a trusted invocation argument")
-    if type(request) is not dict or request.get("capability") != "analyze_errors":
-        raise BridgeContractError("only the mock error-analysis capability is allowed")
-    if not isinstance(cases, list) or not isinstance(baseline, dict):
-        raise BridgeContractError("invalid paired fixture")
+    if (type(request) is not dict or request.get("capability") != "analyze_errors"
+            or type(request.get("context")) is not dict):
+        raise BridgeContractError("only a valid mock error-analysis request is allowed")
+    if (type(cases) is not list or type(baseline) is not dict
+            or type(challenger) is not dict or type(evaluation_packet) is not dict
+            or type(router_packet) is not dict):
+        raise BridgeContractError("invalid synthetic paired or policy input")
+    observed_evaluator_sha256 = evaluator_source_sha256()
+    if (type(expected_evaluator_sha256) is not str
+            or expected_evaluator_sha256 != observed_evaluator_sha256
+            or router_packet.get("evaluator_sha256") != observed_evaluator_sha256):
+        raise BridgeContractError("declared evaluator does not match source bytes and trusted pin")
     predicted = baseline.get("predictions")
     if not isinstance(predicted, list) or not isinstance(request.get("payload"), dict):
         raise BridgeContractError("invalid mock prediction payload")
@@ -68,7 +104,15 @@ def inspect_synthetic_chain(
     if evaluated["status"] != "SYNTHETIC_REVIEW_ELIGIBLE":
         return {"status": "BLOCKED_BY_EVALUATION", "mock_receipt": mock_receipt,
                 "evaluation": evaluated, "router_result": None,
-                "state_changed": False, "external_review_required": True}
+                "receipt_origin": "NOT_ISSUED",
+                "evaluator_source_sha256": observed_evaluator_sha256,
+                "evaluator_source_authenticity_proven": False,
+                "provider_authenticity_proven": False,
+                "benchmark_provenance_authenticated": False,
+                "real_world_improvement_proven": False,
+                "api_called": False, "state_changed": False,
+                "model_promoted": False, "deployment_approved": False,
+                "production_ready": False, "external_review_required": True}
 
     if (router_packet.get("mode") != "SYNTHETIC_ONLY" or
             router_packet.get("task_family") != evaluation_packet["task_family"] or
@@ -79,7 +123,7 @@ def inspect_synthetic_chain(
     receipt = {
         "provider_id": expected_provider_id,
         "packet_sha256": expected_router_sha256,
-        "evaluator_sha256": router_packet["evaluator_sha256"],
+        "evaluator_sha256": observed_evaluator_sha256,
         "case_set_sha256": evaluated["cases_sha256"],
         "evaluated_case_count": evaluated["case_count"],
         "accuracy": evaluated["challenger_metrics"]["accuracy"],
@@ -99,10 +143,12 @@ def inspect_synthetic_chain(
                   else "ROUTER_REJECTED",
         "mock_receipt": mock_receipt, "evaluation": evaluated,
         "router_result": routed, "receipt_origin": "DERIVED_IN_THIS_SYNTHETIC_CALL",
+        "evaluator_source_sha256": observed_evaluator_sha256,
+        "evaluator_source_authenticity_proven": False,
         "provider_authenticity_proven": False,
         "benchmark_provenance_authenticated": False,
         "real_world_improvement_proven": False,
         "api_called": False, "state_changed": False,
         "model_promoted": False, "deployment_approved": False,
-        "external_review_required": True,
+        "production_ready": False, "external_review_required": True,
     }

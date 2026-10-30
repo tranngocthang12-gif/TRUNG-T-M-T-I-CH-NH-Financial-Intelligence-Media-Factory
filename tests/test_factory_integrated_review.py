@@ -4,7 +4,7 @@ import unittest
 from capability_contracts.evidence_router import SCHEMA as ROUTER_SCHEMA, _digest
 from task_templates.tabular_classification.evidence_pilot import SCHEMA as EVAL_SCHEMA, freeze_synthetic_cases
 from learning_governance import digest
-from factory_review.evidence_bridge import BridgeContractError, inspect_synthetic_chain
+from factory_review.evidence_bridge import BridgeContractError, inspect_synthetic_chain, evaluator_source_sha256
 
 
 def fixture():
@@ -43,7 +43,7 @@ def fixture():
     router = {
         "schema": ROUTER_SCHEMA, "frozen": True, "mode": "SYNTHETIC_ONLY",
         "task_family": "TABULAR_CLASSIFICATION", "dataset_version": "synthetic-bridge-v1",
-        "evaluator_sha256": digest({"evaluation_schema": EVAL_SCHEMA, "version": "v1"}),
+        "evaluator_sha256": evaluator_source_sha256(),
         "case_set_sha256": freeze_synthetic_cases(cases), "case_count": 20,
         "min_accuracy": .7, "max_critical_error_rate": .25,
         "max_latency_ms": 100, "max_cost_usd": 0, "min_coverage": 1.0,
@@ -58,7 +58,8 @@ def inspect(f=None, **kwargs):
         req, cases, base, chal, evaluation_packet, router,
         expected_evaluation_sha256=kwargs.get("evaluation_pin", digest(evaluation_packet)),
         expected_router_sha256=kwargs.get("router_pin", _digest(router)),
-        expected_provider_id=kwargs.get("provider", "mock-gpt"))
+        expected_provider_id=kwargs.get("provider", "mock-gpt"),
+        expected_evaluator_sha256=kwargs.get("evaluator_source_pin", evaluator_source_sha256()))
 
 
 class IntegratedFactoryReviewTests(unittest.TestCase):
@@ -129,6 +130,42 @@ class IntegratedFactoryReviewTests(unittest.TestCase):
         with self.assertRaises(BridgeContractError): inspect(f)
         f=fixture(); f[0]["constraints"]["max_cost_usd"] = 1
         with self.assertRaises(BridgeContractError): inspect(f)
+
+
+    def test_self_declared_evaluator_forgery_rejected_even_when_router_rehashed(self):
+        f = fixture()
+        f[5]["evaluator_sha256"] = "d" * 64
+        with self.assertRaisesRegex(BridgeContractError, "declared evaluator"):
+            inspect(f)
+
+    def test_external_evaluator_source_pin_mismatch_rejected(self):
+        with self.assertRaisesRegex(BridgeContractError, "declared evaluator"):
+            inspect(evaluator_source_pin="e" * 64)
+
+    def test_malformed_input_fails_with_contract_error(self):
+        for index in (4, 5):
+            f = fixture()
+            f = list(f)
+            f[index] = None
+            with self.subTest(index=index), self.assertRaises(BridgeContractError):
+                inspect(f)
+
+    def test_blocked_path_has_all_negative_authority_receipts(self):
+        f = fixture()
+        f[3]["predictions"] = copy.deepcopy(f[2]["predictions"])
+        out = inspect(f)
+        self.assertEqual(out["status"], "BLOCKED_BY_EVALUATION")
+        for key in ("api_called", "state_changed", "model_promoted", "deployment_approved",
+                    "production_ready", "benchmark_provenance_authenticated",
+                    "evaluator_source_authenticity_proven"):
+            self.assertIs(out[key], False)
+        self.assertIs(out["external_review_required"], True)
+
+    def test_successful_path_is_only_source_consistent_not_authenticated(self):
+        out = inspect()
+        self.assertEqual(out["evaluator_source_sha256"], evaluator_source_sha256())
+        self.assertIs(out["evaluator_source_authenticity_proven"], False)
+        self.assertIs(out["production_ready"], False)
 
 
 if __name__ == "__main__":
