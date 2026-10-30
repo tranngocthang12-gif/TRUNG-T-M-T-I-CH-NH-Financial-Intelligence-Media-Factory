@@ -8,14 +8,15 @@
 - Kiểm tra chất lượng: biến động giữa hai lần quan sát liên tiếp (trên chuỗi ĐÃ điều chỉnh) vượt biên độ sàn
   → cờ lỗi dữ liệu. Ô bị cờ được loại khỏi feature/nhãn và ghi vào báo cáo chu kỳ."""
 import numpy as np, pandas as pd
-from .config import CFG, ROOT
+from .config import CFG
+from . import config as _runtime_config
 
 STOCK = ("stock_split", "stock_dividend")
 CASH = "cash_dividend"
 EV_COLS = ["ticker", "ex_date", "type", "ratio", "cash_per_share", "source", "source_status", "note"]
 
 def _read_events(rel):
-    p = ROOT / rel
+    p = _runtime_config.ROOT / rel
     if not p.exists():
         return pd.DataFrame(columns=EV_COLS)
     df = pd.read_csv(p, parse_dates=["ex_date"])
@@ -62,11 +63,14 @@ def build_events(close, observed, manual, yahoo):
     for e in ev.itertuples(index=False):
         row = {c: getattr(e, c) for c in EV_COLS}
         row.update(trade_date=pd.NaT, raw_return=np.nan, adj_return=np.nan, price_factor=1.0, split_factor=1.0)
-        s = close[e.ticker].dropna() if e.ticker in close.columns else pd.Series(dtype=float)
-        before, after = s[s.index < e.ex_date], s[s.index >= e.ex_date]
+        # Unknown tickers have no price date index; classify before date comparisons.
         if e.ticker not in close.columns:
             row["status"] = "KHONG_CO_MA"
-        elif after.empty:
+            out.append(row)
+            continue
+        s = close[e.ticker].dropna()
+        before, after = s[s.index < e.ex_date], s[s.index >= e.ex_date]
+        if after.empty:
             row["status"] = "CHUA_DEN_HAN"
         elif before.empty:
             row["status"] = "NGOAI_DU_LIEU"
