@@ -1,0 +1,108 @@
+name: PR16 offline independent audit evidence (read-only)
+on:
+  push:
+    branches: ["audit/umlf-pr16-offline-evidence-20261030"]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  build-frozen-evidence:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - name: Checkout EXACT PR16 audited SHA, not this audit workflow commit
+        uses: actions/checkout@v4
+        with:
+          ref: e1e2e97ab851966c65072ad643f24273daf4826d
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable refs and collect source, tree and diffs
+        shell: bash
+        run: |
+          set -euo pipefail
+          HEAD_SHA=e1e2e97ab851966c65072ad643f24273daf4826d
+          BASE_SHA=6bace5fe82ef92393c81d44af714a087e37869d3
+          PR14_SHA=ad4d145e0cfadb7ad185c9f977956f42d563dd46
+          test "$(git rev-parse HEAD)" = "$HEAD_SHA"
+          git cat-file -e "$BASE_SHA^{commit}"
+          git cat-file -e "$PR14_SHA^{commit}"
+          git merge-base --is-ancestor "$BASE_SHA" "$HEAD_SHA"
+          git merge-base --is-ancestor "$PR14_SHA" "$HEAD_SHA"
+          mkdir -p audit-evidence/ci-logs
+          {
+            echo "OBJECT: PR #16 source checkout (NOT audit-workflow HEAD)"
+            echo "SOURCE_HEAD_SHA=$(git rev-parse HEAD)"
+            echo "SOURCE_TREE_SHA=$(git rev-parse HEAD^{tree})"
+            echo "FINANCE_BASE_SHA=$BASE_SHA"
+            echo "PR14_PARENT_SHA=$PR14_SHA"
+            echo "SOURCE_PR15_SHA=2b194a9997af3a2a9abbfba88cb79df9ccd5558c"
+            echo "ORIGINAL_CI_RUN=41012593370"
+            echo "INDEPENDENT_ATTESTATION=NOT_PROVIDED"
+            echo "MERGE_AUTHORIZED=FALSE"
+          } > audit-evidence/00_EXACT_SHA_MANIFEST.txt
+          git ls-tree -r -l HEAD > audit-evidence/01_EXACT_HEAD_GIT_TREE.txt
+          git diff --name-status --no-renames "$BASE_SHA" "$HEAD_SHA" > audit-evidence/02_CHANGED_FILES_VS_MAIN.txt
+          git diff --stat "$BASE_SHA" "$HEAD_SHA" > audit-evidence/03_DIFF_STAT_VS_MAIN.txt
+          git diff --binary --no-ext-diff "$BASE_SHA" "$HEAD_SHA" > audit-evidence/04_FULL_DIFF_VS_MAIN.patch
+          git diff --binary --no-ext-diff "$PR14_SHA" "$HEAD_SHA" > audit-evidence/05_PR14_TO_PR16_SOURCE_BINDING.patch
+          git archive --format=tar "$HEAD_SHA" | gzip -n > audit-evidence/06_FULL_TRACKED_SOURCE_EXACT_PR16.tar.gz
+          cat > audit-evidence/README_FOR_INDEPENDENT_REVIEWER.txt <<'REVIEW'
+          UMLF PR16 OFFLINE EVIDENCE - exact committed source and original CI logs
+          Audit target: PR #16, e1e2e97ab851966c65072ad643f24273daf4826d
+          Finance main baseline: 6bace5fe82ef92393c81d44af714a087e37869d3
+          PR14 frozen parent: ad4d145e0cfadb7ad185c9f977956f42d563dd46
+          Source code: 06_FULL_TRACKED_SOURCE_EXACT_PR16.tar.gz
+          Full diff: 04_FULL_DIFF_VS_MAIN.patch
+          PR14 -> PR16 delta: 05_PR14_TO_PR16_SOURCE_BINDING.patch
+          Job logs: ci-logs/job_123921588613_factory.log and job_123921588979_finance.log
+          The SHA256SUMS file checks local bundle consistency, NOT independent origin.
+          This ZIP is assembled by a Builder-controlled read-only GitHub workflow.
+          It is NOT an independent trusted attestation of GitHub refs, job execution,
+          reviewer identity, benchmark issuer, labels, model, or runtime.
+          Check the pinned SHA through a separate trusted GitHub channel whenever
+          available. If unable, mark remote SHA/log authenticity INDETERMINATE.
+          Evaluate all 34 changed files and inspect finance six pinned patches.
+          Focus: evaluator_source_sha256 source bytes versus runtime, dependencies,
+          packet/pin forgery, semantic leakage, accuracy source, source labels,
+          governance authority, finance preservation, workflows, CI and branch rules.
+          Do not merge, deploy, execute paid APIs, trade, publish or promote.
+          Output observed evidence, reproducible findings, P0/P1/P2 and gate verdict.
+          REVIEW
+      - name: Retrieve original exact-head Actions job logs if accessible
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          for spec in "123921588613:factory" "123921588979:finance"; do
+            id="${spec%%:*}"
+            label="${spec#*:}"
+            out="audit-evidence/ci-logs/job_${id}_${label}.log"
+            if curl --fail --location --silent --show-error --retry 2 \
+                --header "Authorization: Bearer ${GH_TOKEN}" \
+                --header "Accept: application/vnd.github+json" \
+                --header "X-GitHub-Api-Version: 2022-11-28" \
+                "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/jobs/${id}/logs" \
+                --output "${out}"; then
+              echo "Retrieved original job log ${id}, bytes $(wc -c < "${out}")"
+            else
+              rm -f "${out}"
+              printf 'UNAVAILABLE: external review must mark job log INDETERMINATE.\n' > "audit-evidence/ci-logs/job_${id}_${label}.unavailable.txt"
+              echo "Could not retrieve original job log ${id}; bundle remains useful but incomplete"
+            fi
+          done
+      - name: Finalize evidence digests and package integrity
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd audit-evidence
+          find . -type f ! -name SHA256SUMS.txt -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS.txt
+          sha256sum --check SHA256SUMS.txt
+          echo "Evidence manifest complete (NOT independent attestation)"
+      - name: Upload read-only offline audit packet as downloadable ZIP
+        uses: actions/upload-artifact@v4
+        with:
+          name: UMLF_PR16_EXACT_SHA_INDEPENDENT_AUDIT_PACKET
+          path: audit-evidence/
+          if-no-files-found: error
+          retention-days: 30
