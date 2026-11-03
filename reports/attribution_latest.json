@@ -1,13 +1,13 @@
 {
   "period": {
     "start": "2026-09-25",
-    "end": "2026-11-02",
-    "n_days": 26
+    "end": "2026-11-03",
+    "n_days": 27
   },
   "actual_return": 0.0,
   "counterfactuals": {
     "no_trade": 0.0,
-    "index": -0.057900515104923445
+    "index": -0.0578234716424616
   },
   "components": {
     "market_beta": 0.0,
