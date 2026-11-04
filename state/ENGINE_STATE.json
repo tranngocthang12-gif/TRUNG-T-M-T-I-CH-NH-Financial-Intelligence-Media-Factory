@@ -1,8 +1,8 @@
 {
-  "as_of": "2026-11-03",
-  "regime": "DOWN_LOWVOL",
-  "total_trials": 162,
-  "current_t_threshold": 3.61,
+  "as_of": "2026-11-04",
+  "regime": "DOWN_HIGHVOL",
+  "total_trials": 168,
+  "current_t_threshold": 3.62,
   "models": {
     "ACTIVE": 0,
     "WATCH": 0,
@@ -14,10 +14,10 @@
   "paper_nav": 1000000000,
   "alerts": [],
   "data_quality": {
-    "as_of": "2026-11-03",
-    "checked": 72982,
+    "as_of": "2026-11-04",
+    "checked": 73012,
     "flagged_total": 142,
-    "error_rate_total": 0.00195,
+    "error_rate_total": 0.00194,
     "window_sessions": 20,
     "flagged_window": 0,
     "error_rate_window": 0.0,
@@ -359,8 +359,8 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-11-03T17:14:13.334138",
-    "end": "2026-11-03",
+    "at": "2026-11-04T17:25:12.996246",
+    "end": "2026-11-04",
     "sources": [
       "yahoo"
     ],
@@ -371,59 +371,59 @@
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
-      "ACB": "2026-11-03",
-      "BCM": "2026-11-03",
-      "BID": "2026-11-03",
-      "BVH": "2026-11-03",
-      "CTG": "2026-11-03",
-      "FPT": "2026-11-03",
-      "GAS": "2026-11-03",
-      "GVR": "2026-11-03",
-      "HDB": "2026-11-03",
-      "HPG": "2026-11-03",
-      "MBB": "2026-11-03",
-      "MSN": "2026-11-03",
-      "MWG": "2026-11-03",
-      "PLX": "2026-11-03",
-      "POW": "2026-11-03",
-      "SAB": "2026-11-03",
-      "SHB": "2026-11-03",
-      "SSB": "2026-11-03",
-      "SSI": "2026-11-03",
-      "STB": "2026-11-03",
-      "TCB": "2026-11-03",
-      "TPB": "2026-11-03",
-      "VCB": "2026-11-03",
-      "VHM": "2026-11-03",
-      "VIB": "2026-11-03",
-      "VIC": "2026-11-03",
-      "VJC": "2026-11-03",
-      "VNM": "2026-11-03",
-      "VPB": "2026-11-03",
-      "VRE": "2026-11-03"
+      "ACB": "2026-11-04",
+      "BCM": "2026-11-04",
+      "BID": "2026-11-04",
+      "BVH": "2026-11-04",
+      "CTG": "2026-11-04",
+      "FPT": "2026-11-04",
+      "GAS": "2026-11-04",
+      "GVR": "2026-11-04",
+      "HDB": "2026-11-04",
+      "HPG": "2026-11-04",
+      "MBB": "2026-11-04",
+      "MSN": "2026-11-04",
+      "MWG": "2026-11-04",
+      "PLX": "2026-11-04",
+      "POW": "2026-11-04",
+      "SAB": "2026-11-04",
+      "SHB": "2026-11-04",
+      "SSB": "2026-11-04",
+      "SSI": "2026-11-04",
+      "STB": "2026-11-04",
+      "TCB": "2026-11-04",
+      "TPB": "2026-11-04",
+      "VCB": "2026-11-04",
+      "VHM": "2026-11-04",
+      "VIB": "2026-11-04",
+      "VIC": "2026-11-04",
+      "VJC": "2026-11-04",
+      "VNM": "2026-11-04",
+      "VPB": "2026-11-04",
+      "VRE": "2026-11-04"
     }
   },
   "news_errors": [],
   "bandit": {
     "single_family": {
-      "trials": 35,
+      "trials": 36,
       "survivors": 0,
-      "posterior_mean": 0.027
+      "posterior_mean": 0.026
     },
     "cross_family": {
-      "trials": 42,
-      "survivors": 0,
-      "posterior_mean": 0.023
-    },
-    "random_subset": {
       "trials": 45,
       "survivors": 0,
       "posterior_mean": 0.021
     },
-    "mutate_best": {
-      "trials": 40,
+    "random_subset": {
+      "trials": 46,
       "survivors": 0,
-      "posterior_mean": 0.024
+      "posterior_mean": 0.021
+    },
+    "mutate_best": {
+      "trials": 41,
+      "survivors": 0,
+      "posterior_mean": 0.023
     }
   }
 }
