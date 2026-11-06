@@ -7,20 +7,20 @@
   },
   "cross_family": {
     "a": 1.0,
-    "b": 49.0,
-    "trials": 48,
+    "b": 50.0,
+    "trials": 49,
     "survivors": 0
   },
   "random_subset": {
     "a": 1.0,
-    "b": 47.0,
-    "trials": 46,
+    "b": 51.0,
+    "trials": 50,
     "survivors": 0
   },
   "mutate_best": {
     "a": 1.0,
-    "b": 44.0,
-    "trials": 43,
+    "b": 45.0,
+    "trials": 44,
     "survivors": 0
   }
 }
