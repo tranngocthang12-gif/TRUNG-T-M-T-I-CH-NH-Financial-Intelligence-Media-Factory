@@ -150,3 +150,32 @@ def test_actual_intake_main_writes_single_hashed_issue(tmp_path, monkeypatch):
     monkeypatch.setenv("ISSUE_ACTION", "labeled")
     assert ledger_intake.main() == 2
     assert len(target.read_text().splitlines()) == 1
+
+
+def test_legacy_engine_and_issue_share_one_hash_chain(tmp_path, monkeypatch):
+    monkeypatch.setattr(ledger, "ROOT", tmp_path)
+    def local_path(rel):
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    monkeypatch.setattr(ledger, "path", local_path)
+    old = {
+        "id": "P-old", "created_at": "2026-11-11",
+        "procedure": "news@v1", "probability": 0.5, "base_rate": 0.5,
+        "resolution_rule": {"type": "excess_return_positive", "ticker": "FPT", "horizon": 5},
+    }
+    ledger._append_predictions([old])
+    rows = ledger._load(ledger.PRED)
+    assert len(rows) == 1
+    candidate = issue_row()
+    candidate["prev_hash"] = rows[-1]["hash"]
+    candidate["hash"] = line_hash(candidate)
+    ledger._append(ledger.PRED, [candidate])
+    assert check_ledger_chain(tmp_path) == []
+    normalized, reasons = prepare_predictions(ledger._load(ledger.PRED))
+    assert reasons == {} and len(normalized) == 2
+    with pytest.raises(ValueError, match="integrity failure"):
+        rows = ledger._load(ledger.PRED)
+        rows[0]["probability"] = 0.95
+        local_path(ledger.PRED).write_text("\\n".join(json.dumps(x) for x in rows) + "\\n")
+        ledger._append_predictions([old])
