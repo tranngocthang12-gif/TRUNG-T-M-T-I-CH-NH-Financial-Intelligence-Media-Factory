@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import re
 from datetime import date, datetime, timedelta, timezone
+import hashlib
+import json
 from zoneinfo import ZoneInfo
 
 VN_TZ = ZoneInfo("Asia/Ho_Chi_Minh")
@@ -61,9 +63,11 @@ def normalize_prediction(raw: dict) -> tuple[dict | None, str | None]:
         p, base = float(raw["p"]), float(raw["base_rate"])
         if not (0.05 <= p <= 0.95 and 0 <= base <= 1):
             return None, "INVALID_PROBABILITY"
-        local_day = created.astimezone(VN_TZ).date()
+        issue_day = created.astimezone(VN_TZ).date()
+        registered_day = received.astimezone(VN_TZ).date()
+        decision_day = max(issue_day, registered_day)
         due = date.fromisoformat(raw["resolve_at"])
-        if due <= local_day or due < received.astimezone(VN_TZ).date():
+        if due <= decision_day:
             return None, "INVALID_DUE_DATE"
         rule = raw["resolution_rule"]
         if rule in NONPRICE_RULES:
@@ -82,7 +86,10 @@ def normalize_prediction(raw: dict) -> tuple[dict | None, str | None]:
         return None, "INVALID_ISSUE_ROW"
     return {
         "id": f"I-{n}",
-        "created_at": local_day.isoformat(),
+        # Never use market prices prior to the actual ledger registration date.
+        "created_at": decision_day.isoformat(),
+        "original_issue_created_at": created.isoformat(),
+        "registered_at": received.isoformat(),
         "procedure": f"issue_{seat}",
         "probability": p,
         "base_rate": base,
@@ -96,7 +103,12 @@ def normalize_prediction(raw: dict) -> tuple[dict | None, str | None]:
         },
         "resolve_at": due.isoformat(),
         "seat": seat,
-        "pair_key": f"{local_day.isoformat()}:{ticker}:{horizon}",
+        "pair_key": hashlib.sha256(json.dumps({
+            "day": decision_day.isoformat(), "question": raw.get("question"),
+            "resolution_source": raw["resolution_source"],
+            "rule": rule, "ticker": ticker, "horizon": horizon,
+            "resolve_at": due.isoformat(),
+        }, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest(),
         "evidence_refs": raw.get("library_refs", ""),
         "source_issue_number": n,
     }, None
