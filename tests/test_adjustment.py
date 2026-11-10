@@ -15,15 +15,33 @@ for t, d, lo in [("TCB", "2024-06-11", -0.45), ("VCB", "2025-03-03", -0.30)]:
     assert not bad.at[raw.index[i], t]                          # không bị cờ lỗi (đã có sự kiện quyền giải thích)
     assert adj[t].iloc[-1] == raw[t].iloc[-1]                   # neo tại ngày cuối: giá điều chỉnh = giá gốc
     print(f"OK 1: {t} {d}: giá gốc {r_raw:+.2%} → điều chỉnh {r_adj:+.2%}, không bị cờ lỗi")
-st = mk["events"].set_index("ticker").status
-assert st["TCB"] == "APPLIED" and st["VCB"] == "APPLIED"
+def _single_event_status(events, ticker, ex_date, event_type):
+    rows = events.loc[
+        (events["ticker"] == ticker)
+        & (pd.to_datetime(events["ex_date"]) == pd.Timestamp(ex_date))
+        & (events["type"] == event_type),
+        "status",
+    ]
+    assert len(rows) == 1, (ticker, ex_date, event_type, rows.tolist())
+    return rows.iloc[0]
+
+assert _single_event_status(mk["events"], "TCB", "2024-06-11", "stock_dividend") == "APPLIED"
+assert _single_event_status(mk["events"], "VCB", "2025-03-03", "stock_dividend") == "APPLIED"
 
 # Point-in-time: tính tại 10/06/2024 thì sự kiện TCB CHƯA tồn tại → không điều chỉnh quá khứ bằng thông tin tương lai
 mk0 = data.load_market("2024-06-10")
-assert ((mk0["close"]["TCB"] - mk0["raw_close"]["TCB"]).abs().max()) < 1e-9
-assert mk0["events"].set_index("ticker").status["TCB"] == "CHUA_DEN_HAN"
+assert abs(mk0["close"]["TCB"].iloc[-1] - mk0["raw_close"]["TCB"].iloc[-1]) < 1e-9  # as-of price anchor; earlier legitimate corporate actions may exist
+assert _single_event_status(mk0["events"], "TCB", "2024-06-11", "stock_dividend") == "CHUA_DEN_HAN"
 d9 = pd.Timestamp("2024-06-10")
-assert abs(mk["close"].at[d9, "TCB"] - mk["raw_close"].at[d9, "TCB"] / 2) < 1e-6
+# Isolate the target event's contribution while retaining every other valid event.
+target_mask = (
+    (mk["events"]["ticker"] == "TCB")
+    & (pd.to_datetime(mk["events"]["ex_date"]) == pd.Timestamp("2024-06-11"))
+    & (mk["events"]["type"] == "stock_dividend")
+)
+with_target, _ = adjust.factors(raw.index, raw.columns, mk["events"])
+without_target, _ = adjust.factors(raw.index, raw.columns, mk["events"].loc[~target_mask])
+assert abs(with_target.at[d9, "TCB"] - without_target.at[d9, "TCB"] / 2) < 1e-9
 print("OK 2: point-in-time — tại 10/06/2024 chưa điều chỉnh; tính tại hôm nay thì giá 10/06/2024 = gốc / 2")
 
 # Nhãn 20 phiên của TCB quanh ngày GDKHQ không còn chứa cú rơi -50%

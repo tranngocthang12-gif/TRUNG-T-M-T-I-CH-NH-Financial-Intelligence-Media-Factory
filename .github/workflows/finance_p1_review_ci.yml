@@ -1,0 +1,26 @@
+name: Finance P1 isolated review CI
+on:
+  push:
+    branches: ["review/finance-ci-isolation-p1-*"]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  finance-full-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install declared dependencies
+        run: python -m pip install -r requirements.txt pytest
+      - name: Run all finance pytest checks including subprocess-isolated scripts
+        run: python -m pytest -q tests
+      - name: Confirm no tracked source/data changed by testing
+        if: always()
+        run: |
+          git diff --exit-code -- engine/ governance/ data/ ledger/ state/ config.yaml
+          git status --short
