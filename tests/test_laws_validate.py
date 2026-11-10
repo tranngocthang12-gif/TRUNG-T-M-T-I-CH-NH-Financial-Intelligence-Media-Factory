@@ -55,7 +55,8 @@ class LawsChecksTests(unittest.TestCase):
         self.assertTrue(laws_checks.check_ledger_chain(self.tmp))
 
     def _run_intake(self, body, created="2026-10-22T10:00:00Z", number=7):
-        env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body}
+        env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created,
+               "ISSUE_UPDATED_AT": created, "ISSUE_ACTION": "opened", "ISSUE_BODY": body}
         p = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=env, cwd=self.tmp,
                            capture_output=True, text=True)
         return p.returncode, (json.loads(p.stdout.strip().splitlines()[-1]) if p.stdout.strip() else {})
