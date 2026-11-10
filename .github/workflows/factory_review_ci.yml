@@ -1,0 +1,42 @@
+name: Factory AUTO-05 review CI (read only)
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: ["review/umlf-auto05-*"]
+permissions:
+  contents: read
+jobs:
+  factory-synthetic-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify financial protected paths and review assets
+        run: python tools/validate_factory_review.py
+      - name: Offline Factory contracts and A-B-C adversarial integration
+        run: python -m unittest discover -s tests -p 'test_factory_*.py' -v
+  finance-existing-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install finance test dependencies (no provider APIs)
+        run: pip install -r requirements.txt pytest
+      - name: Finance law and ledger regression
+        run: python -m pytest -q tests/test_laws_validate.py
+      - name: Financial lookahead regression
+        run: python -m tests.test_no_lookahead
+      - name: Finance architecture and law validation
+        run: python tools/validate.py
+      - name: Full finance and Factory tests (informational parity with existing main workflow)
+        continue-on-error: true
+        run: python -m pytest -q tests
