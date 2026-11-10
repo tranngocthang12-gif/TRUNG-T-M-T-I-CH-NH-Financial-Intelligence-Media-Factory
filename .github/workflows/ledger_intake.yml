@@ -2,7 +2,7 @@ name: Ledger intake (Forecast issue)
 
 on:
   issues:
-    types: [opened, labeled]
+    types: [opened]
 
 permissions:
   contents: write
@@ -14,7 +14,7 @@ concurrency:
 
 jobs:
   intake:
-    if: contains(github.event.issue.labels.*.name, 'forecast')
+    if: contains(github.event.issue.labels.*.name, 'forecast') && github.event.issue.user.login == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -31,6 +31,8 @@ jobs:
         env:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_CREATED_AT: ${{ github.event.issue.created_at }}
+          ISSUE_UPDATED_AT: ${{ github.event.issue.updated_at }}
+          ISSUE_ACTION: ${{ github.event.action }}
           ISSUE_BODY: ${{ github.event.issue.body }}
         run: |
           set +e
