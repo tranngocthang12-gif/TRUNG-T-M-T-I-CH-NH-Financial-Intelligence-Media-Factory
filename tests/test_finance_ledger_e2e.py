@@ -1,0 +1,128 @@
+"""Offline synthetic regression: Issue ingest -> normalized Ledger -> resolver -> scorecard."""
+import json
+from datetime import datetime, timezone
+
+import pandas as pd
+import pytest
+from engine import ledger
+from engine.forecast_bridge import normalize_prediction, prepare_predictions
+from tools import ledger_intake
+from tools.laws_checks import check_ledger_chain, line_hash
+
+CREATED = "2026-11-11T01:00:00Z"
+UPDATED = "2026-11-11T01:00:02Z"
+NOW = datetime(2026, 11, 11, 3, 0, tzinfo=timezone.utc)
+
+
+def form(**changes):
+    values = {
+        "seat": "A",
+        "question": "Will the synthetic FPT return exceed its synthetic peers?",
+        "resolution_source": "SYNTHETIC_TEST_DATA_NOT_REAL_PRICES",
+        "resolution_rule": "excess_return_positive",
+        "ticker": "FPT",
+        "horizon": "5",
+        "resolve_at": "2026-11-22",
+        "p": "0.6",
+        "base_rate": "0.5",
+        "invalidation_conditions": "Synthetic target does not outperform peers",
+        "author_seat": "SYNTHETIC_TEST",
+        "model_cutoff": "2026-01",
+    }
+    values.update(changes)
+    return "\n".join("### " + key + "\n\n" + str(value) + "\n" for key, value in values.items())
+
+
+def issue_row(**kwargs):
+    raw = ledger_intake.parse_issue_form(form(**kwargs))
+    assert raw["horizon"] == 5
+    return {
+        "issue_number": 101,
+        "issue_created_at": CREATED,
+        "issue_updated_at": UPDATED,
+        "ingest_action": "opened",
+        "registered_at": "2026-11-11T03:00:00Z",
+        "raw_payload_sha256": "a" * 64,
+        **raw,
+    }
+
+
+def test_adapts_issue_without_mutating_hash_source():
+    raw = issue_row()
+    before = json.dumps(raw, sort_keys=True)
+    view, blocked = normalize_prediction(raw)
+    assert blocked is None and view["id"] == "I-101"
+    assert view["probability"] == 0.6
+    assert view["pair_key"] == "2026-11-11:FPT:5"
+    assert before == json.dumps(raw, sort_keys=True)
+
+
+def test_legacy_is_preserved():
+    row = {"id": "P-example", "created_at": "2026-11-11",
+           "procedure": "news@v1", "probability": 0.6, "base_rate": 0.5,
+           "resolution_rule": {"type": "excess_return_positive", "ticker": "FPT", "horizon": 5}}
+    normalized, reason = normalize_prediction(row)
+    assert normalized is row and reason is None
+
+
+def test_late_edits_late_labels_and_untrusted_rules_blocked():
+    raw = issue_row()
+    raw["issue_updated_at"] = "2026-11-12T00:00:00Z"
+    assert normalize_prediction(raw)[1] == "ISSUE_CHANGED_AFTER_OPEN"
+    raw = issue_row()
+    raw["ingest_action"] = "labeled"
+    assert normalize_prediction(raw)[1] == "UNATTESTED_ISSUE_OPEN_EVENT"
+    raw = issue_row(resolution_rule="numeric_range")
+    assert normalize_prediction(raw)[1] == "SOURCE_RESOLVER_NOT_IMPLEMENTED"
+
+
+def test_duplicate_and_bad_rows_are_counted():
+    row = issue_row()
+    accepted, blocked = prepare_predictions([row, dict(row), {"bad": True}])
+    assert len(accepted) == 1
+    assert blocked == {"DUPLICATE_FORECAST_ID": 1, "INVALID_LEGACY_ROW": 1}
+
+
+def test_markdown_header_spoofing_fails():
+    with pytest.raises(ValueError, match="duplicate"):
+        ledger_intake.parse_issue_form(form() + "\n### p\n\n0.99\n")
+
+
+def test_full_synthetic_ledger_resolution_and_brier(tmp_path, monkeypatch):
+    monkeypatch.setattr(ledger, "ROOT", tmp_path)
+    def local_path(rel):
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    monkeypatch.setattr(ledger, "path", local_path)
+    monkeypatch.setattr(ledger, "save_json",
+                        lambda rel, obj: local_path(rel).write_text(json.dumps(obj)))
+    raw = issue_row()
+    raw["prev_hash"] = "GENESIS"
+    raw["hash"] = line_hash(raw)
+    local_path("ledger/predictions.jsonl").write_text(json.dumps(raw) + "\n")
+    assert check_ledger_chain(tmp_path) == []
+
+    idx = pd.bdate_range("2026-11-12", periods=10)
+    close = pd.DataFrame({"FPT": [100, 101, 102, 103, 104, 107, 108, 109, 110, 111],
+                          "VNM": [100] * 10}, index=idx)
+
+    assert ledger.resolve(close, "2026-11-19") == []  # declared due date pending
+    assert ledger.scorecard("2026-11-19")["resolved"] == 0
+
+    bad = pd.DataFrame(False, index=idx, columns=close.columns)
+    bad.loc[idx[2], "FPT"] = True
+    flagged = ledger.resolve(close, "2026-11-23", bad)
+    assert len(flagged) == 1 and flagged[0]["outcome"] is None
+    assert ledger.scorecard("2026-11-23")["void_data_error"] == 1
+
+    # Independent pristine fixture: do not overwrite a settled VOID in production.
+    (tmp_path / "ledger/resolutions.jsonl").unlink()
+    passed = ledger.resolve(close, "2026-11-23")
+    assert len(passed) == 1 and passed[0]["prediction_id"] == "I-101"
+    assert passed[0]["outcome"] == 1
+    assert ledger.resolve(close, "2026-11-23") == []
+    sc = ledger.scorecard("2026-11-23")
+    assert sc["total_predictions"] == sc["eligible_predictions"] == sc["resolved"] == 1
+    assert sc["procedures"]["issue_A"]["brier"] == pytest.approx(0.16)
+    assert sc["procedures"]["issue_A"]["verdict"] == "CHƯA ĐỦ MẪU"
