@@ -16,6 +16,25 @@ def _append(rel, rows):
     with open(path(rel), "a", encoding="utf-8") as f:
         for r in rows: f.write(json.dumps(r, ensure_ascii=False) + "\n")
 
+
+def _append_predictions(rows):
+    """Extend the SAME hash chain for legacy-engine and Issue-origin forecasts."""
+    if not rows:
+        return
+    from tools.laws_checks import line_hash
+    previous = "GENESIS"
+    for existing in _load(PRED):
+        if existing.get("prev_hash") != previous or existing.get("hash") != line_hash(existing):
+            raise ValueError("Prediction Ledger integrity failure: refusing unchained append")
+        previous = existing["hash"]
+    new = []
+    for row in rows:
+        item = {**row, "prev_hash": previous}
+        item["hash"] = line_hash(item)
+        previous = item["hash"]
+        new.append(item)
+    _append(PRED, new)
+
 def base_rate(close, ticker, h):
     """Tỷ lệ lịch sử mã này vượt bình quân universe trong h phiên (do code tính)."""
     fwd = close.shift(-h) / close - 1
@@ -55,7 +74,7 @@ def record(preds, as_of, universe, fact_ids, close):
                "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
         row["id"] = "P-" + hashlib.sha1(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
         ok.append(row)
-    _append(PRED, ok)
+    _append_predictions(ok)
     if rejected:
         _append("ledger/rejected.jsonl", [{**r, "rejected_at": as_of} for r in rejected])
     return ok, rejected
