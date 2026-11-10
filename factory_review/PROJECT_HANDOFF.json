@@ -1,0 +1,34 @@
+{
+  "schema": "umlf-auto05-handoff/v1",
+  "as_of": "2026-10-30",
+  "repository": "tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory",
+  "branch": "review/umlf-finance-factory-integration-p1-20261030",
+  "baseline_main_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
+  "candidate_head_origin": "a67d0e03fff4aedcbdd71a2d59fec24ebc13fbe2",
+  "scope": "AUTO-05A/B/C plus Finance PR11 and Factory PR12 P1 reconciliation; offline Draft",
+  "protected": [
+    "BOOT.md",
+    "architecture/ARCHITECTURE.md",
+    "governance/",
+    "engine/",
+    ".github/workflows/daily_cycle.yml",
+    ".github/workflows/ledger_intake.yml"
+  ],
+  "merge_authority": "OWNER_ONLY",
+  "validation_production_ready": false,
+  "next_action": "Check exact-head dual-domain blocking CI and independent adversarial review, then Owner decides; NEVER auto-merge",
+  "blocked": [
+    "Integrated exact-head blocking CI not yet independently verified",
+    "Independent exact-head reviewer absent",
+    "Owner migration/main merge decision absent",
+    "Real dataset/evaluator provenance and production rights unproved"
+  ],
+  "pinned_sources": {
+    "finance_baseline_sha": "6bace5fe82ef92393c81d44af714a087e37869d3",
+    "finance_p1_sha": "52972ff9e55dbe3e1c9c16f88a04fb52266cf8db",
+    "factory_p1_sha": "9140ee4e97c46dcc1c3523324997af20f3b4e070"
+  },
+  "reviewed_engine_exception": {
+    "engine/adjust.py": "exact Git blob d3e84f01748410336191553999063c6ded31e41c from Finance PR11; no general engine permission"
+  }
+}
