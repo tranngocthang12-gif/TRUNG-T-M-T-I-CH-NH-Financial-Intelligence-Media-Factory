@@ -177,5 +177,5 @@ def test_legacy_engine_and_issue_share_one_hash_chain(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="integrity failure"):
         rows = ledger._load(ledger.PRED)
         rows[0]["probability"] = 0.95
-        local_path(ledger.PRED).write_text("\\n".join(json.dumps(x) for x in rows) + "\\n")
+        local_path(ledger.PRED).write_text("\n".join(json.dumps(x) for x in rows) + "\n")
         ledger._append_predictions([old])
