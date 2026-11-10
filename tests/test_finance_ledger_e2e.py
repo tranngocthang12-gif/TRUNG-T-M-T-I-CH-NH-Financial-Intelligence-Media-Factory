@@ -126,3 +126,27 @@ def test_full_synthetic_ledger_resolution_and_brier(tmp_path, monkeypatch):
     assert sc["total_predictions"] == sc["eligible_predictions"] == sc["resolved"] == 1
     assert sc["procedures"]["issue_A"]["brier"] == pytest.approx(0.16)
     assert sc["procedures"]["issue_A"]["verdict"] == "CHƯA ĐỦ MẪU"
+
+
+def test_actual_intake_main_writes_single_hashed_issue(tmp_path, monkeypatch):
+    from datetime import timedelta
+    from tools import laws_checks
+    now = datetime.now(timezone.utc)
+    opened = (now - timedelta(seconds=3)).isoformat().replace("+00:00", "Z")
+    due = (now + timedelta(days=45)).date().isoformat()
+    target = tmp_path / "ledger" / "predictions.jsonl"
+    monkeypatch.setattr(ledger_intake, "LEDGER", target)
+    monkeypatch.setenv("ISSUE_NUMBER", "700")
+    monkeypatch.setenv("ISSUE_CREATED_AT", opened)
+    monkeypatch.setenv("ISSUE_UPDATED_AT", opened)
+    monkeypatch.setenv("ISSUE_ACTION", "opened")
+    monkeypatch.setenv("ISSUE_BODY", form(resolve_at=due))
+    assert ledger_intake.main() == 0
+    assert laws_checks.check_ledger_chain(tmp_path) == []
+    stored = json.loads(target.read_text().splitlines()[0])
+    assert normalize_prediction(stored)[1] is None
+    assert ledger_intake.main() == 3
+    assert len(target.read_text().splitlines()) == 1
+    monkeypatch.setenv("ISSUE_ACTION", "labeled")
+    assert ledger_intake.main() == 2
+    assert len(target.read_text().splitlines()) == 1
