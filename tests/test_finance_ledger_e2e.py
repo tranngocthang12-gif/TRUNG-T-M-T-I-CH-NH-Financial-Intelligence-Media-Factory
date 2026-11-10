@@ -53,7 +53,8 @@ def test_adapts_issue_without_mutating_hash_source():
     view, blocked = normalize_prediction(raw)
     assert blocked is None and view["id"] == "I-101"
     assert view["probability"] == 0.6
-    assert view["pair_key"] == "2026-11-11:FPT:5"
+    assert len(view["pair_key"]) == 64
+    assert view["created_at"] == "2026-11-11"
     assert before == json.dumps(raw, sort_keys=True)
 
 
@@ -179,3 +180,17 @@ def test_legacy_engine_and_issue_share_one_hash_chain(tmp_path, monkeypatch):
         rows[0]["probability"] = 0.95
         local_path(ledger.PRED).write_text("\n".join(json.dumps(x) for x in rows) + "\n")
         ledger._append_predictions([old])
+
+def test_delayed_issue_registration_cannot_backdate_price_entry():
+    raw = issue_row()
+    raw["registered_at"] = "2026-11-16T04:00:00Z"
+    raw["resolve_at"] = "2026-11-25"
+    view, blocked = normalize_prediction(raw)
+    assert blocked is None
+    assert view["created_at"] == "2026-11-16"
+    assert view["original_issue_created_at"].startswith("2026-11-11")
+    other = dict(raw)
+    other["question"] = "Different prospectively fixed question"
+    other_view, other_blocked = normalize_prediction(other)
+    assert other_blocked is None
+    assert view["pair_key"] != other_view["pair_key"]
