@@ -1,8 +1,8 @@
 {
-  "as_of": "2026-11-09",
+  "as_of": "2026-11-10",
   "regime": "DOWN_HIGHVOL",
-  "total_trials": 186,
-  "current_t_threshold": 3.64,
+  "total_trials": 192,
+  "current_t_threshold": 3.65,
   "models": {
     "ACTIVE": 0,
     "WATCH": 0,
@@ -14,8 +14,8 @@
   "paper_nav": 1000000000,
   "alerts": [],
   "data_quality": {
-    "as_of": "2026-11-09",
-    "checked": 73102,
+    "as_of": "2026-11-10",
+    "checked": 73132,
     "flagged_total": 142,
     "error_rate_total": 0.00194,
     "window_sessions": 20,
@@ -37,7 +37,7 @@
       "2026": 3
     },
     "events": {
-      "APPLIED": 225,
+      "APPLIED": 226,
       "DA_NAM_TRONG_GIA_NGUON": 121,
       "NGOAI_DU_LIEU": 86
     },
@@ -208,6 +208,7 @@
       "GVR 2023-11-16 cash_dividend (yahoo, TU_DONG): gốc -0.76% → điều chỉnh +1.03%",
       "GVR 2024-11-14 cash_dividend (yahoo, TU_DONG): gốc -3.23% → điều chỉnh -2.33%",
       "GVR 2025-11-13 cash_dividend (yahoo, TU_DONG): gốc +0.18% → điều chỉnh +1.60%",
+      "GVR 2026-11-10 cash_dividend (yahoo, TU_DONG): gốc +1.54% → điều chỉnh +2.95%",
       "HDB 2018-06-20 cash_dividend (yahoo, TU_DONG): gốc -1.36% → điều chỉnh +1.40%",
       "HDB 2023-05-29 cash_dividend (yahoo, TU_DONG): gốc +10.87% → điều chỉnh +16.14%",
       "HDB 2024-07-12 cash_dividend (yahoo, TU_DONG): gốc -4.55% → điều chỉnh -1.55%",
@@ -359,8 +360,8 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-11-09T19:57:38.586599",
-    "end": "2026-11-09",
+    "at": "2026-11-10T17:12:46.222204",
+    "end": "2026-11-10",
     "sources": [
       "yahoo"
     ],
@@ -371,59 +372,59 @@
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
-      "ACB": "2026-11-09",
-      "BCM": "2026-11-09",
-      "BID": "2026-11-09",
-      "BVH": "2026-11-09",
-      "CTG": "2026-11-09",
-      "FPT": "2026-11-09",
-      "GAS": "2026-11-09",
-      "GVR": "2026-11-09",
-      "HDB": "2026-11-09",
-      "HPG": "2026-11-09",
-      "MBB": "2026-11-09",
-      "MSN": "2026-11-09",
-      "MWG": "2026-11-09",
-      "PLX": "2026-11-09",
-      "POW": "2026-11-09",
-      "SAB": "2026-11-09",
-      "SHB": "2026-11-09",
-      "SSB": "2026-11-09",
-      "SSI": "2026-11-09",
-      "STB": "2026-11-09",
-      "TCB": "2026-11-09",
-      "TPB": "2026-11-09",
-      "VCB": "2026-11-09",
-      "VHM": "2026-11-09",
-      "VIB": "2026-11-09",
-      "VIC": "2026-11-09",
-      "VJC": "2026-11-09",
-      "VNM": "2026-11-09",
-      "VPB": "2026-11-09",
-      "VRE": "2026-11-09"
+      "ACB": "2026-11-10",
+      "BCM": "2026-11-10",
+      "BID": "2026-11-10",
+      "BVH": "2026-11-10",
+      "CTG": "2026-11-10",
+      "FPT": "2026-11-10",
+      "GAS": "2026-11-10",
+      "GVR": "2026-11-10",
+      "HDB": "2026-11-10",
+      "HPG": "2026-11-10",
+      "MBB": "2026-11-10",
+      "MSN": "2026-11-10",
+      "MWG": "2026-11-10",
+      "PLX": "2026-11-10",
+      "POW": "2026-11-10",
+      "SAB": "2026-11-10",
+      "SHB": "2026-11-10",
+      "SSB": "2026-11-10",
+      "SSI": "2026-11-10",
+      "STB": "2026-11-10",
+      "TCB": "2026-11-10",
+      "TPB": "2026-11-10",
+      "VCB": "2026-11-10",
+      "VHM": "2026-11-10",
+      "VIB": "2026-11-10",
+      "VIC": "2026-11-10",
+      "VJC": "2026-11-10",
+      "VNM": "2026-11-10",
+      "VPB": "2026-11-10",
+      "VRE": "2026-11-10"
     }
   },
   "news_errors": [],
   "bandit": {
     "single_family": {
-      "trials": 39,
+      "trials": 40,
       "survivors": 0,
       "posterior_mean": 0.024
     },
     "cross_family": {
-      "trials": 51,
+      "trials": 53,
       "survivors": 0,
-      "posterior_mean": 0.019
+      "posterior_mean": 0.018
     },
     "random_subset": {
-      "trials": 52,
+      "trials": 54,
       "survivors": 0,
-      "posterior_mean": 0.019
+      "posterior_mean": 0.018
     },
     "mutate_best": {
-      "trials": 44,
+      "trials": 45,
       "survivors": 0,
-      "posterior_mean": 0.022
+      "posterior_mean": 0.021
     }
   }
 }
