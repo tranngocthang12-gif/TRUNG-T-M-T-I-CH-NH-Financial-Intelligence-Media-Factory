@@ -4,6 +4,7 @@ Auditor, Resolution, Scorecard đều là code tất định — không LLM nào
 import hashlib, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, save_json
+from .forecast_bridge import prepare_predictions
 
 PRED, RES = "ledger/predictions.jsonl", "ledger/resolutions.jsonl"
 
@@ -64,18 +65,23 @@ def resolve(close, as_of, bad=None):
     """Chấm bằng GIÁ ĐIỀU CHỈNH. Mã có ô lỗi dữ liệu trong cửa sổ chấm → VOID (không tính điểm);
     mã khác có lỗi trong cửa sổ bị loại khỏi bình quân universe."""
     done = {r["prediction_id"] for r in _load(RES)}
+    normalized, blocked = prepare_predictions(_load(PRED))
     idx = close.index
     new = []
-    for p in _load(PRED):
+    for p in normalized:
         if p["id"] in done: continue
         rr = p["resolution_rule"]; h = rr["horizon"]
+        if p.get("resolve_at") and pd.Timestamp(as_of).date() < pd.Timestamp(p["resolve_at"]).date():
+            continue  # Never adjudicate a future Issue before its declared due date.
         c = pd.Timestamp(p["created_at"])
         pos = idx.searchsorted(c, side="right")          # phiên kế tiếp = điểm vào lệnh
         if pos + h >= len(idx): continue                 # chưa đến hạn
         t0, t1 = idx[pos], idx[pos + h]
+        if pd.Timestamp(t1).date() > pd.Timestamp(as_of).date():
+            continue  # Supplied price frame may include future sessions.
         ret = close.loc[t1] / close.loc[t0] - 1
         if bad is not None:
-            dirty = bad.loc[(bad.index > t0) & (bad.index <= t1)].any()
+            dirty = bad.loc[(bad.index >= t0) & (bad.index <= t1)].any()
             if bool(dirty.get(rr["ticker"], False)):
                 new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
                             "exit_date": str(t1.date()), "excess_return": None, "outcome": None,
@@ -91,11 +97,15 @@ def resolve(close, as_of, bad=None):
 
 # ---------------- SCORECARD (code) ----------------
 def scorecard(as_of):
-    P = {p["id"]: p for p in _load(PRED)}
+    raw = _load(PRED)
+    normalized, blocked = prepare_predictions(raw)
+    P = {p["id"]: p for p in normalized}
     R = _load(RES)
     rows = [{**P[r["prediction_id"]], **r} for r in R if r["prediction_id"] in P and r.get("outcome") is not None]
     void = sum(1 for r in R if r.get("outcome") is None)
-    out = {"as_of": as_of, "total_predictions": len(P), "resolved": len(rows), "void_data_error": void, "procedures": {}}
+    out = {"as_of": as_of, "total_predictions": len(raw),
+           "eligible_predictions": len(P), "blocked_unresolvable": blocked,
+           "resolved": len(rows), "void_data_error": void, "procedures": {}}
     if rows:
         df = pd.DataFrame(rows)
         for proc, g in df.groupby("procedure"):
