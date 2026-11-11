@@ -8,7 +8,6 @@ from __future__ import annotations
 import hashlib
 import json
 from collections.abc import Mapping
-from copy import deepcopy
 
 SCHEMA = "umlf-problem/v1"
 FIELDS = frozenset({"schema", "problem", "data", "target", "metrics", "constraints", "deployment", "retraining"})
@@ -40,6 +39,17 @@ def _sha(value, label):
 
 def validate_problem(spec: Mapping) -> dict:
     """Validate exact v1 schema; return a copy, never mutate caller input."""
+    # Canonicalize FIRST. Validate only the resulting plain JSON tree.
+    # A dict/Mapping subclass can present conflicting __getitem__/__iter__
+    # views; checking the live object before encoding would trust one view
+    # while hashing and returning another (Q03 independent P1).
+    try:
+        canonical = json.dumps(spec, ensure_ascii=False, sort_keys=True,
+                               separators=(",", ":"), allow_nan=False)
+        normalized = json.loads(canonical)
+    except (TypeError, ValueError, OverflowError, RecursionError) as exc:
+        raise ProblemContractError("declaration is not canonical JSON") from exc
+    spec = normalized
     _object(spec, "problem declaration", FIELDS)
     if spec["schema"] != SCHEMA:
         raise ProblemContractError("unsupported problem schema")
@@ -79,15 +89,7 @@ def validate_problem(spec: Mapping) -> dict:
     if retrain["mode"] not in ("DISABLED", "PROPOSAL_ONLY") or retrain["owner_gate"] is not True:
         raise ProblemContractError("automatic retraining is forbidden")
 
-    # Deep-copy through a strict JSON round-trip to rule out NaN/Infinity,
-    # arbitrary Python objects, hidden aliases and inconsistent digests.
-    try:
-        canonical = json.dumps(spec, ensure_ascii=False, sort_keys=True,
-                               separators=(",", ":"), allow_nan=False)
-        normalized = json.loads(canonical)
-    except (TypeError, ValueError, OverflowError) as exc:
-        raise ProblemContractError("declaration is not canonical JSON") from exc
-    return deepcopy(normalized)
+    return normalized
 
 
 def problem_receipt(spec: Mapping) -> dict:
