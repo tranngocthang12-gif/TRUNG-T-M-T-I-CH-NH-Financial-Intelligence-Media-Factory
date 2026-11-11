@@ -88,11 +88,24 @@ def main() -> int:
     prev = "GENESIS"
     if LEDGER.is_file():
         lines = [l for l in LEDGER.read_text(encoding="utf-8").splitlines() if l.strip()]
-        if any(json.loads(l).get("issue_number") == number for l in lines):
+        # Fail closed before duplicate handling or append: do not extend
+        # a ledger whose prior rows or chain have been corrupted.
+        validated, previous = [], "GENESIS"
+        try:
+            for raw_line in lines:
+                prior_row = json.loads(raw_line)
+                if (prior_row.get("prev_hash") != previous
+                        or prior_row.get("hash") != line_hash(prior_row)):
+                    raise ValueError("Ledger hash chain integrity failure")
+                previous = prior_row["hash"]
+                validated.append(prior_row)
+        except (ValueError, KeyError, TypeError) as exc:
+            print(json.dumps({"ok": False, "message": f"Rejected: {exc}"}, ensure_ascii=False))
+            return 2
+        if any(row.get("issue_number") == number for row in validated):
             print(json.dumps({"ok": True, "duplicate": True, "message": f"Dự báo #{number} đã có trong Ledger, bỏ qua (không ghi trùng)"}, ensure_ascii=False))
             return 3
-        if lines:
-            prev = json.loads(lines[-1])["hash"]
+        prev = previous
     # Snapshot the full configured basket at acceptance, never derive from later price frames.
     import yaml
     config_path = ROOT / "config.yaml"
