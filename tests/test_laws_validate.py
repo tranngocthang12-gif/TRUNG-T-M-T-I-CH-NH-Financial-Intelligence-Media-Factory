@@ -9,6 +9,7 @@ from tools import laws_checks  # noqa: E402
 def _tmp_repo():
     tmp = pathlib.Path(tempfile.mkdtemp())
     (tmp / "architecture").mkdir(); (tmp / "reports").mkdir(); (tmp / "ledger").mkdir(); (tmp / "contracts").mkdir(); (tmp / "tools").mkdir()
+    shutil.copy(ROOT / "config.yaml", tmp / "config.yaml")
     shutil.copy(ROOT / "contracts" / "forecast_issue.schema.json", tmp / "contracts")
     shutil.copy(ROOT / "tools" / "laws_checks.py", tmp / "tools")
     shutil.copy(ROOT / "tools" / "ledger_intake.py", tmp / "tools")
