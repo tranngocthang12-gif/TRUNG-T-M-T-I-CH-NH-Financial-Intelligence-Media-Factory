@@ -108,7 +108,9 @@ def resolve(close, as_of, bad=None):
             reason = "thiếu hoặc sai snapshot rổ universe_equal_weight tại thời điểm dự báo"
         elif not close.columns.is_unique or set(close.columns) != set(basket):
             reason = "rổ giá không khớp snapshot đã khai; không được thu hẹp benchmark"
-        elif bad is not None and (not bad.columns.is_unique or set(bad.columns) != set(basket)):
+        elif bad is None:
+            reason = "thiếu bảng cờ chất lượng, không thể xác minh rổ sạch"
+        elif not bad.columns.is_unique or set(bad.columns) != set(basket):
             reason = "rổ chất lượng không khớp snapshot đã khai"
         elif not idx.is_unique or not idx.is_monotonic_increasing:
             reason = "rổ universe_equal_weight có lịch phiên không hợp lệ"
