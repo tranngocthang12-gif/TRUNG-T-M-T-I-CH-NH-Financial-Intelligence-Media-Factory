@@ -203,6 +203,7 @@ def test_delayed_issue_registration_cannot_backdate_price_entry():
 def test_g001_no_shrinking_benchmark(tmp_path, monkeypatch, case):
     monkeypatch.setattr(ledger, "ROOT", tmp_path)
     monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
+    monkeypatch.setattr(ledger, "save_json", lambda rel, obj: (tmp_path / rel).write_text(json.dumps(obj)))
     (tmp_path / "ledger").mkdir()
     raw = issue_row(resolve_at="2026-11-19")
     raw["benchmark_universe"] = ["FPT", "VNM", "HPG"]
@@ -238,6 +239,7 @@ def test_g001_old_prediction_without_frozen_basket_is_void(tmp_path, monkeypatch
     """No retroactive invention of the universe for historical legacy rows."""
     monkeypatch.setattr(ledger, "ROOT", tmp_path)
     monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
+    monkeypatch.setattr(ledger, "save_json", lambda rel, obj: (tmp_path / rel).write_text(json.dumps(obj)))
     (tmp_path / "ledger").mkdir()
     row = {"id": "P-legacy-unfrozen", "created_at": "2026-11-11",
            "procedure": "legacy", "probability": 0.6, "base_rate": 0.5,
@@ -248,3 +250,26 @@ def test_g001_old_prediction_without_frozen_basket_is_void(tmp_path, monkeypatch
     out = ledger.resolve(close, "2026-11-19")
     assert len(out) == 1 and out[0]["outcome"] is None and out[0]["void"]
     assert ledger.scorecard("2026-11-19")["resolved"] == 0
+
+def test_f02_record_freezes_runtime_universe_and_rejects_mismatch(tmp_path, monkeypatch):
+    """The basket used for audit, record and resolve is a single receipt."""
+    monkeypatch.setattr(ledger, "ROOT", tmp_path)
+    def local_path(rel):
+        p = tmp_path / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        return p
+    monkeypatch.setattr(ledger, "path", local_path)
+    idx = pd.bdate_range("2026-01-01", periods=62)
+    prices = pd.DataFrame({"S01": [100.0] * 62, "S02": [101.0] * 62}, index=idx)
+    p = {"procedure": "test", "ticker": "S01", "horizon": 5,
+         "probability": 0.6, "claim": "synthetic forecast",
+         "evidence_refs": ["E-01"]}
+    accepted, rejected = ledger.record([p], "2026-01-15",
+                                       list(prices.columns), {"E-01"}, prices)
+    assert len(accepted) == 1 and rejected == []
+    assert accepted[0]["benchmark_universe"] == ["S01", "S02"]
+    assert check_ledger_chain(tmp_path) == []
+    mismatched = ledger.record([p], "2026-01-15",
+                               ["S01", "S02", "S03"], {"E-01"}, prices)
+    assert mismatched[0] == [] and mismatched[1][0]["audit_errors"]
+    assert len(ledger._load(ledger.PRED)) == 1
