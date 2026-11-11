@@ -71,7 +71,7 @@ def record(preds, as_of, universe, fact_ids, close):
                "resolution_rule": {"type": "excess_return_positive", "ticker": p["ticker"], "horizon": h,
                                    "benchmark": "universe_equal_weight", "entry": "close_t+1"},
                "probability": round(float(p["probability"]), 3), "base_rate": round(base_rate(close, p["ticker"], h), 3),
-               "benchmark_universe": list(universe),
+               "benchmark_universe": list(CFG["universe"]),
                "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
         row["id"] = "P-" + hashlib.sha1(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
         ok.append(row)
