@@ -273,3 +273,41 @@ def test_f02_record_freezes_runtime_universe_and_rejects_mismatch(tmp_path, monk
                                ["S01", "S02", "S03"], {"E-01"}, prices)
     assert mismatched[0] == [] and mismatched[1][0]["audit_errors"]
     assert len(ledger._load(ledger.PRED)) == 1
+
+
+def test_f07_scorecard_dedupes_resolution_and_ignores_orphan(tmp_path, monkeypatch):
+    monkeypatch.setattr(ledger, "ROOT", tmp_path)
+    monkeypatch.setattr(ledger, "save_json",
+                        lambda rel, obj: (tmp_path / "scorecard.json").write_text(json.dumps(obj)))
+    (tmp_path / "ledger").mkdir()
+    row = issue_row()
+    (tmp_path / "ledger/predictions.jsonl").write_text(json.dumps(row) + "\n")
+    one = {"prediction_id": "I-101", "outcome": 1}
+    (tmp_path / "ledger/resolutions.jsonl").write_text("\n".join(map(json.dumps, [
+        one, dict(one), {"prediction_id": "missing-id", "outcome": None}])) + "\n")
+    sc = ledger.scorecard("2026-12-01")
+    assert sc["resolved"] == 1
+    assert sc["void_data_error"] == 0
+    assert sc["duplicate_resolutions"] == 1
+    assert sc["orphan_resolutions"] == 1
+    assert sc["procedures"]["issue_A"]["n"] == 1
+
+
+def test_f07_intake_rejects_corrupted_existing_chain(tmp_path, monkeypatch):
+    from datetime import timedelta
+    now = datetime.now(timezone.utc)
+    opened = (now - timedelta(seconds=3)).isoformat().replace("+00:00", "Z")
+    due = (now + timedelta(days=45)).date().isoformat()
+    target = tmp_path / "ledger" / "predictions.jsonl"
+    target.parent.mkdir(parents=True)
+    bad = {"issue_number": 600, "prev_hash": "GENESIS", "hash": "deadbeef"}
+    target.write_text(json.dumps(bad) + "\n")
+    before = target.read_bytes()
+    monkeypatch.setattr(ledger_intake, "LEDGER", target)
+    monkeypatch.setenv("ISSUE_NUMBER", "701")
+    monkeypatch.setenv("ISSUE_CREATED_AT", opened)
+    monkeypatch.setenv("ISSUE_UPDATED_AT", opened)
+    monkeypatch.setenv("ISSUE_ACTION", "opened")
+    monkeypatch.setenv("ISSUE_BODY", form(resolve_at=due))
+    assert ledger_intake.main() == 2
+    assert target.read_bytes() == before
