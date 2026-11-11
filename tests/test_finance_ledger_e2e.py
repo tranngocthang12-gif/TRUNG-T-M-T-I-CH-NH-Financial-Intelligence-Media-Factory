@@ -203,7 +203,7 @@ def test_delayed_issue_registration_cannot_backdate_price_entry():
 def test_g001_no_shrinking_benchmark(tmp_path, monkeypatch, case):
     monkeypatch.setattr(ledger, "ROOT", tmp_path)
     monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
-    monkeypatch.setattr(ledger, "save_json", lambda rel, obj: (tmp_path / rel).write_text(json.dumps(obj)))
+    monkeypatch.setattr(ledger, "save_json", lambda rel, obj: (tmp_path / "scorecard.json").write_text(json.dumps(obj)))
     (tmp_path / "ledger").mkdir()
     raw = issue_row(resolve_at="2026-11-19")
     raw["benchmark_universe"] = ["FPT", "VNM", "HPG"]
@@ -239,7 +239,7 @@ def test_g001_old_prediction_without_frozen_basket_is_void(tmp_path, monkeypatch
     """No retroactive invention of the universe for historical legacy rows."""
     monkeypatch.setattr(ledger, "ROOT", tmp_path)
     monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
-    monkeypatch.setattr(ledger, "save_json", lambda rel, obj: (tmp_path / rel).write_text(json.dumps(obj)))
+    monkeypatch.setattr(ledger, "save_json", lambda rel, obj: (tmp_path / "scorecard.json").write_text(json.dumps(obj)))
     (tmp_path / "ledger").mkdir()
     row = {"id": "P-legacy-unfrozen", "created_at": "2026-11-11",
            "procedure": "legacy", "probability": 0.6, "base_rate": 0.5,
