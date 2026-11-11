@@ -94,8 +94,16 @@ def main() -> int:
         if lines:
             prev = json.loads(lines[-1])["hash"]
     # Snapshot the full configured basket at acceptance, never derive from later price frames.
-    from engine.config import CFG
-    basket = list(CFG["universe"])
+    import yaml
+    config_path = ROOT / "config.yaml"
+    if not config_path.is_file():
+        print(json.dumps({"ok": False, "message": "Missing configured benchmark universe"}))
+        return 2
+    configured = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    basket = configured.get("universe") if isinstance(configured, dict) else None
+    if not isinstance(basket, list):
+        print(json.dumps({"ok": False, "message": "Invalid configured benchmark universe"}))
+        return 2
     if (len(basket) < 2 or len(set(basket)) != len(basket)
             or not all(isinstance(t, str) and re.fullmatch(r"[A-Z0-9]{2,8}", t) for t in basket)):
         print(json.dumps({"ok": False, "message": "Invalid configured benchmark universe"}))
