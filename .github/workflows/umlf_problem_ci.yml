@@ -56,6 +56,7 @@ jobs:
           printf 'legacy protected content\n' > "$tmp/engine/secret.py"
           git -C "$tmp" add engine/secret.py
           git -C "$tmp" commit -qm "base"
+          mkdir -p "$tmp/problem_contract"
           git -C "$tmp" mv engine/secret.py problem_contract/core.py
           git -C "$tmp" commit -qm "attack: rename Finance to allowed Factory path"
           if review_scope_gate "$tmp" HEAD^ HEAD; then
