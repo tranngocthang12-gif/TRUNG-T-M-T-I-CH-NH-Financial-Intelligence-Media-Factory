@@ -104,6 +104,8 @@ def resolve(close, as_of, bad=None):
         reason = None
         if len(close.columns) < 2 or not close.columns.is_unique or rr["ticker"] not in close.columns:
             reason = "rổ universe_equal_weight không đủ mã đối chứng"
+        elif bad is not None and set(bad.columns) != set(close.columns):
+            reason = "rổ universe_equal_weight thiếu mã đã khai trong bảng chất lượng"
         elif not idx.is_unique or not idx.is_monotonic_increasing:
             reason = "rổ universe_equal_weight có lịch phiên không hợp lệ"
         else:
