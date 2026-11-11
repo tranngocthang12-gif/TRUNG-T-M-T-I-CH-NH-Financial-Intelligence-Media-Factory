@@ -4,7 +4,7 @@ Auditor, Resolution, Scorecard đều là code tất định — không LLM nào
 import hashlib, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, save_json
-from .forecast_bridge import prepare_predictions
+from .forecast_bridge import prepare_predictions, valid_benchmark_universe
 
 PRED, RES = "ledger/predictions.jsonl", "ledger/resolutions.jsonl"
 
@@ -71,6 +71,7 @@ def record(preds, as_of, universe, fact_ids, close):
                "resolution_rule": {"type": "excess_return_positive", "ticker": p["ticker"], "horizon": h,
                                    "benchmark": "universe_equal_weight", "entry": "close_t+1"},
                "probability": round(float(p["probability"]), 3), "base_rate": round(base_rate(close, p["ticker"], h), 3),
+               "benchmark_universe": list(universe),
                "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
         row["id"] = "P-" + hashlib.sha1(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
         ok.append(row)
@@ -102,14 +103,18 @@ def resolve(close, as_of, bad=None):
         # universe supplied by the market frame, not a subset selected by quality.
         # Its immutable historical membership still needs a separate PIT contract.
         reason = None
-        if len(close.columns) < 2 or not close.columns.is_unique or rr["ticker"] not in close.columns:
-            reason = "rổ universe_equal_weight không đủ mã đối chứng"
-        elif bad is not None and set(bad.columns) != set(close.columns):
-            reason = "rổ universe_equal_weight thiếu mã đã khai trong bảng chất lượng"
+        basket = p.get("benchmark_universe")
+        if not valid_benchmark_universe(basket, rr["ticker"]):
+            reason = "thiếu hoặc sai snapshot rổ universe_equal_weight tại thời điểm dự báo"
+        elif not close.columns.is_unique or set(close.columns) != set(basket):
+            reason = "rổ giá không khớp snapshot đã khai; không được thu hẹp benchmark"
+        elif bad is not None and (not bad.columns.is_unique or set(bad.columns) != set(basket)):
+            reason = "rổ chất lượng không khớp snapshot đã khai"
         elif not idx.is_unique or not idx.is_monotonic_increasing:
             reason = "rổ universe_equal_weight có lịch phiên không hợp lệ"
         else:
-            window = close.iloc[pos:pos + h + 1]
+            # Order by the frozen receipt, not the order returned by a data provider.
+            window = close.loc[:, basket].iloc[pos:pos + h + 1]
             prices = window.apply(pd.to_numeric, errors="coerce")
             values = prices.to_numpy(dtype=float)
             if not np.isfinite(values).all() or not (values > 0).all():
@@ -120,7 +125,7 @@ def resolve(close, as_of, bad=None):
                 if not bad.index.is_unique or not bad.columns.is_unique:
                     reason = "cờ chất lượng có phiên hoặc mã bị trùng"
                 else:
-                    flags = bad.reindex(index=window.index, columns=close.columns)
+                    flags = bad.reindex(index=window.index, columns=basket)
                     if flags.isna().any().any() or flags.astype(bool).any().any():
                         reason = "rổ universe_equal_weight có mã dirty hoặc thiếu cờ chất lượng"
         if reason is not None:
