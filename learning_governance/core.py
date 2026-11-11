@@ -117,7 +117,7 @@ def validate_record(record: Any) -> list[str]:
             errors.append("optional provider/version must be nonempty")
         if "provider_version" in scope and "provider" not in scope:
             errors.append("provider_version requires provider")
-        if any(scope.get(k) == "*" for k in ("task_family", "domain")):
+        if any("*" in scope[k] for k in ("task_family", "domain")):
             errors.append("wildcard task_family/domain scope forbidden")
     evidence = record.get("evidence_refs")
     if not isinstance(evidence, list):
@@ -281,13 +281,18 @@ def check_scope(record: Mapping[str, Any], context: Mapping[str, str]) -> list[s
     if not isinstance(scope, dict):
         return ["missing knowledge scope"]
     errors = []
+    # The exported scope gate must fail closed even when a caller skips
+    # validate_record(): missing task/domain must never mean "match all".
+    for name in ("task_family", "domain", "applicability"):
+        value = scope.get(name)
+        if not _nonempty(value) or "*" in value:
+            errors.append(f"missing or wildcard scope forbidden: {name}")
+    for name in ("task_family", "domain"):
+        value = context.get(name)
+        if not _nonempty(value) or "*" in value:
+            errors.append(f"missing or wildcard runtime context forbidden: {name}")
     for name in ("task_family", "domain", "provider", "provider_version"):
-        if name not in scope:
-            continue
-        if name in ("task_family", "domain") and scope[name] == "*":
-            errors.append(f"wildcard scope forbidden: {name}")
-            continue
-        if scope[name] != context.get(name):
+        if name in scope and scope[name] != context.get(name):
             errors.append(f"runtime context differs from validated scope: {name}")
     return errors
 
