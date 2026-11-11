@@ -120,7 +120,7 @@ def test_full_synthetic_ledger_resolution_and_brier(tmp_path, monkeypatch):
 
     # Independent pristine fixture: do not overwrite a settled VOID in production.
     (tmp_path / "ledger/resolutions.jsonl").unlink()
-    passed = ledger.resolve(close, "2026-11-23")
+    passed = ledger.resolve(close, "2026-11-23", pd.DataFrame(False, index=idx, columns=close.columns))
     assert len(passed) == 1 and passed[0]["prediction_id"] == "I-101"
     assert passed[0]["outcome"] == 1
     assert ledger.resolve(close, "2026-11-23") == []
@@ -147,6 +147,8 @@ def test_actual_intake_main_writes_single_hashed_issue(tmp_path, monkeypatch):
     assert laws_checks.check_ledger_chain(tmp_path) == []
     stored = json.loads(target.read_text().splitlines()[0])
     assert normalize_prediction(stored)[1] is None
+    from engine.config import CFG
+    assert stored["benchmark_universe"] == CFG["universe"]
     assert ledger_intake.main() == 3
     assert len(target.read_text().splitlines()) == 1
     monkeypatch.setenv("ISSUE_ACTION", "labeled")
