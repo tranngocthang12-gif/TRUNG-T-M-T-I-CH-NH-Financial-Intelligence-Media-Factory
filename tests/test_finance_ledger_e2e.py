@@ -194,3 +194,31 @@ def test_delayed_issue_registration_cannot_backdate_price_entry():
     other_view, other_blocked = normalize_prediction(other)
     assert other_blocked is None
     assert view["pair_key"] != other_view["pair_key"]
+
+
+@pytest.mark.parametrize("case", ["clean", "dirty_entry", "dirty_peers", "nan_peers", "missing_peer", "missing_mask"])
+def test_g001_no_shrinking_benchmark(tmp_path, monkeypatch, case):
+    monkeypatch.setattr(ledger, "ROOT", tmp_path)
+    monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
+    (tmp_path / "ledger").mkdir()
+    raw = issue_row(resolve_at="2026-11-19")
+    (tmp_path / "ledger/predictions.jsonl").write_text(json.dumps(raw) + "\n")
+    days = pd.bdate_range("2026-11-12", periods=6)
+    close = pd.DataFrame({"FPT": [100]*5+[101], "VNM": [100]*5+[110], "HPG": [100]*5+[80]}, index=days)
+    bad = pd.DataFrame(False, index=days, columns=close.columns)
+    if case == "dirty_entry": bad.loc[days[0], "HPG"] = True
+    if case == "dirty_peers": bad.loc[days[0], ["VNM", "HPG"]] = True
+    if case == "nan_peers": close.loc[days[-1], ["VNM", "HPG"]] = float("nan")
+    if case == "missing_peer": close = close.drop(columns="HPG")
+    if case == "missing_mask": bad = bad.drop(columns="HPG")
+    out = ledger.resolve(close, "2026-11-19", bad)
+    assert len(out) == 1
+    if case == "clean":
+        assert out[0]["excess_return"] == pytest.approx(0.04)
+        assert out[0]["outcome"] == 1
+    else:
+        assert out[0]["excess_return"] is None and out[0]["outcome"] is None
+        assert out[0]["void"]
+    score = ledger.scorecard("2026-11-19")
+    assert score["resolved"] == (1 if case == "clean" else 0)
+    assert score["void_data_error"] == (0 if case == "clean" else 1)
