@@ -81,8 +81,8 @@ def record(preds, as_of, universe, fact_ids, close):
 
 # ---------------- RESOLUTION (code) ----------------
 def resolve(close, as_of, bad=None):
-    """Chấm bằng GIÁ ĐIỀU CHỈNH. Mã có ô lỗi dữ liệu trong cửa sổ chấm → VOID (không tính điểm);
-    mã khác có lỗi trong cửa sổ bị loại khỏi bình quân universe."""
+    """Chấm bằng GIÁ ĐIỀU CHỈNH. Chỉ chấm nếu toàn bộ rổ universe_equal_weight
+    có giá hợp lệ và không mã nào có cờ lỗi trong cửa sổ; thiếu một mã => VOID."""
     done = {r["prediction_id"] for r in _load(RES)}
     normalized, blocked = prepare_predictions(_load(PRED))
     idx = close.index
@@ -98,16 +98,35 @@ def resolve(close, as_of, bad=None):
         t0, t1 = idx[pos], idx[pos + h]
         if pd.Timestamp(t1).date() > pd.Timestamp(as_of).date():
             continue  # Supplied price frame may include future sessions.
-        ret = close.loc[t1] / close.loc[t0] - 1
-        if bad is not None:
-            dirty = bad.loc[(bad.index >= t0) & (bad.index <= t1)].any()
-            if bool(dirty.get(rr["ticker"], False)):
-                new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
-                            "exit_date": str(t1.date()), "excess_return": None, "outcome": None,
-                            "void": "lỗi dữ liệu giá trong cửa sổ chấm"})
-                continue
-            ret = ret[~dirty.reindex(ret.index).fillna(False).astype(bool)]
-        if pd.isna(ret.get(rr["ticker"])): continue
+        # G-001 (external review): the equal-weight benchmark is the COMPLETE
+        # universe supplied by the market frame, not a subset selected by quality.
+        # Its immutable historical membership still needs a separate PIT contract.
+        reason = None
+        if len(close.columns) < 2 or not close.columns.is_unique or rr["ticker"] not in close.columns:
+            reason = "rổ universe_equal_weight không đủ mã đối chứng"
+        elif not idx.is_unique or not idx.is_monotonic_increasing:
+            reason = "rổ universe_equal_weight có lịch phiên không hợp lệ"
+        else:
+            window = close.iloc[pos:pos + h + 1]
+            prices = window.apply(pd.to_numeric, errors="coerce")
+            values = prices.to_numpy(dtype=float)
+            if not np.isfinite(values).all() or not (values > 0).all():
+                reason = "giá thiếu hoặc không hợp lệ trong rổ universe_equal_weight"
+            elif bad is not None:
+                # Every declared constituent must have a complete quality mask,
+                # INCLUDING the entry session; absent flags are not clean data.
+                if not bad.index.is_unique or not bad.columns.is_unique:
+                    reason = "cờ chất lượng có phiên hoặc mã bị trùng"
+                else:
+                    flags = bad.reindex(index=window.index, columns=close.columns)
+                    if flags.isna().any().any() or flags.astype(bool).any().any():
+                        reason = "rổ universe_equal_weight có mã dirty hoặc thiếu cờ chất lượng"
+        if reason is not None:
+            new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
+                        "exit_date": str(t1.date()), "excess_return": None, "outcome": None,
+                        "void": reason})
+            continue
+        ret = prices.iloc[-1] / prices.iloc[0] - 1
         excess = float(ret[rr["ticker"]] - ret.mean())
         new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
                     "exit_date": str(t1.date()), "excess_return": round(excess, 5), "outcome": int(excess > 0)})
