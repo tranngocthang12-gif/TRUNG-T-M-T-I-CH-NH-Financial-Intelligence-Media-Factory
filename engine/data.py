@@ -134,7 +134,9 @@ def fetch_yahoo_actions():
 
 def load_market(as_of=None):
     """Bang gia DIEU CHINH point-in-time + co loi du lieu + bao cao chat luong.
-    Tra ve dict: close, volume (dieu chinh), raw_close, bad (co loi), events, quality, flags."""
+    Tra ve dict: close (ffill cho feature cu), ledger_close (KHONG ffill de cham),
+    volume (dieu chinh), raw_close, bad (co loi), events, quality, flags.
+    Ledger must never use imputed feature prices to grade a frozen forecast."""
     s = load_store()
     if s.empty:
         raise RuntimeError("Kho du lieu trong. Chay ingest hoac tao du lieu synthetic.")
@@ -156,7 +158,8 @@ def load_market(as_of=None):
     rep["events_applied"] = [f"{e.ticker} {e.trade_date.date()} {e.type} ({e.source}, {e.source_status}): "
                              f"gốc {e.raw_return:+.2%} → điều chỉnh {e.adj_return:+.2%}"
                              for e in events.itertuples() if e.status == "APPLIED"]
-    return {"close": adj.ffill(limit=5), "volume": (vol / S).fillna(0), "raw_close": raw, "bad": bad,
+    return {"close": adj.ffill(limit=5), "ledger_close": adj, "volume": (vol / S).fillna(0),
+            "raw_close": raw, "bad": bad,
             "events": events, "quality": rep, "flags": flags}
 
 def write_derived(mk=None):
