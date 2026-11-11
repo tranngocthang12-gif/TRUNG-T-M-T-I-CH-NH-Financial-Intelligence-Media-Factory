@@ -61,8 +61,15 @@ def audit(p, universe, fact_ids, as_of):
 def record(preds, as_of, universe, fact_ids, close):
     """Kiểm toán rồi ghi. Trả về (đã ghi, bị loại)."""
     ok, rejected = [], []
+    # Record exactly the validated intake universe, not an unrelated config
+    # universe. This preserves legacy synthetic/domain-specific universes.
+    basket = list(universe)
+    frame_ok = (len(basket) >= 2 and len(basket) == len(set(basket))
+                and close.columns.is_unique and set(basket) == set(close.columns))
     for p in preds:
-        errs = audit(p, universe, fact_ids, as_of)
+        errs = audit(p, basket, fact_ids, as_of)
+        if not frame_ok:
+            errs.append("rổ tại lúc ghi không khớp dữ liệu giá đã khai")
         if errs:
             rejected.append({**p, "audit_errors": errs}); continue
         h = int(p["horizon"])
@@ -71,7 +78,7 @@ def record(preds, as_of, universe, fact_ids, close):
                "resolution_rule": {"type": "excess_return_positive", "ticker": p["ticker"], "horizon": h,
                                    "benchmark": "universe_equal_weight", "entry": "close_t+1"},
                "probability": round(float(p["probability"]), 3), "base_rate": round(base_rate(close, p["ticker"], h), 3),
-               "benchmark_universe": list(CFG["universe"]),
+               "benchmark_universe": list(basket),
                "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
         row["id"] = "P-" + hashlib.sha1(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
         ok.append(row)
