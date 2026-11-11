@@ -311,3 +311,42 @@ def test_f07_intake_rejects_corrupted_existing_chain(tmp_path, monkeypatch):
     monkeypatch.setenv("ISSUE_BODY", form(resolve_at=due))
     assert ledger_intake.main() == 2
     assert target.read_bytes() == before
+
+
+def test_f1_missing_observation_reaches_ledger_without_forward_fill(tmp_path, monkeypatch):
+    """Real load_market -> unfilled Ledger input: stale peer must VOID, never score."""
+    from engine import data, adjust
+    monkeypatch.setattr(ledger, "ROOT", tmp_path)
+    monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
+    (tmp_path / "ledger").mkdir()
+    dates = pd.bdate_range("2025-01-01", periods=290)
+    # Both symbols qualify for load_market's >250 observed-session admission.
+    rows = []
+    for name in ("FPT", "VNM"):
+        for k, day in enumerate(dates):
+            if name == "VNM" and k == 286:
+                continue  # One missing actual observation, inside the grading window.
+            price = 101.0 if name == "FPT" and k == 289 else 100.0
+            rows.append({"date": day, "ticker": name, "close": price,
+                         "volume": 10000, "observed_at": day, "source": "synthetic"})
+    store = pd.DataFrame(rows)
+    monkeypatch.setattr(data, "load_store", lambda: store)
+    empty_events = pd.DataFrame(columns=adjust.EV_COLS)
+    monkeypatch.setattr(adjust, "load_manual", lambda: empty_events.copy())
+    monkeypatch.setattr(adjust, "load_yahoo", lambda: empty_events.copy())
+    mk = data.load_market(str(dates[-1].date()))
+    assert pd.isna(mk["ledger_close"].at[dates[286], "VNM"])
+    assert mk["close"].at[dates[286], "VNM"] == 100.0  # Feature ffill remains.
+    assert not mk["bad"].at[dates[286], "VNM"]  # Reproduces the mask gap.
+    prediction = {"id": "P-F1", "created_at": str(dates[283].date()),
+                  "procedure": "synthetic", "probability": 0.6, "base_rate": 0.5,
+                  "benchmark_universe": ["FPT", "VNM"],
+                  "resolution_rule": {"type": "excess_return_positive",
+                                      "ticker": "FPT", "horizon": 5}}
+    (tmp_path / "ledger/predictions.jsonl").write_text(json.dumps(prediction) + "\n")
+    # The known bad path would score 1 on the imputed feature data.
+    # The product path MUST instead use the non-imputed adjusted close.
+    outcome = ledger.resolve(mk["ledger_close"], str(dates[-1].date()), mk["bad"])
+    assert len(outcome) == 1
+    assert outcome[0]["outcome"] is None and outcome[0]["excess_return"] is None
+    assert "void" in outcome[0]
