@@ -1,8 +1,8 @@
 {
   "single_family": {
     "a": 1.0,
-    "b": 41.0,
-    "trials": 40,
+    "b": 43.0,
+    "trials": 42,
     "survivors": 0
   },
   "cross_family": {
@@ -13,14 +13,14 @@
   },
   "random_subset": {
     "a": 1.0,
-    "b": 55.0,
-    "trials": 54,
+    "b": 57.0,
+    "trials": 56,
     "survivors": 0
   },
   "mutate_best": {
     "a": 1.0,
-    "b": 46.0,
-    "trials": 45,
+    "b": 48.0,
+    "trials": 47,
     "survivors": 0
   }
 }
