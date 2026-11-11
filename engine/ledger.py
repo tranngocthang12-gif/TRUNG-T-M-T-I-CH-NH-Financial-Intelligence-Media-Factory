@@ -155,10 +155,24 @@ def scorecard(as_of):
     normalized, blocked = prepare_predictions(raw)
     P = {p["id"]: p for p in normalized}
     R = _load(RES)
-    rows = [{**P[r["prediction_id"]], **r} for r in R if r["prediction_id"] in P and r.get("outcome") is not None]
-    void = sum(1 for r in R if r.get("outcome") is None)
+    # First resolution wins. Never double-weight an outcome or count an
+    # unrelated orphan as VOID; retain integrity counters for audit.
+    unique, seen = [], set()
+    duplicates = orphans = 0
+    for r in R:
+        rid = r.get("prediction_id") if isinstance(r, dict) else None
+        if rid not in P:
+            orphans += 1
+        elif rid in seen:
+            duplicates += 1
+        else:
+            seen.add(rid)
+            unique.append(r)
+    rows = [{**P[r["prediction_id"]], **r} for r in unique if r.get("outcome") is not None]
+    void = sum(1 for r in unique if r.get("outcome") is None)
     out = {"as_of": as_of, "total_predictions": len(raw),
            "eligible_predictions": len(P), "blocked_unresolvable": blocked,
+           "duplicate_resolutions": duplicates, "orphan_resolutions": orphans,
            "resolved": len(rows), "void_data_error": void, "procedures": {}}
     if rows:
         df = pd.DataFrame(rows)
