@@ -53,6 +53,25 @@ Finance scheduler, payment, trading, publication, secrets or production code is
 modified. No private project Library documents or private repository source
 is copied into this public repository.
 
+## 2026-11-12 independent P1 finding and remediation
+
+Grok reviewed exact prior HEAD `814e4897f2fc062147eabbda19c0a16c7c8100cf`
+and reported `REQUEST_CHANGES`: live Python dict subclasses could expose a
+policy-safe value through `__getitem__` or hide an extra authorization key
+through iteration while JSON serialization emitted their stored, unsafe
+values. The old API validated one view but hashed/returned another.
+
+**Decision:** JSON-canonicalize *before* any schema or policy validation;
+perform **all** checks on the resulting plain `json.loads` tree and return
+that same validated tree. This retains the existing v1 schema and exact
+rights/authority boundaries. `Split` and `Hide` adversarial tests reject
+production, automatic retraining and concealed authorization extras.
+No automatic promotion or authority is introduced.
+
+Grok's previous `REQUEST_CHANGES` is not a new-HEAD approval. Re-run
+independent review on the final patched HEAD before any L-09/L-10 decision.
+This is a non-merged candidate, not release certification.
+
 ## Acceptance / rollback
 
 Pass exact-head isolated CI, negative tests and changed-file permit list.
