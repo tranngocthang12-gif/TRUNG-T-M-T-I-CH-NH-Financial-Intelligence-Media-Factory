@@ -18,6 +18,14 @@ _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 _TICKER = re.compile(r"^[A-Z0-9]{2,8}$")
 
 
+def valid_benchmark_universe(members: object, ticker: object) -> bool:
+    """Validate the prospective, hashed constituent snapshot; never infer it from prices."""
+    return (type(members) is list and len(members) >= 2
+            and all(type(t) is str and _TICKER.fullmatch(t) for t in members)
+            and len(set(members)) == len(members)
+            and type(ticker) is str and ticker in members)
+
+
 def _instant(value: str) -> datetime:
     if not isinstance(value, str):
         raise ValueError("missing timestamp")
@@ -93,6 +101,9 @@ def normalize_prediction(raw: dict) -> tuple[dict | None, str | None]:
         "procedure": f"issue_{seat}",
         "probability": p,
         "base_rate": base,
+        # Only an intake-time immutable snapshot can define the scoring basket.
+        # Older Issue rows without it remain readable but cannot be scored.
+        "benchmark_universe": raw.get("benchmark_universe"),
         "question": raw.get("question", ""),
         "resolution_rule": {
             "type": PRICE_RULE,
