@@ -179,6 +179,37 @@ class KnowledgeContractTests(unittest.TestCase):
         b = record("B"); b["supersedes"] = [ref("A")]
         self.assertTrue(any("superseded" in e for e in check_dependency_closure([a, b], ref("A"))["reasons"]))
 
+    def test_cross_domain_current_successor_does_not_supersede_finance(self):
+        root = record("A", domain="finance")
+        attacker = record("M", domain="media")
+        attacker["supersedes"] = [ref("A")]
+        result = check_dependency_closure([root, attacker], ref("A"))
+        self.assertTrue(result["allowed"], result)
+
+    def test_cross_task_successor_does_not_supersede_root(self):
+        root = record("A", domain="finance")
+        successor = record("B", domain="finance", task_family="IMAGE_CLASSIFICATION")
+        successor["supersedes"] = [ref("A")]
+        result = check_dependency_closure([root, successor], ref("A"))
+        self.assertTrue(result["allowed"], result)
+
+    def test_malformed_current_successor_does_not_poison_root(self):
+        root = record("A", domain="finance")
+        forged = record("B", domain="finance")
+        forged["supersedes"] = [ref("A")]
+        forged["evidence_refs"] = []
+        result = check_dependency_closure([root, forged], ref("A"))
+        self.assertTrue(result["allowed"], result)
+
+    def test_same_scope_valid_successor_still_supersedes_dependency(self):
+        root = record("A", domain="finance")
+        dep = record("B", domain="finance", deps=[ref("A")])
+        successor = record("C", domain="finance")
+        successor["supersedes"] = [ref("A")]
+        result = check_dependency_closure([root, dep, successor], ref("B"))
+        self.assertFalse(result["allowed"])
+        self.assertTrue(any("superseded" in msg for msg in result["reasons"]))
+
     def test_unrelated_bad_state_does_not_poison_closure(self):
         a = record("A")
         unrelated = record("X"); unrelated["state"] = "UNEXPECTED"
