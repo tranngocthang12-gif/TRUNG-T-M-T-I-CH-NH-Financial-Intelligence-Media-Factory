@@ -29,10 +29,9 @@ jobs:
         run: python tools/validate.py
 
   full-suite:
-    name: Du bo test engine (thong tin, chua chan — C5 ban hieu)
+    name: Du bo test Finance (BLOCKING)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,3 +42,9 @@ jobs:
         run: pip install -r requirements.txt pytest
       - name: Chay du bo test
         run: python -m pytest -q tests
+      - name: Khong de test ghi de du lieu va bao cao da commit
+        if: always()
+        run: |
+          git diff --exit-code -- engine/ governance/ data/ ledger/ state/ paper/ reports/ research/ fact/ memory/ knowledge/ config.yaml
+          changed="$(git status --porcelain --untracked-files=all -- engine/ governance/ data/ ledger/ state/ paper/ reports/ research/ fact/ memory/ knowledge/ config.yaml)"
+          if [ -n "$changed" ]; then printf '%s\n' "$changed"; exit 1; fi
