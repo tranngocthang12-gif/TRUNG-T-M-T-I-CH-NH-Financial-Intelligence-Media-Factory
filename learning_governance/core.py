@@ -188,11 +188,21 @@ def check_dependency_closure(
     if errors:
         return {"allowed": False, "reasons": sorted(set(errors)), "closure": []}
 
+    # A superseder may invalidate only its own task/domain closure.
+    # A malformed or out-of-scope CURRENT record elsewhere in the index
+    # must not poison an otherwise valid root (F-003 independent review).
+    root_scope = index[root].get("scope")
     superseded = set()
     for key, record in index.items():
-        if record.get("state") == "CURRENT":
-            refs, _ = _keys(record.get("supersedes", []), "supersedes")
-            superseded.update(refs)
+        if record.get("state") != "CURRENT" or validate_record(record):
+            continue
+        scope = record.get("scope")
+        if (not isinstance(root_scope, Mapping) or not isinstance(scope, Mapping)
+                or any(scope.get(name) != root_scope.get(name)
+                       for name in ("task_family", "domain"))):
+            continue
+        refs, _ = _keys(record.get("supersedes", []), "supersedes")
+        superseded.update(refs)
 
     visiting, visited = set(), set()
 
