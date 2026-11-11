@@ -141,6 +141,79 @@ class ProblemContractTests(unittest.TestCase):
         with self.assertRaises(ProblemContractError):
             problem_receipt(p)
 
+    def test_split_view_dict_subclass_cannot_sneak_production(self):
+        class Split(dict):
+            def __getitem__(self, key):
+                if key == "mode":
+                    return "OFFLINE_ONLY"
+                if key == "owner_gate":
+                    return True
+                return dict.__getitem__(self, key)
+
+        spec = valid()
+        spec["deployment"] = Split(mode="PRODUCTION", owner_gate=False)
+        with self.assertRaises(ProblemContractError):
+            validate_problem(spec)
+        with self.assertRaises(ProblemContractError):
+            problem_receipt(spec)
+        self.assertEqual(dict.__getitem__(spec["deployment"], "mode"), "PRODUCTION")
+
+    def test_split_view_dict_subclass_cannot_sneak_automatic_retraining(self):
+        class Split(dict):
+            def __getitem__(self, key):
+                if key == "mode":
+                    return "PROPOSAL_ONLY"
+                if key == "owner_gate":
+                    return True
+                return dict.__getitem__(self, key)
+
+        spec = valid()
+        spec["retraining"] = Split(mode="AUTO_ON_NEW_DATA", owner_gate=False)
+        with self.assertRaises(ProblemContractError):
+            validate_problem(spec)
+        with self.assertRaises(ProblemContractError):
+            problem_receipt(spec)
+
+    def test_hidden_extra_keys_in_dict_subclass_rejected(self):
+        class Hide(dict):
+            def __iter__(self):
+                return (key for key in dict.__iter__(self)
+                        if key not in ("promote_model", "training_authorized"))
+
+            def __len__(self):
+                return sum(1 for _ in self.__iter__())
+
+        for where, key in (("deployment", "promote_model"),
+                           ("top", "training_authorized")):
+            spec = valid()
+            if where == "top":
+                spec = Hide(spec)
+                dict.__setitem__(spec, key, True)
+            else:
+                spec["deployment"] = Hide(spec["deployment"])
+                dict.__setitem__(spec["deployment"], key, True)
+            with self.subTest(where=where):
+                with self.assertRaises(ProblemContractError):
+                    validate_problem(spec)
+                with self.assertRaises(ProblemContractError):
+                    problem_receipt(spec)
+
+    def test_exact_canonical_tree_is_validated_not_custom_getitem(self):
+        class Split(dict):
+            def __getitem__(self, key):
+                if key == "mode":
+                    return "PRODUCTION"
+                if key == "owner_gate":
+                    return False
+                return dict.__getitem__(self, key)
+
+        spec = valid()
+        spec["deployment"] = Split(mode="OFFLINE_ONLY", owner_gate=True)
+        normalized = validate_problem(spec)
+        self.assertEqual(normalized["deployment"],
+                         {"mode": "OFFLINE_ONLY", "owner_gate": True})
+        self.assertFalse(problem_receipt(spec)["deployment_authorized"])
+
     def test_unknown_schema_is_not_upgraded_silently(self):
         p = valid()
         p["schema"] = "umlf-problem/v2"
