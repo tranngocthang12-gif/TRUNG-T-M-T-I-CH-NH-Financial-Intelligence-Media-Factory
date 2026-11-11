@@ -478,6 +478,43 @@ class ScopeIsolationRegressionTests(unittest.TestCase):
         self.assertFalse(verdict["allowed"])
         self.assertTrue(any("cross-scope" in msg for msg in verdict["reasons"]))
 
+    def test_direct_scope_gate_rejects_missing_task_and_domain(self):
+        context = {"task_family": "TABULAR_CLASSIFICATION", "domain": "finance"}
+        for field in ("task_family", "domain"):
+            candidate = record("A", domain="finance")
+            del candidate["scope"][field]
+            with self.subTest(field=field):
+                self.assertTrue(check_scope(candidate, context))
+
+    def test_direct_scope_gate_rejects_missing_runtime_context(self):
+        candidate = record("A", domain="finance")
+        for field in ("task_family", "domain"):
+            context = {"task_family": "TABULAR_CLASSIFICATION", "domain": "finance"}
+            del context[field]
+            with self.subTest(field=field):
+                self.assertTrue(check_scope(candidate, context))
+
+    def test_scope_rejects_partial_wildcards_not_only_bare_star(self):
+        for field, value in (("task_family", "TABULAR_*"), ("domain", "finance*")):
+            candidate = record("A", domain="finance")
+            candidate["scope"][field] = value
+            context = {"task_family": value if field == "task_family" else "TABULAR_CLASSIFICATION",
+                       "domain": value if field == "domain" else "finance"}
+            with self.subTest(field=field):
+                self.assertTrue(any("wildcard" in e for e in validate_record(candidate)))
+                self.assertTrue(check_scope(candidate, context))
+
+    def test_direct_scope_gate_requires_applicability(self):
+        candidate = record("A", domain="finance")
+        candidate["scope"].pop("applicability")
+        self.assertTrue(check_scope(candidate, {"task_family": "TABULAR_CLASSIFICATION",
+                                                "domain": "finance"}))
+
+    def test_direct_scope_gate_preserves_valid_exact_match(self):
+        candidate = record("A", domain="finance")
+        self.assertEqual(check_scope(candidate, {"task_family": "TABULAR_CLASSIFICATION",
+                                                 "domain": "finance"}), [])
+
     def test_forged_reviewer_cannot_grant_approval(self):
         candidate = record("X", state="EXPERIMENTAL")
         evaluation, review = promotion_receipts(candidate)
