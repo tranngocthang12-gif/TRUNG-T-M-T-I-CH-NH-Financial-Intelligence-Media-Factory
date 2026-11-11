@@ -1,0 +1,55 @@
+name: UMLF Q03 problem contract review (read only)
+on:
+  push:
+    branches: ["review/umlf-q03-problem-contract-*"]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  problem-contract-read-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scope permit list and Finance no-touch guard
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          base="$(git merge-base origin/main HEAD)"
+          git diff --name-only "$base" HEAD | while IFS= read -r file; do
+            case "$file" in
+              problem_contract/core.py|problem_contract/__init__.py|tests/test_umlf_problem_contract.py|.github/workflows/umlf_problem_ci.yml|architecture/adr/ADR-CANDIDATE-UMLF-Q03-PROBLEM-CONTRACT-20261111.md) echo "Allowed: $file";;
+              *) echo "::error::Unexpected path $file"; exit 9;;
+            esac
+          done
+          test -z "$(git diff --name-only "$base" HEAD -- engine/ governance/ data/ ledger/ state/ research/ paper/ config.yaml .github/workflows/daily_cycle.yml)"
+      - name: Offline deterministic Q03 tests
+        run: python -m unittest discover -s tests -p 'test_umlf_problem_contract.py' -v
+      - name: Imports and mutation guard
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          allowed = {"hashlib", "json", "collections", "copy", "__future__"}
+          for p in Path("problem_contract").glob("*.py"):
+              for node in ast.walk(ast.parse(p.read_text())):
+                  if isinstance(node, ast.Import):
+                      names = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom):
+                      names = [(node.module or "").split(".")[0]] if not node.level else []
+                  else:
+                      continue
+                  for name in names:
+                      if name not in allowed:
+                          raise SystemExit(f"Unexpected dependency {p}: {name}")
+          PY
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all -- engine governance data ledger state research paper)"
