@@ -93,7 +93,14 @@ def main() -> int:
             return 3
         if lines:
             prev = json.loads(lines[-1])["hash"]
-    row = {"issue_number": number, "issue_created_at": created,
+    # Snapshot the full configured basket at acceptance, never derive from later price frames.
+    from engine.config import CFG
+    basket = list(CFG["universe"])
+    if (len(basket) < 2 or len(set(basket)) != len(basket)
+            or not all(isinstance(t, str) and re.fullmatch(r"[A-Z0-9]{2,8}", t) for t in basket)):
+        print(json.dumps({"ok": False, "message": "Invalid configured benchmark universe"}))
+        return 2
+    row = {"benchmark_universe": basket, "issue_number": number, "issue_created_at": created,
            "issue_updated_at": updated, "ingest_action": action,
            "registered_at": now.isoformat().replace("+00:00", "Z"),
            "raw_payload_sha256": hashlib.sha256(body.encode("utf-8")).hexdigest(),
