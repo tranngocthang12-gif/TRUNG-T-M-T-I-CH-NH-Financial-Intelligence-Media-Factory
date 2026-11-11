@@ -43,6 +43,7 @@ def issue_row(**kwargs):
         "ingest_action": "opened",
         "registered_at": "2026-11-11T03:00:00Z",
         "raw_payload_sha256": "a" * 64,
+        "benchmark_universe": ["FPT", "VNM"],
         **raw,
     }
 
@@ -196,12 +197,15 @@ def test_delayed_issue_registration_cannot_backdate_price_entry():
     assert view["pair_key"] != other_view["pair_key"]
 
 
-@pytest.mark.parametrize("case", ["clean", "dirty_entry", "dirty_peers", "nan_peers", "missing_peer", "missing_mask"])
+@pytest.mark.parametrize("case", ["clean", "dirty_entry", "dirty_peers", "nan_peers", "missing_peer", "missing_mask", "both_drop_peer", "extra_price_peer", "extra_quality_peer", "invalid_snapshot", "missing_snapshot"])
 def test_g001_no_shrinking_benchmark(tmp_path, monkeypatch, case):
     monkeypatch.setattr(ledger, "ROOT", tmp_path)
     monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
     (tmp_path / "ledger").mkdir()
     raw = issue_row(resolve_at="2026-11-19")
+    raw["benchmark_universe"] = ["FPT", "VNM", "HPG"]
+    if case == "invalid_snapshot": raw["benchmark_universe"] = ["FPT", "FPT", "HPG"]
+    if case == "missing_snapshot": raw.pop("benchmark_universe")
     (tmp_path / "ledger/predictions.jsonl").write_text(json.dumps(raw) + "\n")
     days = pd.bdate_range("2026-11-12", periods=6)
     close = pd.DataFrame({"FPT": [100]*5+[101], "VNM": [100]*5+[110], "HPG": [100]*5+[80]}, index=days)
@@ -211,6 +215,11 @@ def test_g001_no_shrinking_benchmark(tmp_path, monkeypatch, case):
     if case == "nan_peers": close.loc[days[-1], ["VNM", "HPG"]] = float("nan")
     if case == "missing_peer": close = close.drop(columns="HPG")
     if case == "missing_mask": bad = bad.drop(columns="HPG")
+    if case == "both_drop_peer":
+        close = close.drop(columns="HPG")
+        bad = bad.drop(columns="HPG")
+    if case == "extra_price_peer": close["ACB"] = [100] * len(days)
+    if case == "extra_quality_peer": bad["ACB"] = False
     out = ledger.resolve(close, "2026-11-19", bad)
     assert len(out) == 1
     if case == "clean":
@@ -222,3 +231,18 @@ def test_g001_no_shrinking_benchmark(tmp_path, monkeypatch, case):
     score = ledger.scorecard("2026-11-19")
     assert score["resolved"] == (1 if case == "clean" else 0)
     assert score["void_data_error"] == (0 if case == "clean" else 1)
+
+def test_g001_old_prediction_without_frozen_basket_is_void(tmp_path, monkeypatch):
+    """No retroactive invention of the universe for historical legacy rows."""
+    monkeypatch.setattr(ledger, "ROOT", tmp_path)
+    monkeypatch.setattr(ledger, "path", lambda rel: tmp_path / rel)
+    (tmp_path / "ledger").mkdir()
+    row = {"id": "P-legacy-unfrozen", "created_at": "2026-11-11",
+           "procedure": "legacy", "probability": 0.6, "base_rate": 0.5,
+           "resolution_rule": {"type": "excess_return_positive", "ticker": "FPT", "horizon": 5}}
+    (tmp_path / "ledger/predictions.jsonl").write_text(json.dumps(row) + "\n")
+    days = pd.bdate_range("2026-11-12", periods=6)
+    close = pd.DataFrame({"FPT": [100]*5+[101], "VNM": [100]*5+[110]}, index=days)
+    out = ledger.resolve(close, "2026-11-19")
+    assert len(out) == 1 and out[0]["outcome"] is None and out[0]["void"]
+    assert ledger.scorecard("2026-11-19")["resolved"] == 0
