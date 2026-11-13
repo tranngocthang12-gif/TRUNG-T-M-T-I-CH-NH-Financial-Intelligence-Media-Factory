@@ -4,6 +4,7 @@ Auditor, Resolution, Scorecard đều là code tất định — không LLM nào
 import hashlib, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, save_json
+from .forecast_bridge import prepare_predictions, valid_benchmark_universe
 
 PRED, RES = "ledger/predictions.jsonl", "ledger/resolutions.jsonl"
 
@@ -14,6 +15,25 @@ def _load(rel):
 def _append(rel, rows):
     with open(path(rel), "a", encoding="utf-8") as f:
         for r in rows: f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+
+def _append_predictions(rows):
+    """Extend the SAME hash chain for legacy-engine and Issue-origin forecasts."""
+    if not rows:
+        return
+    from tools.laws_checks import line_hash
+    previous = "GENESIS"
+    for existing in _load(PRED):
+        if existing.get("prev_hash") != previous or existing.get("hash") != line_hash(existing):
+            raise ValueError("Prediction Ledger integrity failure: refusing unchained append")
+        previous = existing["hash"]
+    new = []
+    for row in rows:
+        item = {**row, "prev_hash": previous}
+        item["hash"] = line_hash(item)
+        previous = item["hash"]
+        new.append(item)
+    _append(PRED, new)
 
 def base_rate(close, ticker, h):
     """Tỷ lệ lịch sử mã này vượt bình quân universe trong h phiên (do code tính)."""
@@ -41,8 +61,15 @@ def audit(p, universe, fact_ids, as_of):
 def record(preds, as_of, universe, fact_ids, close):
     """Kiểm toán rồi ghi. Trả về (đã ghi, bị loại)."""
     ok, rejected = [], []
+    # Record exactly the validated intake universe, not an unrelated config
+    # universe. This preserves legacy synthetic/domain-specific universes.
+    basket = list(universe)
+    frame_ok = (len(basket) >= 2 and len(basket) == len(set(basket))
+                and close.columns.is_unique and set(basket) == set(close.columns))
     for p in preds:
-        errs = audit(p, universe, fact_ids, as_of)
+        errs = audit(p, basket, fact_ids, as_of)
+        if not frame_ok:
+            errs.append("rổ tại lúc ghi không khớp dữ liệu giá đã khai")
         if errs:
             rejected.append({**p, "audit_errors": errs}); continue
         h = int(p["horizon"])
@@ -51,38 +78,71 @@ def record(preds, as_of, universe, fact_ids, close):
                "resolution_rule": {"type": "excess_return_positive", "ticker": p["ticker"], "horizon": h,
                                    "benchmark": "universe_equal_weight", "entry": "close_t+1"},
                "probability": round(float(p["probability"]), 3), "base_rate": round(base_rate(close, p["ticker"], h), 3),
+               "benchmark_universe": list(basket),
                "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
         row["id"] = "P-" + hashlib.sha1(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
         ok.append(row)
-    _append(PRED, ok)
+    _append_predictions(ok)
     if rejected:
         _append("ledger/rejected.jsonl", [{**r, "rejected_at": as_of} for r in rejected])
     return ok, rejected
 
 # ---------------- RESOLUTION (code) ----------------
 def resolve(close, as_of, bad=None):
-    """Chấm bằng GIÁ ĐIỀU CHỈNH. Mã có ô lỗi dữ liệu trong cửa sổ chấm → VOID (không tính điểm);
-    mã khác có lỗi trong cửa sổ bị loại khỏi bình quân universe."""
+    """Chấm bằng GIÁ ĐIỀU CHỈNH. Chỉ chấm nếu toàn bộ rổ universe_equal_weight
+    có giá hợp lệ và không mã nào có cờ lỗi trong cửa sổ; thiếu một mã => VOID."""
     done = {r["prediction_id"] for r in _load(RES)}
+    normalized, blocked = prepare_predictions(_load(PRED))
     idx = close.index
     new = []
-    for p in _load(PRED):
+    for p in normalized:
         if p["id"] in done: continue
         rr = p["resolution_rule"]; h = rr["horizon"]
+        if p.get("resolve_at") and pd.Timestamp(as_of).date() < pd.Timestamp(p["resolve_at"]).date():
+            continue  # Never adjudicate a future Issue before its declared due date.
         c = pd.Timestamp(p["created_at"])
         pos = idx.searchsorted(c, side="right")          # phiên kế tiếp = điểm vào lệnh
         if pos + h >= len(idx): continue                 # chưa đến hạn
         t0, t1 = idx[pos], idx[pos + h]
-        ret = close.loc[t1] / close.loc[t0] - 1
-        if bad is not None:
-            dirty = bad.loc[(bad.index > t0) & (bad.index <= t1)].any()
-            if bool(dirty.get(rr["ticker"], False)):
-                new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
-                            "exit_date": str(t1.date()), "excess_return": None, "outcome": None,
-                            "void": "lỗi dữ liệu giá trong cửa sổ chấm"})
-                continue
-            ret = ret[~dirty.reindex(ret.index).fillna(False).astype(bool)]
-        if pd.isna(ret.get(rr["ticker"])): continue
+        if pd.Timestamp(t1).date() > pd.Timestamp(as_of).date():
+            continue  # Supplied price frame may include future sessions.
+        # G-001 (external review): the equal-weight benchmark is the COMPLETE
+        # universe supplied by the market frame, not a subset selected by quality.
+        # Its immutable historical membership still needs a separate PIT contract.
+        reason = None
+        basket = p.get("benchmark_universe")
+        if not valid_benchmark_universe(basket, rr["ticker"]):
+            reason = "thiếu hoặc sai snapshot rổ universe_equal_weight tại thời điểm dự báo"
+        elif not close.columns.is_unique or set(close.columns) != set(basket):
+            reason = "rổ giá không khớp snapshot đã khai; không được thu hẹp benchmark"
+        elif bad is None:
+            reason = "thiếu bảng cờ chất lượng, không thể xác minh rổ sạch"
+        elif not bad.columns.is_unique or set(bad.columns) != set(basket):
+            reason = "rổ chất lượng không khớp snapshot đã khai"
+        elif not idx.is_unique or not idx.is_monotonic_increasing:
+            reason = "rổ universe_equal_weight có lịch phiên không hợp lệ"
+        else:
+            # Order by the frozen receipt, not the order returned by a data provider.
+            window = close.loc[:, basket].iloc[pos:pos + h + 1]
+            prices = window.apply(pd.to_numeric, errors="coerce")
+            values = prices.to_numpy(dtype=float)
+            if not np.isfinite(values).all() or not (values > 0).all():
+                reason = "giá thiếu hoặc không hợp lệ trong rổ universe_equal_weight"
+            elif bad is not None:
+                # Every declared constituent must have a complete quality mask,
+                # INCLUDING the entry session; absent flags are not clean data.
+                if not bad.index.is_unique or not bad.columns.is_unique:
+                    reason = "cờ chất lượng có phiên hoặc mã bị trùng"
+                else:
+                    flags = bad.reindex(index=window.index, columns=basket)
+                    if flags.isna().any().any() or flags.astype(bool).any().any():
+                        reason = "rổ universe_equal_weight có mã dirty hoặc thiếu cờ chất lượng"
+        if reason is not None:
+            new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
+                        "exit_date": str(t1.date()), "excess_return": None, "outcome": None,
+                        "void": reason})
+            continue
+        ret = prices.iloc[-1] / prices.iloc[0] - 1
         excess = float(ret[rr["ticker"]] - ret.mean())
         new.append({"prediction_id": p["id"], "resolved_at": as_of, "entry_date": str(t0.date()),
                     "exit_date": str(t1.date()), "excess_return": round(excess, 5), "outcome": int(excess > 0)})
@@ -91,11 +151,29 @@ def resolve(close, as_of, bad=None):
 
 # ---------------- SCORECARD (code) ----------------
 def scorecard(as_of):
-    P = {p["id"]: p for p in _load(PRED)}
+    raw = _load(PRED)
+    normalized, blocked = prepare_predictions(raw)
+    P = {p["id"]: p for p in normalized}
     R = _load(RES)
-    rows = [{**P[r["prediction_id"]], **r} for r in R if r["prediction_id"] in P and r.get("outcome") is not None]
-    void = sum(1 for r in R if r.get("outcome") is None)
-    out = {"as_of": as_of, "total_predictions": len(P), "resolved": len(rows), "void_data_error": void, "procedures": {}}
+    # First resolution wins. Never double-weight an outcome or count an
+    # unrelated orphan as VOID; retain integrity counters for audit.
+    unique, seen = [], set()
+    duplicates = orphans = 0
+    for r in R:
+        rid = r.get("prediction_id") if isinstance(r, dict) else None
+        if rid not in P:
+            orphans += 1
+        elif rid in seen:
+            duplicates += 1
+        else:
+            seen.add(rid)
+            unique.append(r)
+    rows = [{**P[r["prediction_id"]], **r} for r in unique if r.get("outcome") is not None]
+    void = sum(1 for r in unique if r.get("outcome") is None)
+    out = {"as_of": as_of, "total_predictions": len(raw),
+           "eligible_predictions": len(P), "blocked_unresolvable": blocked,
+           "duplicate_resolutions": duplicates, "orphan_resolutions": orphans,
+           "resolved": len(rows), "void_data_error": void, "procedures": {}}
     if rows:
         df = pd.DataFrame(rows)
         for proc, g in df.groupby("procedure"):

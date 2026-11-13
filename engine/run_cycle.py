@@ -71,7 +71,8 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
     n_total = 0 if ledger_df is None else len(ledger_df)
 
     # ---- v1.0 GĐ1: PREDICTION LEDGER ----
-    resolved = ledger.resolve(close, as_of, bad)
+    # Only raw observed adjusted prices may determine a real outcome. Never ffill labels.
+    resolved = ledger.resolve(mk["ledger_close"].loc[:as_of], as_of, bad)
     news = facts.ingest_news(as_of) if live else {"new_items": 0, "errors": []}
     if skip:
         ex = {"ran": False, "reasons": [f"tạm dừng: tỷ lệ lỗi dữ liệu {quality['error_rate_window']:.2%} "

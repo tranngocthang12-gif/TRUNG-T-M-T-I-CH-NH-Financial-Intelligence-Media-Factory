@@ -29,6 +29,18 @@ body:
       options: ["numeric_range", "event_before_date", "comparison", "excess_return_positive"]
     validations: {required: true}
   - type: input
+    id: ticker
+    attributes:
+      label: ticker
+      description: Chỉ dùng cho excess_return_positive (mã đang trong universe)
+  - type: dropdown
+    id: horizon
+    attributes:
+      label: horizon
+      description: Chỉ dùng cho excess_return_positive (số phiên)
+      options: ["5", "20"]
+    validations: {required: false}
+  - type: input
     id: resolve_at
     attributes:
       label: resolve_at
