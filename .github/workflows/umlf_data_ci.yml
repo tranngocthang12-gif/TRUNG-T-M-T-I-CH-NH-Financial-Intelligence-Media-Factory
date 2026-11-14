@@ -1,0 +1,90 @@
+name: UMLF Q04 provisional data contract CI (read only)
+# Candidate-only evidence, not accepted Q03 dependency or approval.
+on:
+  push:
+    branches: ["review/umlf-q04-data-contract-provisional-*"]
+permissions:
+  contents: read
+jobs:
+  q04-data-contract:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Exact-only-additions gate and Finance rename adversarial check
+        shell: bash
+        run: |
+          set -euo pipefail
+          gate() {
+            local repo_dir="$1" base="$2" head="$3"
+            git -C "$repo_dir" -c diff.renames=false diff --no-renames --name-status "$base" "$head" |
+              while IFS="$(printf '\t')" read -r status path; do
+                if [ "$status" != "A" ]; then
+                  echo "::error::Q04 prohibits deletion/modification: $status $path"
+                  exit 9
+                fi
+                case "$path" in
+                  data_contract/core.py|data_contract/__init__.py|tests/test_umlf_data_contract.py|.github/workflows/umlf_data_ci.yml|architecture/adr/ADR-CANDIDATE-UMLF-Q04-DATA-CONTRACT-20261112.md)
+                    echo "Allowed Q04 addition: $path";;
+                  *)
+                    echo "::error::Forbidden Q04 path: $path"
+                    exit 9;;
+                esac
+              done
+          }
+          git fetch --no-tags origin main
+          base="$(git merge-base origin/main HEAD)"
+          gate "$PWD" "$base" HEAD
+
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          git init -q "$tmp"
+          git -C "$tmp" config user.name q04-fixture
+          git -C "$tmp" config user.email q04@example.invalid
+          mkdir -p "$tmp/engine" "$tmp/data_contract"
+          printf 'legacy\n' > "$tmp/engine/secret.py"
+          git -C "$tmp" add engine/secret.py
+          git -C "$tmp" commit -qm base
+          git -C "$tmp" mv engine/secret.py data_contract/core.py
+          git -C "$tmp" commit -qm rename-attack
+          if gate "$tmp" HEAD^ HEAD; then
+            echo "::error::Q04 rename bypass"
+            exit 9
+          else
+            status="$?"
+            test "$status" -eq 9
+            echo "Renamed Finance source refused: exit 9"
+          fi
+          mkdir -p "$tmp/tests"
+          printf 'positive\n' > "$tmp/tests/test_umlf_data_contract.py"
+          git -C "$tmp" add tests/test_umlf_data_contract.py
+          git -C "$tmp" commit -qm allowed-addition
+          gate "$tmp" HEAD^ HEAD
+      - name: Q04 offline structural synthetic tests
+        run: python -m unittest discover -s tests -p 'test_umlf_data_contract.py' -v
+      - name: Enforce zero domain/provider/OS/network import coupling
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          allowed = {"__future__", "hashlib", "json", "math", "datetime", "collections"}
+          for path in Path("data_contract").glob("*.py"):
+              for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                  if isinstance(node, ast.Import):
+                      names = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                      names = [(node.module or "").split(".")[0]]
+                  else:
+                      continue
+                  for name in names:
+                      if name not in allowed:
+                          raise SystemExit(f"Forbidden Q04 module import {path}: {name}")
+          PY
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all -- engine governance data state ledger paper research)"
