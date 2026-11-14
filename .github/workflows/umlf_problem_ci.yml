@@ -1,0 +1,102 @@
+name: UMLF Q03 problem contract review (read only)
+# Review-only workflow: branch push CI follows the exact PR SHA.
+# No global pull_request trigger: it would block unrelated future Factory slices.
+on:
+  push:
+    branches: ["review/umlf-q03-problem-contract-*"]
+permissions:
+  contents: read
+jobs:
+  problem-contract-read-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Only five additions allowed; never mask Finance rename or deletion
+        shell: bash
+        run: |
+          set -euo pipefail
+          # One shared gate for the real diff and adversarial fixture.
+          # --no-renames makes the deleted source visible as D even for R100.
+          review_scope_gate() {
+            local repo_dir="$1" base="$2" head="$3"
+            git -C "$repo_dir" -c diff.renames=false diff --no-renames --name-status "$base" "$head" |
+              while IFS="$(printf '\t')" read -r status path; do
+                if [ "$status" != "A" ]; then
+                  echo "::error::Q03 only permits additions: $status $path"
+                  exit 9
+                fi
+                case "$path" in
+                  problem_contract/core.py|problem_contract/__init__.py|tests/test_umlf_problem_contract.py|.github/workflows/umlf_problem_ci.yml|architecture/adr/ADR-CANDIDATE-UMLF-Q03-PROBLEM-CONTRACT-20261111.md)
+                    echo "Allowed added Q03 candidate: $path";;
+                  *)
+                    echo "::error::Forbidden path in Q03 candidate: $path"
+                    exit 9;;
+                esac
+              done
+          }
+          git fetch --no-tags origin main
+          base="$(git merge-base origin/main HEAD)"
+          review_scope_gate "$PWD" "$base" HEAD
+
+          # Reproduce the F-008 attack against the ACTUAL gate function.
+          # A rename from a protected legacy source must fail with exit 9.
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          git init -q "$tmp"
+          git -C "$tmp" config user.name "q03-ci-fixture"
+          git -C "$tmp" config user.email "q03-ci@example.invalid"
+          mkdir -p "$tmp/engine"
+          printf 'legacy protected content\n' > "$tmp/engine/secret.py"
+          git -C "$tmp" add engine/secret.py
+          git -C "$tmp" commit -qm "base"
+          mkdir -p "$tmp/problem_contract"
+          git -C "$tmp" mv engine/secret.py problem_contract/core.py
+          git -C "$tmp" commit -qm "attack: rename Finance to allowed Factory path"
+          if review_scope_gate "$tmp" HEAD^ HEAD; then
+            echo "::error::RENAME ATTACK BYPASSED Q03 GATE"
+            exit 9
+          else
+            got="$?"
+            if [ "$got" -ne 9 ]; then
+              echo "::error::Gate failed with unexpected status: $got"
+              exit 9
+            fi
+            echo "Negative control PASS: renamed Finance source rejected with exit 9"
+          fi
+
+          # Positive control: only addition of an allowed Factory file passes.
+          mkdir -p "$tmp/tests"
+          printf 'pass\n' > "$tmp/tests/test_umlf_problem_contract.py"
+          git -C "$tmp" add tests/test_umlf_problem_contract.py
+          git -C "$tmp" commit -qm "control: allowed Q03 addition"
+          review_scope_gate "$tmp" HEAD^ HEAD
+          echo "Positive control PASS: allowlisted addition accepted"
+      - name: Offline deterministic Q03 tests
+        run: python -m unittest discover -s tests -p 'test_umlf_problem_contract.py' -v
+      - name: Imports and mutation guard
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          allowed = {"hashlib", "json", "collections", "copy", "__future__"}
+          for p in Path("problem_contract").glob("*.py"):
+              for node in ast.walk(ast.parse(p.read_text())):
+                  if isinstance(node, ast.Import):
+                      names = [a.name.split(".")[0] for a in node.names]
+                  elif isinstance(node, ast.ImportFrom):
+                      names = [(node.module or "").split(".")[0]] if not node.level else []
+                  else:
+                      continue
+                  for name in names:
+                      if name not in allowed:
+                          raise SystemExit(f"Unexpected dependency {p}: {name}")
+          PY
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all -- engine governance data ledger state research paper)"
