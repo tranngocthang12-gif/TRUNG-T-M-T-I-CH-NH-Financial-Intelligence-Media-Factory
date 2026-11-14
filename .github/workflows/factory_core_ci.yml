@@ -1,0 +1,99 @@
+name: UMLF isolated core contract CI (review-only)
+on:
+  push:
+    branches: ["review/umlf-core-scope-f003-*"]
+  pull_request:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  factory-core-read-only:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Verify isolated file allowlist and protected Finance diff
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          base="$(git merge-base origin/main HEAD)"
+          echo "Merge-base: $base"
+          # -M/rename detection can hide a deleted protected source path by
+          # reporting only its allowed destination. Disable rename detection,
+          # inspect BOTH name-status and original paths, reject all D/M/C/R.
+          git -c diff.renames=false diff --no-renames --name-status "$base" HEAD |
+            while IFS="$(printf '\t')" read -r status file; do
+              if [ "$status" != "A" ]; then
+                echo "::error::Candidate must only add files; got $status $file"
+                exit 9
+              fi
+              case "$file" in
+                learning_governance/__init__.py|learning_governance/core.py|task_templates/tabular_classification/__init__.py|task_templates/tabular_classification/contract.py|tests/test_factory_governance.py|tests/test_factory_tabular.py|.github/workflows/factory_core_ci.yml|architecture/adr/ADR-CANDIDATE-UMLF-CORE-SCOPE-GATE-20261111.md)
+                  echo "Allowed added Factory candidate: $file";;
+                *)
+                  echo "::error::Forbidden out-of-scope path: $file"
+                  exit 9;;
+              esac
+            done
+          if git -c diff.renames=false diff --no-renames --name-only "$base" HEAD |
+              grep -E '^(engine/|governance/|data/|state/|ledger/|paper/|research/|\.github/workflows/daily_cycle\.yml$|config\.yaml$)'; then
+            echo "::error::Finance path touched"
+            exit 9
+          fi
+      - name: Regression - renamed Finance source must not disappear
+        shell: bash
+        run: |
+          set -euo pipefail
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          git init -q "$tmp"
+          git -C "$tmp" config user.name ci-fixture
+          git -C "$tmp" config user.email ci-fixture@example.invalid
+          mkdir -p "$tmp/engine" "$tmp/learning_governance"
+          printf 'protected source\n' > "$tmp/engine/secret.py"
+          git -C "$tmp" add engine/secret.py
+          git -C "$tmp" commit -qm base
+          git -C "$tmp" mv engine/secret.py learning_governance/core.py
+          # Baseline vulnerable path enumeration reports only the destination.
+          # Hardened enumeration MUST expose D engine/secret.py as well as A.
+          names="$(git -C "$tmp" -c diff.renames=false diff --no-renames --name-status --cached HEAD)"
+          printf '%s\n' "$names"
+          printf '%s\n' "$names" | grep -Fx "$(printf 'D\tengine/secret.py')"
+          printf '%s\n' "$names" | grep -Fx "$(printf 'A\tlearning_governance/core.py')"
+
+      - name: Verify Factory imports do not depend on finance or OS/network runtimes
+        run: |
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          roots = [Path("learning_governance"), Path("task_templates/tabular_classification")]
+          forbidden = {"engine", "governance", "experts", "paper", "media", "yfinance",
+                       "requests", "httpx", "subprocess", "socket"}
+          for root in roots:
+              for path in root.glob("*.py"):
+                  tree = ast.parse(path.read_text(encoding="utf-8"))
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Import):
+                          names = [alias.name.split(".")[0] for alias in node.names]
+                      elif isinstance(node, ast.ImportFrom) and node.level == 0:
+                          names = [(node.module or "").split(".")[0]]
+                      else:
+                          continue
+                      for name in names:
+                          if name in forbidden:
+                              raise SystemExit(f"Forbidden Factory import {path}: {name}")
+                  print("Import boundary OK:", path)
+          PY
+      - name: Read-only Factory governance and tabular adversarial unit tests
+        run: python -m unittest discover -s tests -p 'test_factory_*.py' -v
+      - name: Verify no files were mutated by tests
+        run: |
+          git diff --exit-code
+          test -z "$(git status --porcelain --untracked-files=all -- engine governance data state ledger paper research)"
