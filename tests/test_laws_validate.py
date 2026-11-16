@@ -29,8 +29,13 @@ class ReviewGateTests(unittest.TestCase):
         self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Grok (xAI)"), [])
         self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Owner"), [])
         self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Owner (Trần Ngọc Thắng)"), [])
-        self.assertTrue(f("authored_by: Claude\nreviewed_by: not-an-owner"))      # "owner" phải là một từ
-        self.assertTrue(f("authored_by: Claude\nreviewed_by: downer"))
+        for bad in ("not-an-owner", "downer", "not_an_owner", "éowner", "an owner", "Trần Ngọc Thắng (Owner)",
+                    "owner_bot", "owner-bot", "ownerx", "not_a_grok", "xgrok", "ai đó"):
+            self.assertTrue(f(f"authored_by: Claude\nreviewed_by: {bad}"), bad)      # phải BẮT ĐẦU bằng tên ghế
+        for good in ("Owner", "owner", "Owner (Trần Ngọc Thắng)", "Owner — vòng 3", "ChatGPT (OpenAI)", "Grok (xAI)",
+                     "GPT-5.5 Thinking", "Gemini 3 Pro", "grok"):
+            self.assertEqual(f(f"authored_by: Claude (Anthropic)\nreviewed_by: {good}"), [], good)
+        self.assertEqual(f("authored_by: ChatGPT\nreviewed_by: claude-opus-5-5"), [])
         self.assertEqual(f("- authored_by: `ChatGPT`\n- reviewed_by: `Claude`"), [])
 
 
