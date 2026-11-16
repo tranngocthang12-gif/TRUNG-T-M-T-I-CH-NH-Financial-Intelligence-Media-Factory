@@ -39,8 +39,12 @@ try:
     n_sources = len(json.loads((ROOT / "library/SOURCE_MANIFEST.json").read_text(encoding="utf-8")).get("files") or {})
 except Exception as e:
     n_sources = 0; errors.append(f"library/SOURCE_MANIFEST.json đọc lỗi ({e})")
-n_forecasts = _count_lines("ledger/predictions.jsonl")
-progress = f"tiến độ G1: tài liệu gốc ghim {n_sources}/40, dự báo trong Ledger {n_forecasts}/60"
+def _count_issue_forecasts(rel):
+    p = ROOT / rel
+    if not p.is_file(): return 0
+    return sum(1 for l in p.read_text(encoding="utf-8").splitlines() if l.strip() and "issue_number" in json.loads(l))
+n_forecasts = _count_issue_forecasts("ledger/predictions.jsonl")          # chỉ dự báo A+B qua Issue (§8 G1), không đếm dòng engine
+progress = f"tiến độ G1: tài liệu gốc ghim {n_sources}/40, dự báo A+B trong Ledger {n_forecasts}/60"
 
 # ---------- 3) Mọi YAML trong repo phải đọc được ----------
 yamls = sorted(p for ext in ("*.yaml", "*.yml") for p in ROOT.rglob(ext) if ".git" not in p.parts)

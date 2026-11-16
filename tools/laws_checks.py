@@ -1,7 +1,8 @@
 """Kiểm máy cho governance/LAWS.md — gọi từ tools/validate.py, có test riêng.
 L-07  một kiến trúc: ARCHITECTURE_v*.md phải được liệt kê SUPERSEDED trong architecture/ARCHIVE.md.
 L-02  không khuyến nghị: reports/, media/, ledger/ không chứa từ khóa khuyến nghị mua bán.
-L-05/Ledger  hash chuỗi: ledger/predictions.jsonl mỗi dòng có sha256 và prev_hash khớp dòng trước (dòng đầu "GENESIS").
+L-05/Ledger  hash chuỗi: ledger/predictions.jsonl và ledger/resolutions.jsonl mỗi dòng có sha256 và prev_hash khớp dòng trước
+      (dòng đầu "GENESIS"); sửa một kết quả đã ghi làm CI đỏ.
 L-03  dữ liệu cá nhân: tệp chữ (md/yaml/json/jsonl/txt) ngoài dữ liệu giá không chứa số định danh/số tài khoản đi kèm
       nhãn (CCCD, CMND, căn cước, hộ chiếu, số tài khoản, STK, account number).
 L-09  người viết ≠ người chấm: thân PR có "authored_by:" và "reviewed_by:"; reviewed_by không rỗng, không cùng nhà cung cấp
@@ -32,7 +33,7 @@ def line_hash(payload: dict) -> str:
 
 PII_RE = re.compile(r"(CCCD|CMND|c[ăa]n c[ưu][ớo]c|h[ộo] chi[ếe]u|s[ốo] t[àa]i kho[ảa]n|\bSTK\b|account number|passport)"
                     r"[^\n0-9]{0,25}[0-9][0-9 .-]{5,}[0-9]", re.IGNORECASE)
-PII_SKIP_DIRS = {".git", "data", "research", "paper", "node_modules", "__pycache__"}
+PII_SKIP_DIRS = {".git", "node_modules", "__pycache__"}      # quét mọi thư mục; chỉ bỏ qua theo đuôi tệp (PII_EXT)
 PII_EXT = {".md", ".txt", ".yaml", ".yml", ".json", ".jsonl"}
 
 
@@ -106,8 +107,12 @@ def _chain_errors(path, label) -> list[str]:
 
 
 def check_ledger_chain(root) -> list[str]:
-    path = pathlib.Path(root) / "ledger" / "predictions.jsonl"
-    return _chain_errors(path, "Ledger") if path.is_file() else []
+    errs = []
+    for name, label in (("predictions.jsonl", "Ledger"), ("resolutions.jsonl", "Ledger phân định")):
+        path = pathlib.Path(root) / "ledger" / name
+        if path.is_file():
+            errs += _chain_errors(path, label)
+    return errs
 
 
 def check_trial_registry(root) -> list[str]:
@@ -142,13 +147,25 @@ def check_trial_registry(root) -> list[str]:
     return errs
 
 
-PROVIDERS = {"anthropic": ("claude", "anthropic"), "openai": ("chatgpt", "openai", "gpt", "codex", "minh tri", "minh trí"),
-             "xai": ("grok", "xai"), "google": ("gemini", "google", "bard")}
+PROVIDERS = {"anthropic": ("claude", "anthropic", "opus", "sonnet", "haiku", "fable", "mythos"),
+             "openai": ("chatgpt", "openai", "gpt", "codex", "o1", "o3", "o4", "minh tri", "minh trí"),
+             "xai": ("grok", "xai"), "google": ("gemini", "google", "bard"),
+             "meta": ("llama", "meta ai"), "deepseek": ("deepseek",), "mistral": ("mistral",)}
+_PROVIDER_RE = {k: re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(x) for x in keys) + r")(?![a-z0-9])")
+                for k, keys in PROVIDERS.items()}
 
 
 def _providers(text: str) -> set:
+    """Nhà cung cấp mô hình được nhắc tới trong một chuỗi tên ghế (so khớp theo từ, không theo chuỗi con)."""
     t = (text or "").lower()
-    return {k for k, keys in PROVIDERS.items() if any(x in t for x in keys)}
+    return {k for k, rx in _PROVIDER_RE.items() if rx.search(t)}
+
+
+def same_provider(a: str, b: str) -> bool:
+    """L-09: hai ghế cùng nhà cung cấp, hoặc cùng tên. Ghế người (Owner) không có nhà cung cấp."""
+    if (a or "").strip().lower() == (b or "").strip().lower():
+        return True
+    return bool(_providers(a) & _providers(b))
 
 
 def check_pr_review(body: str) -> list[str]:
@@ -163,11 +180,10 @@ def check_pr_review(body: str) -> list[str]:
         return ["L-09: thân PR thiếu dòng 'authored_by: <ghế/mô hình>'"]
     if not r:
         return ["L-09: chưa có người chấm — điền 'reviewed_by: <ghế khác nhà cung cấp>' sau khi chấm xong"]
-    if a.lower() == r.lower():
-        return ["L-09: reviewed_by trùng authored_by"]
-    same = _providers(a) & _providers(r)
-    if same:
-        return [f"L-09: người viết và người chấm cùng nhà cung cấp ({', '.join(sorted(same))})"]
+    if same_provider(a, r):
+        return [f"L-09: người viết và người chấm cùng nhà cung cấp hoặc cùng tên ('{a}' / '{r}')"]
+    if not _providers(r) and "owner" not in r.lower():
+        return [f"L-09: reviewed_by '{r}' không nhận ra nhà cung cấp (ghi rõ, ví dụ 'ChatGPT (OpenAI)', 'Grok (xAI)', hoặc 'Owner')"]
     return []
 
 
