@@ -28,6 +28,9 @@ class ReviewGateTests(unittest.TestCase):
         self.assertTrue(f("authored_by: Claude\nreviewed_by: ai đó"))                 # không nhận ra nhà cung cấp
         self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Grok (xAI)"), [])
         self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Owner"), [])
+        self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Owner (Trần Ngọc Thắng)"), [])
+        self.assertTrue(f("authored_by: Claude\nreviewed_by: not-an-owner"))      # "owner" phải là một từ
+        self.assertTrue(f("authored_by: Claude\nreviewed_by: downer"))
         self.assertEqual(f("- authored_by: `ChatGPT`\n- reviewed_by: `Claude`"), [])
 
 

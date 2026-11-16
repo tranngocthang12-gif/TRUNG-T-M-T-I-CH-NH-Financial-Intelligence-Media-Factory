@@ -96,6 +96,17 @@ class LedgerCompatTests(unittest.TestCase):
         self.assertEqual(resolved_again["n"], 0)                        # không chấm lại, không chấm dòng Issue
         self.assertEqual(resolved_again["sc"]["issue_forecasts"]["total"], 3)
 
+    def test_engine_void_row_matches_resolution_schema(self):
+        """Dòng VOID của engine (excess_return null, outcome null, void) phải khớp contracts/resolution.schema.json."""
+        import jsonschema
+        schema = json.loads((ROOT / "contracts" / "resolution.schema.json").read_text(encoding="utf-8"))
+        void_row = {"prediction_id": "P-x", "resolved_at": "2026-11-17", "entry_date": "2026-11-01", "exit_date": "2026-11-10",
+                    "excess_return": None, "outcome": None, "void": "lỗi dữ liệu giá trong cửa sổ chấm"}
+        jsonschema.validate(void_row, schema)
+        jsonschema.validate({"prediction_id": "P-y", "resolved_at": "2026-11-17", "excess_return": 0.012, "outcome": 1}, schema)
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate({"prediction_id": "P-z", "resolved_at": "2026-11-17", "outcome": None}, schema)   # VOID thiếu lý do
+
     def test_intake_rejects_recommendation_words_before_writing(self):
         code, out = self._intake(201, _form("A", "VCB: nên mua trước khi công bố BCTC?"))
         self.assertEqual(code, 2, out)
