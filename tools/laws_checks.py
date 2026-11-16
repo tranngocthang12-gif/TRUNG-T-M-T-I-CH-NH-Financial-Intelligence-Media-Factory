@@ -168,6 +168,15 @@ def same_provider(a: str, b: str) -> bool:
     return bool(_providers(a) & _providers(b))
 
 
+# Nhận ghế chấm hợp lệ: chuỗi phải BẮT ĐẦU bằng "owner" hoặc một tên trong PROVIDERS, và ngay sau đó không được là
+# ký tự chữ/số/gạch dưới (mọi bảng chữ, vì \w là Unicode); riêng "owner" còn không được nối bằng gạch ngang.
+# Neo đầu chuỗi nên "not_an_owner", "éowner", "an owner", "not_a_grok" đều không được nhận.
+# (Chặn cùng nhà cung cấp thì ngược lại: _providers() dò lỏng ở mọi vị trí để không lọt.)
+_REVIEWER_START_RE = re.compile(
+    r"^(?:owner(?![\w-])|(?:" + "|".join(re.escape(x) for x in sorted({k for ks in PROVIDERS.values() for k in ks},
+                                                                    key=len, reverse=True)) + r")(?!\w))")
+
+
 def check_pr_review(body: str) -> list[str]:
     """L-09 cho một PR: đọc hai dòng 'authored_by:' và 'reviewed_by:' trong thân PR."""
     fields = {}
@@ -182,8 +191,9 @@ def check_pr_review(body: str) -> list[str]:
         return ["L-09: chưa có người chấm — điền 'reviewed_by: <ghế khác nhà cung cấp>' sau khi chấm xong"]
     if same_provider(a, r):
         return [f"L-09: người viết và người chấm cùng nhà cung cấp hoặc cùng tên ('{a}' / '{r}')"]
-    if not _providers(r) and not re.search(r"(?<![a-z0-9-])owner(?![a-z0-9-])", r.lower()):   # "owner" là một từ, không phải chuỗi con
-        return [f"L-09: reviewed_by '{r}' không nhận ra nhà cung cấp (ghi rõ, ví dụ 'ChatGPT (OpenAI)', 'Grok (xAI)', hoặc 'Owner')"]
+    if not _REVIEWER_START_RE.match(r.strip().lower()):
+        return [f"L-09: reviewed_by '{r}' phải BẮT ĐẦU bằng tên ghế chấm: 'Owner', hoặc tên mô hình/nhà cung cấp "
+                "(ví dụ 'ChatGPT (OpenAI)', 'Grok (xAI)', 'Gemini (Google)')"]
     return []
 
 
