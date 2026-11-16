@@ -1,0 +1,44 @@
+name: Resolution
+description: Phân định một câu hỏi dự báo đã tới hạn (ARCHITECTURE v3.0 §4.1 bước 4, ADR-0003). Workflow kiểm và ghi ledger/resolutions.jsonl.
+title: "[Resolution] "
+labels: ["resolution"]
+body:
+  - type: input
+    id: forecast_ids
+    attributes:
+      label: forecast_ids
+      description: Mã các dự báo của CÙNG một câu hỏi, cách nhau dấu phẩy (ví dụ "F-101, F-102" cho cặp A/B)
+    validations: {required: true}
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: outcome
+      description: YES = mệnh đề trong câu hỏi đúng; NO = sai; VOID = không phân định được (nguồn không công bố, câu hỏi sai đề)
+      options: ["YES", "NO", "VOID"]
+    validations: {required: true}
+  - type: input
+    id: observed_value
+    attributes:
+      label: observed_value
+      description: Giá trị quan sát được (nếu câu hỏi là số), ví dụ "2,61%"
+  - type: input
+    id: resolution_source
+    attributes:
+      label: resolution_source
+      description: URL hoặc địa chỉ văn bản công khai đã dùng để phân định
+  - type: textarea
+    id: quote
+    attributes:
+      label: quote
+      description: Trích nguyên văn đoạn trong nguồn chứa con số hoặc sự kiện (bắt buộc với YES/NO)
+  - type: input
+    id: resolver
+    attributes:
+      label: resolver
+      description: Ai đọc nguồn và phân định (Owner hoặc ghế khác nhà cung cấp). Không được là Claude (L-09)
+    validations: {required: true}
+  - type: textarea
+    id: void_reason
+    attributes:
+      label: void_reason
+      description: Chỉ với VOID — vì sao không phân định được
