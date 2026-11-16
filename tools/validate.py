@@ -42,7 +42,14 @@ except Exception as e:
 def _count_issue_forecasts(rel):
     p = ROOT / rel
     if not p.is_file(): return 0
-    return sum(1 for l in p.read_text(encoding="utf-8").splitlines() if l.strip() and "issue_number" in json.loads(l))
+    n = 0
+    for i, l in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+        if not l.strip(): continue
+        try:
+            n += "issue_number" in json.loads(l)
+        except ValueError:
+            errors.append(f"{rel}: dòng {i} không phải JSON")      # báo lỗi, không đổ
+    return n
 n_forecasts = _count_issue_forecasts("ledger/predictions.jsonl")          # chỉ dự báo A+B qua Issue (§8 G1), không đếm dòng engine
 progress = f"tiến độ G1: tài liệu gốc ghim {n_sources}/40, dự báo A+B trong Ledger {n_forecasts}/60"
 

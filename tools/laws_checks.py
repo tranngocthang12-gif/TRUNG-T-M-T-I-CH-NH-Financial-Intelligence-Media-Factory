@@ -182,7 +182,7 @@ def check_pr_review(body: str) -> list[str]:
         return ["L-09: chưa có người chấm — điền 'reviewed_by: <ghế khác nhà cung cấp>' sau khi chấm xong"]
     if same_provider(a, r):
         return [f"L-09: người viết và người chấm cùng nhà cung cấp hoặc cùng tên ('{a}' / '{r}')"]
-    if not _providers(r) and "owner" not in r.lower():
+    if not _providers(r) and not re.search(r"(?<![a-z0-9-])owner(?![a-z0-9-])", r.lower()):   # "owner" là một từ, không phải chuỗi con
         return [f"L-09: reviewed_by '{r}' không nhận ra nhà cung cấp (ghi rõ, ví dụ 'ChatGPT (OpenAI)', 'Grok (xAI)', hoặc 'Owner')"]
     return []
 
