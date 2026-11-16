@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "trung-tam-tai-chinh/contracts/resolution.schema.json",
   "title": "RESOLUTION",
-  "description": "Kết quả do code chấm khi dự báo đến hạn",
+  "description": "Kết quả phân định một dự báo: do code chấm (engine, luật excess_return_positive) hoặc do người đọc nguồn qua Issue Resolution (ADR-0003). VOID = outcome null kèm void (lý do).",
   "type": "object",
   "required": [
     "prediction_id",
@@ -36,12 +36,58 @@
       "type": "number"
     },
     "outcome": {
-      "type": "integer",
+      "type": [
+        "integer",
+        "null"
+      ],
       "enum": [
         0,
-        1
+        1,
+        null
       ]
+    },
+    "void": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Lý do không phân định được; bắt buộc khi outcome null"
+    },
+    "resolution_issue": {
+      "type": "integer"
+    },
+    "resolution_issue_created_at": {
+      "type": "string"
+    },
+    "resolver": {
+      "type": "string",
+      "minLength": 1
+    },
+    "resolution_source": {
+      "type": "string"
+    },
+    "quote": {
+      "type": "string"
+    },
+    "observed_value": {
+      "type": "string"
+    },
+    "prev_hash": {
+      "type": "string"
+    },
+    "hash": {
+      "type": "string"
     }
   },
-  "additionalProperties": true
+  "additionalProperties": true,
+  "if": {
+    "properties": {
+      "outcome": {
+        "const": null
+      }
+    }
+  },
+  "then": {
+    "required": [
+      "void"
+    ]
+  }
 }
