@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.0.1 — 2026-11-16 (sửa lỗi Ledger P0 của G0) — Claude soạn, Owner đưa lên kho
+- **Vòng học không vỡ khi có dự báo Issue.** Dòng từ Issue "Forecast" không có `id` và `resolution_rule` là chuỗi, nên `engine/ledger.py` (`resolve`, `scorecard`) ném lỗi → `daily_cycle` dừng ngay sau dự báo đầu tiên. Nay engine chỉ chấm bằng giá dòng của chính nó; dòng Issue được đếm theo ghế A/B trong `reports/scorecard.json` (`issue_forecasts`) và báo cáo vòng học.
+- **Một hash chuỗi cho mọi bên ghi.** Đường experts của engine ghi `prev_hash`/`hash` như `tools/ledger_intake.py` (trước đó sẽ làm đỏ `validate`). Dòng Issue có `id` = `F-<số Issue>`.
+- **L-02 kiểm ngay khi nhận.** Dự báo chứa từ khóa khuyến nghị bị từ chối trước khi ghi (Ledger chỉ ghi thêm; một dòng sai sẽ làm `validate` đỏ và dừng vòng học vĩnh viễn).
+- **`ledger_intake.yml`.** Chỉ nhận Issue lúc mở (`opened`) do chính Owner mở (kho công khai: người lạ không ghi được vào sổ); bỏ sự kiện `labeled` (Issue cũ gắn nhãn muộn có thể đã bị sửa sau khi biết kết quả, trái L-05); bỏ nhóm concurrency chung (GitHub hủy run đang chờ → mất dự báo khi mở nhiều Issue liền); mỗi run tự lấy `main` mới nhất, tính lại chuỗi và thử lại khi bị trùng.
+- **`daily_cycle.yml`.** Rebase rồi mới đẩy, thử lại tối đa 5 lần (Ledger intake có thể đã đẩy trong lúc vòng học chạy).
+- **Test.** `tests/test_ledger_compat.py` (chặn merge): Issue A/B + dự báo engine + Issue tiếp theo trong một tệp; engine chấm đúng một dòng, đếm đúng theo ghế, chuỗi hash nguyên vẹn; L-02 từ chối khi nhận. Thêm `tools/__init__.py`.
+
 ## v3.0 — 2026-10-22 (G0: hợp nhất kiến trúc, luật, đường ghi dự báo) — Claude soạn, Owner đưa lên kho
 - **Một kiến trúc.** `architecture/ARCHITECTURE.md` thay v0.1–v2.2; bản cũ liệt kê SUPERSEDED trong `architecture/ARCHIVE.md`; ADR-0001 có điều kiện hoàn tác 30 ngày.
 - **Luật vận hành.** `governance/LAWS.md` L-01…L-10; `tools/laws_checks.py` kiểm máy L-02 (không khuyến nghị), L-07 (một kiến trúc), hash chuỗi Ledger; gọi từ `tools/validate.py`.

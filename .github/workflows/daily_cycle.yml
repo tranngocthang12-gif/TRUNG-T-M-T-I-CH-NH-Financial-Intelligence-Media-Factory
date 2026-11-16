@@ -44,4 +44,10 @@ jobs:
           git config user.email "ttc-engine@users.noreply.github.com"
           git add -A data state research knowledge paper reports fact ledger memory
           git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F)"
-          git push
+          # Ledger intake co the da day du bao len main trong luc vong hoc chay: rebase roi day, thu lai toi 5 lan
+          for i in 1 2 3 4 5; do
+            git pull -q --rebase origin main && git push && exit 0
+            git rebase --abort 2>/dev/null || true
+            sleep $(( i * 10 ))
+          done
+          exit 1

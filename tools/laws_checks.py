@@ -12,6 +12,12 @@ SCAN_DIRS = ("reports", "media", "ledger")
 SCAN_EXT = {".md", ".txt", ".jsonl", ".json", ".yaml", ".yml", ".csv"}
 
 
+def recommendation_hit(text: str):
+    """Trả về cụm từ khóa khuyến nghị đầu tiên tìm thấy (L-02), hoặc None."""
+    m = _RE.search(text or "")
+    return m.group(0) if m else None
+
+
 def line_hash(payload: dict) -> str:
     """sha256 của dòng Ledger không kể trường 'hash' — ổn định theo khóa sắp xếp."""
     body = {k: v for k, v in payload.items() if k != "hash"}

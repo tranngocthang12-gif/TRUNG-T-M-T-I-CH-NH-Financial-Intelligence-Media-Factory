@@ -3,12 +3,15 @@ Chạy trong workflow ledger_intake.yml. Đầu vào qua biến môi trường:
   ISSUE_NUMBER, ISSUE_CREATED_AT (ISO, giờ máy chủ GitHub), ISSUE_BODY (thân Issue dạng form).
 Đầu ra: in JSON {"ok": bool, "message": str}; thoát 0 khi ghi được, 2 khi từ chối (không ghi), 3 khi Issue đã có trong Ledger (bỏ qua), 1 khi lỗi.
 Luật: thiếu resolution_source, resolve_at đã qua so với ngày tạo Issue, p ngoài [0.05, 0.95] → từ chối (L-05).
+Nội dung chứa từ khóa khuyến nghị mua bán → từ chối ngay khi nhận (L-02), để một dòng sai không làm đỏ validate
+và dừng vòng học hằng ngày (Ledger chỉ ghi thêm, không sửa được).
+Mỗi dòng có id "F-<số Issue>" để tệp ledger/resolutions.jsonl trỏ tới khi phân định.
 """
 import json, os, pathlib, re, sys
 from datetime import date, datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from tools.laws_checks import line_hash  # noqa: E402
+from tools.laws_checks import line_hash, recommendation_hit  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "ledger" / "predictions.jsonl"
@@ -50,6 +53,10 @@ def main() -> int:
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "message": f"Từ chối: không khớp forecast_issue.schema.json — {str(e).splitlines()[0]}"}, ensure_ascii=False))
         return 2
+    hit = recommendation_hit(json.dumps(data, ensure_ascii=False))
+    if hit:
+        print(json.dumps({"ok": False, "message": f"Từ chối (L-02): nội dung chứa từ khóa khuyến nghị '{hit}'"}, ensure_ascii=False))
+        return 2
     created_day = datetime.fromisoformat(created.replace("Z", "+00:00")).date()
     if date.fromisoformat(data["resolve_at"]) <= created_day:
         print(json.dumps({"ok": False, "message": "Từ chối (L-05): resolve_at phải sau ngày tạo Issue"}, ensure_ascii=False))
@@ -62,7 +69,7 @@ def main() -> int:
             return 3
         if lines:
             prev = json.loads(lines[-1])["hash"]
-    row = {"issue_number": number, "issue_created_at": created, **data, "prev_hash": prev}
+    row = {**data, "id": f"F-{number}", "issue_number": number, "issue_created_at": created, "prev_hash": prev}
     row["hash"] = line_hash(row)
     LEDGER.parent.mkdir(parents=True, exist_ok=True)
     with LEDGER.open("a", encoding="utf-8") as f:
