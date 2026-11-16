@@ -15,16 +15,25 @@ for t, d, lo in [("TCB", "2024-06-11", -0.45), ("VCB", "2025-03-03", -0.30)]:
     assert not bad.at[raw.index[i], t]                          # không bị cờ lỗi (đã có sự kiện quyền giải thích)
     assert adj[t].iloc[-1] == raw[t].iloc[-1]                   # neo tại ngày cuối: giá điều chỉnh = giá gốc
     print(f"OK 1: {t} {d}: giá gốc {r_raw:+.2%} → điều chỉnh {r_adj:+.2%}, không bị cờ lỗi")
-st = mk["events"].set_index("ticker").status
-assert st["TCB"] == "APPLIED" and st["VCB"] == "APPLIED"
+def ev_status(events, ticker, ex_date):
+    """Trạng thái của ĐÚNG sự kiện (mã, ngày GDKHQ). Mỗi mã có thể có nhiều sự kiện (nguồn Yahoo bổ sung cổ tức tiền)."""
+    m = (events.ticker == ticker) & (pd.to_datetime(events.ex_date) == pd.Timestamp(ex_date))
+    return list(events.loc[m, "status"])
+
+assert ev_status(mk["events"], "TCB", "2024-06-11") == ["APPLIED"]
+assert ev_status(mk["events"], "VCB", "2025-03-03") == ["APPLIED"]
 
 # Point-in-time: tính tại 10/06/2024 thì sự kiện TCB CHƯA tồn tại → không điều chỉnh quá khứ bằng thông tin tương lai
+# (Sau khi nguồn Yahoo bổ sung cổ tức tiền, TCB có thêm sự kiện trước/sau 11/06/2024; nên kiểm đúng hệ số của
+#  sự kiện 11/06/2024 thay vì đòi "không điều chỉnh gì": cổ tức tiền chỉ làm lệch vài %, chia tách 1:1 làm lệch ×2.)
 mk0 = data.load_market("2024-06-10")
-assert ((mk0["close"]["TCB"] - mk0["raw_close"]["TCB"]).abs().max()) < 1e-9
-assert mk0["events"].set_index("ticker").status["TCB"] == "CHUA_DEN_HAN"
-d9 = pd.Timestamp("2024-06-10")
-assert abs(mk["close"].at[d9, "TCB"] - mk["raw_close"].at[d9, "TCB"] / 2) < 1e-6
-print("OK 2: point-in-time — tại 10/06/2024 chưa điều chỉnh; tính tại hôm nay thì giá 10/06/2024 = gốc / 2")
+f0 = (mk0["raw_close"]["TCB"] / mk0["close"]["TCB"]).dropna()
+assert f0.max() < 1.2, f0.max()                                 # chưa có hệ số ×2 của sự kiện 11/06/2024
+assert ev_status(mk0["events"], "TCB", "2024-06-11") == ["CHUA_DEN_HAN"]
+d9, d11 = pd.Timestamp("2024-06-10"), pd.Timestamp("2024-06-11")
+f = mk["close"]["TCB"] / mk["raw_close"]["TCB"]
+assert abs(f[d9] / f[d11] - 0.5) < 1e-6, f[d9] / f[d11]          # tính tại hôm nay: riêng sự kiện 11/06/2024 chia đôi giá trước đó
+print("OK 2: point-in-time — tại 10/06/2024 chưa có hệ số chia tách; tính tại hôm nay thì hệ số qua ngày 11/06/2024 = 1/2")
 
 # Nhãn 20 phiên của TCB quanh ngày GDKHQ không còn chứa cú rơi -50%
 y = features.labels_wide(adj, 20, bad)

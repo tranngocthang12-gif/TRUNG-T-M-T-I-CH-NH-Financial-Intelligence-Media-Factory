@@ -16,6 +16,17 @@ def _tmp_repo():
     return tmp
 
 
+class ReviewGateTests(unittest.TestCase):
+    def test_l09_pr_review_fields(self):
+        f = laws_checks.check_pr_review
+        self.assertTrue(f("Mô tả không có trường"))
+        self.assertTrue(f("authored_by: Claude (Anthropic)\nreviewed_by:"))
+        self.assertTrue(f("authored_by: Claude Opus\nreviewed_by: Claude Sonnet"))      # cùng nhà
+        self.assertTrue(f("authored_by: ChatGPT\nreviewed_by: GPT-5 Codex"))            # cùng nhà
+        self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Grok (xAI)"), [])
+        self.assertEqual(f("- authored_by: `ChatGPT`\n- reviewed_by: `Claude`"), [])
+
+
 class LawsChecksTests(unittest.TestCase):
     def setUp(self):
         self.tmp = _tmp_repo()
