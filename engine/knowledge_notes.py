@@ -9,8 +9,9 @@ Quy ước trên đĩa (library/sources/README.md):
   data_source (tên trong governance/DATA_SOURCES.yaml, không được là nguồn "forbidden"), legal_status, license,
   kind, effective_from, effective_to, superseded_by.
 - library/notes/<KN-id>.json: KNOWLEDGE_NOTE theo contracts/knowledge_note.schema.json.
-- library/audits/<KN-id>.json: biên bản chấm {note_id, auditor, verdict: PASS|FAIL, date} — chỉ biên bản PASS của người
-  khác read_by mới cho phép trạng thái ngoài DRAFT/OUTDATED (CITED chỉ do Auditor gán).
+- library/audits/<KN-id>.json: biên bản chấm {note_id, auditor, verdict: PASS|FAIL, date} — chỉ biên bản PASS mà auditor
+  và read_by đều bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung ghế mới cho phép trạng thái ngoài
+  DRAFT/OUTDATED (CITED chỉ do Auditor gán).
 
 Địa chỉ: "<doc_id>:p<trang>:<đoạn>" hoặc "<doc_id>:t<bảng>:<dòng>". Trích dẫn (quote) phải nằm nguyên văn (so sau khi gộp
 khoảng trắng) trong ít nhất một chỗ được trỏ tới.
@@ -27,7 +28,7 @@ from .config import REPO
 
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
-from tools.laws_checks import same_provider  # noqa: E402
+from tools.laws_checks import recognised_seat, same_provider  # noqa: E402
 
 LIB = "library"
 MAX_NOTE_BYTES = 16_000
@@ -148,9 +149,11 @@ def _audit_pass(root, note):
     if not p.is_file():
         return False
     a = json.loads(p.read_text(encoding="utf-8"))
-    auditor = _norm(a.get("auditor"))
-    return (a.get("note_id") == note.get("id") and a.get("verdict") == "PASS" and bool(auditor)
-            and not same_provider(auditor, _norm(note.get("read_by"))))      # L-09: khác tên VÀ khác nhà cung cấp
+    auditor, reader = _norm(a.get("auditor")), _norm(note.get("read_by"))
+    # L-09: cả người đọc và người chấm phải ghi bắt đầu bằng tên ghế (không nhận ra ghế thì không so được),
+    # và không chung ghế nào (cùng nhà cung cấp, hoặc cùng là Owner).
+    return (a.get("note_id") == note.get("id") and a.get("verdict") == "PASS"
+            and recognised_seat(auditor) and recognised_seat(reader) and not same_provider(auditor, reader))
 
 
 def check_note(root, path, docs, man, today):
