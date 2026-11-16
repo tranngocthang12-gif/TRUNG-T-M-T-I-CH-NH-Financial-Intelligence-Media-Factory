@@ -35,7 +35,7 @@ body:
     id: resolver
     attributes:
       label: resolver
-      description: Ai đọc nguồn và phân định (Owner hoặc ghế khác nhà cung cấp). Không được là Claude (L-09)
+      description: Ai đọc nguồn và phân định. Ghi BẮT ĐẦU bằng tên ghế — "Owner", hoặc mô hình khác nhà cung cấp với ghế viết dự báo, ví dụ "ChatGPT (OpenAI)". Không được là Claude (L-09)
     validations: {required: true}
   - type: textarea
     id: void_reason
