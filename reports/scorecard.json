@@ -1,7 +1,11 @@
 {
-  "as_of": "2026-11-13",
+  "as_of": "2026-11-16",
   "total_predictions": 0,
   "resolved": 0,
   "void_data_error": 0,
+  "issue_forecasts": {
+    "total": 0,
+    "by_seat": {}
+  },
   "procedures": {}
 }
