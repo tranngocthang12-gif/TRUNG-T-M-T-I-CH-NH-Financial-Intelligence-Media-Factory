@@ -5,6 +5,7 @@
 authored_by: 
 reviewed_by: 
 
-<!-- reviewed_by để trống khi mở PR; sau khi chấm xong mới điền, và phải BẮT ĐẦU bằng tên ghế chấm:
-     "Owner", hoặc tên mô hình/nhà cung cấp khác nhà với authored_by, ví dụ "ChatGPT (OpenAI)", "Grok (xAI)".
+<!-- Mỗi trường đúng một dòng. authored_by phải BẮT ĐẦU bằng tên ghế viết ("Claude (Anthropic)", "ChatGPT (OpenAI)", "Owner"…).
+     reviewed_by để trống khi mở PR; sau khi chấm xong mới điền, cũng BẮT ĐẦU bằng tên ghế chấm, và không chung ghế với
+     authored_by: khác nhà cung cấp; Owner viết thì Owner không tự chấm. Ví dụ "ChatGPT (OpenAI)", "Grok (xAI)", "Owner".
      Workflow "L-09 nguoi cham" đỏ cho tới khi có reviewed_by hợp lệ. Owner gộp main (L-10). -->
