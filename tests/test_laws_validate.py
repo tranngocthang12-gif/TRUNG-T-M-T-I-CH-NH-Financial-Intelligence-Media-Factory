@@ -36,6 +36,23 @@ class ReviewGateTests(unittest.TestCase):
                      "GPT-5.5 Thinking", "Gemini 3 Pro", "grok"):
             self.assertEqual(f(f"authored_by: Claude (Anthropic)\nreviewed_by: {good}"), [], good)
         self.assertEqual(f("authored_by: ChatGPT\nreviewed_by: claude-opus-5-5"), [])
+        # Owner là MỘT ghế: Owner viết thì Owner không tự chấm, dù ghi thêm tên hay ghi chú
+        for rb in ("Owner", "Owner (Trần Ngọc Thắng)", "Owner — vòng 3", "owner"):
+            self.assertTrue(f(f"authored_by: Owner\nreviewed_by: {rb}"), rb)
+            self.assertTrue(f(f"authored_by: Owner (Trần Ngọc Thắng) và Claude\nreviewed_by: {rb}"), rb)
+        self.assertTrue(f("authored_by: Claude và Owner\nreviewed_by: ChatGPT + Claude"))   # người chấm có chung một ghế với người viết
+        self.assertEqual(f("authored_by: Owner\nreviewed_by: ChatGPT (OpenAI)"), [])
+        self.assertEqual(f("authored_by: ChatGPT (OpenAI)\nreviewed_by: Owner (Trần Ngọc Thắng)"), [])
+        # ghế viết không nhận ra được thì không so được với ghế chấm
+        for ab in ("kiến trúc sư trưởng", "ai đó", "not_a_claude", "ghe-thi-cong"):
+            self.assertTrue(f(f"authored_by: {ab}\nreviewed_by: Claude"), ab)
+        self.assertTrue(laws_checks.recognised_seat("Claude (Anthropic) — kiến trúc sư trưởng"))
+        self.assertFalse(laws_checks.recognised_seat("kiến trúc sư trưởng Claude"))
+        # mỗi trường một dòng: không chèn dòng thứ hai để đè
+        self.assertTrue(f("authored_by: Claude\nauthored_by: ChatGPT\nreviewed_by: Claude"))
+        self.assertTrue(f("authored_by: Claude\nreviewed_by: Claude\nreviewed_by: Grok"))
+        self.assertTrue(laws_checks.same_provider("Owner", "Owner (kiểm lại)"))
+        self.assertFalse(laws_checks.same_provider("Owner", "Grok (xAI)"))
         self.assertEqual(f("- authored_by: `ChatGPT`\n- reviewed_by: `Claude`"), [])
 
 

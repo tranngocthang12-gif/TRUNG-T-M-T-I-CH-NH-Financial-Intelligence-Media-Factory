@@ -8,11 +8,11 @@ sys.path.insert(0, str(ROOT))
 from tools import laws_checks  # noqa: E402
 
 
-def _forecast(seat, question, p, resolve_at="2026-12-31", rule="comparison"):
+def _forecast(seat, question, p, resolve_at="2026-12-31", rule="comparison", author=None):
     f = {"seat": seat, "question": question, "resolution_source": "https://example.org/nguon",
          "resolution_rule": rule, "resolve_at": resolve_at, "p": str(p), "base_rate": "0.5",
          "invalidation_conditions": "Nguồn đổi định nghĩa chỉ tiêu",
-         "author_seat": "Claude Project TTC" if seat == "A" else "Claude trần", "model_cutoff": "2026-06"}
+         "author_seat": author or ("Claude Project TTC" if seat == "A" else "Claude trần"), "model_cutoff": "2026-06"}
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items())
 
 
@@ -113,6 +113,27 @@ class ResolutionTests(unittest.TestCase):
         self.assertEqual(ab["p_value_two_sided_vs_coin"], 1.0)                   # n=1: 2·P(X≥1)=1
         self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (1/194"))
         self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
+
+
+    def test_resolver_must_be_recognised_and_differ_from_every_author(self):
+        """L-09: resolver bắt đầu bằng tên ghế; không chung nhà cung cấp với bất kỳ ghế viết nào của câu hỏi."""
+        q3 = "Tín dụng năm 2026 tăng từ 15% trở lên?"
+        self.assertEqual(self._run("ledger_intake.py", 111, _forecast("A", q3, 0.7), "2026-11-17T02:20:00Z")[0], 0)
+        self.assertEqual(self._run("ledger_intake.py", 112, _forecast("B", q3, 0.4, author="ChatGPT trần (OpenAI)"),
+                                   "2026-11-17T02:21:00Z")[0], 0)
+        when = "2027-01-05T03:00:00Z"
+        for who in ("ai đó", "người phân định", "not_an_owner", "kế toán trưởng Owner"):       # không nhận ra ghế
+            c, o = self._res(301, _resolution("F-111", "YES", resolver=who), when)
+            self.assertEqual(c, 2, o); self.assertIn("L-09", o)
+        for who in ("ChatGPT (OpenAI)", "GPT-5.5", "Claude", "Opus 5.5"):                       # trùng một ghế viết của câu hỏi
+            c, o = self._res(302, _resolution("F-111", "YES", resolver=who), when)
+            self.assertEqual(c, 2, o); self.assertIn("L-09", o)
+        self.assertEqual(self._rows(), [])
+        c, o = self._res(303, _resolution("F-111", "YES", resolver="Grok (xAI)"), when)         # khác cả hai ghế viết
+        self.assertEqual(c, 0, o)
+        # câu hỏi 1 chỉ có ghế viết Claude: ChatGPT phân định được
+        c, o = self._res(304, _resolution("F-101", "NO", resolver="ChatGPT (OpenAI)"), when)
+        self.assertEqual(c, 0, o)
 
 
 class TwoSidedTests(unittest.TestCase):

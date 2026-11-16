@@ -36,7 +36,7 @@ NOTE = {
         {"id": "P3", "vi": "Nợ nhóm 3 tại 31/12 là 1.350", "addresses": ["luat_ke_toan_88_2015:t1:1"],
          "quote": "| Nợ nhóm 3 | 1.200 | 1.350 |", "kind": "TEXT_ATTESTED"}],
     "not_said": ["Không nói về kế toán ngân hàng", "Không nói mức phạt"],
-    "testable_implications": [], "status": "DRAFT", "review_by": "2099-01-01", "read_by": "ghe-thi-cong",
+    "testable_implications": [], "status": "DRAFT", "review_by": "2099-01-01", "read_by": "ChatGPT (ghế thi công)",
     "self_check": {"parallelism": True, "one_word_one_meaning": True, "contrast_pairs": False,
                    "question_answer": False, "counts_from_source": True, "doubts": []}}
 
@@ -108,11 +108,18 @@ class LibraryTests(unittest.TestCase):
         self._note(cited)
         self.assertTrue(any("L-09" in e for e in self._check()[0]))
         a = self.tmp / "library" / "audits"; a.mkdir()
-        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "ghe-thi-cong", "verdict": "PASS"}), encoding="utf-8")
-        self.assertTrue(any("L-09" in e for e in self._check()[0]))          # tự chấm mình: không tính
+        for auditor in ("ChatGPT (ghế thi công)", "GPT-5.5", "ai đó", "ghe-cham"):   # tự chấm, cùng nhà, hoặc không nhận ra ghế
+            (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": auditor, "verdict": "PASS"}), encoding="utf-8")
+            self.assertTrue(any("L-09" in e for e in self._check()[0]), auditor)
+        self._note(dict(cited, read_by="ghe-thi-cong"))                      # người đọc không nhận ra ghế: Owner chấm cũng không tính
+        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Owner", "verdict": "PASS"}), encoding="utf-8")
+        self.assertTrue(any("L-09" in e for e in self._check()[0]))
         self._note(dict(cited, read_by="Claude"))
         (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Opus 5.5", "verdict": "PASS"}), encoding="utf-8")
         self.assertTrue(any("L-09" in e for e in self._check()[0]))          # khác tên nhưng cùng nhà cung cấp: không tính
+        self._note(dict(cited, read_by="Owner"))
+        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Owner (xem lại)", "verdict": "PASS"}), encoding="utf-8")
+        self.assertTrue(any("L-09" in e for e in self._check()[0]))          # Owner đọc thì Owner không tự chấm
         self._note(cited)
         (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Owner", "verdict": "PASS"}), encoding="utf-8")
         self.assertEqual(self._check()[0], [])
