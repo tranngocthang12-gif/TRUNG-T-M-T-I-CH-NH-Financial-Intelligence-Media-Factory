@@ -10,6 +10,13 @@
 - **CI chặn gộp chạy đủ mọi test**: test dạng script mỗi tệp một tiến trình (hết lỗi thu thập của pytest), thêm bước "test không được sửa tệp nào của kho". Sửa `tests/test_adjustment.py`: Yahoo bổ sung nhiều sự kiện quyền cho TCB/VCB nên test kiểm đúng sự kiện (mã, ngày GDKHQ) và hệ số chia tách qua ngày 11/06/2024 thay vì đòi "không điều chỉnh gì".
 - **`validate.py` theo v3.0**: bỏ danh sách "v2.x yêu cầu" (đã SUPERSEDED); thêm tệp bắt buộc của v3.0; contract 25/25 thành lỗi nếu thiếu; dòng THÔNG TIN tiến độ G1.
 - **Văn bản**: ARCHITECTURE §3 ghế thi công không phải MINH TRÍ; §4.1 bước 2 và 4; §4.3; ADR-0001 ACCEPTED; ADR-0003; danh mục ADR.
+- **Bản 2 sau chấm độc lập (17/11/2026, ghế khác nhà cung cấp — SỬA TRƯỚC, 8 HIGH / 9 MEDIUM / 1 LOW; sửa đủ 18):**
+  (1) `test_adjustment.py` kiểm point-in-time chặt hơn bản gốc: hệ số neo = 1 đúng bằng 1, chỉ cổ tức tiền ∈ [1; 1,05), không sự kiện tương lai APPLIED, và close/raw tại mỗi ngày = tích `price_factor` các sự kiện APPLIED sau ngày đó;
+  (2) phân định: một Issue ghi cho MỌI dự báo của câu hỏi (một sự thật), câu hỏi đã phân định thì khóa kể cả VOID, YES sớm chỉ khi mọi dự báo của câu hỏi là `event_before_date`, chặn resolver theo bảng nhà cung cấp (Opus/Sonnet/Haiku…), ghi theo `resolution.schema.json` (VOID = `outcome null` + `void`), chuỗi hash cho `resolutions.jsonl` và CI kiểm;
+  (3) chấm A–B: ghép cặp theo thứ tự trong từng câu hỏi, chỉ tính khi cả A và B đã phân định cùng một sự thật, p hai phía (khớp cỡ mẫu 194), đếm cặp lẻ và cặp mâu thuẫn;
+  (4) DSR: phương sai Sharpe dự phòng 1/(T−1) khi sổ cũ chưa có Sharpe (SR0 không còn = 0), N = mọi lần thử;
+  (5) L-09 dùng chung `same_provider()` cho PR, biên bản chấm ghi chú và resolver; (6) `knowledge_notes` kiểm địa chỉ `counts` và `reading_flags` tồn tại; (7) L-03 quét cả `research/`, `paper/`; (8) `validate` đếm tiến độ G1 chỉ dự báo A+B; (9) workflow intake đỏ khi mã 1.
+  Lỗi phát hiện thêm nhờ bước CI "test không được sửa tệp của kho": `test_adjustment` giả lập `_append` nhưng `resolve` nay ghi qua `_append_chained` → stub cả hai.
 - **Còn lại (ADR riêng):** kho dữ liệu ghi tăng dần (C2).
 
 ## v3.0.1 — 2026-11-16 (sửa lỗi Ledger P0 của G0) — Claude soạn, Owner đưa lên kho
