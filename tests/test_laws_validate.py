@@ -23,7 +23,11 @@ class ReviewGateTests(unittest.TestCase):
         self.assertTrue(f("authored_by: Claude (Anthropic)\nreviewed_by:"))
         self.assertTrue(f("authored_by: Claude Opus\nreviewed_by: Claude Sonnet"))      # cùng nhà
         self.assertTrue(f("authored_by: ChatGPT\nreviewed_by: GPT-5 Codex"))            # cùng nhà
+        self.assertTrue(f("authored_by: Claude\nreviewed_by: Opus"))                 # cùng nhà, tên khác
+        self.assertTrue(f("authored_by: Claude\nreviewed_by: Haiku 5.5"))
+        self.assertTrue(f("authored_by: Claude\nreviewed_by: ai đó"))                 # không nhận ra nhà cung cấp
         self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Grok (xAI)"), [])
+        self.assertEqual(f("authored_by: Claude (Anthropic)\nreviewed_by: Owner"), [])
         self.assertEqual(f("- authored_by: `ChatGPT`\n- reviewed_by: `Claude`"), [])
 
 

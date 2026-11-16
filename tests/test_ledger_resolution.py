@@ -27,7 +27,8 @@ class ResolutionTests(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
         (self.tmp / "contracts").mkdir()
-        shutil.copy(ROOT / "contracts" / "forecast_issue.schema.json", self.tmp / "contracts")
+        for c in ("forecast_issue.schema.json", "resolution.schema.json"):
+            shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         (self.tmp / "ledger").mkdir()
         q1, q2 = "Nợ nhóm 3-5 của VCB tại 31/12/2026 cao hơn tại 30/9/2026?", "NHNN đổi lãi suất tái cấp vốn trước 31/01/2027?"
@@ -56,25 +57,40 @@ class ResolutionTests(unittest.TestCase):
     def test_rules_then_ab_scorecard(self):
         c, o = self._res(201, _resolution("F-101, F-102", "NO"), "2026-12-15T03:00:00Z")
         self.assertEqual(c, 2, o); self.assertIn("L-05", o)                      # phân định trước hạn
-        c, o = self._res(202, _resolution("F-101, F-102", "NO", resolver="Claude Opus"), "2027-01-02T03:00:00Z")
-        self.assertEqual(c, 2, o); self.assertIn("L-09", o)                      # người viết cùng nhà
+        for who in ("Claude Opus", "Opus 5.5", "Sonnet", "Anthropic Haiku"):     # cùng nhà với ghế viết, dù không có chữ "claude"
+            c, o = self._res(202, _resolution("F-101, F-102", "NO", resolver=who), "2027-01-02T03:00:00Z")
+            self.assertEqual(c, 2, o); self.assertIn("L-09", o)
         c, o = self._res(203, _resolution("F-101, F-103", "NO"), "2027-01-02T03:00:00Z")
         self.assertEqual(c, 2, o)                                                # hai câu hỏi khác nhau
         c, o = self._res(204, _resolution("F-101, F-102", "NO", quote="_No response_"), "2027-01-02T03:00:00Z")
         self.assertEqual(c, 2, o)                                                # YES/NO thiếu trích nguyên văn
-        c, o = self._res(205, _resolution("F-101, F-102", "NO"), "2027-01-02T03:00:00Z")
-        self.assertEqual(c, 0, o)
-        self.assertEqual(self._res(205, _resolution("F-101, F-102", "NO"), "2027-01-02T03:00:00Z")[0], 3)   # chạy lại
-        c, o = self._res(206, _resolution("F-101", "YES"), "2027-01-03T03:00:00Z")
-        self.assertEqual(c, 2, o)                                                # đã phân định rồi
+        # Thêm một dự báo A thứ hai cùng câu hỏi 1 nhưng luật event_before_date: YES sớm phải bị chặn vì câu hỏi có
+        # dự báo luật comparison (lỗi "chỉ nhìn targets[0]")
+        q1 = "Nợ nhóm 3-5 của VCB tại 31/12/2026 cao hơn tại 30/9/2026?"
+        self.assertEqual(self._run("ledger_intake.py", 105, _forecast("A", q1, 0.3, "2026-12-31", "event_before_date"),
+                                   "2026-11-17T02:10:00Z")[0], 0)
+        c, o = self._res(209, _resolution("F-105", "YES"), "2026-12-20T03:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("L-05", o)
+        # Chỉ liệt kê F-101 nhưng câu hỏi có F-101, F-102, F-105 → ghi cả ba cùng một outcome (một câu hỏi một sự thật)
+        c, o = self._res(205, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z")
+        self.assertEqual(c, 0, o); self.assertIn("F-102", o); self.assertIn("F-105", o)
+        self.assertEqual(self._res(205, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z")[0], 3)         # chạy lại
+        c, o = self._res(206, _resolution("F-102", "YES"), "2027-01-03T03:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("không phân định lại", o)       # không gán sự thật thứ hai cho B
         c, o = self._res(207, _resolution("F-103, F-104", "VOID"), "2027-02-02T03:00:00Z")
         self.assertEqual(c, 2, o)                                                # VOID thiếu lý do
         c, o = self._res(208, _resolution("F-103, F-104", "YES"), "2026-12-20T03:00:00Z")
-        self.assertEqual(c, 0, o)                                                # YES của event_before_date được sớm
+        self.assertEqual(c, 0, o)                                                # YES của event_before_date (cả câu hỏi) được sớm
         rows = self._rows()
         self.assertEqual([(r["prediction_id"], r["outcome"]) for r in rows],
-                         [("F-101", 0), ("F-102", 0), ("F-103", 1), ("F-104", 1)])
+                         [("F-101", 0), ("F-102", 0), ("F-105", 0), ("F-103", 1), ("F-104", 1)])
         self.assertTrue(all(r["resolver"] == "Owner" and r["quote"] for r in rows))
+        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])          # resolutions.jsonl có chuỗi hash
+        rp = self.tmp / "ledger" / "resolutions.jsonl"
+        rp.write_text(rp.read_text(encoding="utf-8").replace('"outcome": 0', '"outcome": 1', 1), encoding="utf-8")
+        self.assertTrue(any("phân định" in e for e in laws_checks.check_ledger_chain(self.tmp)))   # sửa kết quả → đỏ
+        rp.write_text(rp.read_text(encoding="utf-8").replace('"outcome": 1', '"outcome": 0', 1), encoding="utf-8")
+        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
 
         env = {**os.environ, "TTC_HOME": str(self.tmp), "PYTHONPATH": str(ROOT)}
         code = textwrap.dedent("""
@@ -85,15 +101,29 @@ class ResolutionTests(unittest.TestCase):
         r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         sc = json.loads(r.stdout.strip().splitlines()[-1])
-        self.assertEqual(sc["by_seat"]["A"], {"n": 2, "resolved": 2, "pending": 0})
-        self.assertAlmostEqual(sc["scores"]["A"]["brier"], 0.09, places=4)       # ((0,3-0)² + (0,7-1)²)/2
+        self.assertEqual(sc["by_seat"]["A"], {"n": 3, "resolved": 3, "pending": 0})
+        self.assertAlmostEqual(sc["scores"]["A"]["brier"], 0.09, places=4)       # ((0,3-0)² + (0,7-1)² + (0,3-0)²)/3 = 0,09
         self.assertAlmostEqual(sc["scores"]["B"]["brier"], 0.2, places=4)        # ((0,6-0)² + (0,8-1)²)/2
         ab = sc["ab"]
-        self.assertEqual((ab["pairs"], ab["disagreements"], ab["disagreements_resolved"], ab["a_correct"]), (2, 1, 1, 1))
+        # câu 1: A=[F-101, F-105], B=[F-102] → 1 cặp + 1 lẻ; câu 2: 1 cặp. Bất đồng chỉ ở câu 1 (0,3 vs 0,6).
+        self.assertEqual((ab["pairs"], ab["unpaired"], ab["disagreements"], ab["disagreements_resolved"], ab["a_correct"]),
+                         (2, 1, 1, 1, 1))
+        self.assertEqual(ab["inconsistent_outcomes"], 0)
         self.assertEqual(ab["a_accuracy"], 1.0)
-        self.assertEqual(ab["p_value_a_better_than_coin"], 0.5)
+        self.assertEqual(ab["p_value_two_sided_vs_coin"], 1.0)                   # n=1: 2·P(X≥1)=1
         self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (1/194"))
         self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
+
+
+class TwoSidedTests(unittest.TestCase):
+    def test_binom_two_sided_matches_sample_size_logic(self):
+        sys.path.insert(0, str(ROOT))
+        from engine import ledger
+        # 109/194 đúng: một phía ≈ 0,049 nhưng hai phía ≈ 0,098 → KHÔNG có ý nghĩa (khớp cỡ mẫu 194 tính hai phía)
+        self.assertGreater(ledger._binom_two_sided(109, 194), 0.05)
+        self.assertLess(ledger._binom_two_sided(112, 194), 0.05)
+        self.assertEqual(ledger._binom_two_sided(0, 0), 1.0)
+        self.assertAlmostEqual(ledger._binom_two_sided(2, 4), 1.0)                # đúng nửa → p = 1
 
 
 class TrialRegistryTests(unittest.TestCase):
@@ -151,14 +181,20 @@ class TrialRegistryTests(unittest.TestCase):
             from engine import research
             one = research.deflated_sharpe(0.3, 60, 0.0, 3.0, 1, None)
             many = research.deflated_sharpe(0.3, 60, 0.0, 3.0, 210, 0.02)
+            many_nohist = research.deflated_sharpe(0.3, 60, 0.0, 3.0, 210, None)     # sổ cũ không có Sharpe → vẫn phải trừ
+            v_theory = research.sharpe_variance([], 0.3, 60)
+            v_emp = research.sharpe_variance([0.1, -0.2, 0.05, 0.0, 0.3, -0.1, 0.2, 0.15, -0.05, 0.25], 0.3, 60)
             st = research.sharpe_stats([0.01, -0.005, 0.02, 0.0, 0.015, -0.01], 20)
-            print(json.dumps({"one": one, "many": many, "st": st}))
+            print(json.dumps({"one": one, "many": many, "many_nohist": many_nohist, "v_theory": v_theory, "v_emp": v_emp, "st": st}))
         """)
         self.assertEqual(code, 0, err[-2000:])
         d = json.loads(out.strip().splitlines()[-1])
         from statistics import NormalDist
         self.assertAlmostEqual(d["one"], NormalDist().cdf(0.3 * math.sqrt(59) / math.sqrt(1 + 0.5 * 0.09)), places=9)
         self.assertLess(d["many"], d["one"])
+        self.assertLess(d["many_nohist"], d["one"])                               # không còn SR0 = 0 khi thiếu lịch sử Sharpe
+        self.assertAlmostEqual(d["v_theory"], 1 / 59, places=9)
+        self.assertGreater(d["v_emp"], 0)
         self.assertEqual(d["st"]["sr_T"], 6)
         self.assertAlmostEqual(d["st"]["sharpe_ann"], d["st"]["sharpe"] * math.sqrt(252 / 20), places=9)
 

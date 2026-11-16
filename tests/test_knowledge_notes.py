@@ -110,6 +110,10 @@ class LibraryTests(unittest.TestCase):
         a = self.tmp / "library" / "audits"; a.mkdir()
         (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "ghe-thi-cong", "verdict": "PASS"}), encoding="utf-8")
         self.assertTrue(any("L-09" in e for e in self._check()[0]))          # tự chấm mình: không tính
+        self._note(dict(cited, read_by="Claude"))
+        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Opus 5.5", "verdict": "PASS"}), encoding="utf-8")
+        self.assertTrue(any("L-09" in e for e in self._check()[0]))          # khác tên nhưng cùng nhà cung cấp: không tính
+        self._note(cited)
         (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Owner", "verdict": "PASS"}), encoding="utf-8")
         self.assertEqual(self._check()[0], [])
 
@@ -122,6 +126,15 @@ class LibraryTests(unittest.TestCase):
         self.assertEqual(kn.mark_outdated(self.tmp, date(2026, 11, 17)), [NOTE["id"]])
         self.assertEqual(json.loads((self.tmp / "library" / "notes" / f"{NOTE['id']}.json").read_text(encoding="utf-8"))["status"], "OUTDATED")
         self.assertEqual(self._check(), ([], []))
+
+    def test_counts_and_flags_addresses_must_exist(self):
+        bad = copy.deepcopy(NOTE)
+        bad["counts"] = [{"what": "số nhóm nợ", "n": 2, "addresses": ["luat_ke_toan_88_2015:t1:9"]}]
+        bad["reading_flags"] = [{"addresses": ["luat_ke_toan_88_2015:p7:1"], "note": "bản dịch lệch", "material": False}]
+        self._note(bad)
+        errs, _ = self._check()
+        self.assertTrue(any("counts" in e and "không tồn tại" in e for e in errs), errs)
+        self.assertTrue(any("reading_flags" in e and "không tồn tại" in e for e in errs), errs)
 
     def test_bad_dates_are_errors_not_crashes(self):
         self._note(dict(NOTE, review_by="31/12/2026"))
@@ -137,6 +150,10 @@ class LibraryTests(unittest.TestCase):
         self.assertTrue(laws_checks.check_personal_data(self.tmp))
         (self.tmp / "governance" / "ghi_chu.md").write_text("CCCD 001234567890\n", encoding="utf-8")
         self.assertTrue(laws_checks.check_personal_data(self.tmp))
+        (self.tmp / "governance" / "ghi_chu.md").write_text("ok\n", encoding="utf-8")
+        (self.tmp / "research").mkdir()
+        (self.tmp / "research" / "note.jsonl").write_text('{"x": "Số tài khoản 0123 4567 8910"}\n', encoding="utf-8")
+        self.assertTrue(laws_checks.check_personal_data(self.tmp))              # research/ không được bỏ qua
 
 
 if __name__ == "__main__":
