@@ -135,6 +135,34 @@ class ResolutionTests(unittest.TestCase):
         c, o = self._res(304, _resolution("F-101", "NO", resolver="ChatGPT (OpenAI)"), when)
         self.assertEqual(c, 0, o)
 
+    def test_owner_authored_forecast_cannot_be_resolved_by_owner(self):
+        """L-09: Owner cũng là một ghế viết. Dự báo do Owner viết thì Owner không phân định."""
+        q4 = "Tỷ giá trung tâm ngày 31/12/2026 từ 25.650 đồng trở lên?"
+        self.assertEqual(self._run("ledger_intake.py", 121, _forecast("A", q4, 0.6, author="Owner (Trần Ngọc Thắng)"),
+                                   "2026-11-17T02:30:00Z")[0], 0)
+        when = "2027-01-05T03:00:00Z"
+        for who in ("Owner", "Owner (Trần Ngọc Thắng)", "owner — kiểm lại", "Claude"):
+            c, o = self._res(401, _resolution("F-121", "YES", resolver=who), when)
+            self.assertEqual(c, 2, o); self.assertIn("L-09", o)
+        self.assertEqual(self._rows(), [])
+        c, o = self._res(402, _resolution("F-121", "YES", resolver="ChatGPT (OpenAI)"), when)
+        self.assertEqual(c, 0, o)
+
+    def test_unrecognised_author_seat_is_refused_at_intake_and_fails_closed_at_resolution(self):
+        c, o = self._run("ledger_intake.py", 131, _forecast("A", "Câu hỏi thử có ghế viết lạ?", 0.6, author="ai đó"),
+                         "2026-11-17T02:40:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("L-09", o)                   # không vào sổ
+        # Dòng cũ (giả lập ghi trước khi có luật) có author_seat không nhận ra: phân định đóng lại, kể cả với Owner
+        led = self.tmp / "ledger" / "predictions.jsonl"
+        row = json.loads(led.read_text(encoding="utf-8").splitlines()[0])
+        row.update(id="F-141", issue_number=141, question="Dòng cũ không rõ ghế viết?", author_seat="người viết")
+        with led.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        for who in ("Owner", "ChatGPT (OpenAI)"):
+            c, o = self._res(501, _resolution("F-141", "NO", resolver=who), "2027-01-05T03:00:00Z")
+            self.assertEqual(c, 2, o); self.assertIn("không nhận ra ghế viết", o)
+        self.assertEqual(self._rows(), [])
+
 
 class TwoSidedTests(unittest.TestCase):
     def test_binom_two_sided_matches_sample_size_logic(self):
