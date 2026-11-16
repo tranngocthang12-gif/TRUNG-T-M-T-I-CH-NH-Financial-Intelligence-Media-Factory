@@ -17,3 +17,10 @@ Mẫu tệp `ADR-NNNN-<slug>.md`:
 ## Điều kiện hoàn tác (đo được, có hạn)
 ## Ảnh hưởng tới ARCHITECTURE.md (mục nào đổi)
 ```
+
+## Danh mục
+| ADR | Tên | Trạng thái |
+|---|---|---|
+| ADR-0001 | Hợp nhất sáu bản kiến trúc thành ARCHITECTURE.md v3.0 | ACCEPTED 24/10/2026 (PR #3) |
+| ADR-0002 | (để dành: xét thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001) | — |
+| ADR-0003 | Phân định dự báo qua Issue, chấm A–B, luật vào máy kiểm, engine hằng tuần | PROPOSED |
