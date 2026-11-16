@@ -100,8 +100,9 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
              "- Dự báo từ Issue: " + (", ".join(f"ghế {k}: {v['n']} (chờ {v['pending']})"
                                                  for k, v in sorted(sc["issue_forecasts"]["by_seat"].items()))
                                        or "chưa có"),
-             "- Cặp A–B: {pairs} cặp, bất đồng {disagreements}, đã phân định {disagreements_resolved}, "
-             "A đúng {a_correct} — {verdict}".format(**sc["issue_forecasts"]["ab"]),
+             "- Cặp A–B: {pairs} cặp (lẻ {unpaired}), bất đồng {disagreements}, đã phân định {disagreements_resolved}, "
+             "A đúng {a_correct}, mâu thuẫn {inconsistent_outcomes} — {verdict}".format(**sc["issue_forecasts"]["ab"])
+             + ("  ⚠ " + sc["issue_forecasts"]["ab"]["warning_inconsistent"] if "warning_inconsistent" in sc["issue_forecasts"]["ab"] else ""),
              f"- Ghi chú chuyển OUTDATED (L-08): {', '.join(outdated) if outdated else 'không có'}", ""]
         if sc["procedures"]:
             L += ["| Chuyên gia | n | Brier | Brier baseline mạnh nhất | Skill | Tỷ lệ đúng | Kết luận |", "|---|---|---|---|---|---|---|"]
