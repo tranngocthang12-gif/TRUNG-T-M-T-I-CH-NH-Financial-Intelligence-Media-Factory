@@ -37,7 +37,7 @@ trung-tam-tai-chinh/
 ├── templates/                   # Mẫu điền nhanh
 ├── engine/                      # BỘ NÃO HỌC MÁY — vòng học tự động
 ├── tests/                       # Chống look-ahead + diễn tập giả lập
-├── .github/workflows/           # Chạy vòng học 16:30 mỗi ngày giao dịch
+├── .github/workflows/           # Vòng học 16:30 thứ Sáu hằng tuần; nhận dự báo/phân định qua Issue; CI
 ├── config.yaml                  # Universe, chi phí, ngưỡng thống kê
 ├── data/ paper/ reports/        # Engine tự ghi
 ├── docs/HUONG_DAN_VAN_HANH.md

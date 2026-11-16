@@ -1,5 +1,17 @@
 # Changelog
 
+## v3.0.2 — 2026-11-17 (làm nốt G0/G1: phân định, chấm A–B, luật vào máy kiểm) — Claude soạn, Owner đưa lên kho; ADR-0003
+- **Phân định dự báo.** Issue mẫu "Resolution" + `resolution_intake.yml` + `tools/resolution_intake.py` → `ledger/resolutions.jsonl`. Không phân định trước hạn (trừ YES của `event_before_date`), không phân định lại, một Issue một câu hỏi, người phân định không phải Claude (L-09), YES/NO phải có nguồn và trích nguyên văn, VOID phải có lý do. Chỉ Issue do Owner mở.
+- **Chấm A–B** (`reports/scorecard.json` → `issue_forecasts`; báo cáo vòng học): Brier theo ghế, hiệu chuẩn, cặp A–B, tỷ lệ bất đồng, độ đúng của A trên tập bất đồng, p so với tung đồng xu, tiến độ tới 194.
+- **Thư viện có máy kiểm** (`engine/knowledge_notes.py`, gọi từ `validate.py`): L-01 tài liệu gốc ghim sha256/bytes, địa chỉ trang/đoạn/bảng tồn tại, trích nguyên văn; L-04 giấy phép, nguồn không bị cấm trong `DATA_SOURCES.yaml`; L-08 hiệu lực văn bản, vòng học tự chuyển OUTDATED; L-09 trạng thái ngoài DRAFT cần biên bản chấm của người khác. Quy ước: `library/notes/README.md`.
+- **L-03** quét số định danh/số tài khoản trong tệp chữ. **L-09** mẫu PR `authored_by`/`reviewed_by` + workflow `review_gate.yml`.
+- **L-06 + Deflated Sharpe.** Mỗi lần thử đăng ký vào `research/trial_registry.jsonl` (hash chuỗi) trước khi chạy; `trials.csv` thêm `sharpe`, `sharpe_ann`, `dsr`, `registry_hash`; CI đối chiếu sổ với kết quả.
+- **Engine hằng tuần** (thứ Sáu 16:30 giờ VN) theo §4.3.
+- **CI chặn gộp chạy đủ mọi test**: test dạng script mỗi tệp một tiến trình (hết lỗi thu thập của pytest), thêm bước "test không được sửa tệp nào của kho". Sửa `tests/test_adjustment.py`: Yahoo bổ sung nhiều sự kiện quyền cho TCB/VCB nên test kiểm đúng sự kiện (mã, ngày GDKHQ) và hệ số chia tách qua ngày 11/06/2024 thay vì đòi "không điều chỉnh gì".
+- **`validate.py` theo v3.0**: bỏ danh sách "v2.x yêu cầu" (đã SUPERSEDED); thêm tệp bắt buộc của v3.0; contract 25/25 thành lỗi nếu thiếu; dòng THÔNG TIN tiến độ G1.
+- **Văn bản**: ARCHITECTURE §3 ghế thi công không phải MINH TRÍ; §4.1 bước 2 và 4; §4.3; ADR-0001 ACCEPTED; ADR-0003; danh mục ADR.
+- **Còn lại (ADR riêng):** kho dữ liệu ghi tăng dần (C2).
+
 ## v3.0.1 — 2026-11-16 (sửa lỗi Ledger P0 của G0) — Claude soạn, Owner đưa lên kho
 - **Vòng học không vỡ khi có dự báo Issue.** Dòng từ Issue "Forecast" không có `id` và `resolution_rule` là chuỗi, nên `engine/ledger.py` (`resolve`, `scorecard`) ném lỗi → `daily_cycle` dừng ngay sau dự báo đầu tiên. Nay engine chỉ chấm bằng giá dòng của chính nó; dòng Issue được đếm theo ghế A/B trong `reports/scorecard.json` (`issue_forecasts`) và báo cáo vòng học.
 - **Một hash chuỗi cho mọi bên ghi.** Đường experts của engine ghi `prev_hash`/`hash` như `tools/ledger_intake.py` (trước đó sẽ làm đỏ `validate`). Dòng Issue có `id` = `F-<số Issue>`.
