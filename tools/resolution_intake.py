@@ -7,8 +7,9 @@ Luật:
   forecast_ids chỉ liệt kê một phần: một câu hỏi chỉ có một sự thật, A và B nhận cùng outcome.
 - Câu hỏi đã có bất kỳ dự báo nào được phân định thì không phân định lại (kể cả VOID).
 - Không phân định trước resolve_at; ngoại lệ duy nhất: YES khi MỌI dự báo của câu hỏi có luật event_before_date (L-05).
-- Người phân định khác nhà cung cấp với người viết: dự báo A và B đều do Claude (Anthropic) viết, nên resolver không được
-  thuộc Anthropic theo bảng nhà cung cấp dùng chung tools/laws_checks.PROVIDERS (L-09).
+- Người phân định (resolver) phải bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung nhà cung cấp với
+  bất kỳ ghế viết dự báo nào của câu hỏi (đọc author_seat từng dòng; Anthropic luôn bị chặn) — bảng dùng chung
+  tools/laws_checks.PROVIDERS (L-09).
 - YES/NO phải có resolution_source và trích nguyên văn (quote); VOID phải có void_reason.
 - Nội dung chứa từ khóa khuyến nghị mua bán → từ chối (L-02).
 - Mỗi dòng ghi theo contracts/resolution.schema.json, nối hash chuỗi (prev_hash/hash) như predictions.jsonl.
@@ -17,7 +18,7 @@ import json, os, pathlib, re, sys
 from datetime import date, datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from tools.laws_checks import line_hash, recommendation_hit, _providers  # noqa: E402
+from tools.laws_checks import line_hash, recommendation_hit, recognised_seat, _providers, _seats  # noqa: E402
 from tools.ledger_intake import parse_issue_form  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -65,8 +66,8 @@ def main() -> int:
     resolver = str(data.get("resolver", "")).strip()
     if not resolver:
         return reject("thiếu resolver (ai đã đọc nguồn và phân định)")
-    if AUTHOR_PROVIDER in _providers(resolver):
-        return reject(f"L-09: '{resolver}' cùng nhà cung cấp với ghế viết dự báo (Anthropic); người phân định phải là Owner hoặc ghế khác nhà")
+    if not recognised_seat(resolver):
+        return reject(f"L-09: resolver '{resolver}' phải BẮT ĐẦU bằng tên ghế: 'Owner', hoặc tên mô hình/nhà cung cấp (ví dụ 'ChatGPT (OpenAI)')")
     source, quote, void_reason = (str(data.get(k, "")).strip() for k in ("resolution_source", "quote", "void_reason"))
     if outcome_key == "VOID":
         if not void_reason:
@@ -91,6 +92,15 @@ def main() -> int:
     already = [i for i in group_ids if i in done]
     if already:
         return reject(f"câu hỏi này đã được phân định ({', '.join(already)}); không phân định lại")
+    # L-09: người phân định không chung ghế với BẤT KỲ ghế viết dự báo nào của câu hỏi (đọc từ author_seat từng dòng);
+    # Anthropic luôn bị chặn vì prompt chuẩn của A và B đều chạy trên Claude.
+    authors = {AUTHOR_PROVIDER}
+    for p in group:
+        authors |= _providers(p.get("author_seat"))
+    clash = sorted(_seats(resolver) & authors)
+    if clash:
+        return reject(f"L-09: '{resolver}' cùng nhà cung cấp với ghế viết dự báo của câu hỏi ({', '.join(clash)}); "
+                      "người phân định phải là Owner hoặc ghế khác nhà")
     resolve_at = date.fromisoformat(group[0]["resolve_at"])
     early_ok = outcome_key == "YES" and all(p.get("resolution_rule") == "event_before_date" for p in group)
     if created_day < resolve_at and not early_ok:

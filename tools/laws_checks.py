@@ -5,8 +5,9 @@ L-05/Ledger  hash chuỗi: ledger/predictions.jsonl và ledger/resolutions.jsonl
       (dòng đầu "GENESIS"); sửa một kết quả đã ghi làm CI đỏ.
 L-03  dữ liệu cá nhân: tệp chữ (md/yaml/json/jsonl/txt) ngoài dữ liệu giá không chứa số định danh/số tài khoản đi kèm
       nhãn (CCCD, CMND, căn cước, hộ chiếu, số tài khoản, STK, account number).
-L-09  người viết ≠ người chấm: thân PR có "authored_by:" và "reviewed_by:"; reviewed_by không rỗng, không cùng nhà cung cấp
-      với authored_by (workflow review_gate.yml gọi check_pr_review).
+L-09  người viết ≠ người chấm: thân PR có đúng một dòng "authored_by:" và một dòng "reviewed_by:"; cả hai bắt đầu bằng tên ghế
+      (Owner hoặc mô hình/nhà cung cấp); không chung ghế nào — cùng nhà cung cấp, hoặc cùng là Owner (workflow review_gate.yml
+      gọi check_pr_review). recognised_seat()/same_provider() dùng chung cho người phân định dự báo và biên bản chấm ghi chú.
 L-06  sổ thử: research/trial_registry.jsonl đúng hash chuỗi; mọi lần thử trong research/trials.csv từ mã thử đầu tiên
       của sổ trở đi đều có dòng đăng ký cùng trial_id, spec_id, ngưỡng, registry_hash; số dòng đăng ký ≥ số lần thử đó.
 """
@@ -161,11 +162,21 @@ def _providers(text: str) -> set:
     return {k for k, rx in _PROVIDER_RE.items() if rx.search(t)}
 
 
+_OWNER_LOOSE_RE = re.compile(r"(?<![a-z0-9])owner(?![a-z0-9])")      # dò lỏng ở mọi vị trí, như _providers (chiều chặn)
+
+
+def _seats(text: str) -> set:
+    """Các ghế được nhắc tới: nhà cung cấp mô hình + ghế người "owner". Owner là MỘT ghế: 'Owner', 'Owner (tên)',
+    'Owner — vòng 3' đều là cùng một ghế."""
+    t = (text or "").lower()
+    return _providers(t) | ({"owner"} if _OWNER_LOOSE_RE.search(t) else set())
+
+
 def same_provider(a: str, b: str) -> bool:
-    """L-09: hai ghế cùng nhà cung cấp, hoặc cùng tên. Ghế người (Owner) không có nhà cung cấp."""
+    """L-09: hai chuỗi cùng tên, hoặc có chung một ghế (cùng nhà cung cấp mô hình, hoặc cùng là Owner)."""
     if (a or "").strip().lower() == (b or "").strip().lower():
         return True
-    return bool(_providers(a) & _providers(b))
+    return bool(_seats(a) & _seats(b))
 
 
 # Nhận ghế chấm hợp lệ: chuỗi phải BẮT ĐẦU bằng "owner" hoặc một tên trong PROVIDERS, và ngay sau đó không được là
@@ -177,21 +188,36 @@ _REVIEWER_START_RE = re.compile(
                                                                     key=len, reverse=True)) + r")(?!\w))")
 
 
+def recognised_seat(text: str) -> bool:
+    """Chuỗi BẮT ĐẦU bằng tên ghế: 'Owner' hoặc tên mô hình/nhà cung cấp trong PROVIDERS. Dùng chung cho mọi chỗ L-09
+    cần biết AI là ai (người viết, người chấm PR, người phân định dự báo, người đọc và người chấm ghi chú): ghế không
+    nhận ra được thì không so được nhà cung cấp, nên không được chấp nhận."""
+    return bool(_REVIEWER_START_RE.match((text or "").strip().lower()))
+
+
 def check_pr_review(body: str) -> list[str]:
     """L-09 cho một PR: đọc hai dòng 'authored_by:' và 'reviewed_by:' trong thân PR."""
-    fields = {}
+    fields, seen = {}, {}
     for line in (body or "").splitlines():
         m = re.match(r"^\s*[-*]?\s*(authored_by|reviewed_by)\s*:\s*(.*?)\s*$", line, re.IGNORECASE)
         if m:
-            fields[m.group(1).lower()] = m.group(2).strip().strip("`")
+            k = m.group(1).lower()
+            seen[k] = seen.get(k, 0) + 1
+            fields[k] = m.group(2).strip().strip("`")
+    dup = [k for k, n in seen.items() if n > 1]
+    if dup:
+        return [f"L-09: thân PR có nhiều hơn một dòng {dup} — mỗi trường chỉ được một dòng"]
     a, r = fields.get("authored_by", ""), fields.get("reviewed_by", "")
     if not a:
         return ["L-09: thân PR thiếu dòng 'authored_by: <ghế/mô hình>'"]
+    if not recognised_seat(a):
+        return [f"L-09: authored_by '{a}' phải BẮT ĐẦU bằng tên ghế viết: 'Owner', hoặc tên mô hình/nhà cung cấp "
+                "(ví dụ 'Claude (Anthropic)', 'ChatGPT (OpenAI)') — không nhận ra ghế viết thì không so được với ghế chấm"]
     if not r:
         return ["L-09: chưa có người chấm — điền 'reviewed_by: <ghế khác nhà cung cấp>' sau khi chấm xong"]
     if same_provider(a, r):
-        return [f"L-09: người viết và người chấm cùng nhà cung cấp hoặc cùng tên ('{a}' / '{r}')"]
-    if not _REVIEWER_START_RE.match(r.strip().lower()):
+        return [f"L-09: người viết và người chấm cùng ghế (cùng nhà cung cấp, hoặc cùng là Owner): '{a}' / '{r}'"]
+    if not recognised_seat(r):
         return [f"L-09: reviewed_by '{r}' phải BẮT ĐẦU bằng tên ghế chấm: 'Owner', hoặc tên mô hình/nhà cung cấp "
                 "(ví dụ 'ChatGPT (OpenAI)', 'Grok (xAI)', 'Gemini (Google)')"]
     return []
