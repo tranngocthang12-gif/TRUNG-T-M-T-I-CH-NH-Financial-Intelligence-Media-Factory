@@ -33,7 +33,11 @@
       "format": "date"
     },
     "excess_return": {
-      "type": "number"
+      "type": [
+        "number",
+        "null"
+      ],
+      "description": "null khi VOID (engine/ledger.resolve: lỗi dữ liệu giá trong cửa sổ chấm)"
     },
     "outcome": {
       "type": [
