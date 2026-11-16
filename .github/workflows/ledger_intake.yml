@@ -73,3 +73,8 @@ jobs:
               issue_number: context.issue.number, body: (r.ok ? "✅ " : "❌ ") + r.message});
             await github.rest.issues.addLabels({owner: context.repo.owner, repo: context.repo.repo,
               issue_number: context.issue.number, labels: [r.ok ? "ledgered" : "rejected"]});
+      - name: Loi he thong (ma 1) lam job do; tu choi (2) va trung (3) la ket qua hop le
+        if: steps.intake.outputs.code == '1'
+        run: |
+          echo "Intake loi he thong hoac khong day duoc len main: ${{ steps.intake.outputs.result }}"
+          exit 1
