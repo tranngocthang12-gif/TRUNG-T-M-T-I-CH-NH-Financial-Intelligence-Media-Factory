@@ -6,7 +6,7 @@ import argparse, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
 from . import data, features, regime, research, meta, knowledge, paper, attribution, report, llm_review
-from . import ledger, experts, facts
+from . import ledger, experts, facts, knowledge_notes
 
 def load_ledger():
     p = ROOT / "research/trials.csv"
@@ -34,16 +34,22 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         method, spec = meta.next_spec(bandit, rng, ledger_df)
         if spec is None:
             break
-        n_total = (0 if ledger_df is None else len(ledger_df)) + 1
+        n_total = research.next_trial_number(ledger_df)
         thr = research.threshold(n_total)
+        reg_hash = research.register_trial(f"T{n_total:05d}", as_of, method, spec, thr)   # L-06: đăng ký trước
         oos, folds = research.walk_forward(ds, spec)
         m = research.metrics(oos, folds, reg_lab)
         status = research.classify(m, thr)
         mid = research.spec_id(spec)
+        prev_sr = (pd.to_numeric(ledger_df["sharpe"], errors="coerce").dropna().tolist()
+                   if ledger_df is not None and "sharpe" in ledger_df else [])
+        var_sr = float(np.var(prev_sr + [m["sharpe"]], ddof=1)) if len(prev_sr) >= 1 else None
+        dsr = research.deflated_sharpe(m["sharpe"], m["sr_T"], m["sr_skew"], m["sr_kurt"], n_total, var_sr)
         row = {"trial_id": f"T{n_total:05d}", "cycle_date": as_of, "method": method, "spec_id": mid,
                "features": ";".join(spec["features"]), "model": spec["model"], "ic_mean": m["ic_mean"],
                "ic_t": m["ic_t"], "net_ann": m["net_ann"], "fold_pos": m["fold_pos"], "threshold": thr,
-               "status": status, "regimes": json.dumps(m["regimes"])}
+               "status": status, "regimes": json.dumps(m["regimes"]),
+               "sharpe": m["sharpe"], "sharpe_ann": m["sharpe_ann"], "dsr": dsr, "registry_hash": reg_hash}
         ledger_df = pd.concat([ledger_df, pd.DataFrame([row])], ignore_index=True) if ledger_df is not None else pd.DataFrame([row])
         meta.update(bandit, method, status)
         if status != "REJECTED":
@@ -79,6 +85,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
     else:
         ex = experts.run(as_of, close) if use_llm else {"ran": False, "reasons": ["tắt bởi --no-llm"]}
     sc = ledger.scorecard(as_of)
+    outdated = knowledge_notes.mark_outdated(ROOT)        # L-08: ghi chú dựa trên văn bản hết hiệu lực → OUTDATED
 
     if write_report:
         report.write(as_of, regime_now, done, bandit, registry, nav, decision, attr, alerts,
@@ -92,7 +99,10 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
              f"- Dự báo đã chấm hôm nay: {len(resolved)} | Tổng: {sc['total_predictions']} dự báo, {sc['resolved']} đã chấm",
              "- Dự báo từ Issue: " + (", ".join(f"ghế {k}: {v['n']} (chờ {v['pending']})"
                                                  for k, v in sorted(sc["issue_forecasts"]["by_seat"].items()))
-                                       or "chưa có"), ""]
+                                       or "chưa có"),
+             "- Cặp A–B: {pairs} cặp, bất đồng {disagreements}, đã phân định {disagreements_resolved}, "
+             "A đúng {a_correct} — {verdict}".format(**sc["issue_forecasts"]["ab"]),
+             f"- Ghi chú chuyển OUTDATED (L-08): {', '.join(outdated) if outdated else 'không có'}", ""]
         if sc["procedures"]:
             L += ["| Chuyên gia | n | Brier | Brier baseline mạnh nhất | Skill | Tỷ lệ đúng | Kết luận |", "|---|---|---|---|---|---|---|"]
             L += [f"| {k} | {v['n']} | {v['brier']} | {v['brier_base_rate']} | {v['brier_skill']} | {v['hit_rate']} | {v['verdict']} |"

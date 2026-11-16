@@ -1,10 +1,20 @@
-"""Research & Backtest Engine: walk-forward có embargo, chi phí thật, ngưỡng thống kê tăng theo số lần thử."""
-import hashlib, json
+"""Research & Backtest Engine: walk-forward có embargo, chi phí thật, ngưỡng thống kê tăng theo số lần thử.
+L-06: mọi lần thử được ĐĂNG KÝ vào research/trial_registry.jsonl (hash chuỗi) TRƯỚC khi chạy; báo Sharpe kèm
+Deflated Sharpe (Bailey & López de Prado 2014) tính theo tổng số lần thử."""
+import hashlib, json, math, sys
+from datetime import datetime, timezone
 from statistics import NormalDist
 import numpy as np, pandas as pd
 from sklearn.linear_model import Ridge
 from sklearn.ensemble import HistGradientBoostingRegressor
-from .config import CFG, ROUNDTRIP
+from .config import CFG, ROOT, REPO, ROUNDTRIP, path
+
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+from tools.laws_checks import line_hash  # noqa: E402
+
+REGISTRY = "research/trial_registry.jsonl"
+EULER_GAMMA = 0.5772156649015329
 
 MODELS = ["ridge", "gbm", "signed_sum"]
 
@@ -90,6 +100,7 @@ def metrics(oos, fold_ics, regime):
         net.append(g.loc[list(top), "y"].mean() - turnover * ROUNDTRIP)
         prev = top
     out["net_ann"] = float(np.mean(net) * 252 / h) if net else 0.0
+    out.update(sharpe_stats(net, h))
     reg = {}
     lab = regime.reindex(ic.index)
     for rname, s in ic.groupby(lab):
@@ -110,3 +121,59 @@ def classify(m, thr):
     if m["ic_t"] >= 2:
         return "WEAK"
     return "REJECTED"
+
+
+# ---------------- L-06: Sharpe, Deflated Sharpe, sổ đăng ký thử ----------------
+def sharpe_stats(net, h):
+    """Sharpe theo kỳ tái cân bằng (không năm hóa) + năm hóa, số kỳ T, độ lệch, độ nhọn (không trừ 3)."""
+    x = np.asarray([v for v in net if v is not None and np.isfinite(v)], dtype=float)
+    T = int(len(x))
+    if T < 3 or x.std(ddof=1) == 0:
+        return {"sharpe": 0.0, "sharpe_ann": 0.0, "sr_T": T, "sr_skew": 0.0, "sr_kurt": 3.0}
+    sd = x.std(ddof=1)
+    sr = float(x.mean() / sd)
+    z = (x - x.mean()) / x.std(ddof=0)
+    return {"sharpe": sr, "sharpe_ann": float(sr * math.sqrt(252 / h)), "sr_T": T,
+            "sr_skew": float(np.mean(z ** 3)), "sr_kurt": float(np.mean(z ** 4))}
+
+def deflated_sharpe(sr, T, skew, kurt, n_trials, var_sr):
+    """Xác suất Sharpe thật > 0 sau khi trừ kỳ vọng Sharpe lớn nhất của n_trials lần thử ngẫu nhiên.
+    SR0 = sqrt(V[SR]) * ((1-γ)·Φ⁻¹(1-1/N) + γ·Φ⁻¹(1-1/(N·e))); DSR = Φ((SR-SR0)·sqrt(T-1) / sqrt(1-γ3·SR+(γ4-1)/4·SR²))."""
+    nd = NormalDist()
+    if T is None or T < 3:
+        return float("nan")
+    sr0 = 0.0
+    if n_trials >= 2 and var_sr is not None and var_sr > 0:
+        sr0 = math.sqrt(var_sr) * ((1 - EULER_GAMMA) * nd.inv_cdf(1 - 1 / n_trials)
+                                   + EULER_GAMMA * nd.inv_cdf(1 - 1 / (n_trials * math.e)))
+    den = 1 - skew * sr + (kurt - 1) / 4 * sr ** 2
+    if den <= 0:
+        return float("nan")
+    return float(nd.cdf((sr - sr0) * math.sqrt(T - 1) / math.sqrt(den)))
+
+def _registry_rows():
+    p = ROOT / REGISTRY
+    return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()] if p.exists() else []
+
+def next_trial_number(ledger_df):
+    """Số thứ tự lần thử kế tiếp = số đã có kết quả + số đã đăng ký mà chưa có kết quả (thử bị dừng giữa chừng).
+    Ngưỡng tính theo số này nên mọi lần đã thử đều được đếm (L-06)."""
+    done = set(ledger_df["trial_id"]) if ledger_df is not None and "trial_id" in ledger_df else set()
+    extra = sum(1 for r in _registry_rows() if r.get("trial_id") not in done)
+    return len(done) + extra + 1
+
+def register_trial(trial_id, cycle_date, method, spec, thr):
+    """Đăng ký một lần thử TRƯỚC khi chạy walk-forward (L-06). Trả về hash dòng đăng ký."""
+    old = _registry_rows()
+    if any(r.get("trial_id") == trial_id for r in old):
+        raise RuntimeError(f"L-06: {trial_id} đã có trong sổ đăng ký — không chạy lại cùng mã thử")
+    row = {"trial_id": trial_id, "cycle_date": cycle_date,
+           "registered_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+           "method": method, "spec_id": spec_id(spec), "features": ";".join(spec["features"]),
+           "model": spec["model"], "threshold": float(thr), "horizon_days": CFG["horizon_days"],
+           "hypothesis": "rank IC > 0 ngoài mẫu (walk-forward có embargo), lãi ròng sau phí > 0",
+           "prev_hash": old[-1]["hash"] if old else "GENESIS"}
+    row["hash"] = line_hash(row)
+    with open(path(REGISTRY), "a", encoding="utf-8") as f:
+        f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+    return row["hash"]

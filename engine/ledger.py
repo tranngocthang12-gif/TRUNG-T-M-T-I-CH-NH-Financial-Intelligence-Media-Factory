@@ -1,7 +1,7 @@
 """PREDICTION LEDGER — trái tim của v1.0.
 Dự báo ghi TRƯỚC khi biết kết quả (append-only, commit vào git). Kết quả ghi ở file riêng.
 Auditor, Resolution, Scorecard đều là code tất định — không LLM nào tự chấm mình."""
-import hashlib, json, sys
+import hashlib, json, math, re, sys
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, REPO, path, save_json
 
@@ -118,18 +118,67 @@ def resolve(close, as_of, bad=None):
     return new
 
 # ---------------- SCORECARD (code) ----------------
+TARGET_DISAGREEMENTS = 194        # ARCHITECTURE v3.0 §4.2: phát hiện A đúng 60% so với 50%, độ mạnh 80%, α 0,05
+
+def _qkey(p):
+    return (re.sub(r"\s+", " ", str(p.get("question", ""))).strip().lower(), str(p.get("resolve_at", "")))
+
+def _calibration(ps, os_):
+    out = {}
+    for k in range(10):
+        lo, hi = k / 10, (k + 1) / 10
+        idx = [i for i, p in enumerate(ps) if lo <= p < hi or (k == 9 and p == 1.0)]
+        if idx:
+            out[f"{lo:.1f}-{hi:.1f}"] = {"n": len(idx), "mean_p": round(float(np.mean([ps[i] for i in idx])), 3),
+                                              "hit_rate": round(float(np.mean([os_[i] for i in idx])), 3)}
+    return out
+
+def _binom_sf(k, n):
+    """P(X ≥ k) với X ~ Binomial(n, 0,5): A đúng trên tập bất đồng có hơn tung đồng xu không."""
+    return float(sum(math.comb(n, j) for j in range(k, n + 1)) / 2 ** n) if n else 1.0
+
 def issue_summary(all_rows, R):
-    """Đếm dự báo từ Issue theo ghế A/B (ARCHITECTURE v3.0 §4): tổng, đã phân định, chờ phân định."""
+    """Chấm dự báo từ Issue theo ARCHITECTURE v3.0 §4.1 bước 5: theo ghế (n, Brier, Brier xác suất nền, hiệu chuẩn);
+    cặp A–B cùng câu hỏi: tỷ lệ bất đồng (hai ghế ở hai phía 0,5) và độ đúng của A trên tập bất đồng đã phân định."""
     done = {r.get("prediction_id") for r in R}
+    outcome = {r.get("prediction_id"): r.get("outcome") for r in R if r.get("outcome") is not None}
     issue = [p for p in all_rows if is_issue_row(p)]
-    by_seat = {}
+    by_seat, scores = {}, {}
     for p in issue:
         s = str(p.get("seat", "?"))
         d = by_seat.setdefault(s, {"n": 0, "resolved": 0, "pending": 0})
         d["n"] += 1
         if p.get("id") in done: d["resolved"] += 1
         else: d["pending"] += 1
-    return {"total": len(issue), "by_seat": by_seat}
+    for s in sorted(by_seat):
+        rows = [p for p in issue if str(p.get("seat")) == s and p.get("id") in outcome]
+        if not rows:
+            continue
+        ps = [float(p["p"]) for p in rows]; os_ = [int(outcome[p["id"]]) for p in rows]
+        bs = [float(p.get("base_rate", 0.5)) for p in rows]
+        scores[s] = {"n": len(rows), "brier": round(float(np.mean([(a - b) ** 2 for a, b in zip(ps, os_)])), 4),
+                     "brier_base_rate": round(float(np.mean([(a - b) ** 2 for a, b in zip(bs, os_)])), 4),
+                     "mean_p": round(float(np.mean(ps)), 3), "hit_rate": round(float(np.mean(os_)), 3),
+                     "calibration": _calibration(ps, os_)}
+    first = {}
+    for p in sorted(issue, key=lambda r: r.get("issue_number", 0)):
+        first.setdefault((_qkey(p), str(p.get("seat"))), p)
+    pairs = [(a, first[(k, "B")]) for (k, seat), a in first.items() if seat == "A" and (k, "B") in first]
+    dis = [(a, b) for a, b in pairs if (float(a["p"]) - 0.5) * (float(b["p"]) - 0.5) < 0]
+    dis_res = [(a, b) for a, b in dis if a.get("id") in outcome]
+    a_right = sum(1 for a, _ in dis_res if (float(a["p"]) > 0.5) == (int(outcome[a["id"]]) == 1))
+    n = len(dis_res)
+    ab = {"pairs": len(pairs), "disagreements": len(dis),
+          "disagreement_rate": round(len(dis) / len(pairs), 3) if pairs else None,
+          "disagreements_resolved": n, "a_correct": a_right,
+          "a_accuracy": round(a_right / n, 3) if n else None,
+          "p_value_a_better_than_coin": round(_binom_sf(a_right, n), 4) if n else None,
+          "target_disagreements": TARGET_DISAGREEMENTS,
+          "verdict": (f"CHƯA ĐỦ MẪU ({n}/{TARGET_DISAGREEMENTS} bất đồng đã phân định)" if n < TARGET_DISAGREEMENTS else
+                      "A HƠN B CÓ Ý NGHĨA" if _binom_sf(a_right, n) < 0.05 else "CHƯA THẤY A HƠN B")}
+    if pairs and len(dis) / len(pairs) < 0.10 and len(pairs) >= 20:
+        ab["warning"] = "tỷ lệ bất đồng < 10%: thư viện chưa làm A khác B (ARCHITECTURE v3.0 §9)"
+    return {"total": len(issue), "by_seat": by_seat, "scores": scores, "ab": ab}
 
 def scorecard(as_of):
     all_rows = _load(PRED)
