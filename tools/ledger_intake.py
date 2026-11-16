@@ -6,12 +6,14 @@ Luật: thiếu resolution_source, resolve_at đã qua so với ngày tạo Issu
 Nội dung chứa từ khóa khuyến nghị mua bán → từ chối ngay khi nhận (L-02), để một dòng sai không làm đỏ validate
 và dừng vòng học hằng ngày (Ledger chỉ ghi thêm, không sửa được).
 Mỗi dòng có id "F-<số Issue>" để tệp ledger/resolutions.jsonl trỏ tới khi phân định.
+author_seat phải bắt đầu bằng tên ghế (mô hình/nhà cung cấp hoặc Owner) → từ chối nếu không (L-09), vì người phân định
+phải khác ghế với người viết.
 """
 import json, os, pathlib, re, sys
 from datetime import date, datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from tools.laws_checks import line_hash, recommendation_hit  # noqa: E402
+from tools.laws_checks import line_hash, recommendation_hit, recognised_seat  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "ledger" / "predictions.jsonl"
@@ -52,6 +54,11 @@ def main() -> int:
         jsonschema.validate(data, json.loads(SCHEMA.read_text(encoding="utf-8")))
     except Exception as e:  # noqa: BLE001
         print(json.dumps({"ok": False, "message": f"Từ chối: không khớp forecast_issue.schema.json — {str(e).splitlines()[0]}"}, ensure_ascii=False))
+        return 2
+    if not recognised_seat(data["author_seat"]):
+        print(json.dumps({"ok": False, "message": f"Từ chối (L-09): author_seat '{data['author_seat']}' phải BẮT ĐẦU bằng tên ghế viết — "
+                          "tên mô hình/nhà cung cấp (ví dụ 'Claude Project TTC', 'Claude trần', 'ChatGPT trần') hoặc 'Owner'; "
+                          "không nhận ra ghế viết thì về sau không xác định được người phân định độc lập"}, ensure_ascii=False))
         return 2
     hit = recommendation_hit(json.dumps(data, ensure_ascii=False))
     if hit:

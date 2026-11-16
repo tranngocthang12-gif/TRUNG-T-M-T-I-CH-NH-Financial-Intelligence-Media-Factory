@@ -7,9 +7,9 @@ Luật:
   forecast_ids chỉ liệt kê một phần: một câu hỏi chỉ có một sự thật, A và B nhận cùng outcome.
 - Câu hỏi đã có bất kỳ dự báo nào được phân định thì không phân định lại (kể cả VOID).
 - Không phân định trước resolve_at; ngoại lệ duy nhất: YES khi MỌI dự báo của câu hỏi có luật event_before_date (L-05).
-- Người phân định (resolver) phải bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung nhà cung cấp với
-  bất kỳ ghế viết dự báo nào của câu hỏi (đọc author_seat từng dòng; Anthropic luôn bị chặn) — bảng dùng chung
-  tools/laws_checks.PROVIDERS (L-09).
+- Người phân định (resolver) phải bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung GHẾ với bất kỳ
+  người viết dự báo nào của câu hỏi (đọc author_seat từng dòng bằng _seats: nhà cung cấp mô hình hoặc Owner; Anthropic
+  luôn bị chặn). author_seat không nhận ra được ghế → không ghi. Bảng dùng chung tools/laws_checks.PROVIDERS (L-09).
 - YES/NO phải có resolution_source và trích nguyên văn (quote); VOID phải có void_reason.
 - Nội dung chứa từ khóa khuyến nghị mua bán → từ chối (L-02).
 - Mỗi dòng ghi theo contracts/resolution.schema.json, nối hash chuỗi (prev_hash/hash) như predictions.jsonl.
@@ -18,7 +18,7 @@ import json, os, pathlib, re, sys
 from datetime import date, datetime
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from tools.laws_checks import line_hash, recommendation_hit, recognised_seat, _providers, _seats  # noqa: E402
+from tools.laws_checks import line_hash, recommendation_hit, recognised_seat, _seats  # noqa: E402
 from tools.ledger_intake import parse_issue_form  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -94,13 +94,17 @@ def main() -> int:
         return reject(f"câu hỏi này đã được phân định ({', '.join(already)}); không phân định lại")
     # L-09: người phân định không chung ghế với BẤT KỲ ghế viết dự báo nào của câu hỏi (đọc từ author_seat từng dòng);
     # Anthropic luôn bị chặn vì prompt chuẩn của A và B đều chạy trên Claude.
+    unknown = [p["id"] for p in group if not recognised_seat(p.get("author_seat"))]
+    if unknown:
+        return reject(f"L-09: không nhận ra ghế viết (author_seat) của {', '.join(unknown)} nên không xác định được "
+                      "người phân định độc lập; không ghi (đóng khi không chắc)")
     authors = {AUTHOR_PROVIDER}
     for p in group:
-        authors |= _providers(p.get("author_seat"))
+        authors |= _seats(p.get("author_seat"))          # ghế = nhà cung cấp mô hình HOẶC Owner
     clash = sorted(_seats(resolver) & authors)
     if clash:
-        return reject(f"L-09: '{resolver}' cùng nhà cung cấp với ghế viết dự báo của câu hỏi ({', '.join(clash)}); "
-                      "người phân định phải là Owner hoặc ghế khác nhà")
+        return reject(f"L-09: '{resolver}' chung ghế với người viết dự báo của câu hỏi ({', '.join(clash)}); "
+                      "người phân định phải là ghế khác: khác nhà cung cấp, và Owner không phân định dự báo do Owner viết")
     resolve_at = date.fromisoformat(group[0]["resolve_at"])
     early_ok = outcome_key == "YES" and all(p.get("resolution_rule") == "event_before_date" for p in group)
     if created_day < resolve_at and not early_ok:
