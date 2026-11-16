@@ -17,6 +17,7 @@
   (4) DSR: phương sai Sharpe dự phòng 1/(T−1) khi sổ cũ chưa có Sharpe (SR0 không còn = 0), N = mọi lần thử;
   (5) L-09 dùng chung `same_provider()` cho PR, biên bản chấm ghi chú và resolver; (6) `knowledge_notes` kiểm địa chỉ `counts` và `reading_flags` tồn tại; (7) L-03 quét cả `research/`, `paper/`; (8) `validate` đếm tiến độ G1 chỉ dự báo A+B; (9) workflow intake đỏ khi mã 1.
   **Bản 3 (vòng chấm 2, 17/11/2026 — còn 4 điểm, đã sửa đủ):** `reviewed_by` nhận "Owner" theo từ, không theo chuỗi con (`not-an-owner`, `downer` → đỏ); `resolution.schema.json` cho `excess_return` null ở dòng VOID của engine (test khớp schema cho cả hai loại dòng); `validate.py` báo lỗi thay vì đổ khi `predictions.jsonl` có dòng hỏng; báo cáo vòng học in cả số cặp lẻ và số cặp mâu thuẫn.
+  **Bản 4 (vòng chấm 3, 17/11/2026 — còn 1 điểm LOW, đã sửa):** `reviewed_by` phải BẮT ĐẦU bằng tên ghế chấm ("Owner" hoặc tên mô hình/nhà cung cấp), ranh giới theo `\w` Unicode; `not_an_owner`, `éowner`, `an owner`, `not_a_grok` đều đỏ. Dò cùng nhà cung cấp vẫn lỏng ở mọi vị trí.
   Lỗi phát hiện thêm nhờ bước CI "test không được sửa tệp của kho": `test_adjustment` giả lập `_append` nhưng `resolve` nay ghi qua `_append_chained` → stub cả hai.
 - **Còn lại (ADR riêng):** kho dữ liệu ghi tăng dần (C2).
 
