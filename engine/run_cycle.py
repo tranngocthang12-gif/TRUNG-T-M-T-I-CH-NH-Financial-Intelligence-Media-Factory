@@ -89,7 +89,10 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
              f"- Chuyên gia: " + (f"ghi {ex.get('recorded', 0)} dự báo, loại {ex.get('rejected', 0)}, "
                                    f"Devil's Advocate {ex.get('devils_advocate', 0)}" if ex.get("ran")
                                    else "KHÔNG CHẠY — " + "; ".join(ex.get("reasons", []))),
-             f"- Dự báo đã chấm hôm nay: {len(resolved)} | Tổng: {sc['total_predictions']} dự báo, {sc['resolved']} đã chấm", ""]
+             f"- Dự báo đã chấm hôm nay: {len(resolved)} | Tổng: {sc['total_predictions']} dự báo, {sc['resolved']} đã chấm",
+             "- Dự báo từ Issue: " + (", ".join(f"ghế {k}: {v['n']} (chờ {v['pending']})"
+                                                 for k, v in sorted(sc["issue_forecasts"]["by_seat"].items()))
+                                       or "chưa có"), ""]
         if sc["procedures"]:
             L += ["| Chuyên gia | n | Brier | Brier baseline mạnh nhất | Skill | Tỷ lệ đúng | Kết luận |", "|---|---|---|---|---|---|---|"]
             L += [f"| {k} | {v['n']} | {v['brier']} | {v['brier_base_rate']} | {v['brier_skill']} | {v['hit_rate']} | {v['verdict']} |"
