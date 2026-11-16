@@ -1,9 +1,13 @@
 """PREDICTION LEDGER — trái tim của v1.0.
 Dự báo ghi TRƯỚC khi biết kết quả (append-only, commit vào git). Kết quả ghi ở file riêng.
 Auditor, Resolution, Scorecard đều là code tất định — không LLM nào tự chấm mình."""
-import hashlib, json
+import hashlib, json, sys
 import numpy as np, pandas as pd
-from .config import CFG, ROOT, path, save_json
+from .config import CFG, ROOT, REPO, path, save_json
+
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+from tools.laws_checks import line_hash  # noqa: E402  một thuật toán hash chuỗi cho mọi bên ghi Ledger
 
 PRED, RES = "ledger/predictions.jsonl", "ledger/resolutions.jsonl"
 
@@ -14,6 +18,29 @@ def _load(rel):
 def _append(rel, rows):
     with open(path(rel), "a", encoding="utf-8") as f:
         for r in rows: f.write(json.dumps(r, ensure_ascii=False) + "\n")
+
+def _append_chained(rel, rows):
+    """Ghi nối tiếp vào Ledger có hash chuỗi prev_hash/hash, cùng luật với tools/ledger_intake.py
+    (tools/laws_checks.check_ledger_chain kiểm mọi dòng)."""
+    old = _load(rel)
+    prev = old[-1].get("hash", "GENESIS") if old else "GENESIS"
+    out = []
+    for r in rows:
+        r = {**r, "prev_hash": prev}
+        r["hash"] = line_hash(r)
+        prev = r["hash"]
+        out.append(r)
+    with open(path(rel), "a", encoding="utf-8") as f:
+        for r in out: f.write(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n")
+
+def is_issue_row(p):
+    """Dòng ghi từ GitHub Issue 'Forecast' (tools/ledger_intake.py). Không chấm bằng giá ở đây."""
+    return "issue_number" in p
+
+def is_engine_row(p):
+    """Dòng do engine/experts ghi: có id và luật chấm dạng dict có ticker → chấm tự động bằng giá."""
+    rr = p.get("resolution_rule")
+    return not is_issue_row(p) and "id" in p and isinstance(rr, dict) and "ticker" in rr
 
 def base_rate(close, ticker, h):
     """Tỷ lệ lịch sử mã này vượt bình quân universe trong h phiên (do code tính)."""
@@ -54,7 +81,7 @@ def record(preds, as_of, universe, fact_ids, close):
                "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
         row["id"] = "P-" + hashlib.sha1(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
         ok.append(row)
-    _append(PRED, ok)
+    _append_chained(PRED, ok)
     if rejected:
         _append("ledger/rejected.jsonl", [{**r, "rejected_at": as_of} for r in rejected])
     return ok, rejected
@@ -67,6 +94,7 @@ def resolve(close, as_of, bad=None):
     idx = close.index
     new = []
     for p in _load(PRED):
+        if not is_engine_row(p): continue                # dự báo từ Issue: phân định theo resolution_source, không bằng giá
         if p["id"] in done: continue
         rr = p["resolution_rule"]; h = rr["horizon"]
         c = pd.Timestamp(p["created_at"])
@@ -90,12 +118,27 @@ def resolve(close, as_of, bad=None):
     return new
 
 # ---------------- SCORECARD (code) ----------------
+def issue_summary(all_rows, R):
+    """Đếm dự báo từ Issue theo ghế A/B (ARCHITECTURE v3.0 §4): tổng, đã phân định, chờ phân định."""
+    done = {r.get("prediction_id") for r in R}
+    issue = [p for p in all_rows if is_issue_row(p)]
+    by_seat = {}
+    for p in issue:
+        s = str(p.get("seat", "?"))
+        d = by_seat.setdefault(s, {"n": 0, "resolved": 0, "pending": 0})
+        d["n"] += 1
+        if p.get("id") in done: d["resolved"] += 1
+        else: d["pending"] += 1
+    return {"total": len(issue), "by_seat": by_seat}
+
 def scorecard(as_of):
-    P = {p["id"]: p for p in _load(PRED)}
+    all_rows = _load(PRED)
+    P = {p["id"]: p for p in all_rows if is_engine_row(p)}
     R = _load(RES)
-    rows = [{**P[r["prediction_id"]], **r} for r in R if r["prediction_id"] in P and r.get("outcome") is not None]
-    void = sum(1 for r in R if r.get("outcome") is None)
-    out = {"as_of": as_of, "total_predictions": len(P), "resolved": len(rows), "void_data_error": void, "procedures": {}}
+    rows = [{**P[r["prediction_id"]], **r} for r in R if r.get("prediction_id") in P and r.get("outcome") is not None]
+    void = sum(1 for r in R if r.get("prediction_id") in P and r.get("outcome") is None)
+    out = {"as_of": as_of, "total_predictions": len(all_rows), "resolved": len(rows), "void_data_error": void,
+           "issue_forecasts": issue_summary(all_rows, R), "procedures": {}}
     if rows:
         df = pd.DataFrame(rows)
         for proc, g in df.groupby("procedure"):
