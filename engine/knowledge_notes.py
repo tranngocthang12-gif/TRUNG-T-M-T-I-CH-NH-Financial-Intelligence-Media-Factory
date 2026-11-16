@@ -25,6 +25,10 @@ import yaml
 
 from .config import REPO
 
+if str(REPO) not in sys.path:
+    sys.path.insert(0, str(REPO))
+from tools.laws_checks import same_provider  # noqa: E402
+
 LIB = "library"
 MAX_NOTE_BYTES = 16_000
 LEGAL_KINDS = {"LAW", "DECREE", "CIRCULAR", "DECISION", "STANDARD", "REGULATION"}
@@ -144,8 +148,9 @@ def _audit_pass(root, note):
     if not p.is_file():
         return False
     a = json.loads(p.read_text(encoding="utf-8"))
-    return (a.get("note_id") == note.get("id") and a.get("verdict") == "PASS"
-            and _norm(a.get("auditor")).lower() not in ("", _norm(note.get("read_by")).lower()))
+    auditor = _norm(a.get("auditor"))
+    return (a.get("note_id") == note.get("id") and a.get("verdict") == "PASS" and bool(auditor)
+            and not same_provider(auditor, _norm(note.get("read_by"))))      # L-09: khác tên VÀ khác nhà cung cấp
 
 
 def check_note(root, path, docs, man, today):
@@ -195,10 +200,21 @@ def check_note(root, path, docs, man, today):
                 segs.append(seg)
         if segs and not any(_norm(p["quote"]) in _norm(s) for s in segs):
             errs.append(f"{nid}/{p['id']}: quote không nằm nguyên văn trong chỗ được trỏ tới (L-01)")
+    def addr_exists(a, where):
+        m = ADDR_RE.match(a)
+        if not m:
+            errs.append(f"{nid}: {where} địa chỉ sai dạng {a}"); return
+        d, kind, x, y = m.group(1), m.group(2), int(m.group(3)), int(m.group(4))
+        if d not in note["doc_ids"]:
+            errs.append(f"{nid}: {where} địa chỉ {a} trỏ tới tài liệu ngoài doc_ids")
+        elif d in docs and _segment(docs[d], kind, x, y) is None:
+            errs.append(f"{nid}: {where} địa chỉ {a} không tồn tại trong library/sources/{d}/text.md")
     for c in note.get("counts") or []:
         for a in c["addresses"]:
-            if not ADDR_RE.match(a):
-                errs.append(f"{nid}: counts địa chỉ sai dạng {a}")
+            addr_exists(a, "counts")
+    for fl in note.get("reading_flags") or []:
+        for a in fl["addresses"]:
+            addr_exists(a, "reading_flags")
     if note["status"] not in FREE_STATUS and not _audit_pass(root, note):
         errs.append(f"{nid}: status {note['status']} cần biên bản library/audits/{nid}.json PASS của người khác read_by (L-09)")
     expired = [d for d in note["doc_ids"] if d in man and _expired(man[d], today)]

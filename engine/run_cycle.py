@@ -43,7 +43,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         mid = research.spec_id(spec)
         prev_sr = (pd.to_numeric(ledger_df["sharpe"], errors="coerce").dropna().tolist()
                    if ledger_df is not None and "sharpe" in ledger_df else [])
-        var_sr = float(np.var(prev_sr + [m["sharpe"]], ddof=1)) if len(prev_sr) >= 1 else None
+        var_sr = research.sharpe_variance(prev_sr, m["sharpe"], m["sr_T"])   # N = mọi lần thử từ đầu (kể cả chưa ghi Sharpe)
         dsr = research.deflated_sharpe(m["sharpe"], m["sr_T"], m["sr_skew"], m["sr_kurt"], n_total, var_sr)
         row = {"trial_id": f"T{n_total:05d}", "cycle_date": as_of, "method": method, "spec_id": mid,
                "features": ";".join(spec["features"]), "model": spec["model"], "ic_mean": m["ic_mean"],

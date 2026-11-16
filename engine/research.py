@@ -136,12 +136,27 @@ def sharpe_stats(net, h):
     return {"sharpe": sr, "sharpe_ann": float(sr * math.sqrt(252 / h)), "sr_T": T,
             "sr_skew": float(np.mean(z ** 3)), "sr_kurt": float(np.mean(z ** 4))}
 
+MIN_SR_SAMPLE = 10     # dưới ngưỡng này, phương sai Sharpe giữa các lần thử chưa ước lượng được → dùng phương sai lý thuyết
+
+def sharpe_variance(prev_sharpes, sr, T):
+    """V[SR] để tính SR0. Đủ ≥ MIN_SR_SAMPLE Sharpe đã ghi → phương sai mẫu (Bailey & López de Prado 2014).
+    Chưa đủ (sổ cũ không ghi Sharpe) → phương sai lý thuyết của ước lượng Sharpe dưới giả thuyết SR thật = 0: 1/(T−1).
+    Không bao giờ trả về None để SR0 không bị đặt = 0 khi đã thử nhiều lần."""
+    xs = [x for x in prev_sharpes if x is not None and math.isfinite(x)] + ([sr] if sr is not None and math.isfinite(sr) else [])
+    theory = 1.0 / max(T - 1, 1)
+    if len(xs) >= MIN_SR_SAMPLE:
+        return max(float(np.var(xs, ddof=1)), 1e-12)
+    return theory
+
 def deflated_sharpe(sr, T, skew, kurt, n_trials, var_sr):
     """Xác suất Sharpe thật > 0 sau khi trừ kỳ vọng Sharpe lớn nhất của n_trials lần thử ngẫu nhiên.
-    SR0 = sqrt(V[SR]) * ((1-γ)·Φ⁻¹(1-1/N) + γ·Φ⁻¹(1-1/(N·e))); DSR = Φ((SR-SR0)·sqrt(T-1) / sqrt(1-γ3·SR+(γ4-1)/4·SR²))."""
+    SR0 = sqrt(V[SR]) * ((1-γ)·Φ⁻¹(1-1/N) + γ·Φ⁻¹(1-1/(N·e))); DSR = Φ((SR-SR0)·sqrt(T-1) / sqrt(1-γ3·SR+(γ4-1)/4·SR²)).
+    var_sr None → dùng sharpe_variance([], sr, T) (phương sai lý thuyết), không đặt SR0 = 0."""
     nd = NormalDist()
     if T is None or T < 3:
         return float("nan")
+    if var_sr is None:
+        var_sr = sharpe_variance([], sr, T)
     sr0 = 0.0
     if n_trials >= 2 and var_sr is not None and var_sr > 0:
         sr0 = math.sqrt(var_sr) * ((1 - EULER_GAMMA) * nd.inv_cdf(1 - 1 / n_trials)
