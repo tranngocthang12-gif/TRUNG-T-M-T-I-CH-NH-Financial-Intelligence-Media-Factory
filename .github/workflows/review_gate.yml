@@ -1,0 +1,33 @@
+name: L-09 nguoi cham
+
+# governance/LAWS.md L-09: PR phai ghi authored_by va reviewed_by khac nha cung cap. Than PR la du lieu nguoi dung:
+# chi doc qua bien moi truong, khong chen vao lenh.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  l09:
+    name: L-09 nguoi cham khac nha cung cap
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Kiem authored_by / reviewed_by
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          python -c "
+          import os, sys
+          sys.path.insert(0, '.')
+          from tools.laws_checks import check_pr_review
+          errs = check_pr_review(os.environ.get('PR_BODY', ''))
+          print('\n'.join(errs) if errs else 'OK: L-09')
+          sys.exit(1 if errs else 0)
+          "

@@ -1,8 +1,10 @@
-name: Vong hoc hang ngay
+name: Vong hoc hang tuan
 
+# ARCHITECTURE v3.0 §4.3 + ADR-0003: engine la doi chung am, chay HANG TUAN (thu Sau 16:30 gio VN) de so lan thu
+# khong phinh nguong Bonferroni; ingest tai bu moi phien tu ngay cuoi trong kho nen khong mat du lieu.
 on:
   schedule:
-    - cron: "30 9 * * 1-5"
+    - cron: "30 9 * * 5"
   workflow_dispatch:
     inputs:
       trials:
@@ -42,7 +44,7 @@ jobs:
         run: |
           git config user.name "ttc-engine"
           git config user.email "ttc-engine@users.noreply.github.com"
-          git add -A data state research knowledge paper reports fact ledger memory
+          git add -A data state research knowledge paper reports fact ledger memory library/notes
           git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F)"
           # Ledger intake co the da day du bao len main trong luc vong hoc chay: rebase roi day, thu lai toi 5 lan
           for i in 1 2 3 4 5; do

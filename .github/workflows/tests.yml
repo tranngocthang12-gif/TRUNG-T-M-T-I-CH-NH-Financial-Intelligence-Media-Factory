@@ -12,7 +12,10 @@ jobs:
   gate:
     name: Test bat buoc (chan merge)
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
+    env:
+      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes"
+      SCRIPTS: "test_no_lookahead test_adjustment test_ingest_errors test_ledger_pipeline test_quality_gate test_llm_review_budget"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -21,27 +24,23 @@ jobs:
           cache: pip
       - name: Cai thu vien
         run: pip install -r requirements.txt pytest
-      - name: Luat van hanh + Ledger (L-02, L-05, L-07, hash chuoi)
-        run: python -m pytest -q tests/test_laws_validate.py
-      - name: Ledger Issue + engine cung doc mot tep (khong vo vong hoc)
-        run: python -m pytest -q tests/test_ledger_compat.py
-      - name: Chong nhin truoc tuong lai
-        run: python -m tests.test_no_lookahead
+      - name: Moi tep tests/test_*.py deu nam trong CI (khong bo sot test moi)
+        run: |
+          for f in tests/test_*.py; do
+            n=$(basename "$f" .py)
+            echo " $UNITTEST $SCRIPTS " | grep -q " $n " || { echo "Tep $f chua duoc dua vao tests.yml"; exit 1; }
+          done
+      - name: Test dang unittest (luat, Ledger, phan dinh, so thu L-06)
+        run: python -m pytest -q $(for n in $UNITTEST; do printf "tests/%s.py " "$n"; done)
+      - name: Test dang script cu cua engine (moi tep mot tien trinh rieng, khong dung chung TTC_HOME)
+        run: |
+          for n in $SCRIPTS; do
+            echo "=== $n"; python -m "tests.$n" || exit 1
+          done
       - name: Kiem cau truc bo nao
         run: python tools/validate.py
-
-  full-suite:
-    name: Du bo test engine (thong tin, chua chan — C5 ban hieu)
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-      - name: Cai thu vien
-        run: pip install -r requirements.txt pytest
-      - name: Chay du bo test
-        run: python -m pytest -q tests
+      - name: Test khong duoc sua tep nao cua kho
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Test da sua/tao tep trong kho:"; git status --porcelain; exit 1
+          fi

@@ -1,0 +1,71 @@
+name: Resolution intake (Resolution issue)
+
+# Phan dinh du bao da toi han (ADR-0003). Cung khuon voi ledger_intake.yml:
+# chi Issue luc MO, do chinh Owner mo, tieu de "[Resolution]" hoac nhan "resolution"; moi run tu thu lai khi bi trung.
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: resolution-intake-${{ github.event.issue.number }}
+  cancel-in-progress: false
+
+jobs:
+  intake:
+    if: >-
+      (contains(github.event.issue.labels.*.name, 'resolution') || startsWith(github.event.issue.title, '[Resolution]')) &&
+      github.event.issue.user.login == github.repository_owner
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Nhan phan dinh va ghi vao Ledger (tu thu lai khi bi trung)
+        id: intake
+        env:
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_CREATED_AT: ${{ github.event.issue.created_at }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+        run: |
+          set +e
+          git config user.name "ttc-ledger"
+          git config user.email "ttc-ledger@users.noreply.github.com"
+          out='{"ok":false,"message":"Khong day duoc len main sau 8 lan thu"}'
+          code=1
+          for i in 1 2 3 4 5 6 7 8; do
+            git fetch -q origin main && git reset -q --hard origin/main
+            out=$(python tools/resolution_intake.py)
+            code=$?
+            if [ "$code" != "0" ]; then break; fi
+            git add ledger/resolutions.jsonl
+            git commit -q -m "ledger: resolution #${ISSUE_NUMBER}"
+            if git push -q origin HEAD:main; then break; fi
+            out='{"ok":false,"message":"Khong day duoc len main sau 8 lan thu"}'
+            code=1
+            sleep $(( (RANDOM % 15) + 5 ))
+          done
+          echo "result=$out" >> "$GITHUB_OUTPUT"
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "$out"
+          exit 0
+      - name: Binh luan ket qua
+        if: steps.intake.outputs.code != '3'
+        uses: actions/github-script@v7
+        env:
+          RESULT: ${{ steps.intake.outputs.result }}
+        with:
+          script: |
+            const r = JSON.parse(process.env.RESULT || '{"ok":false,"message":"khong co ket qua"}');
+            await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, body: (r.ok ? "✅ " : "❌ ") + r.message});
+            await github.rest.issues.addLabels({owner: context.repo.owner, repo: context.repo.repo,
+              issue_number: context.issue.number, labels: [r.ok ? "ledgered" : "rejected"]});
