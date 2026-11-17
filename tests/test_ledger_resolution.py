@@ -1505,8 +1505,41 @@ class TrialRegistryTests(unittest.TestCase):
         run4 = clone("run4"); run5 = clone("run5")
         self.assertEqual(cycle(run4).returncode, 7)
         r = cycle(run5)
-        self.assertEqual(r.returncode, 1, r.stdout); self.assertIn("không phải tiền tố", r.stderr)
+        self.assertEqual(r.returncode, 1, r.stdout + r.stderr)
+        # Khác giây → "không phải tiền tố". Cùng giây → dòng JSON trùng từng byte, phải dừng cùng cách (không chạy backtest).
+        self.assertTrue("không phải tiền tố" in r.stderr or "đã trùng bản đang chạy" in r.stderr, r.stderr)
         self.assertEqual(on_main(), ["T00001", "T00002", "T00003"])
+
+    def test_identical_registry_bytes_do_not_let_a_second_cycle_run(self):
+        """L-06: registered_at chỉ tới giây, nên hai vòng học đăng ký cùng nội dung ra cùng một dòng. push() từng coi
+        'đã có trên main' là thành công — vòng thứ hai vẫn chạy backtest. Phải báo lỗi trước khi có kết quả."""
+        from tools.registry_push import push
+        origin = self.tmp / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True, capture_output=True)
+
+        def git(cwd, *a):
+            r = subprocess.run(["git", "-C", str(cwd), "-c", "user.name=t", "-c", "user.email=t@t", *a],
+                               capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, f"git {a}: {r.stderr}")
+            return r.stdout
+
+        def clone(name):
+            subprocess.run(["git", "clone", "-q", f"file://{origin}", str(self.tmp / name)], check=True, capture_output=True)
+            return self.tmp / name
+
+        seed = clone("seed-dup")
+        _config_without_pin(seed / "config.yaml")
+        (seed / "research").mkdir()
+        (seed / "research" / "trials.csv").write_text(",".join(laws_checks.TRIAL_LEGACY_COLS) + "\n", encoding="utf-8")
+        line = '{"hash":"abc","trial_id":"T00003"}\n'
+        (seed / "research" / "trial_registry.jsonl").write_text(line, encoding="utf-8")
+        git(seed, "add", "-A"); git(seed, "commit", "-qm", "seed"); git(seed, "push", "-q", "origin", "HEAD:main")
+        other = clone("other-dup")
+        self.assertEqual((other / "research" / "trial_registry.jsonl").read_text(encoding="utf-8"), line)
+        with self.assertRaises(RuntimeError) as caught:
+            push(other, "T00003", tries=2, wait=0)
+        self.assertIn("đã trùng bản đang chạy", str(caught.exception))
+        self.assertEqual(git(origin, "show", "main:research/trial_registry.jsonl"), line)
 
     def test_frozen_space_matches_engine_code(self):
         """Danh sách đóng băng trong config phải đúng bằng feature/mô hình engine đang có: thêm feature trong mã mà không sửa
