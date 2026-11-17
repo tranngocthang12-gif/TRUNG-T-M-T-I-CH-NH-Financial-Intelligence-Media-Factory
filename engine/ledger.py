@@ -171,6 +171,7 @@ def issue_summary(all_rows, R):
     Chỉ chấm cặp mà cả A và B đã phân định cùng một sự thật.
     Kiểm định CHỐT MẪU: phán quyết chỉ tính trên đúng 194 bất đồng được phân định ĐẦU TIÊN (theo thứ tự ghi trong sổ),
     kiểm định nhị thức hai phía với p0 = 0,5 — không xem lại mỗi vòng trên mẫu lớn dần (tránh dừng tùy ý)."""
+    R = [r for r in R if r.get("resolution_issue") is not None]   # dự báo Issue chỉ nhận kết quả từ Issue 'Resolution'
     res_order = {r.get("prediction_id"): i for i, r in enumerate(R)}
     done = set(res_order)
     outcome = {r.get("prediction_id"): int(r["outcome"]) for r in R if r.get("outcome") in (0, 1)}

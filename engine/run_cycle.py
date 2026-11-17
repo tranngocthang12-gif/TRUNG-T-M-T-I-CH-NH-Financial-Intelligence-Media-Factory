@@ -59,8 +59,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         if was_new and mid in registry and use_llm:
             llm_review.review(mid, load_json(f"knowledge/candidates/{mid}.json", {}), m, as_of)
         done.append(row)
-    if ledger_df is not None:
-        ledger_df.to_csv(path("research/trials.csv"), index=False)
+    research.append_trial_results(done)                   # chỉ ghi thêm; dòng cũ giữ nguyên từng ký tự (L-06)
     meta.save(bandit)
 
     # LIVE PREDICTION + DECAY
@@ -74,7 +73,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
     # PAPER + ATTRIBUTION
     nav, decision = paper.run(as_of, close, preds_today, registry, udates, events=mk["events"], frozen=skip)
     attr = attribution.run(close, bad)
-    n_total = 0 if ledger_df is None else len(ledger_df)
+    n_total = research.total_trials(ledger_df)            # kể cả lần thử đăng ký rồi bỏ dở (L-06)
 
     # ---- v1.0 GĐ1: PREDICTION LEDGER ----
     resolved = ledger.resolve(close, as_of, bad)

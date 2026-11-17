@@ -2,7 +2,7 @@
 L-06: mọi lần thử được ĐĂNG KÝ vào research/trial_registry.jsonl (hash chuỗi) TRƯỚC khi chạy, và trong vòng học trên
 GitHub dòng đăng ký được đẩy lên main trước khi backtest bắt đầu (persist_registration) — lần thử hỏng giữa chừng vẫn
 được đếm; báo Sharpe kèm Deflated Sharpe (Bailey & López de Prado 2014) tính theo tổng số lần thử."""
-import hashlib, json, math, os, subprocess, sys
+import csv, hashlib, io, json, math, os, subprocess, sys
 from datetime import datetime, timezone
 from statistics import NormalDist
 import numpy as np, pandas as pd
@@ -12,9 +12,11 @@ from .config import CFG, ROOT, REPO, ROUNDTRIP, path
 
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
-from tools.laws_checks import line_hash  # noqa: E402
+from tools.laws_checks import LEGACY_ANCHOR, TRIAL_LEGACY_COLS, line_hash, read_trials, trials_digest  # noqa: E402
 
 REGISTRY = "research/trial_registry.jsonl"
+TRIALS = "research/trials.csv"
+TRIAL_NEW_COLS = ("sharpe", "sharpe_ann", "dsr", "registry_hash")     # thêm từ v3.0.2, đứng sau 13 cột gốc
 EULER_GAMMA = 0.5772156649015329
 
 MODELS = ["ridge", "gbm", "signed_sum"]
@@ -171,18 +173,70 @@ def _registry_rows():
     p = ROOT / REGISTRY
     return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()] if p.exists() else []
 
-def next_trial_number(ledger_df):
-    """Số thứ tự lần thử kế tiếp = số đã có kết quả + số đã đăng ký mà chưa có kết quả (thử bị dừng giữa chừng).
-    Ngưỡng tính theo số này nên mọi lần đã thử đều được đếm (L-06)."""
+def _registry_trials():
+    """Các dòng đăng ký lần thử (bỏ dòng neo lịch sử đứng đầu sổ)."""
+    return [r for r in _registry_rows() if r.get("kind") != "legacy_anchor"]
+
+def total_trials(ledger_df):
+    """Tổng số lần đã thử = số đã có kết quả + số đã đăng ký mà chưa có kết quả (thử bị dừng giữa chừng). Mọi con số
+    phụ thuộc số lần thử — ngưỡng Bonferroni, N của Deflated Sharpe, báo cáo, trạng thái — đều lấy từ đây (L-06)."""
     done = set(ledger_df["trial_id"]) if ledger_df is not None and "trial_id" in ledger_df else set()
-    extra = sum(1 for r in _registry_rows() if r.get("trial_id") not in done)
-    return len(done) + extra + 1
+    return len(done) + sum(1 for r in _registry_trials() if r.get("trial_id") not in done)
+
+def next_trial_number(ledger_df):
+    """Số thứ tự lần thử kế tiếp."""
+    return total_trials(ledger_df) + 1
+
+def _legacy_anchor():
+    """Dòng neo lịch sử: ghi một lần lúc tạo sổ đăng ký. Chốt số kết quả đã có trước khi có sổ và sha256 của chúng, để
+    về sau không ai sửa được kết quả cũ hay chèn kết quả không đăng ký mà kiểm máy không thấy (laws_checks.check_trial_registry)."""
+    p = ROOT / TRIALS
+    _, rows = read_trials(p.read_text(encoding="utf-8")) if p.exists() else ([], [])
+    row = {"trial_id": LEGACY_ANCHOR, "kind": "legacy_anchor", "results": len(rows),
+           "last_trial_id": rows[-1].get("trial_id", "") if rows else "", "legacy_sha256": trials_digest(rows),
+           "registered_at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "prev_hash": "GENESIS"}
+    row["hash"] = line_hash(row)
+    return row
+
+def append_trial_results(new_rows):
+    """GHI THÊM kết quả vào research/trials.csv ở mức văn bản: dòng cũ giữ nguyên từng ký tự (không đọc–ghi lại qua
+    pandas, vì việc đó có thể đổi cách viết số và làm lệch sha256 lịch sử). Lần đầu có cột mới thì nối tên cột vào tiêu
+    đề và thêm ô rỗng vào cuối mỗi dòng cũ; 13 cột gốc không bị đụng."""
+    if not new_rows:
+        return
+    p = ROOT / TRIALS
+    cols = list(TRIAL_LEGACY_COLS) + list(TRIAL_NEW_COLS)
+    lines = p.read_text(encoding="utf-8").split("\n") if p.exists() else []
+    while lines and lines[-1] == "":
+        lines.pop()
+    if lines:
+        head = next(csv.reader([lines[0]]))
+        if head[:len(TRIAL_LEGACY_COLS)] != list(TRIAL_LEGACY_COLS):
+            raise RuntimeError("L-06: tiêu đề research/trials.csv không đúng 13 cột gốc — không ghi thêm")
+        missing = [c for c in cols if c not in head]
+        if missing:
+            if head != cols[:len(head)]:
+                raise RuntimeError("L-06: thứ tự cột research/trials.csv lạ — không ghi thêm")
+            pad = "," * len(missing)
+            lines = [lines[0] + "," + ",".join(missing)] + [ln + pad for ln in lines[1:]]
+    else:
+        lines = [",".join(cols)]
+    buf = io.StringIO()
+    w = csv.writer(buf, lineterminator="\n")
+    for r in new_rows:
+        w.writerow(["" if r.get(c) is None else (repr(float(r[c])) if isinstance(r[c], (float, np.floating)) else r[c]) for c in cols])
+    with open(path(TRIALS), "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(lines) + "\n" + buf.getvalue())
 
 def register_trial(trial_id, cycle_date, method, spec, thr):
     """Đăng ký một lần thử TRƯỚC khi chạy walk-forward (L-06). Trả về hash dòng đăng ký."""
     old = _registry_rows()
     if any(r.get("trial_id") == trial_id for r in old):
         raise RuntimeError(f"L-06: {trial_id} đã có trong sổ đăng ký — không chạy lại cùng mã thử")
+    anchor = None
+    if not old:                                           # tạo sổ: dòng đầu là neo lịch sử, đi cùng lần đẩy đầu tiên lên main
+        anchor = _legacy_anchor()
+        old = [anchor]
     fs = CFG["research"].get("frozen_space")
     if fs:
         extra = [f for f in spec["features"] if f not in fs["features"]]
@@ -197,7 +251,8 @@ def register_trial(trial_id, cycle_date, method, spec, thr):
            "prev_hash": old[-1]["hash"] if old else "GENESIS"}
     row["hash"] = line_hash(row)
     with open(path(REGISTRY), "a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n")
+        for r in ([anchor] if anchor else []) + [row]:
+            f.write(json.dumps(r, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n")
     persist_registration(trial_id)                        # không ghi bền được → báo lỗi, backtest không chạy
     return row["hash"]
 
@@ -221,4 +276,4 @@ def persist_registration(trial_id):
 def abandoned_trials(ledger_df):
     """Mã thử đã đăng ký mà không có kết quả (vòng học dừng giữa chừng). Vẫn tính vào số lần thử."""
     done = set(ledger_df["trial_id"]) if ledger_df is not None and "trial_id" in ledger_df else set()
-    return [r.get("trial_id") for r in _registry_rows() if r.get("trial_id") not in done]
+    return [r.get("trial_id") for r in _registry_trials() if r.get("trial_id") not in done]
