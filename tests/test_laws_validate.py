@@ -9,9 +9,10 @@ from tools import laws_checks  # noqa: E402
 def _tmp_repo():
     tmp = pathlib.Path(tempfile.mkdtemp())
     (tmp / "architecture").mkdir(); (tmp / "reports").mkdir(); (tmp / "ledger").mkdir(); (tmp / "contracts").mkdir(); (tmp / "tools").mkdir()
-    shutil.copy(ROOT / "contracts" / "forecast_issue.schema.json", tmp / "contracts")
-    shutil.copy(ROOT / "tools" / "laws_checks.py", tmp / "tools")
-    shutil.copy(ROOT / "tools" / "ledger_intake.py", tmp / "tools")
+    for c in ("forecast_issue.schema.json", "resolution.schema.json"):
+        shutil.copy(ROOT / "contracts" / c, tmp / "contracts")
+    for t in ("laws_checks.py", "ledger_intake.py", "resolution_intake.py"):   # robot nhận tự chạy lại luật của CẢ hai sổ trước khi ghi
+        shutil.copy(ROOT / "tools" / t, tmp / "tools")
     (tmp / "tools" / "__init__.py").write_text("", encoding="utf-8")
     return tmp
 
@@ -105,7 +106,8 @@ class LawsChecksTests(unittest.TestCase):
         self.assertTrue(laws_checks.check_ledger_chain(self.tmp))
 
     def _run_intake(self, body, created="2026-10-22T10:00:00Z", number=7):
-        env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body}
+        env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
+               "TTC_INTAKE_NOW": created.replace(":00:00Z", ":01:00Z")}        # robot chạy một phút sau khi Issue mở
         p = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=env, cwd=self.tmp,
                            capture_output=True, text=True)
         return p.returncode, (json.loads(p.stdout.strip().splitlines()[-1]) if p.stdout.strip() else {})

@@ -2,7 +2,7 @@
 công tắc an toàn, và soát các workflow. Mọi thứ chạy trong thư mục tạm; không chạm tệp nào của kho.
 """
 import json, os, pathlib, re, shutil, subprocess, sys, tempfile, unittest
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import yaml
 
@@ -13,6 +13,11 @@ from tools.ledger_intake import control_b_hash, dumps, parse_cutoff, parse_issue
 
 B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
 WF = ROOT / ".github" / "workflows"
+
+
+def _just_after(created, seconds=60):
+    """Giờ robot chạy trong test (TTC_INTAKE_NOW): mặc định một phút sau khi Issue mở, như khi workflow chạy thật."""
+    return (datetime.fromisoformat(created.replace("Z", "+00:00")) + timedelta(seconds=seconds)).isoformat()
 
 
 def _forecast(seat="A", question="CPI tháng 11/2026 so với cùng kỳ từ 5,00% trở lên?", **kw):
@@ -30,7 +35,8 @@ class IntakeRuleTests(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
         (self.tmp / "contracts").mkdir(); (self.tmp / "governance").mkdir(); (self.tmp / "ledger").mkdir()
-        shutil.copy(ROOT / "contracts" / "forecast_issue.schema.json", self.tmp / "contracts")
+        for c in ("forecast_issue.schema.json", "resolution.schema.json"):       # robot nhận tự chạy lại luật của CẢ hai sổ trước khi ghi
+            shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
         shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
 
@@ -38,7 +44,8 @@ class IntakeRuleTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _fc(self, number, body, created="2026-11-17T02:00:00Z", **env):
-        e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body, **env}
+        e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
+             "TTC_INTAKE_NOW": _just_after(created), **env}
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=e, capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
@@ -307,6 +314,110 @@ class LedgerAuditTests(unittest.TestCase):
         self.assertTrue(f(pred, [], issues, {}))
         self.assertFalse(hasattr(ledger_audit, "ATTEST_GRACE"))
 
+    def test_recovery_without_rewriting_the_ledger(self):
+        """Vòng 8 điểm 1 (phần "cơ chế phục hồi không phá tính chỉ-ghi-thêm"). Sổ không sửa được, nên một dòng đã ghi mà thiếu
+        bằng chứng phải có đường xử lý bằng cách GHI THÊM:
+        - dòng phân định: dấu nhận không có hạn 6 giờ → chạy lại job phân định lúc nào cũng bổ sung được;
+        - dòng dự báo: quá hạn 6 giờ thì không bổ sung được nữa (đó chính là thứ chặn mượn giờ Issue cũ) → hủy câu hỏi bằng VOID;
+          dự báo đã VOID bằng dòng phân định có dấu nhận thì không bao giờ được chấm, nên không bị đòi dấu nhận nữa."""
+        f = ledger_audit.attestation_errors
+        h1, h2, hv1, hv2 = "a" * 64, "b" * 64, "c" * 64, "d" * 64
+        pred = [{"id": "F-7", "issue_number": 7, "issue_created_at": "2026-11-17T02:00:00Z", "hash": h1, "resolve_at": "2026-12-10"},
+                {"id": "F-8", "issue_number": 8, "issue_created_at": "2026-11-17T02:05:00Z", "hash": h2, "resolve_at": "2026-12-10"}]
+        void = [{"prediction_id": "F-7", "resolution_issue": 9, "resolution_issue_created_at": "2026-11-18T03:00:00Z", "hash": hv1, "outcome": None, "void": "F-8 thiếu dấu nhận"},
+                {"prediction_id": "F-8", "resolution_issue": 9, "resolution_issue_created_at": "2026-11-18T03:00:00Z", "hash": hv2, "outcome": None, "void": "F-8 thiếu dấu nhận"}]
+        issues = {n: {"created_at": at, "user": "chu-kho", "is_pr": False}
+                  for n, at in ((7, "2026-11-17T02:00:00Z"), (8, "2026-11-17T02:05:00Z"), (9, "2026-11-18T03:00:00Z"))}
+        bot = lambda at, body: {"user": "github-actions[bot]", "created_at": at, "updated_at": at, "body": body}
+        c7 = bot("2026-11-17T02:01:00Z", f"✅\n`ledger-attest: predictions F-7 {h1}`")
+        c9 = bot("2026-11-18T03:01:00Z", f"✅ Đã phân định\n`ledger-attest: resolutions F-7 {hv1}`\n`ledger-attest: resolutions F-8 {hv2}`")
+        # F-8 đã nằm trong sổ nhưng bình luận ✅ không đăng được; quá 6 giờ, chạy lại job chỉ cho dấu nhận muộn → vẫn lỗi
+        errs = f(pred, [], issues, {7: [c7]})
+        self.assertEqual(len(errs), 1); self.assertIn("Issue #8", errs[0]); self.assertIn("VOID", errs[0])   # lỗi chỉ đường phục hồi
+        late8 = bot("2026-11-17T09:00:00Z", f"✅ Dự báo #8 đã có trong Ledger\n`ledger-attest: predictions F-8 {h2}`")
+        self.assertIn("quá 6 giờ", f(pred, [], issues, {7: [c7], 8: [late8]})[0])
+        # hủy câu hỏi bằng VOID (ghi thêm, có dấu nhận) + dấu nhận muộn của robot cho F-8 → sổ xanh lại; in ra, không im lặng
+        notes = []
+        self.assertEqual(ledger_audit.attestation_failures(pred, void, issues, {7: [c7], 8: [late8], 9: [c9]}, notes), [])
+        self.assertTrue(len(notes) == 1 and "F-8" in notes[0] and "VOID" in notes[0] and "Issue #9" in notes[0], notes)
+        # VOID không gỡ được cho dòng KHÔNG có dấu nhận nào của robot (dòng ghi tay), hay dấu nhận do người khác đăng, bị sửa,
+        # đăng trước khi Issue mở, hoặc robot đăng hai hash
+        for c8 in ([], [{**late8, "user": "chu-kho"}], [{**late8, "updated_at": "2026-11-18T00:00:00Z"}],
+                   [bot("2026-11-17T02:04:00Z", late8["body"])], [late8, bot("2026-11-17T09:01:00Z", f"✅\n`ledger-attest: predictions F-8 {h1}`")],
+                   [bot("2026-11-17T09:00:00Z", f"❌ Từ chối 'ledger-attest: predictions F-8 {h2}'")]):
+            errs = f(pred, void, issues, {7: [c7], 8: c8, 9: [c9]})
+            self.assertEqual(len(errs), 1, c8); self.assertIn("dự báo F-8", errs[0])
+        # …và chỉ khi chính dòng VOID có dấu nhận hợp lệ, và chỉ VOID: kết quả YES/NO không gỡ được lỗi dấu nhận của dự báo
+        errs = f(pred, void, issues, {7: [c7], 8: [late8]})
+        self.assertEqual(len(errs), 3, errs)                                     # F-8 và hai dòng VOID
+        self.assertEqual(len(f(pred, void, issues, {7: [c7], 8: [late8], 9: [bot("2026-11-18T03:01:00Z", f"✅\n`ledger-attest: resolutions F-7 {hv1}`")]})), 2)
+        yes = [{**r, "outcome": 1} for r in void]
+        errs = f(pred, yes, issues, {7: [c7], 8: [late8], 9: [c9]})
+        self.assertEqual(len(errs), 1); self.assertIn("dự báo F-8", errs[0])
+        self.assertEqual(len(f(pred, [{k: v for k, v in r.items() if k != "outcome"} for r in void], issues, {7: [c7], 8: [late8], 9: [c9]})), 1)
+        # một dự báo có dấu nhận đúng hạn thì VOID không sinh ghi chú nào
+        notes = []
+        c8 = bot("2026-11-17T02:06:00Z", f"✅\n`ledger-attest: predictions F-8 {h2}`")
+        self.assertEqual(ledger_audit.attestation_failures(pred, void, issues, {7: [c7], 8: [c8], 9: [c9]}, notes), []); self.assertEqual(notes, [])
+        # dòng phân định: dấu nhận đăng muộn (job chạy lại sau một tháng) vẫn hợp lệ; đăng TRƯỚC giờ tạo Issue, bị sửa, sai hash thì không
+        month = bot("2026-12-20T00:00:00Z", c9["body"])
+        self.assertEqual(f(pred[:1], void[:1], issues, {7: [c7], 9: [month]}), [])
+        self.assertIn("trước cả giờ tạo Issue", f(pred[:1], void[:1], issues, {7: [c7], 9: [bot("2026-11-18T02:59:00Z", c9["body"])]})[0])
+        self.assertIn("đã bị sửa", f(pred[:1], void[:1], issues, {7: [c7], 9: [{**month, "updated_at": "2026-12-21T00:00:00Z"}]})[0])
+        self.assertIn("hash khác cho cùng mã", f(pred[:1], void[:1], issues, {7: [c7], 9: [month, bot("2026-12-20T00:01:00Z", f"✅\n`ledger-attest: resolutions F-7 {h2}`")]})[0])
+        # đối chiếu Issue thật không được nới: dự báo đã VOID vẫn phải trỏ tới Issue có thật, đúng giờ tạo
+        self.assertTrue(ledger_audit.issue_crosscheck_errors(pred, void, {7: issues[7], 9: issues[9]}, "chu-kho"))
+        # phía ghi: robot phân định ghi VOID trước hạn được, và engine không chấm dự báo VOID (test_ledger_resolution)
+        src = (ROOT / "tools" / "resolution_intake.py").read_text(encoding="utf-8")
+        self.assertIn('early_ok = outcome_key == "VOID" or', src)
+
+    def test_audit_rereads_attestations_while_another_robot_is_between_push_and_comment(self):
+        """Vòng 8 điểm 4: robot nhận đẩy commit TRƯỚC rồi mới đăng bình luận ✅. Kiểm toán chạy sau khi robot A xong nhưng đọc
+        cả main, nên thấy dòng của robot B vừa đẩy mà chưa có dấu nhận → báo đỏ giả. Nay: đọc lại bình luận trong khoảng chờ
+        hữu hạn; hết lượt vẫn thiếu thì vẫn là lỗi (không phải khoảng miễn kiểm)."""
+        f = ledger_audit.attestation_errors_with_retry
+        h1, h2 = "a" * 64, "b" * 64
+        pred = [{"id": "F-7", "issue_number": 7, "issue_created_at": "2026-11-17T02:00:00Z", "hash": h1, "resolve_at": "2026-12-10"},
+                {"id": "F-8", "issue_number": 8, "issue_created_at": "2026-11-17T02:00:20Z", "hash": h2, "resolve_at": "2026-12-10"}]
+        issues = {7: {"created_at": "2026-11-17T02:00:00Z", "user": "chu-kho", "is_pr": False},
+                  8: {"created_at": "2026-11-17T02:00:20Z", "user": "chu-kho", "is_pr": False}}
+        bot = lambda at, body: {"user": "github-actions[bot]", "created_at": at, "updated_at": at, "body": body}
+        c7 = bot("2026-11-17T02:01:10Z", f"✅ Đã ghi dự báo #7\n\n`ledger-attest: predictions F-7 {h1}`")
+        c8 = bot("2026-11-17T02:01:40Z", f"✅ Đã ghi dự báo #8\n\n`ledger-attest: predictions F-8 {h2}`")
+        now = datetime(2026, 11, 17, 2, 1, 30, tzinfo=timezone.utc)
+        seq, calls, slept = [{7: [c7]}, {7: [c7], 8: [c8]}], [], []
+        def fetch():
+            calls.append(1); return seq[min(len(calls), len(seq)) - 1]
+        run = lambda **kw: f(pred, [], issues, fetch, **{"tries": 6, "wait": 30, "sleep": slept.append, "now": now, **kw})
+        # robot A (#7) đã xong; robot B (#8) đã đẩy commit, chưa đăng bình luận: lượt đọc 1 thiếu, lượt 2 đã có → không báo đỏ
+        self.assertEqual(run(), [])
+        self.assertEqual((len(calls), slept), (2, [30]))
+        self.assertEqual(len(ledger_audit.attestation_errors(pred, [], issues, seq[0])), 1)        # một lượt đọc: lỗi
+        # dấu nhận không bao giờ tới: chờ có giới hạn, hết lượt vẫn là LỖI
+        calls.clear(); slept.clear(); seq[:] = [{7: [c7]}]
+        errs = run()
+        self.assertEqual(len(errs), 1); self.assertIn("Issue #8", errs[0])
+        self.assertEqual((len(calls), slept), (6, [30] * 5))
+        # Issue đã quá hạn 6 giờ: dấu nhận có tới cũng không hợp lệ → không chờ, báo lỗi ngay
+        calls.clear(); slept.clear()
+        self.assertEqual(len(run(now=datetime(2026, 11, 17, 9, 0, 0, tzinfo=timezone.utc))), 1)
+        self.assertEqual((len(calls), slept), (1, []))
+        # tries=1 là một lượt đọc; sổ đủ dấu nhận cũng chỉ đọc một lượt
+        calls.clear(); self.assertEqual(len(run(tries=1)), 1); self.assertEqual((len(calls), slept), (1, []))
+        calls.clear(); seq[:] = [{7: [c7], 8: [c8]}]
+        self.assertEqual(run(), []); self.assertEqual((len(calls), slept), (1, []))
+        # lỗi không do chờ (robot đăng hash khác cho cùng mã) vẫn là lỗi sau khi đọc lại đủ lượt
+        calls.clear(); seq[:] = [{7: [c7], 8: [c8, bot("2026-11-17T02:01:50Z", f"✅\n`ledger-attest: predictions F-8 {h1}`")]}]
+        self.assertIn("hash khác cho cùng mã", run()[0]); self.assertEqual(len(calls), 6)
+        # main() dùng bản có đọc lại; tổng thời gian chờ mặc định hữu hạn và ngắn hơn hạn chạy của job kiểm toán
+        src = (ROOT / "tools" / "ledger_audit.py").read_text(encoding="utf-8")
+        self.assertIn("errs += attestation_errors_with_retry(pred, res, issues, lambda: fetch_comments(repo, token)", src.split("def main")[1])
+        self.assertGreaterEqual(ledger_audit.ATTEST_TRIES, 2)
+        wait = (ledger_audit.ATTEST_TRIES - 1) * ledger_audit.ATTEST_WAIT
+        for wf, job in (("ledger_audit.yml", "audit"), ("tests.yml", "gate")):
+            self.assertLess(wait, yaml.safe_load((WF / wf).read_text(encoding="utf-8"))["jobs"][job]["timeout-minutes"] * 60 / 2, wf)
+        self.assertFalse(hasattr(ledger_audit, "ATTEST_GRACE"))
+
     def test_audit_runs_after_every_bot_write(self):
         """Vòng 7 điểm 4: commit do GITHUB_TOKEN đẩy không kích hoạt 'push', nên phải có workflow riêng chạy kiểm toán sau khi
         robot ghi sổ và sau vòng học."""
@@ -335,6 +446,10 @@ class LedgerAuditTests(unittest.TestCase):
             text = (WF / name).read_text(encoding="utf-8")
             self.assertIn('"ledger-attest: " + a', text, name)
             self.assertIn("retries: 3", text, name)
+            self.assertIn("for (let i = 1; ; i++)", text, name)                  # vòng 8: dòng đã lên main thì dấu nhận phải được đăng —
+            self.assertIn("if (i >= 5) throw e;", text, name)                    # thử lại có giới hạn, vẫn hỏng thì job đỏ
+            push, comment = text.index("git push -q origin HEAD:main"), text.index("issues.createComment")
+            self.assertLess(push, comment, name)                                 # ghi trước, dấu nhận sau (hash phủ cả chuỗi đã ghi)
             self.assertIn('process.env.CODE === "3"', text, name)                # chạy lại job vẫn bổ sung được dấu nhận
             self.assertIn('.replace(/ledger-attest/gi, "ledger_attest")', text, name)   # thông báo không mang được dấu nhận giả
             self.assertIn("r.ok && Array.isArray(r.attest)", text, name)         # bình luận ❌ không bao giờ có dấu nhận
@@ -351,7 +466,8 @@ class LedgerReplayTests(unittest.TestCase):
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         self.led = self.tmp / "ledger" / "predictions.jsonl"
         for n, seat in ((1, "A"), (2, "B")):
-            e = {**os.environ, "ISSUE_NUMBER": str(n), "ISSUE_CREATED_AT": "2026-11-17T02:00:00Z", "ISSUE_BODY": _forecast(seat)}
+            e = {**os.environ, "ISSUE_NUMBER": str(n), "ISSUE_CREATED_AT": "2026-11-17T02:00:00Z", "ISSUE_BODY": _forecast(seat),
+                 "TTC_INTAKE_NOW": _just_after("2026-11-17T02:00:00Z")}
             r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=e, capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout)
         self.good = self.led.read_text(encoding="utf-8")

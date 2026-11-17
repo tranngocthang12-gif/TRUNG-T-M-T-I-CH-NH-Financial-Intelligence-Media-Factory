@@ -95,8 +95,10 @@ print("OK 5: feature/nhãn chạm ô lỗi bị loại; phần sạch giữ nguy
 
 # Ledger: dự báo có ô lỗi trong cửa sổ chấm → VOID, không chấm điểm
 import engine.ledger as LG
-LG._load = lambda rel: [{"id": "P-x", "created_at": str(idx[140].date()), "procedure": "t",
-                         "resolution_rule": {"ticker": "B", "horizon": 20}}] if rel == LG.PRED else []
+LG.CFG["ledger"]["engine_forecasts"] = "open"                 # chỉ trong tiến trình test: kho thật đóng đường ghi của engine
+_row = LG._engine_row({"procedure": "t", "claim": "x", "ticker": "B", "horizon": 20, "probability": 0.5}, str(idx[140].date()), 0.5)
+assert LG.engine_row_error(_row) is None
+LG._load = lambda rel: [_row] if rel == LG.PRED else []
 LG._append = LG._append_chained = lambda rel, rows: None      # không ghi gì vào kho (resolve ghi theo chuỗi hash)
 r = ledger.resolve(a.ffill(), str(idx[-1].date()), bad2)
 assert r[0]["outcome"] is None and "lỗi dữ liệu" in r[0]["void"], r

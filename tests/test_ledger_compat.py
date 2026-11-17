@@ -1,7 +1,9 @@
-"""Dự báo từ Issue 'Forecast' (tools/ledger_intake.py) và engine (engine/ledger.py) cùng ghi/đọc ledger/predictions.jsonl.
+"""Dự báo từ Issue 'Forecast' (tools/ledger_intake.py) và engine (engine/ledger.py) cùng đọc ledger/predictions.jsonl.
 
 Lỗi được chặn ở đây: dòng từ Issue không có khóa 'id' và resolution_rule là chuỗi, nên engine.ledger.resolve()
 và scorecard() ném KeyError → vòng học hằng ngày dừng ngay sau dự báo Issue đầu tiên.
+Từ vòng chấm 8, đường GHI dự báo của engine đóng trong kho thật (config.yaml ledger.engine_forecasts: closed; validate không
+nhận dòng P-…). Test này mở cổng trong thư mục tạm để mã của đường đó vẫn được chạy thử, và kiểm cả trạng thái đóng.
 Mọi thứ chạy trong thư mục tạm (TTC_HOME, bản sao tools/) và tiến trình con: không chạm tệp nào của kho.
 """
 import json, os, pathlib, shutil, subprocess, sys, tempfile, textwrap, unittest
@@ -27,7 +29,8 @@ class LedgerCompatTests(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
         (self.tmp / "contracts").mkdir()
-        shutil.copy(ROOT / "contracts" / "forecast_issue.schema.json", self.tmp / "contracts")
+        for c in ("forecast_issue.schema.json", "resolution.schema.json"):
+            shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         (self.tmp / "governance").mkdir()
         shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
@@ -37,7 +40,8 @@ class LedgerCompatTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _intake(self, number, body, created="2026-11-17T02:00:00Z"):
-        env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body}
+        env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
+               "TTC_INTAKE_NOW": created.replace(":00:00Z", ":01:00Z")}        # robot chạy một phút sau khi Issue mở
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")],
                            env=env, capture_output=True, text=True)
         return r.returncode, r.stdout
@@ -61,6 +65,25 @@ class LedgerCompatTests(unittest.TestCase):
         rows = [json.loads(l) for l in (self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()]
         self.assertEqual([r["id"] for r in rows], ["F-101", "F-102"])
 
+        # Cổng đóng (config của kho): engine đọc sổ có dòng Issue mà không vỡ, không ghi và không chấm gì bằng giá
+        closed = self._engine("""
+            import json
+            import numpy as np, pandas as pd
+            from engine import ledger
+            idx = pd.bdate_range("2026-01-02", periods=60)
+            close = pd.DataFrame({"AAA": np.linspace(10, 13, 60), "BBB": np.linspace(10, 9, 60)}, index=idx)
+            pred = {"procedure": "test", "claim": "x", "ticker": "AAA", "horizon": 5, "probability": 0.6, "requires_evidence": False}
+            ok, rej = ledger.record([pred], "2026-01-05", ["AAA", "BBB"], set(), close)
+            sc = ledger.scorecard("2026-03-20")
+            print(json.dumps({"ok": len(ok), "rej": len(rej), "res": len(ledger.resolve(close, "2026-03-20")),
+                              "total": sc["total_predictions"], "issue": sc["issue_forecasts"]["total"], "proc": sc["procedures"]}))
+        """)
+        self.assertEqual(closed, {"ok": 0, "rej": 1, "res": 0, "total": 2, "issue": 2, "proc": {}})
+
+        import yaml                                                       # mở cổng CHỈ trong thư mục tạm của test
+        cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+        cfg["ledger"]["engine_forecasts"] = "open"
+        (self.tmp / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
         out = self._engine("""
             import json
             import numpy as np, pandas as pd

@@ -1,16 +1,24 @@
 """Phân định dự báo Issue (tools/resolution_intake.py), chấm A–B (engine/ledger.issue_summary), sổ thử L-06 và Deflated Sharpe.
 Mọi thứ chạy trong thư mục tạm và tiến trình con: không chạm tệp nào của kho.
 """
-import csv, json, math, os, pathlib, shutil, subprocess, sys, tempfile, textwrap, unittest
+import contextlib, csv, io, json, math, os, pathlib, shutil, subprocess, sys, tempfile, textwrap, unittest
+from datetime import datetime, timedelta
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
-from tools import laws_checks  # noqa: E402
+from tools import laws_checks, ledger_intake, resolution_intake  # noqa: E402
 from tools.ledger_intake import control_b_hash  # noqa: E402
 
 B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
 Q1 = "Nợ nhóm 3-5 của VCB tại 31/12/2026 cao hơn tại 30/9/2026?"
 Q2 = "NHNN đổi lãi suất tái cấp vốn trước 31/01/2027?"
+Q3 = "NHNN công bố giảm trần lãi suất huy động trước 28/02/2027?"
+
+
+def _just_after(created, seconds=60):
+    """Giờ robot chạy trong test (TTC_INTAKE_NOW): mặc định một phút sau khi Issue mở, như khi workflow chạy thật."""
+    return (datetime.fromisoformat(created.replace("Z", "+00:00")) + timedelta(seconds=seconds)).isoformat()
 
 
 def _forecast(seat, question, p, resolve_at="2026-12-31", rule="comparison", author=None, source="https://www.nso.gov.vn — thông cáo"):
@@ -48,17 +56,18 @@ class _Base(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _run(self, script, number, body, created, **env):
-        e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body, **env}
+        e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
+             "TTC_INTAKE_NOW": _just_after(created), **env}
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / script)], env=e, capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
 
-    def _fc(self, number, body, created="2026-11-17T02:00:00Z", expect=0):
-        c, o = self._run("ledger_intake.py", number, body, created)
+    def _fc(self, number, body, created="2026-11-17T02:00:00Z", expect=0, **env):
+        c, o = self._run("ledger_intake.py", number, body, created, **env)
         self.assertEqual(c, expect, o)
         return o
 
-    def _res(self, number, body, created):
-        return self._run("resolution_intake.py", number, body, created)
+    def _res(self, number, body, created, **env):
+        return self._run("resolution_intake.py", number, body, created, **env)
 
     def _rows(self, name="resolutions.jsonl"):
         p = self.tmp / "ledger" / name
@@ -151,9 +160,17 @@ class ResolutionRuleTests(_Base):
         self.assertEqual(c, 0, o)                                                # tên miền con, chữ hoa, cổng, hai đường dẫn cùng nguồn
         out = json.loads(o.strip().splitlines()[-1])
         self.assertEqual(out["attest"], [f"resolutions {r['prediction_id']} {r['hash']}" for r in self._rows()])
-        c, o = self._res(350, _resolution("F-101", "NO"), when)
+        same = _resolution("F-101", "NO", source="Thông cáo: https://data.NSO.gov.vn:443/cpi?thang=12 và https://www.nso.gov.vn/b")
+        c, o = self._res(350, same, when)
         self.assertEqual(c, 3, o)                                                # chạy lại job: trả lại dấu nhận, không ghi trùng
         self.assertEqual(json.loads(o.strip().splitlines()[-1])["attest"], out["attest"])
+        c, o = self._res(350, same, when, TTC_INTAKE_NOW="2027-02-01T00:00:00Z")
+        self.assertEqual(c, 3, o)                                                # …kể cả một tháng sau: dấu nhận phân định không có hạn 6 giờ
+        # chạy lại job chỉ trả dấu nhận khi dòng trong sổ đúng là kết quả của luật trên thân Issue lúc mở
+        for other in (_resolution("F-101", "NO"), _resolution("F-101", "YES", source=same.split("### resolution_source\n\n")[1].split("\n\n")[0]),
+                      _resolution("F-101", "NO", resolver="ChatGPT (OpenAI)", source="https://www.nso.gov.vn/b")):
+            c, o = self._res(350, other, when)
+            self.assertEqual(c, 2, o); self.assertIn("KHÔNG khớp", o); self.assertNotIn("attest", json.loads(o.strip().splitlines()[-1]))
         from tools.resolution_intake import source_allowed, url_hosts
         self.assertEqual(url_hosts("https://www.nso.gov.vn/x"), {"nso.gov.vn"})
         self.assertFalse(source_allowed({"nso.gov.vn"}, set())); self.assertFalse(source_allowed(set(), {"nso.gov.vn"}))
@@ -227,25 +244,15 @@ class ResolutionRuleTests(_Base):
         self.assertEqual(r.returncode, 0, r.stderr[-1500:])
         seats = json.loads(r.stdout.strip().splitlines()[-1])
         self.assertEqual((seats["A"]["resolved"], seats["B"]["resolved"]), (0, 0))   # điểm A–B không đổi vì dòng giả
-        # dòng thiếu resolution_issue trỏ tới dự báo không tồn tại, hay tới dự báo engine hợp lệ
-        self.assertTrue(write([{"prediction_id": "P-khong-co", "resolved_at": "2026-12-11", "outcome": 1}]))
-        pp = self.tmp / "ledger" / "predictions.jsonl"
-        rows = [json.loads(l) for l in pp.read_text(encoding="utf-8").splitlines()]
-        eng = {"id": "P-abc123", "created_at": "2026-11-18", "question": "VCB vượt bình quân universe trong 20 phiên",
-               "resolution_rule": {"type": "excess_return_positive", "ticker": "VCB", "horizon": 20}, "probability": 0.55,
-               "base_rate": 0.5, "prev_hash": rows[-1]["hash"]}
-        eng["hash"] = laws_checks.line_hash(eng)
-        good_pred = pp.read_text(encoding="utf-8")
-        pp.write_text(good_pred + json.dumps(eng, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
-        ok_row = {"prediction_id": "P-abc123", "resolved_at": "2026-12-20", "excess_return": 0.01, "outcome": 1}
-        self.assertEqual(write([ok_row]), [])                                    # dòng engine thật: đạt
-        self.assertTrue(any("hai dòng" in e for e in write([ok_row, ok_row])))
-        self.assertTrue(any("trước ngày tạo" in e for e in write([{**ok_row, "resolved_at": "2026-11-01"}])))
-        self.assertTrue(any("outcome" in e for e in write([{**ok_row, "outcome": 2}])))
+        # vòng 8 điểm 2: không còn loại dòng "của engine" nào được miễn — dòng thiếu resolution_issue trỏ tới mã P-… (có hay
+        # không có dự báo P-… tương ứng trong sổ) cũng là lỗi; phía dự báo, dòng thiếu issue_number là lỗi dù mang mã gì
+        self.assertTrue(any("không có resolution_issue" in e for e in write([{"prediction_id": "P-khong-co", "resolved_at": "2026-12-11", "outcome": 1}])))
         rp.unlink()
-        # phía dự báo: dòng mang mã F-… hoặc ghế A/B mà thiếu issue_number cũng là dòng tìm cách né kiểm
+        pp = self.tmp / "ledger" / "predictions.jsonl"
+        good_pred = pp.read_text(encoding="utf-8")
+        rows = [json.loads(l) for l in good_pred.splitlines()]
         for bad in ({"id": "F-999", "seat": "A", "question": "Câu chèn?", "resolve_at": "2026-12-31", "p": 0.9},
-                    {**{k: v for k, v in eng.items() if k not in ("hash", "prev_hash")}, "id": "P-def456", "seat": "A"},
+                    {"id": "P-def456", "seat": "A", "question": "x", "resolution_rule": {"ticker": "VCB", "horizon": 20}},
                     {"id": "P-ghi789", "question": "thiếu luật chấm"}):
             row = {**bad, "prev_hash": rows[-1]["hash"]}; row["hash"] = laws_checks.line_hash(row)
             pp.write_text(good_pred + json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
@@ -274,6 +281,497 @@ class ResolutionRuleTests(_Base):
         self._raw_prediction(id="F-150", issue_number=150, question=Q2, resolve_at="2027-01-31", resolution_rule="comparison")
         c, o = self._res(240, _resolution("F-103", "YES"), "2026-12-20T03:00:00Z")
         self.assertEqual(c, 2, o); self.assertIn("L-05", o)
+
+
+class IntakeOrderTests(_Base):
+    """Vòng 8 điểm 1: robot nhận dự báo và robot phân định chạy độc lập; thứ tự chúng GHI có thể khác thứ tự MỞ Issue.
+    Ở mọi thứ tự, sổ sau khi ghi phải qua kiểm lại (validate) — không có trạng thái hỏng vĩnh viễn — và Issue bị từ chối
+    được làm lại bằng một Issue mới, không sửa sổ."""
+    R_AT = "2026-12-10T03:01:00Z"
+
+    def _a(self):
+        self._fc(301, _forecast("A", Q3, 0.4, "2027-02-28", "event_before_date"), created="2026-12-01T02:00:00Z")
+
+    def _b(self, created, expect=0, **env):
+        return self._fc(302, _forecast("B", Q3, 0.6, "2027-02-28", "event_before_date"), created=created, expect=expect, **env)
+
+    def _clean(self):
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])            # đúng hàm mà tools/validate.py chạy
+        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
+
+    def _resolved(self):
+        return [(r["prediction_id"], r["resolution_issue"]) for r in self._rows()]
+
+    def _ids(self):
+        return [r["id"] for r in self._rows("predictions.jsonl")]
+
+    def test_forecast_opened_first_but_written_after_the_resolution(self):
+        """Kịch bản 1 của bản chấm: B mở 10:00, Issue phân định mở 10:01, robot phân định chạy xong TRƯỚC robot nhận B.
+        Bản trước: B vẫn được ghi → kiểm lại đòi hai dòng phân định mà sổ chỉ có một → đỏ mãi."""
+        self._a()
+        c, o = self._res(401, _resolution("F-301", "YES"), self.R_AT)
+        self.assertEqual(c, 0, o)
+        o = self._b("2026-12-10T03:00:00Z", expect=2)
+        self.assertIn("trước khi robot ghi được dự báo này", o)
+        self.assertEqual(self._ids()[-1], "F-301")                               # B không vào sổ
+        self.assertEqual(self._resolved(), [("F-301", 401)])
+        self._clean()
+        self._b("2026-12-10T03:00:00Z", expect=2)                                # chạy lại job: vẫn từ chối, sổ không đổi
+        self._clean()
+
+    def test_same_issues_written_in_the_order_they_were_opened(self):
+        self._a(); self._b("2026-12-10T03:00:00Z")
+        c, o = self._res(401, _resolution("F-301", "YES"), self.R_AT)
+        self.assertEqual(c, 0, o)
+        self.assertEqual(self._resolved(), [("F-301", 401), ("F-302", 401)])     # phân định phủ cả B
+        self._clean()
+
+    def test_forecast_opened_after_the_resolution_issue_but_written_first(self):
+        """Kịch bản 2 của bản chấm: Issue phân định mở 10:00, B mở 10:01, robot nhận B chạy xong TRƯỚC robot phân định.
+        Bản trước: phân định ghi kết quả cho cả B (dự báo mở sau Issue phân định) → kiểm lại đỏ mãi."""
+        self._a(); self._b(self.R_AT)
+        c, o = self._res(401, _resolution("F-301", "YES"), "2026-12-10T03:00:00Z")
+        self.assertEqual(c, 2, o)
+        self.assertIn("F-302", o); self.assertIn("Mở Issue Resolution mới", o)
+        self.assertEqual(self._rows(), [])                                       # không ghi gì: không cho B kết quả, cũng không bỏ sót B
+        self._clean()
+        self.assertEqual(self._res(401, _resolution("F-301", "YES"), "2026-12-10T03:00:00Z")[0], 2)   # chạy lại job: vẫn vậy
+        # đường phục hồi: Issue Resolution MỚI (mở sau cả hai dự báo) phân định cả câu hỏi; sổ không phải sửa dòng nào
+        c, o = self._res(402, _resolution("F-301", "YES"), "2026-12-10T03:05:00Z")
+        self.assertEqual(c, 0, o)
+        self.assertEqual(self._resolved(), [("F-301", 402), ("F-302", 402)])
+        self._clean()
+
+    def test_resolution_opened_first_and_written_first(self):
+        self._a()
+        c, o = self._res(401, _resolution("F-301", "YES"), "2026-12-10T03:00:00Z")
+        self.assertEqual(c, 0, o)
+        o = self._b(self.R_AT, expect=2)
+        self.assertIn("đã được phân định", o)
+        self.assertEqual(self._resolved(), [("F-301", 401)])
+        self._clean()
+
+    def test_forecast_and_resolution_opened_in_the_same_second(self):
+        self._a(); self._b(self.R_AT)
+        c, o = self._res(401, _resolution("F-301", "YES"), self.R_AT)
+        self.assertEqual(c, 2, o); self.assertIn("cùng lúc hoặc sau", o)
+        self.assertEqual(self._rows(), [])
+        self._clean()
+
+    def _append_pred(self, number, seat, created):
+        """Ghi thẳng một dòng dự báo đúng khuôn, hash chuỗi hợp lệ — như bản trước vòng 8 đã ghi."""
+        rows = self._rows("predictions.jsonl")
+        data = ledger_intake.parse_issue_form(_forecast(seat, Q3, 0.6, "2027-02-28", "event_before_date"))
+        row = ledger_intake.build_row(data, number, created, "", rows[-1]["hash"])
+        with (self.tmp / "ledger" / "predictions.jsonl").open("a", encoding="utf-8") as f:
+            f.write(ledger_intake.dumps(row) + "\n")
+        return row
+
+    def test_the_two_broken_states_fail_the_replay(self):
+        """Hai trạng thái mà bản trước ghi ra được đều bị kiểm lại đánh đỏ. Vì robot nay tự chạy đúng phép kiểm đó trên
+        trạng thái sau khi ghi (post_write_errors), nó không còn ghi ra được chúng."""
+        self._a()
+        self.assertEqual(self._res(401, _resolution("F-301", "YES"), self.R_AT)[0], 0)
+        before = (self._rows("predictions.jsonl"), self._rows())
+        self._append_pred(302, "B", "2026-12-10T03:00:00Z")                      # trạng thái 1: B mở trước, ghi sau phân định
+        errs = laws_checks.check_ledger_rows(self.tmp)
+        self.assertTrue(any("Issue #401" in e and "không khớp kết quả chạy lại" in e for e in errs), errs)
+        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])           # hash chuỗi không thấy gì
+        new = ledger_intake.post_write_errors(before[0], before[1], self._rows("predictions.jsonl"), self._rows())
+        self.assertTrue(new and all("Issue #401" in e for e in new), new)
+        # trạng thái 2: phân định (mở 03:00) ghi kết quả cho cả B (mở 03:01)
+        rp = self.tmp / "ledger" / "resolutions.jsonl"
+        pp = self.tmp / "ledger" / "predictions.jsonl"
+        pp.write_text("".join(ledger_intake.dumps(r) + "\n" for r in before[0]), encoding="utf-8"); rp.unlink()
+        self._append_pred(302, "B", self.R_AT)
+        self.assertEqual(self._res(402, _resolution("F-301", "YES"), "2026-12-10T03:05:00Z")[0], 0)
+        self._clean()
+        out, prev = [], "GENESIS"
+        for r in self._rows():
+            r = {k: v for k, v in r.items() if k not in ("hash", "prev_hash")}
+            r.update(resolution_issue_created_at="2026-12-10T03:00:00Z", prev_hash=prev)
+            r["hash"] = laws_checks.line_hash(r); prev = r["hash"]; out.append(ledger_intake.dumps(r))
+        rp.write_text("\n".join(out) + "\n", encoding="utf-8")
+        errs = laws_checks.check_ledger_rows(self.tmp)
+        self.assertTrue(any("cùng lúc hoặc sau" in e for e in errs), errs)       # luật phân định
+        self.assertTrue(any("F-302" in e and "đã được phân định" in e for e in errs), errs)   # luật nhận dự báo
+
+    def _in_process(self, module, number, body, created):
+        """Chạy main() của robot ngay trong tiến trình test, trỏ vào sổ của thư mục tạm."""
+        env = {"ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body, "TTC_INTAKE_NOW": _just_after(created),
+               "ISSUE_AUTHOR": "", "REPO_OWNER": ""}
+        led = self.tmp / "ledger"
+        buf = io.StringIO()
+        with mock.patch.object(ledger_intake, "LEDGER", led / "predictions.jsonl"), mock.patch.object(ledger_intake, "RES", led / "resolutions.jsonl"), \
+             mock.patch.object(resolution_intake, "PRED", led / "predictions.jsonl"), mock.patch.object(resolution_intake, "RES", led / "resolutions.jsonl"), \
+             mock.patch.dict(os.environ, env), contextlib.redirect_stdout(buf):
+            code = module.main()
+        return code, buf.getvalue()
+
+    def test_robot_refuses_to_write_a_state_the_replay_would_reject(self):
+        """Lưới an toàn (lớp 2): giả sử luật lúc ghi có lỗ (ở đây: bị thay bằng bản luôn cho qua, như bản trước vòng 8).
+        Robot vẫn không ghi, vì trạng thái sau khi ghi không qua kiểm lại. Kết quả là lỗi hệ thống (mã 1), sổ không đổi."""
+        self._a()
+        self.assertEqual(self._res(401, _resolution("F-301", "YES"), self.R_AT)[0], 0)
+        snap = lambda: ((self.tmp / "ledger" / "predictions.jsonl").read_bytes(), (self.tmp / "ledger" / "resolutions.jsonl").read_bytes())
+        before = snap()
+        body = _forecast("B", Q3, 0.6, "2027-02-28", "event_before_date")
+        code, out = self._in_process(ledger_intake, 302, body, "2026-12-10T03:00:00Z")
+        self.assertEqual(code, 2, out)                                           # luật lúc ghi (lớp 1) từ chối
+        with mock.patch.object(ledger_intake, "forecast_error", lambda *a, **k: (None, "")):
+            code, out = self._in_process(ledger_intake, 302, body, "2026-12-10T03:00:00Z")
+        self.assertEqual(code, 1, out)                                           # lớp 1 bị vô hiệu → lớp 2 chặn
+        self.assertIn("KHÔNG ghi", out); self.assertIn("Issue #401", out)
+        self.assertEqual(snap(), before)
+        # phía phân định: luật lúc ghi "quên" kiểm dự báo mở sau Issue phân định
+        pp, rp = self.tmp / "ledger" / "predictions.jsonl", self.tmp / "ledger" / "resolutions.jsonl"
+        rp.unlink(); self._b(self.R_AT)
+        before = pp.read_bytes()
+        real = resolution_intake.decide
+        def lax(data, number, created, author, pred_rows, res_rows, schema=None):
+            msg, rows, note = real(data, number, "2026-12-10T03:05:00Z", author, pred_rows, res_rows, schema)
+            return msg, [{**r, "resolution_issue_created_at": created} for r in rows], note
+        with mock.patch.object(resolution_intake, "decide", lax):
+            code, out = self._in_process(resolution_intake, 401, _resolution("F-301", "YES"), "2026-12-10T03:00:00Z")
+        self.assertEqual(code, 1, out)
+        self.assertIn("KHÔNG ghi", out); self.assertIn("F-302", out)
+        self.assertFalse(rp.exists()); self.assertEqual(pp.read_bytes(), before)
+        code, out = self._in_process(resolution_intake, 401, _resolution("F-301", "YES"), "2026-12-10T03:00:00Z")
+        self.assertEqual(code, 2, out)                                           # luật thật: từ chối có lý do
+
+    def test_rerun_only_attests_rows_the_robot_itself_wrote(self):
+        """Chạy lại job của một Issue ("mã 3") trả lại dấu nhận để workflow đăng bổ sung. Nếu trả cho BẤT KỲ dòng nào mang số
+        Issue đó thì có đường gian lận: mở một Issue bị từ chối, ghi tay một dòng mang số Issue ấy, rồi chạy lại job để robot
+        đăng dấu nhận cho dòng ghi tay. Nay robot so dòng trong sổ với dòng nó dựng từ thân Issue lúc mở."""
+        bad = _forecast("A", "Câu hỏi bị từ chối lúc mở vì resolve_at đã qua?", 0.5, resolve_at="2026-11-01")
+        at = "2026-11-18T02:00:00Z"
+        self._fc(320, bad, created=at, expect=2)
+        rows = self._rows("predictions.jsonl")
+        forged = ledger_intake.build_row(ledger_intake.parse_issue_form(_forecast("A", "Câu hỏi ghi tay sau khi biết thêm tin?", 0.9)),
+                                         320, at, "", rows[-1]["hash"])
+        with (self.tmp / "ledger" / "predictions.jsonl").open("a", encoding="utf-8") as f:
+            f.write(ledger_intake.dumps(forged) + "\n")
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])            # dòng ghi tay đúng mọi luật nhận: kiểm lại không thấy
+        o = self._fc(320, bad, created=at, expect=2)                             # chạy lại job với thân Issue gốc
+        self.assertIn("KHÔNG khớp thân Issue", o)
+        self.assertNotIn("attest", json.loads(o.strip().splitlines()[-1]))       # không có dấu nhận nào được trả ra để đăng
+        ok = _forecast("A", "Câu hỏi ghi đúng đường về lãi suất điều hành?", 0.5)
+        o1 = self._fc(321, ok, created=at)
+        o3 = self._fc(321, ok, created=at, expect=3)                             # dòng do robot ghi: chạy lại thì trả đúng dấu nhận cũ
+        self.assertEqual(json.loads(o3.strip().splitlines()[-1])["attest"], json.loads(o1.strip().splitlines()[-1])["attest"])
+        self._fc(321, ok.replace("0.5", "0.6", 1), created=at, expect=2)         # thân khác (không thể xảy ra khi chạy lại thật) → không cấp
+
+    def test_void_cancels_a_question_at_any_time(self):
+        """VOID không phải kết quả mà là hủy câu hỏi: ghi được trước resolve_at. Đây là đường phục hồi không sửa sổ cho một dự
+        báo vĩnh viễn thiếu dấu nhận (xem test kiểm toán). YES/NO trước hạn vẫn bị chặn như cũ."""
+        when = "2026-12-01T03:00:00Z"                                            # trước resolve_at 31/12/2026 của câu hỏi 1
+        c, o = self._res(420, _resolution("F-101", "NO"), when)
+        self.assertEqual(c, 2, o); self.assertIn("L-05", o)
+        c, o = self._res(421, _resolution("F-101", "VOID"), when)
+        self.assertEqual(c, 2, o); self.assertIn("void_reason", o)               # hủy phải có lý do
+        c, o = self._res(422, _resolution("F-101", "VOID", void_reason="Dòng F-102 không có dấu nhận hợp lệ (sự cố GitHub 01/12)"), when)
+        self.assertEqual(c, 0, o)
+        self.assertEqual([(r["prediction_id"], r["outcome"]) for r in self._rows()], [("F-101", None), ("F-102", None)])
+        self._clean()
+        self._fc(330, _forecast("A", Q1, 0.4, author="ChatGPT trần"), created="2026-12-02T02:00:00Z", expect=2)   # câu hỏi đã hủy: khóa
+        self.assertEqual(self._res(423, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z")[0], 2)               # và không phân định lại
+        sc = self._summary()
+        self.assertEqual(sc["by_seat"]["A"]["void"], 1); self.assertEqual(sc["ab"]["disagreements_resolved"], 0)  # không được chấm
+        ab = sc["ab"]                                                            # câu hỏi đã hủy không vào cặp, không vào tỷ lệ bất đồng
+        self.assertEqual((ab["pairs"], ab["disagreements"], ab["void_forecasts"]), (1, 0, 2))
+        # tiến độ (tools/validate.py) cũng không đếm dự báo đã VOID: chạy validate trên một bản sao kho mang sổ này
+        repo = self.tmp / "repo"
+        shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "*.gz", "reports", "paper"))
+        for n in ("predictions.jsonl", "resolutions.jsonl"):
+            shutil.copy(self.tmp / "ledger" / n, repo / "ledger" / n)
+        r = subprocess.run([sys.executable, str(repo / "tools" / "validate.py")], capture_output=True, text=True, cwd=str(repo))
+        self.assertIn("dự báo A+B trong Ledger 2/60 (không tính 2 dự báo đã VOID)", r.stdout, r.stdout[-1500:] + r.stderr[-500:])
+        self.assertNotIn("L-05", r.stdout, r.stdout[-1500:])                    # và sổ này qua toàn bộ kiểm lại của validate
+
+    def test_an_old_error_does_not_lock_new_issues(self):
+        """Tự kiểm so với trạng thái trước khi ghi: lỗi cũ đang chờ xử lý không khóa Issue mới; lỗi MỚI thì chặn."""
+        self._raw_prediction(id="F-150", issue_number=150, question="Câu hỏi cũ sai luật?", resolve_at="2026-11-17")
+        self.assertTrue(laws_checks.check_ledger_rows(self.tmp))                 # sổ đang có một lỗi cũ
+        self._fc(303, _forecast("A", "Câu hỏi mới hoàn toàn về tỷ giá trung tâm cuối năm 2026?", 0.5))
+        self.assertEqual(self._ids()[-1], "F-303")
+
+    def test_robot_does_not_write_when_the_attestation_could_not_be_in_time(self):
+        """Lớp 3: dấu nhận phải đăng trong 6 giờ sau khi Issue mở và trước ngày resolve_at. Job chạy lại muộn, hay Issue mở
+        sát nửa đêm, nếu vẫn ghi sẽ để lại một dòng không bao giờ có dấu nhận hợp lệ (kiểm toán đỏ mãi)."""
+        body = _forecast("A", "Câu hỏi mới về CPI tháng 12/2026 từ 4,00% trở lên?", 0.5)
+        at = "2026-11-18T02:00:00Z"
+        o = self._fc(310, body, created=at, expect=2, TTC_INTAKE_NOW="2026-11-18T07:31:00Z")
+        self.assertIn("quá 5 giờ 30 phút", o); self.assertIn("Mở Issue mới", o)
+        self.assertNotIn("F-310", self._ids())
+        self._fc(310, body, created=at, TTC_INTAKE_NOW="2026-11-18T07:29:00Z")    # còn trong hạn: ghi
+        # mở 23:35 ngày 30/12 (giờ VN), resolve_at 31/12: dấu nhận có thể rơi sang ngày 31 → không ghi; mở 23:20 thì kịp
+        eve = _forecast("B", "Câu hỏi sát ngày về tỷ giá cuối năm 2026?", 0.5)
+        o = self._fc(311, eve, created="2026-12-30T16:35:00Z", expect=2)
+        self.assertIn("quá sát ngày resolve_at", o)
+        self._fc(312, eve, created="2026-12-30T16:20:00Z")
+        # phân định không có hạn đó (dấu nhận của dòng phân định không bị đòi trong 6 giờ): job chạy lại muộn vẫn ghi được
+        c, o = self._res(410, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z", TTC_INTAKE_NOW="2027-01-09T09:00:00Z")
+        self.assertEqual(c, 0, o)
+        f = ledger_intake.write_deadline_error
+        t = lambda x: ledger_intake.ts(x)
+        self.assertIsNone(f("2026-11-18T02:00:00Z", t("2026-11-18T02:01:00Z"), "2026-12-31"))
+        self.assertIsNone(f("2026-11-18T02:00:00Z", t("2026-11-18T07:30:00Z")))
+        self.assertTrue(f("2026-11-18T02:00:00Z", t("2026-11-18T07:30:01Z")))
+        self.assertTrue(f("2026-12-30T16:00:00Z", t("2026-12-30T16:30:00Z"), "2026-12-31"))    # 23:30 + 30 phút = 00:00 ngày 31
+        self.assertIsNone(f("2026-12-30T16:00:00Z", t("2026-12-30T16:29:00Z"), "2026-12-31"))
+        self.assertEqual(ledger_intake.ATTEST_WINDOW, laws_checks.ATTEST_WINDOW)
+        from tools import ledger_audit
+        self.assertIs(ledger_audit.ATTEST_WINDOW, laws_checks.ATTEST_WINDOW)     # bên ghi và bên kiểm dùng chung một hạn
+        self.assertLess(ledger_intake.WRITE_MARGIN, ledger_intake.ATTEST_WINDOW)
+        with mock.patch.dict(os.environ, {"TTC_INTAKE_NOW": ""}):
+            self.assertLess(abs((ledger_intake.now_utc() - datetime.now(ledger_intake.timezone.utc)).total_seconds()), 5)   # mặc định: đồng hồ thật
+
+
+class IntakeWorkflowRaceTests(unittest.TestCase):
+    """Vòng 8 điểm 1, ở mức workflow: chạy ĐÚNG đoạn lệnh của bước "intake" trong hai tệp workflow trên một kho git thật, và
+    cho hai robot xen kẽ ở đúng chỗ hiểm — robot 1 đã quyết định và commit, robot 2 đẩy lên main trước, rồi robot 1 mới đẩy.
+    Vì vòng lặp của workflow là "lấy main mới nhất → quyết định → đẩy; đẩy không được thì làm lại TỪ ĐẦU", quyết định của
+    robot 1 được tính lại trên trạng thái có dòng của robot 2."""
+    def setUp(self):
+        import yaml
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+        self.origin = self.tmp / "origin.git"
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(self.origin)], check=True, capture_output=True)
+        seed = self._clone("seed")
+        (seed / "contracts").mkdir(); (seed / "governance").mkdir(); (seed / "ledger").mkdir()
+        for c in ("forecast_issue.schema.json", "resolution.schema.json"):
+            shutil.copy(ROOT / "contracts" / c, seed / "contracts")
+        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", seed / "governance")
+        shutil.copytree(ROOT / "tools", seed / "tools", ignore=shutil.ignore_patterns("__pycache__"))
+        (seed / "ledger" / ".gitkeep").write_text("")
+        self._git(seed, "add", "-A"); self._git(seed, "commit", "-qm", "seed"); self._git(seed, "push", "-q", "origin", "HEAD:main")
+        self.bin = self.tmp / "bin"; self.bin.mkdir()
+        (self.bin / "python").write_text(f'#!/bin/sh\nexec "{sys.executable}" "$@"\n'); (self.bin / "sleep").write_text("#!/bin/sh\nexit 0\n")
+        for f in self.bin.iterdir():
+            f.chmod(0o755)
+        self.run_script = {}
+        for name in ("ledger_intake.yml", "resolution_intake.yml"):
+            d = yaml.safe_load((ROOT / ".github" / "workflows" / name).read_text(encoding="utf-8"))
+            self.run_script[name] = next(s for s in d["jobs"]["intake"]["steps"] if s.get("id") == "intake")["run"]
+        self.n = 0
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _git(self, cwd, *a):
+        r = subprocess.run(["git", "-C", str(cwd), "-c", "user.name=t", "-c", "user.email=t@t", *a], capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, f"git {a}: {r.stderr}")
+        return r.stdout.strip()
+
+    def _clone(self, name):
+        subprocess.run(["git", "clone", "-q", f"file://{self.origin}", str(self.tmp / name)], check=True, capture_output=True)
+        return self.tmp / name
+
+    def _env(self, number, body, created, out):
+        return {**os.environ, "PATH": f"{self.bin}{os.pathsep}{os.environ['PATH']}", "GITHUB_OUTPUT": str(out), "ISSUE_NUMBER": str(number),
+                "ISSUE_CREATED_AT": created, "ISSUE_BODY": body, "ISSUE_AUTHOR": "chu-kho", "REPO_OWNER": "chu-kho",
+                "TTC_INTAKE_NOW": _just_after(created)}
+
+    def _robot(self, wf, number, body, created, between_commit_and_push=None):
+        """Một lần chạy của workflow `wf` cho một Issue, trong bản sao kho riêng (như một máy chạy riêng). Nếu có
+        between_commit_and_push = (wf2, number2, body2, created2): robot thứ hai chạy trọn vẹn và đẩy lên main đúng lúc robot
+        này đã commit mà chưa đẩy (qua hook pre-push, một lần). Trả về (mã, thông báo) của robot này [và của robot thứ hai]."""
+        self.n += 1
+        clone, out = self._clone(f"run{self.n}"), self.tmp / f"out{self.n}.txt"
+        other_out = None
+        if between_commit_and_push:
+            wf2, n2, body2, created2 = between_commit_and_push
+            self.n += 1
+            clone2, other_out, flag = self._clone(f"run{self.n}"), self.tmp / f"out{self.n}.txt", self.tmp / f"flag{self.n}"
+            env2 = self._env(n2, body2, created2, other_out)
+            driver = self.tmp / f"other{self.n}.py"
+            driver.write_text("import json, subprocess, sys\n"
+                              f"e = json.load(open({str(self.tmp / f'env{self.n}.json')!r}, encoding='utf-8'))\n"
+                              f"subprocess.run(['bash', '-c', {self.run_script[wf2]!r}], cwd={str(clone2)!r}, env=e, capture_output=True)\n",
+                              encoding="utf-8")
+            (self.tmp / f"env{self.n}.json").write_text(json.dumps({k: v for k, v in env2.items() if not k.startswith("GIT_")}), encoding="utf-8")
+            hook = clone / ".git" / "hooks" / "pre-push"
+            hook.write_text(f'#!/bin/sh\n[ -f "{flag}" ] && exit 0\ntouch "{flag}"\nunset $(git rev-parse --local-env-vars)\n'
+                            f'"{sys.executable}" "{driver}"\nexit 0\n')
+            hook.chmod(0o755)
+        r = subprocess.run(["bash", "-c", self.run_script[wf]], cwd=str(clone), env=self._env(number, body, created, out),
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr[-1500:])
+        def read(path):
+            kv = dict(l.split("=", 1) for l in path.read_text(encoding="utf-8").splitlines() if "=" in l)
+            return kv["code"], json.loads(kv["result"])["message"]
+        return read(out) + (read(other_out) if other_out else ())
+
+    def _main(self):
+        """Trạng thái main sau cùng: (mã các dự báo, [(mã dự báo, số Issue phân định)], lỗi kiểm lại, tiêu đề các commit ghi sổ)."""
+        self.n += 1
+        c = self._clone(f"check{self.n}")
+        rows = lambda n: [json.loads(l) for l in (c / "ledger" / n).read_text(encoding="utf-8").splitlines() if l.strip()] if (c / "ledger" / n).exists() else []
+        errs = laws_checks.check_ledger_rows(c) + laws_checks.check_ledger_chain(c)
+        return ([r["id"] for r in rows("predictions.jsonl")], [(r["prediction_id"], r["resolution_issue"]) for r in rows("resolutions.jsonl")],
+                errs, self._git(c, "log", "--format=%s", "--reverse").splitlines()[1:])
+
+    A = ("ledger_intake.yml", 301, _forecast("A", Q3, 0.4, "2027-02-28", "event_before_date"), "2026-12-01T02:00:00Z")
+    B_BODY = _forecast("B", Q3, 0.6, "2027-02-28", "event_before_date")
+    R_BODY = _resolution("F-301", "YES")
+
+    def test_resolution_lands_between_the_forecast_robots_commit_and_push(self):
+        """B mở 03:00, Issue phân định mở 03:01. Robot nhận B đã quyết định "ghi" và commit; robot phân định đẩy trước."""
+        self.assertEqual(self._robot(*self.A)[0], "0")
+        code, msg, code2, msg2 = self._robot("ledger_intake.yml", 302, self.B_BODY, "2026-12-10T03:00:00Z",
+                                             between_commit_and_push=("resolution_intake.yml", 401, self.R_BODY, "2026-12-10T03:01:00Z"))
+        self.assertEqual(code2, "0", msg2)                                       # robot phân định ghi kết quả cho A
+        self.assertEqual(code, "2", msg); self.assertIn("trước khi robot ghi được dự báo này", msg)   # robot nhận B làm lại từ đầu → từ chối
+        preds, res, errs, log = self._main()
+        self.assertEqual((preds, res, errs), (["F-301"], [("F-301", 401)], []))
+        self.assertEqual(log, ["ledger: forecast #301", "ledger: resolution #401"])   # commit của B không bao giờ lên main
+
+    def test_forecast_lands_between_the_resolution_robots_commit_and_push(self):
+        """Issue phân định mở 03:00, B mở 03:01. Robot phân định đã quyết định "ghi cho A" và commit; robot nhận B đẩy trước."""
+        self.assertEqual(self._robot(*self.A)[0], "0")
+        code, msg, code2, msg2 = self._robot("resolution_intake.yml", 401, self.R_BODY, "2026-12-10T03:00:00Z",
+                                             between_commit_and_push=("ledger_intake.yml", 302, self.B_BODY, "2026-12-10T03:01:00Z"))
+        self.assertEqual(code2, "0", msg2)                                       # B vào sổ (lúc đó chưa có kết quả nào)
+        self.assertEqual(code, "2", msg); self.assertIn("F-302", msg); self.assertIn("Mở Issue Resolution mới", msg)
+        preds, res, errs, log = self._main()
+        self.assertEqual((preds, res, errs), (["F-301", "F-302"], [], []))       # không dòng phân định nào bị ghi nửa chừng
+        code, msg = self._robot("resolution_intake.yml", 402, self.R_BODY, "2026-12-10T03:05:00Z")   # phục hồi: Issue mới, không sửa sổ
+        self.assertEqual(code, "0", msg)
+        preds, res, errs, log = self._main()
+        self.assertEqual((res, errs), ([("F-301", 402), ("F-302", 402)], []))
+        self.assertEqual(log, ["ledger: forecast #301", "ledger: forecast #302", "ledger: resolution #402"])
+
+    def test_two_unrelated_forecasts_racing_both_land_with_a_valid_chain(self):
+        other = _forecast("A", "Câu hỏi khác hẳn về tăng trưởng tín dụng cuối năm 2026?", 0.5)
+        code, msg, code2, msg2 = self._robot(*self.A, between_commit_and_push=("ledger_intake.yml", 305, other, "2026-12-01T02:00:30Z"))
+        self.assertEqual((code, code2), ("0", "0"), msg + msg2)
+        preds, res, errs, log = self._main()
+        self.assertEqual((preds, errs), (["F-305", "F-301"], []))                # robot 1 nối chuỗi lại sau dòng của robot 2
+
+
+class EngineGateTests(_Base):
+    """Vòng 8 điểm 2: dòng "trông như của engine" (mã P-…) không còn được miễn kiểm; đường ghi dự báo của engine đóng."""
+    CLOSE = """
+        import json
+        import numpy as np, pandas as pd
+        from engine import ledger
+        idx = pd.bdate_range("2026-01-02", periods=60)
+        close = pd.DataFrame({"AAA": np.linspace(10, 13, 60), "BBB": np.linspace(10, 9, 60)}, index=idx)
+    """
+
+    def _engine(self, code, home=None):
+        env = {**os.environ, "TTC_HOME": str(home or self.tmp), "PYTHONPATH": str(ROOT)}
+        r = subprocess.run([sys.executable, "-c", textwrap.dedent(self.CLOSE) + textwrap.dedent(code)], cwd=str(ROOT), env=env,
+                           capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr[-3000:])
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    def _put(self, name, rows, base):
+        """Ghi thêm các dòng tự tạo với hash chuỗi HỢP LỆ vào một sổ."""
+        p = self.tmp / "ledger" / name
+        old = [json.loads(l) for l in base.splitlines() if l.strip()]
+        prev, out = (old[-1]["hash"] if old else "GENESIS"), []
+        for r in rows:
+            r = {**r, "prev_hash": prev}; r["hash"] = laws_checks.line_hash(r); prev = r["hash"]
+            out.append(json.dumps(r, ensure_ascii=False, sort_keys=True))
+        p.write_text(base + "".join(o + "\n" for o in out), encoding="utf-8")
+        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])           # hash chuỗi hợp lệ: không bắt được gì
+
+    def _open_config(self, dst):
+        import yaml
+        cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+        cfg["ledger"]["engine_forecasts"] = "open"
+        pathlib.Path(dst).write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+    def test_fake_engine_rows_fail_validate_and_cannot_break_the_cycle(self):
+        good = (self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8")
+        fake = {"id": "P-fake", "resolution_rule": {"ticker": "VCB"}}             # đúng dòng trong bản chấm: thiếu horizon, created_at, probability
+        self._put("predictions.jsonl", [fake], good)
+        errs = laws_checks.check_ledger_rows(self.tmp)
+        self.assertTrue(any("'P-fake'" in e and "không có issue_number" in e for e in errs), errs)
+        self.assertTrue(any("'P-fake'" in e for e in laws_checks.run_all(self.tmp)))   # validate.py đỏ — daily_cycle.yml chạy nó TRƯỚC vòng học
+        cycle = (ROOT / ".github" / "workflows" / "daily_cycle.yml").read_text(encoding="utf-8")
+        self.assertLess(cycle.index("python tools/validate.py"), cycle.index("engine.run_cycle"))
+        # kể cả khi validate bị bỏ qua: vòng học không vỡ (bản trước: KeyError 'horizon'), không chấm, không tính điểm dòng giả
+        out = self._engine("""
+            res = ledger.resolve(close, "2026-03-20")
+            sc = ledger.scorecard("2026-03-20")
+            print(json.dumps({"res": len(res), "resolved": sc["resolved"], "procedures": sc["procedures"], "total": sc["issue_forecasts"]["total"]}))
+        """)
+        self.assertEqual(out, {"res": 0, "resolved": 0, "procedures": {}, "total": 4})
+        # biến thể trong bản chấm: dòng P- ĐỦ trường, đúng từng chữ như engine viết, kèm kết quả "engine tự chấm" tùy chọn
+        full = self._engine("""
+            row = ledger._engine_row({"procedure": "news@v1", "claim": "x", "ticker": "AAA", "horizon": 5, "probability": 0.9}, "2026-01-05", 0.5)
+            print(json.dumps(row))
+        """)
+        self.assertRegex(full["id"], r"^P-[0-9a-f]{12}$")
+        self._put("predictions.jsonl", [full], good)
+        self._put("resolutions.jsonl", [{"prediction_id": full["id"], "resolved_at": "2026-01-20", "entry_date": "2026-01-06",
+                                         "exit_date": "2026-01-13", "excess_return": 0.05, "outcome": 1}], "")
+        errs = laws_checks.check_ledger_rows(self.tmp)
+        self.assertTrue(any("không có issue_number" in e for e in errs) and any("không có resolution_issue" in e for e in errs), errs)
+        out = self._engine("""
+            sc = ledger.scorecard("2026-03-20")
+            print(json.dumps({"n": len(ledger.resolve(close, "2026-03-20")), "resolved": sc["resolved"], "procedures": sc["procedures"]}))
+        """)
+        self.assertEqual(out, {"n": 0, "resolved": 0, "procedures": {}})         # không vào Brier, không vào phán quyết thủ tục
+
+    def test_gate_is_closed_in_the_repo_and_flipping_the_config_is_not_enough(self):
+        import yaml
+        self.assertEqual(yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))["ledger"]["engine_forecasts"], "closed")
+        self.assertEqual(laws_checks.check_engine_gate(ROOT), [])
+        self.assertIn("check_engine_gate(root)", (ROOT / "tools" / "laws_checks.py").read_text(encoding="utf-8").split("def run_all")[1])
+        self.assertEqual(laws_checks.check_engine_gate(self.tmp), [])            # không có config: đóng
+        cfg = self.tmp / "config.yaml"
+        for text, ok in (("ledger:\n  engine_forecasts: closed\n", True), ("ledger:\n  horizons: [5]\n", True),
+                         ("ledger:\n  engine_forecasts: open\n", False), ("ledger:\n  engine_forecasts: true\n", False),
+                         ("ledger:\n  engine_forecasts: CLOSED\n", False), ("ledger: [\n", False)):
+            cfg.write_text(text, encoding="utf-8")
+            self.assertEqual(laws_checks.check_engine_gate(self.tmp) == [], ok, text)
+        # đổi config thành open cũng không làm dòng P- qua được kiểm lại: muốn mở phải sửa mã kiểm (ADR mới)
+        self._open_config(cfg)
+        self.assertTrue(any("engine_forecasts" in e for e in laws_checks.run_all(self.tmp)))
+        good = (self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8")
+        full = self._engine("""
+            row = ledger._engine_row({"procedure": "news@v1", "claim": "x", "ticker": "AAA", "horizon": 5, "probability": 0.9}, "2026-01-05", 0.5)
+            print(json.dumps(row))
+        """)
+        self._put("predictions.jsonl", [full], good)
+        self.assertTrue(any("không có issue_number" in e for e in laws_checks.check_ledger_rows(self.tmp)))
+
+    def test_engine_does_not_write_while_the_gate_is_closed(self):
+        home = self.tmp / "home"; (home / "ledger").mkdir(parents=True)
+        code = """
+            pred = {"procedure": "test", "claim": "x", "ticker": "AAA", "horizon": 5, "probability": 0.6, "requires_evidence": False}
+            ok, rej = ledger.record([pred], "2026-01-05", ["AAA", "BBB"], set(), close)
+            from engine import experts
+            ex = experts.run("2026-01-05", close)
+            print(json.dumps({"open": ledger.forecasts_open(), "ok": len(ok), "rej": [r["audit_errors"][0] for r in rej], "ex": ex,
+                              "res": len(ledger.resolve(close, "2026-03-20"))}, ensure_ascii=False))
+        """
+        out = self._engine(code, home)                                          # config của kho: đóng
+        self.assertEqual((out["open"], out["ok"], out["res"]), (False, 0, 0))
+        self.assertIn("engine_forecasts", out["rej"][0])
+        self.assertFalse(out["ex"]["ran"]); self.assertIn("engine_forecasts", out["ex"]["reasons"][0])
+        self.assertEqual(list((home / "ledger").iterdir()), [])                  # không tệp nào được tạo trong sổ
+        # mã của đường ghi vẫn chạy được khi cổng mở (thư mục tạm) — và dòng nó viết ra đúng hợp đồng đầy đủ
+        self._open_config(home / "config.yaml")
+        out = self._engine("""
+            pred = {"procedure": "test", "claim": "x", "ticker": "AAA", "horizon": 5, "probability": 0.6, "requires_evidence": False}
+            ok, rej = ledger.record([pred], "2026-01-05", ["AAA", "BBB"], set(), close)
+            row = ledger._load(ledger.PRED)[0]
+            bad = []
+            for edit in ({"id": "P-fake"}, {"probability": 2}, {"probability": None}, {"created_at": "hôm qua"}, {"seat": "A"},
+                         {"resolution_rule": {"ticker": "AAA"}}, {"resolution_rule": {**row["resolution_rule"], "horizon": 7}},
+                         {"resolution_rule": {**row["resolution_rule"], "horizon": True}}, {"extra": 1}, {"claim": ""},
+                         {"issue_number": 5}, {"evidence_refs": "x"}):
+                bad.append(ledger.engine_row_error({**row, **edit}) is not None)
+            missing = [ledger.engine_row_error({k: v for k, v in row.items() if k != key}) is not None for key in ledger.ENGINE_KEYS]
+            print(json.dumps({"ok": len(ok), "err": ledger.engine_row_error(row), "bad": bad, "missing": missing,
+                              "res": len(ledger.resolve(close, "2026-03-20"))}))
+        """, home)
+        self.assertEqual((out["ok"], out["err"], out["res"]), (1, None, 1))
+        self.assertTrue(all(out["bad"]) and all(out["missing"]), out)
 
 
 class ResolverSeatTests(_Base):
@@ -492,8 +990,64 @@ class TrialRegistryTests(unittest.TestCase):
         self.assertTrue(any("đóng băng" in e for e in registry(chain(rows + [{**rows[2], "trial_id": "T00005", "features": "mom_60;feature_moi"}]))))
         self.assertTrue(any("tăng dần" in e for e in registry(chain([rows[0], rows[2], rows[1]]))))
         self.assertTrue(any("hơn một dòng neo" in e for e in registry(chain(rows + [rows[0]]))))
-        reg.unlink()
-        self.assertTrue(any("thiếu research/trial_registry.jsonl" in e for e in laws_checks.check_trial_registry(self.tmp)))
+        reg.unlink()                                                             # mất sổ: kết quả mang registry_hash/sharpe không còn chỗ dựa
+        self.assertTrue(any("phải để trống bốn cột" in e for e in laws_checks.check_trial_registry(self.tmp)))
+
+    def test_trials_csv_has_one_fixed_shape(self):
+        """Vòng 8 điểm 3: thêm cột lạ và ô rỗng vào trials.csv không đổi sha256 của 13 cột gốc, không đổi ô cũ nào, không
+        thêm kết quả — CI không báo, nhưng lần ghi kết quả kế tiếp của vòng học hỏng. Nay: tệp chỉ có một khuôn."""
+        from tools import ledger_audit
+        tp = self.tmp / "research" / "trials.csv"
+        def check(t):
+            tp.write_bytes(t.encode("utf-8")); return laws_checks.check_trial_registry(self.tmp)
+        L = self.LEGACY
+        lines = L.strip().split("\n")
+        self.assertEqual(check(L), [])
+        FULL = lines[0] + ",sharpe,sharpe_ann,dsr,registry_hash\n" + "".join(l + ",,,,\n" for l in lines[1:])
+        self.assertEqual(check(FULL), [])                                        # đúng 17 cột sau lần ghi đầu của v3.0.2
+        note = lines[0] + ",note\n" + "".join(l + ",\n" for l in lines[1:])      # đúng kịch bản trong bản chấm
+        self.assertEqual(laws_checks.trials_digest(laws_checks.read_trials(note)[1]), laws_checks.trials_digest(laws_checks.read_trials(L)[1]))
+        self.assertTrue(any("tiêu đề" in e for e in check(note)))
+        self.assertTrue(any("tiêu đề" in e and "bị đổi" in e for e in ledger_audit.trials_rows_errors(L.encode(), note.encode())))
+        cols = lines[0].split(",")
+        swapped = ",".join(cols[:6] + [cols[7], cols[6]] + cols[8:]) + "\n" + "\n".join(lines[1:]) + "\n"
+        for bad, why in ((swapped, "tiêu đề"), (L.replace("trial_id", "Trial_ID", 1), "tiêu đề"), (L.replace(",regimes\n", "\n", 1), "tiêu đề"),
+                         (lines[0] + ",sharpe\n" + "".join(l + ",\n" for l in lines[1:]), "tiêu đề"),
+                         (FULL.replace(",sharpe,sharpe_ann,", ",sharpe_ann,sharpe,"), "tiêu đề"),
+                         ("\ufeff" + L, "tiêu đề"), (L + "\n", "số ô"), (L.replace("REJECTED,{}\n", "REJECTED\n"), "số ô"),
+                         (L.replace("REJECTED,{}\n", "REJECTED,{},\n"), "số ô"), (L.replace("\n", "\r\n"), "dạng chuẩn"),
+                         (L.rstrip("\n"), "dạng chuẩn"), (L.replace(",ridge,", ',"ridge",', 1), "dạng chuẩn"),
+                         (L.replace("T00002,", " T00002,", 1).replace(",gbm,", ', "gbm",', 1), "dạng chuẩn")):
+            errs = check(bad)
+            self.assertTrue(errs and any(why in e for e in errs), f"{bad[:60]!r}: {errs}")
+        # kết quả lịch sử không có bốn cột mới: chèn Sharpe cho lần thử cũ (đi vào phương sai của Deflated Sharpe) → lỗi
+        self.assertTrue(any("phải để trống bốn cột" in e for e in check(FULL.replace(",REJECTED,{},,,,", ",REJECTED,{},0.9,,,", 1))))
+        # kiểm toán theo commit gốc: 13 → 17 cột được; 17 → 13, hay sang bất kỳ tiêu đề nào khác thì không
+        f = ledger_audit.trials_rows_errors
+        self.assertEqual(f(L.encode(), FULL.encode()), [])
+        self.assertEqual(f(FULL.encode(), FULL.encode()), [])
+        self.assertTrue(any("bị đổi" in e for e in f(FULL.encode(), L.encode())))
+        self.assertTrue(any("đã bị sửa" in e for e in f(FULL.encode(), FULL.replace(",REJECTED,{},,,,", ",REJECTED,{},0.9,,,", 1).encode())))
+        # vòng học ghi thêm được trên cả hai khuôn hợp lệ, và từ chối khuôn lạ thay vì ghi bừa
+        (self.tmp / "cases.json").write_text(json.dumps([L, FULL, note, swapped]), encoding="utf-8")
+        code, out, err = self._engine("""
+            import json
+            from engine import research
+            from engine.config import path
+            row = {"trial_id": "T00003", "cycle_date": "2026-11-20", "method": "m", "spec_id": "M-x", "features": "mom_60", "model": "ridge",
+                   "ic_mean": 0.1, "ic_t": 1.0, "net_ann": 0.0, "fold_pos": 0.5, "threshold": 3.0, "status": "REJECTED", "regimes": "{}",
+                   "sharpe": 0.1, "sharpe_ann": 1.0, "dsr": 0.5, "registry_hash": "h"}
+            out = []
+            for text in json.loads(open(path("cases.json"), encoding="utf-8").read()):
+                open(path("research/trials.csv"), "w", encoding="utf-8", newline="").write(text)
+                try:
+                    research.append_trial_results([row]); out.append("ok")
+                except RuntimeError as e:
+                    out.append("refused")
+            print(json.dumps(out))
+        """)
+        self.assertEqual(code, 0, err[-2000:])
+        self.assertEqual(json.loads(out.strip().splitlines()[-1]), ["ok", "ok", "refused", "refused"])
 
     def test_first_210_results_are_pinned_in_config(self):
         """Vòng 7 điểm 2: 210 kết quả thử đầu tiên được ghim sha256 ngay trong config.yaml — có hiệu lực cả khi chưa có sổ đăng ký."""
@@ -564,6 +1118,14 @@ class TrialRegistryTests(unittest.TestCase):
         (repo / "x.txt").write_text("2"); commit("ledger: forecast")
         tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("Vong hoc")
         self.assertEqual(f(base), [])
+        # xóa tệp mốc v3.0.2 ngay trong commit ghi kết quả để giả làm "kho bản cũ" → không được miễn
+        git("reset", "-q", "--hard", base)
+        (repo / "tools" / "registry_push.py").unlink(); tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("xoa tep moc + ghi ket qua")
+        (repo / "tools" / "registry_push.py").write_text("# v3.0.2\n"); commit("tra lai tep moc")
+        self.assertTrue(any("commit liền trước chưa có" in e for e in f(base)))
+        git("reset", "-q", "--hard", base)
+        rg.write_text(json.dumps({"trial_id": "T00003"}) + "\n", encoding="utf-8"); commit("L-06: dang ky thu T00003")
+        tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("Vong hoc")
         # (d) sửa hoặc xóa kết quả cũ
         tp.write_text((self.LEGACY + res3).replace("-0.0146496299511184", "0.0946496299511184"), encoding="utf-8"); commit("sua ket qua cu")
         self.assertTrue(any("đã bị sửa" in e for e in f(base)))
@@ -581,9 +1143,9 @@ class TrialRegistryTests(unittest.TestCase):
         tp.write_text(self.LEGACY + res3 + res3.replace("T00003", "T00004"), encoding="utf-8"); commit("PR lai them ket qua")
         git("reset", "-q", "--soft", "HEAD~1"); git("commit", "-q", "--amend", "-m", "Merge PR co them ket qua")   # nhét vào commit gộp
         self.assertTrue(any("Pull Request thêm 1 kết quả" in e for e in f(base, pr=True)))
-        # thêm cột mới và ô rỗng vào dòng cũ (đúng như engine làm lần đầu) không bị coi là sửa
-        self.assertEqual(ledger_audit.trials_rows_errors(self.LEGACY.encode(), (self.LEGACY.split("\n")[0] + ",sharpe\n"
-                         + "\n".join(l + "," for l in self.LEGACY.strip().split("\n")[1:]) + "\n").encode()), [])
+        # thêm đúng bốn cột mới và ô rỗng vào dòng cũ (đúng như engine làm lần đầu) không bị coi là sửa
+        self.assertEqual(ledger_audit.trials_rows_errors(self.LEGACY.encode(), (self.LEGACY.split("\n")[0] + ",sharpe,sharpe_ann,dsr,registry_hash\n"
+                         + "\n".join(l + ",,,," for l in self.LEGACY.strip().split("\n")[1:]) + "\n").encode()), [])
         self.assertIn("research/trials.csv", ledger_audit.TRIALS)
         for name in ("paper/nav.csv", "paper/decisions.csv", "paper/trades.csv", "research/trial_registry.jsonl"):
             self.assertIn(name, ledger_audit.APPEND_ONLY)
@@ -602,7 +1164,7 @@ class TrialRegistryTests(unittest.TestCase):
             return self.tmp / name
         seed = clone("seed")
         _config_without_pin(seed / "config.yaml"); (seed / "research").mkdir(); (seed / "data.txt").write_text("v1\n")
-        (seed / "research" / "trials.csv").write_text("trial_id\n", encoding="utf-8")
+        (seed / "research" / "trials.csv").write_text(",".join(laws_checks.TRIAL_LEGACY_COLS) + "\n", encoding="utf-8")
         git(seed, "add", "-A"); git(seed, "commit", "-qm", "seed"); git(seed, "push", "-q", "origin", "HEAD:main")
         script = """
             import json, sys
