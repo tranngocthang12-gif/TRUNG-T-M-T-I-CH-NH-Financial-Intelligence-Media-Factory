@@ -1,5 +1,10 @@
 # Nguồn gốc (Thư viện tầng 1–2)
 
-Mỗi tài liệu gốc nằm trong `library/sources/<doc_id>/` gồm: `text.md` (văn bản thuần, có số trang `[p12]` và số đoạn), `meta.json` (issuer, issued_on, accessed_on, source_url, legal_status, license, effective_from, effective_to, superseded_by) và được ghim trong `library/SOURCE_MANIFEST.json` bằng `sha256` + `bytes`.
+Mỗi tài liệu gốc nằm trong `library/sources/<doc_id>/text.md` và được ghim trong `library/SOURCE_MANIFEST.json`. Manifest là nơi DUY NHẤT giữ siêu dữ liệu: `sha256` + `bytes` của `text.md`, `issuer`, `issued_on`, `accessed_on`, `source_url`, `data_source` (tên trong `governance/DATA_SOURCES.yaml`, không được là nguồn bị cấm), `legal_status`, `license`, `kind`, `effective_from`, `effective_to`, `superseded_by`.
 
-Luật: chỉ tài liệu gốc công khai (văn bản quy phạm, chuẩn mực, BCTC kiểm toán, công bố cơ quan quản lý); không sửa nội dung; nguồn chưa duyệt trong `governance/DATA_SOURCES.yaml` thì không chép (L-01, L-04). Văn bản pháp lý phải có trạng thái hiệu lực (L-08). Địa chỉ trích dẫn: `<doc_id>:p<trang>:<đoạn>` hoặc `<doc_id>:t<bảng>:<dòng>`.
+Quy ước `text.md` (máy đọc theo đúng quy ước này — `engine/knowledge_notes.py`):
+- Dòng `[p12]` mở trang 12. Trong trang, các đoạn cách nhau bằng một dòng trống và được đánh số 1, 2, 3… theo thứ tự.
+- Dòng `[t3]` mở bảng 3: các dòng bắt đầu bằng `|` ngay sau đó là bảng; dòng đầu là tiêu đề, dòng `|---|` bỏ qua, dòng dữ liệu đánh số 1, 2, 3… Bảng không tính là đoạn.
+- Địa chỉ trích dẫn: `<doc_id>:p<trang>:<đoạn>` hoặc `<doc_id>:t<bảng>:<dòng>`.
+
+Luật: chỉ tài liệu gốc công khai (văn bản quy phạm, chuẩn mực, BCTC kiểm toán, công bố cơ quan quản lý); chép nguyên văn, không sửa sau khi ghim (sửa một byte là lệch sha256, CI đỏ); thư mục nguồn chưa ghim là lỗi; nguồn chưa duyệt trong `DATA_SOURCES.yaml` thì không chép (L-01, L-04). Văn bản pháp lý (`kind` LAW/DECREE/CIRCULAR/DECISION/STANDARD/REGULATION) phải có `effective_from`; bị thay thế thì ghi `superseded_by` hoặc `effective_to` — ghi chú dựa trên nó tự chuyển OUTDATED (L-08).
