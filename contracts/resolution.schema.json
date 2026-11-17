@@ -79,6 +79,9 @@
     },
     "hash": {
       "type": "string"
+    },
+    "resolution_issue_author": {
+      "type": "string"
     }
   },
   "additionalProperties": true,
