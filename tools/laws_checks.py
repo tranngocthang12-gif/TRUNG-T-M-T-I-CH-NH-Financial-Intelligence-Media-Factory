@@ -1,17 +1,23 @@
-"""Kiểm máy cho governance/LAWS.md — gọi từ tools/validate.py, có test riêng.
-L-07  một kiến trúc: ARCHITECTURE_v*.md phải được liệt kê SUPERSEDED trong architecture/ARCHIVE.md.
-L-02  không khuyến nghị: reports/, media/, ledger/ không chứa từ khóa khuyến nghị mua bán.
-L-05/Ledger  hash chuỗi: ledger/predictions.jsonl và ledger/resolutions.jsonl mỗi dòng có sha256 và prev_hash khớp dòng trước
-      (dòng đầu "GENESIS"); sửa một kết quả đã ghi làm CI đỏ.
-L-03  dữ liệu cá nhân: tệp chữ (md/yaml/json/jsonl/txt) ngoài dữ liệu giá không chứa số định danh/số tài khoản đi kèm
-      nhãn (CCCD, CMND, căn cước, hộ chiếu, số tài khoản, STK, account number).
-L-09  người viết ≠ người chấm: thân PR có đúng một dòng "authored_by:" và một dòng "reviewed_by:"; cả hai bắt đầu bằng tên ghế
-      (Owner hoặc mô hình/nhà cung cấp); không chung ghế nào — cùng nhà cung cấp, hoặc cùng là Owner (workflow review_gate.yml
-      gọi check_pr_review). recognised_seat()/same_provider() dùng chung cho người phân định dự báo và biên bản chấm ghi chú.
-L-06  sổ thử: research/trial_registry.jsonl đúng hash chuỗi; mọi lần thử trong research/trials.csv từ mã thử đầu tiên
-      của sổ trở đi đều có dòng đăng ký cùng trial_id, spec_id, ngưỡng, registry_hash; số dòng đăng ký ≥ số lần thử đó.
+"""Kiểm máy cho governance/LAWS.md — gọi từ tools/validate.py, có test riêng. Bảng luật ↔ máy kiểm: ADR-0003.
+L-02  không khuyến nghị: reports/, media/, ledger/ không chứa từ khóa khuyến nghị mua bán (intake kiểm thêm lúc nhận).
+L-03  dữ liệu cá nhân: tệp chữ (md/yaml/json/jsonl/txt) không chứa số định danh/số tài khoản đi kèm nhãn (CCCD, CMND,
+      căn cước, hộ chiếu, số tài khoản, STK, account number). Không quét library/sources/ (tài liệu gốc công khai đã ghim,
+      chép nguyên văn theo L-01/L-04).
+L-05  Ledger: ledger/predictions.jsonl và ledger/resolutions.jsonl đúng hash chuỗi (prev_hash/hash, dòng đầu "GENESIS").
+      Hash chuỗi KHÔNG phải chữ ký: nó bắt sửa nhầm/sửa một phần. Chống viết lại có chủ ý là việc của tools/ledger_audit.py
+      (chỉ-ghi-thêm so với commit trước; đối chiếu từng dòng với Issue thật trên GitHub) và ruleset cấm force-push.
+L-06  sổ thử: research/trial_registry.jsonl đúng hash chuỗi; mã thử không trùng; mọi lần thử trong research/trials.csv từ
+      mã thử đầu tiên của sổ trở đi có dòng đăng ký cùng trial_id, spec_id, ngưỡng, registry_hash; số dòng đăng ký ≥ số
+      lần thử; feature/mô hình đăng ký nằm trong không gian giả thuyết đóng băng (config.yaml research.frozen_space).
+L-07  một kiến trúc: mỗi ARCHITECTURE_v*.md phải có dòng riêng trong architecture/ARCHIVE.md ghi SUPERSEDED.
+L-09  người viết ≠ người chấm: thân PR (bỏ chú thích HTML) có đúng một dòng "authored_by:" và một dòng "reviewed_by:"; cả hai
+      bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp); không chung ghế — cùng nhà cung cấp, hoặc cùng là Owner; và
+      PR có bình luận của chủ kho mở đầu "GỘP ĐƯỢC" kèm 7 ký tự đầu SHA của commit đang chấm (bản chấm nằm trên kho,
+      đổi mã thì phải chấm lại). recognised_seat()/same_provider() dùng chung cho người phân định và biên bản ghi chú.
+L-10  đề thi: tệp trong academy/exams/ khớp exam_item.schema.json và released_at không ở tương lai (đề chỉ vào kho sau khi thi).
 """
-import csv, hashlib, json, pathlib, re
+import csv, hashlib, json, pathlib, re, unicodedata
+from datetime import date
 
 RECOMMEND_PATTERNS = [r"mua ngay", r"n[êe]n mua", r"b[áa]n ngay", r"n[êe]n b[áa]n", r"gi[áa] m[ụu]c ti[êe]u",
                       r"target price", r"khuy[ếe]n ngh[ịi] mua", r"khuy[ếe]n ngh[ịi] b[áa]n", r"\bBUY\b", r"\bSELL\b"]
@@ -20,9 +26,15 @@ SCAN_DIRS = ("reports", "media", "ledger")
 SCAN_EXT = {".md", ".txt", ".jsonl", ".json", ".yaml", ".yml", ".csv"}
 
 
+def nfc(text) -> str:
+    """Chuẩn hóa Unicode dựng sẵn (NFC). Chữ Việt dán từ nguồn khác nhau có thể ở dạng tổ hợp (NFD): 'nên' gõ kiểu NFD
+    sẽ lọt mọi mẫu so chuỗi nếu không chuẩn hóa trước."""
+    return unicodedata.normalize("NFC", text or "")
+
+
 def recommendation_hit(text: str):
     """Trả về cụm từ khóa khuyến nghị đầu tiên tìm thấy (L-02), hoặc None."""
-    m = _RE.search(text or "")
+    m = _RE.search(nfc(text))
     return m.group(0) if m else None
 
 
@@ -42,10 +54,13 @@ def check_personal_data(root) -> list[str]:
     root = pathlib.Path(root)
     errs = []
     for p in sorted(root.rglob("*")):
-        if not p.is_file() or p.suffix.lower() not in PII_EXT or PII_SKIP_DIRS & set(p.relative_to(root).parts):
+        rel = p.relative_to(root)
+        if not p.is_file() or p.suffix.lower() not in PII_EXT or PII_SKIP_DIRS & set(rel.parts):
+            continue
+        if rel.parts[:2] == ("library", "sources"):       # tài liệu gốc công khai đã ghim, chép nguyên văn (L-01, L-04)
             continue
         try:
-            text = p.read_text(encoding="utf-8")
+            text = nfc(p.read_text(encoding="utf-8"))
         except (UnicodeDecodeError, OSError):
             continue
         for i, line in enumerate(text.splitlines(), 1):
@@ -62,9 +77,10 @@ def check_one_architecture(root) -> list[str]:
     if not (arch_dir / "ARCHITECTURE.md").is_file():
         return errs                      # chưa hợp nhất: không áp L-07
     archive = (arch_dir / "ARCHIVE.md").read_text(encoding="utf-8") if (arch_dir / "ARCHIVE.md").is_file() else ""
+    lines = archive.splitlines()
     for p in sorted(arch_dir.glob("ARCHITECTURE_v*.md")):
-        if p.name not in archive or "SUPERSEDED" not in archive:
-            errs.append(f"L-07: {p.relative_to(root)} không được liệt kê SUPERSEDED trong architecture/ARCHIVE.md")
+        if not any(p.name in ln and "SUPERSEDED" in ln for ln in lines):      # cùng MỘT dòng, không phải đâu đó trong tệp
+            errs.append(f"L-07: {p.relative_to(root)} không có dòng riêng ghi SUPERSEDED trong architecture/ARCHIVE.md")
     return errs
 
 
@@ -79,7 +95,7 @@ def check_no_recommendation(root) -> list[str]:
             if not p.is_file() or p.suffix.lower() not in SCAN_EXT:
                 continue
             try:
-                text = p.read_text(encoding="utf-8", errors="ignore")
+                text = nfc(p.read_text(encoding="utf-8", errors="ignore"))
             except OSError:
                 continue
             for i, line in enumerate(text.splitlines(), 1):
@@ -116,6 +132,17 @@ def check_ledger_chain(root) -> list[str]:
     return errs
 
 
+def _frozen_space(root):
+    """research.frozen_space trong config.yaml: {features: [...], models: [...]}; None nếu chưa khai."""
+    try:
+        import yaml
+        cfg = yaml.safe_load((pathlib.Path(root) / "config.yaml").read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        return None
+    fs = (cfg.get("research") or {}).get("frozen_space")
+    return {"features": set(fs.get("features") or []), "models": set(fs.get("models") or [])} if fs else None
+
+
 def check_trial_registry(root) -> list[str]:
     root = pathlib.Path(root)
     reg_path, trials_path = root / "research" / "trial_registry.jsonl", root / "research" / "trials.csv"
@@ -127,8 +154,21 @@ def check_trial_registry(root) -> list[str]:
     reg = [json.loads(l) for l in reg_path.read_text(encoding="utf-8").splitlines() if l.strip()]
     if errs or not reg:
         return errs
+    ids = [r.get("trial_id") for r in reg]
+    for d in sorted({i for i in ids if ids.count(i) > 1}):
+        errs.append(f"L-06: sổ đăng ký có mã thử trùng {d}")
+    frozen = _frozen_space(root)
+    if frozen:
+        for r in reg:
+            extra = [f for f in str(r.get("features", "")).split(";") if f and f not in frozen["features"]]
+            if extra or r.get("model") not in frozen["models"]:
+                errs.append(f"L-06: {r.get('trial_id')} nằm ngoài không gian giả thuyết đóng băng "
+                            f"(feature lạ {extra}, mô hình {r.get('model')}) — giả thuyết mới phải qua ADR")
     start = min(r["trial_id"] for r in reg)          # mã thử đánh số liên tục T00001…; sổ bắt đầu từ mã này
     by_id = {r["trial_id"]: r for r in reg}
+    tids = [t.get("trial_id") for t in trials if t.get("trial_id", "") >= start]
+    for d in sorted({i for i in tids if tids.count(i) > 1}):
+        errs.append(f"L-06: trials.csv có hai kết quả cho cùng mã thử {d}")
     since = [t for t in trials if t.get("trial_id", "") >= start]
     for t in since:
         r = by_id.get(t["trial_id"])
@@ -149,16 +189,17 @@ def check_trial_registry(root) -> list[str]:
 
 
 PROVIDERS = {"anthropic": ("claude", "anthropic", "opus", "sonnet", "haiku", "fable", "mythos"),
-             "openai": ("chatgpt", "openai", "gpt", "codex", "o1", "o3", "o4", "minh tri", "minh trí"),
-             "xai": ("grok", "xai"), "google": ("gemini", "google", "bard"),
-             "meta": ("llama", "meta ai"), "deepseek": ("deepseek",), "mistral": ("mistral",)}
+             "openai": ("chatgpt", "openai", "gpt", "codex", "o1", "o3", "o4", "copilot", "minh tri", "minh trí"),
+             "xai": ("grok", "xai"), "google": ("gemini", "google", "bard", "notebooklm"),
+             "meta": ("llama", "meta ai"), "deepseek": ("deepseek",), "mistral": ("mistral",),
+             "perplexity": ("perplexity",), "alibaba": ("qwen",), "moonshot": ("kimi",)}
 _PROVIDER_RE = {k: re.compile(r"(?<![a-z0-9])(" + "|".join(re.escape(x) for x in keys) + r")(?![a-z0-9])")
                 for k, keys in PROVIDERS.items()}
 
 
 def _providers(text: str) -> set:
     """Nhà cung cấp mô hình được nhắc tới trong một chuỗi tên ghế (so khớp theo từ, không theo chuỗi con)."""
-    t = (text or "").lower()
+    t = nfc(text).lower()
     return {k for k, rx in _PROVIDER_RE.items() if rx.search(t)}
 
 
@@ -168,7 +209,7 @@ _OWNER_LOOSE_RE = re.compile(r"(?<![a-z0-9])owner(?![a-z0-9])")      # dò lỏn
 def _seats(text: str) -> set:
     """Các ghế được nhắc tới: nhà cung cấp mô hình + ghế người "owner". Owner là MỘT ghế: 'Owner', 'Owner (tên)',
     'Owner — vòng 3' đều là cùng một ghế."""
-    t = (text or "").lower()
+    t = nfc(text).lower()
     return _providers(t) | ({"owner"} if _OWNER_LOOSE_RE.search(t) else set())
 
 
@@ -192,13 +233,14 @@ def recognised_seat(text: str) -> bool:
     """Chuỗi BẮT ĐẦU bằng tên ghế: 'Owner' hoặc tên mô hình/nhà cung cấp trong PROVIDERS. Dùng chung cho mọi chỗ L-09
     cần biết AI là ai (người viết, người chấm PR, người phân định dự báo, người đọc và người chấm ghi chú): ghế không
     nhận ra được thì không so được nhà cung cấp, nên không được chấp nhận."""
-    return bool(_REVIEWER_START_RE.match((text or "").strip().lower()))
+    return bool(_REVIEWER_START_RE.match(nfc(text).strip().lower()))
 
 
 def check_pr_review(body: str) -> list[str]:
     """L-09 cho một PR: đọc hai dòng 'authored_by:' và 'reviewed_by:' trong thân PR."""
     fields, seen = {}, {}
-    for line in (body or "").splitlines():
+    body = re.sub(r"<!--.*?-->", "", nfc(body), flags=re.S)       # chú thích của mẫu PR không phải nội dung
+    for line in body.splitlines():
         m = re.match(r"^\s*[-*]?\s*(authored_by|reviewed_by)\s*:\s*(.*?)\s*$", line, re.IGNORECASE)
         if m:
             k = m.group(1).lower()
@@ -223,6 +265,63 @@ def check_pr_review(body: str) -> list[str]:
     return []
 
 
+VERDICT_OK = "GỘP ĐƯỢC"
+
+
+def check_review_evidence(comments, head_sha: str, owner_login: str) -> list[str]:
+    """L-09 + GitHub-first: bản chấm phải nằm trên kho. Cần ít nhất một bình luận PR do chủ kho đăng, dòng đầu (không rỗng)
+    mở đầu bằng "GỘP ĐƯỢC", và có 7 ký tự đầu SHA của commit đang đứng đầu PR. Đẩy commit mới → SHA đổi → phải chấm lại.
+    comments: danh sách {"user": login, "body": str}."""
+    sha7 = (head_sha or "")[:7].lower()
+    if len(sha7) < 7:
+        return ["L-09: không xác định được SHA đầu PR để đối chiếu bản chấm"]
+    for c in comments or []:
+        if (c.get("user") or "").lower() != (owner_login or "").lower():
+            continue
+        body = re.sub(r"<!--.*?-->", "", nfc(c.get("body")), flags=re.S)
+        first = next((ln.strip().lstrip("#*> ").strip() for ln in body.splitlines() if ln.strip()), "")
+        if first.upper().startswith(VERDICT_OK) and sha7 in body.lower():
+            return []
+    return [f"L-09: chưa có bình luận của chủ kho dán bản chấm mở đầu '{VERDICT_OK}' kèm SHA {sha7} của commit đang chấm "
+            "(đổi mã thì phải chấm lại bản mới)"]
+
+
+def check_exams(root, today=None) -> list[str]:
+    """L-10: đề thi giữ ngoài kho tới khi thi. Tệp trong academy/exams/ phải khớp exam_item.schema.json và
+    released_at không ở tương lai."""
+    root = pathlib.Path(root)
+    today = today or date.today()
+    d = root / "academy" / "exams"
+    if not d.is_dir():
+        return []
+    errs = []
+    try:
+        import jsonschema
+        schema = json.loads((root / "contracts" / "exam_item.schema.json").read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        jsonschema = schema = None
+    for p in sorted(d.rglob("*.json")):
+        rel = p.relative_to(root).as_posix()
+        try:
+            item = json.loads(p.read_text(encoding="utf-8"))
+        except ValueError:
+            errs.append(f"L-10: {rel} không phải JSON"); continue
+        if jsonschema is not None:
+            try:
+                jsonschema.validate(item, schema)
+            except Exception as e:  # noqa: BLE001
+                errs.append(f"L-10: {rel} không khớp exam_item.schema.json — {str(e).splitlines()[0]}"); continue
+        if item.get("released_at") in (None, ""):
+            errs.append(f"L-10: {rel} chưa có released_at — đề chưa phát hành không được nằm trong kho"); continue
+        try:
+            rel_at = date.fromisoformat(str(item.get("released_at"))[:10])
+        except ValueError:
+            errs.append(f"L-10: {rel} released_at không phải ngày YYYY-MM-DD"); continue
+        if rel_at > today:
+            errs.append(f"L-10: {rel} có released_at {rel_at} ở tương lai — đề chưa thi không được nằm trong kho")
+    return errs
+
+
 def run_all(root) -> list[str]:
     return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root)
-            + check_trial_registry(root) + check_personal_data(root))
+            + check_trial_registry(root) + check_personal_data(root) + check_exams(root))
