@@ -6,7 +6,8 @@ name: Kiem toan so sau khi ghi
 # ghi, doi chieu Issue that va dau nhan cua tung dong. Do la do, khong co khoang mien kiem.
 # Robot nhan day commit TRUOC roi moi dang dau nhan, va hai robot co the chay xen ke: luot kiem toan sau robot A co the thay
 # dong cua robot B vua day ma chua kip dang binh luan. tools/ledger_audit.py vi vay DOC LAI binh luan vai lan trong mot khoang
-# cho huu han (mac dinh 6 luot, cach nhau 30 giay) truoc khi ket luan thieu dau nhan; het luot van thieu thi van la loi.
+# cho huu han (mac dinh 15 luot cach nhau 30 giay = 420 giay, dai hon ca chuoi thu lai 200 giay cua buoc dang dau nhan o hai
+# workflow nhan) truoc khi ket luan thieu dau nhan; het luot van thieu thi van la loi.
 on:
   workflow_run:
     workflows: ["Ledger intake (Forecast issue)", "Resolution intake (Resolution issue)", "Vong hoc hang tuan"]
