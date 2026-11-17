@@ -65,6 +65,10 @@ llm_review:
   model: claude-sonnet-5
 # ---- v1.0 Giai đoạn 1 ----
 ledger:
+  # ADR-0003 quyết định 11 (vòng chấm 8): đường ghi dự báo của engine (chuyên gia LLM tự ghi, engine tự chấm bằng giá) ĐÓNG.
+  # Sổ dự báo chỉ nhận dòng từ Issue 'Forecast'/'Resolution' — có Issue thật và dấu nhận của robot. tools/validate.py chỉ
+  # chấp nhận giá trị closed; mở lại phải qua ADR mới kèm cơ chế bằng chứng xuất xứ cho dòng engine, không phải sửa chữ này.
+  engine_forecasts: closed
   horizons: [5, 20]
   min_p: 0.05
   max_p: 0.95
