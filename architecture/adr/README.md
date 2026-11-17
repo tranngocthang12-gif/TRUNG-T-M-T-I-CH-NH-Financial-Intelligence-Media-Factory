@@ -22,7 +22,7 @@ Mẫu tệp `ADR-NNNN-<slug>.md`:
 | ADR | Tên | Trạng thái |
 |---|---|---|
 | ADR-0001 | Hợp nhất sáu bản kiến trúc thành ARCHITECTURE.md v3.0 | ACCEPTED 24/10/2026 (PR #3) |
-| ADR-0002 | Không thu hẹp v3.0; dự báo là việc dài hạn; phạm vi phép thử A–B | PROPOSED |
+| ADR-0002 | Không thu hẹp v3.0; dự báo là việc dài hạn; phạm vi phép thử A–B | ACCEPTED 17/11/2026 (PR #29) |
 | ADR-0003 | Phân định dự báo qua Issue, chấm A–B, luật vào máy kiểm, engine hằng tuần | ACCEPTED 17/11/2026 (PR #28) |
-| ADR-0004 | Đóng bốn việc tồn sau gộp PR #28 | PROPOSED |
-| ADR-0005 | Tạm gác "engine cờ kinh tế" (engine kịch bản) | PROPOSED |
+| ADR-0004 | Đóng bốn việc tồn sau gộp PR #28 | ACCEPTED 17/11/2026 (PR #29) |
+| ADR-0005 | Tạm gác "engine cờ kinh tế" (engine kịch bản) | ACCEPTED 17/11/2026 (PR #29) |

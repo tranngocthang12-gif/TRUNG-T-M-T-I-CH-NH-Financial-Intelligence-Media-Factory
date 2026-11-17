@@ -1,9 +1,9 @@
 # ADR-0002: Không thu hẹp v3.0; dự báo là việc dài hạn; phạm vi phép thử A–B
 - Ngày: 2026-11-17
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này)
+- Trạng thái: ACCEPTED 17/11/2026 (Owner gộp PR #29, commit gộp `b8158be`)
 - Người đề xuất: Claude (kiến trúc sư trưởng)
-- Người chấm: ghế khác nhà cung cấp (L-09), ghi ở PR
-- Owner duyệt: khi gộp PR. Quyết định gốc của Owner (17/11/2026, chat vận hành): tập trung hoàn thiện kiến trúc; dự báo và các việc khác là việc lâu dài. Cùng ngày Owner giao Claude quyền tổng công trình sư ("tự quyết, tôi nghiệm thu"): Claude quyết định và thực hiện, Owner nghiệm thu bằng nút Merge; ba tay người của L-10 giữ nguyên, người viết vẫn phải được ghế khác nhà cung cấp chấm (L-09).
+- Người chấm: Gemini (Google) — `GỘP ĐƯỢC — commit 6201090` (bình luận PR #29)
+- Owner duyệt: gộp PR #29 ngày 17/11/2026. Quyết định gốc của Owner (17/11/2026, chat vận hành): tập trung hoàn thiện kiến trúc; dự báo và các việc khác là việc lâu dài. Cùng ngày Owner giao Claude quyền tổng công trình sư ("tự quyết, tôi nghiệm thu"): Claude quyết định và thực hiện, Owner nghiệm thu bằng nút Merge; ba tay người của L-10 giữ nguyên, người viết vẫn phải được ghế khác nhà cung cấp chấm (L-09).
 
 ## Quyết định
 1. **Không thu hẹp v3.0.** Điều kiện hoàn tác của ADR-0001 ("sau 30 ngày kể từ ngày gộp — tức 23/11/2026 — sổ có dưới 20 dự báo hợp lệ thì mở ADR-0002 xét thu hẹp") được xét tại đây và kết luận: giữ nguyên v3.0.

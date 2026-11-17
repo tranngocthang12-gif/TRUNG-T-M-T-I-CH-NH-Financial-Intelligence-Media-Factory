@@ -1,9 +1,9 @@
 # ADR-0004: Đóng bốn việc tồn sau gộp PR #28 (bản chấm vòng 10 của ADR-0003)
 - Ngày: 2026-11-17
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này)
+- Trạng thái: ACCEPTED 17/11/2026 (Owner gộp PR #29, commit gộp `b8158be`)
 - Người đề xuất: Claude (kiến trúc sư trưởng)
-- Người chấm: ghế khác nhà cung cấp (L-09), ghi ở PR
-- Owner duyệt: khi gộp PR
+- Người chấm: Gemini (Google) — `GỘP ĐƯỢC — commit 6201090` (bình luận PR #29)
+- Owner duyệt: gộp PR #29 ngày 17/11/2026
 
 Bản chấm vòng 10 của PR #28 (ChatGPT, 17/11/2026; nguyên văn ở bình luận PR #28) xếp bốn việc vào nhóm "việc tồn sau gộp", không chặn gộp. ADR này đóng cả bốn.
 
