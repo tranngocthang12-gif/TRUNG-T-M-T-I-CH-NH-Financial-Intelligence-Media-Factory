@@ -7,9 +7,12 @@ thử dùng cho ngưỡng Bonferroni và Deflated Sharpe không bị đếm thi�
 
 Cách ghi: dựng một commit chỉ đổi research/trial_registry.jsonl trên đầu origin/main bằng lệnh git cấp thấp (chỉ mục tạm),
 không đụng thư mục làm việc và chỉ mục của vòng học đang chạy. Sổ trên main phải là tiền tố của bản đang chạy (chỉ ghi
-thêm); main đổi giữa chừng (workflow nhận dự báo vừa đẩy) thì lấy lại và thử lại.
+thêm); main đổi giữa chừng (workflow nhận dự báo vừa đẩy) thì lấy lại và thử lại. Bản trên main trùng từng byte với bản
+đang chạy KHÔNG tính là đã đẩy xong: hai vòng học đăng ký cùng một giây ra cùng một dòng, vòng thua sẽ thấy trùng và
+nếu coi là thành công thì vẫn chạy backtest — thành hai kết quả cho một mã thử. Đóng lại: chỉ thoát 0 khi chính lần gọi
+này đẩy được.
 
-Dùng: python tools/registry_push.py --root <thư mục kho> <mã thử>        Thoát 0 khi dòng đã nằm trên main.
+Dùng: python tools/registry_push.py --root <thư mục kho> <mã thử>        Thoát 0 chỉ khi chính lần gọi này đẩy được dòng lên main.
 """
 import argparse, os, pathlib, subprocess, sys, tempfile, time
 
@@ -36,7 +39,12 @@ def push(root, trial_id, remote="origin", branch="main", tries=6, wait=5.0) -> s
         shown = _git(root, "show", f"{tip}:{REG}")
         on_main = shown.stdout if shown.returncode == 0 else b""
         if on_main == local:
-            return f"{trial_id}: đã có trên {branch}"
+            # Trùng từng byte trước khi CHÍNH lần gọi này đẩy xong. Hai vòng học trong cùng một giây ra cùng một dòng JSON
+            # (registered_at chỉ tới giây): vòng đẩy sau thấy sổ đã trùng và không được chạy backtest. Lần đẩy trước đã tới
+            # kho mà máy này không nhận được cũng dừng — mã thử đã nằm trên main, lần sau lấy số tiếp theo, không đếm thiếu.
+            raise RuntimeError(f"sổ đăng ký trên {branch} đã trùng bản đang chạy trước khi vòng này đẩy xong — hai vòng học "
+                               "đăng ký cùng nội dung, hoặc lần đẩy trước đã tới kho mà máy này không nhận được; dừng, không "
+                               "ghi đè, không chạy backtest")
         if not local.startswith(on_main):
             raise RuntimeError(f"sổ đăng ký trên {branch} không phải tiền tố của bản đang chạy — có dòng trên {branch} mà "
                                "vòng học này không có (hai vòng học chạy cùng lúc, hoặc sổ bị sửa); dừng, không ghi đè")

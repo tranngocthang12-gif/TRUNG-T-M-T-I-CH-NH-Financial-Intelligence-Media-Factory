@@ -50,6 +50,10 @@ research:
     results: 210
     last_trial_id: T00210
     sha256: 53b28e246c1bba842d93eac30478942422e00000da2519a93ece6c12498548af
+  # L-06 (ADR-0004): MỐC v3.0.2 CỐ ĐỊNH = đầu nhánh main ngay trước khi gộp PR #28 (cha thứ nhất của commit gộp 0b0bffc).
+  # tools/ledger_audit.py chỉ miễn kiểm "đăng ký trước kết quả" cho commit nằm trong lịch sử của commit này (vòng học bản
+  # cũ); mọi commit khác — kể cả nhánh tách từ lịch sử cũ rồi gộp vào sau — đều bị kiểm. Không sửa dòng dưới đây.
+  v302_boundary: c777f91392946ed613417c4e9ae494dfcbc9322f
 registry:
   max_active: 5
   refit_days: 20

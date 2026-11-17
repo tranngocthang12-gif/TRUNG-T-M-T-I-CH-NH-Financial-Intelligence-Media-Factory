@@ -251,6 +251,33 @@ def _frozen_space(root):
     return {"features": set(fs.get("features") or []), "models": set(fs.get("models") or [])} if fs else None
 
 
+_SHA40_RE = re.compile(r"[0-9a-f]{40}")
+
+
+def v302_boundary(root):
+    """research.v302_boundary trong config.yaml (SHA đủ 40 ký tự) hoặc None nếu chưa khai. ValueError nếu khai sai dạng."""
+    cfg = _config(root)
+    if not cfg:
+        return None
+    b = (cfg.get("research") or {}).get("v302_boundary")
+    if b is None:
+        return None
+    if not isinstance(b, str) or not _SHA40_RE.fullmatch(b):
+        raise ValueError("research.v302_boundary phải là SHA đủ 40 ký tự hex (chữ thường)")
+    return b
+
+
+def check_v302_boundary(root) -> list[str]:
+    """L-06 (ADR-0004): kho đã ghim 210 kết quả lịch sử (research.legacy_pin) thì phải có mốc v3.0.2 cố định, đúng dạng."""
+    try:
+        b = v302_boundary(root)
+    except ValueError as e:
+        return [f"L-06: {e}"]
+    if b is None and _legacy_pin(root) is not None:
+        return ["L-06: config.yaml có research.legacy_pin nhưng thiếu research.v302_boundary (mốc v3.0.2 cố định, ADR-0004)"]
+    return []
+
+
 def _legacy_pin(root):
     """research.legacy_pin trong config.yaml: {results, last_trial_id, sha256}; None nếu chưa khai."""
     cfg = _config(root)
@@ -559,5 +586,5 @@ def check_exams(root, today=None) -> list[str]:
 
 def run_all(root) -> list[str]:
     return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root) + check_ledger_rows(root)
-            + check_engine_gate(root) + check_control_b_prompts(root) + check_trial_registry(root) + check_personal_data(root)
+            + check_engine_gate(root) + check_control_b_prompts(root) + check_v302_boundary(root) + check_trial_registry(root) + check_personal_data(root)
             + check_exams(root))

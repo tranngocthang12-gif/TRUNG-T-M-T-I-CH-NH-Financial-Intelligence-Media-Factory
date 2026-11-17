@@ -14,5 +14,7 @@ Bản hiểu 21/10/2026 (commit 3c9f69d): 6 bản kiến trúc viết trong mộ
 ## Điều kiện hoàn tác
 Nếu sau 30 ngày kể từ ngày gộp, `ledger/predictions.jsonl` có dưới 20 dự báo hợp lệ, mở ADR-0002 xét thu hẹp v3.0 về đúng phần Ledger + Thư viện tầng 1. Nếu `tools/validate.py` hoặc workflow nhận dự báo làm CI đỏ liên tục 5 ngày không sửa được, hoàn tác phần G của PR TTC-0 bằng PR riêng; ARCHITECTURE.md vẫn giữ.
 
+(Điều kiện "dưới 20 dự báo sau 30 ngày" đã được xét tại ADR-0002 ngày 17/11/2026: không thu hẹp v3.0; điều kiện thay thế ghi ở ADR-0002.)
+
 ## Ảnh hưởng tới ARCHITECTURE.md
 Toàn bộ (bản đầu tiên của tệp).

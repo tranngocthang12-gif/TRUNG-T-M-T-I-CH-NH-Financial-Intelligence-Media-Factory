@@ -1,10 +1,10 @@
 # ADR-0003: Phân định dự báo qua Issue, chấm A–B, đưa mười luật vào máy kiểm, engine hằng tuần
 - Ngày: 2026-11-17
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR #28)
+- Trạng thái: ACCEPTED (Owner gộp PR #28 ngày 17/11/2026, commit `0b0bffc`); quyết định 3 được ADR-0002 (phạm vi phép thử) và ADR-0004 (cách gọi khóa chọn mẫu) bổ sung
 - Người đề xuất: Claude (kiến trúc sư trưởng)
 - Người chấm: ghế khác nhà cung cấp. Đã chấm mười vòng (17/11/2026), mỗi vòng SỬA TRƯỚC: năm vòng trên các bản 1–5, rồi Claude tự rà toàn bộ theo lệnh Owner "rà soát kiến trúc rồi sửa một lần" (commit `a19e019`), rồi vòng 6 trên bản đó (4 điểm HIGH, đã sửa), rồi vòng 7 trên commit `2ba54fc` (2 HIGH, 2 MEDIUM, đã sửa), rồi vòng 8 trên commit `69e282a` (2 HIGH, 2 MEDIUM, đã sửa — quyết định 10, 11 và phần bổ sung ở quyết định 2, 3, 4, 7), rồi vòng 9 trên commit `a69f204` (2 HIGH, 2 MEDIUM, 1 LOW, đã sửa — quyết định 12 và phần sửa ở quyết định 1, 2, 3, 4, 7, 10), rồi vòng 10 — vòng chấm cuối theo quyết định của Owner — trên commit `9367976` (năm điểm vòng 9 đã đóng; còn 1 MEDIUM chặn gộp, đã sửa ở quyết định 7; 4 việc tồn sau gộp ghi ở cuối tệp). Bản chấm GỘP ĐƯỢC phải nằm thành bình luận PR (mục 6) trước khi gộp.
 - Owner duyệt: khi gộp PR #28
-- Ghi chú số: ADR-0002 để dành cho việc xét thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001.
+- Ghi chú số: ADR-0002 là bản xét điều kiện hoàn tác của ADR-0001 (17/11/2026: không thu hẹp v3.0).
 
 ## Quyết định
 
@@ -81,6 +81,7 @@
 - Mục 11 chỉ hoàn tác bằng ADR mới (mở lại đường ghi của engine kèm cơ chế xuất xứ), không bằng sửa cấu hình.
 
 ## Việc tồn sau gộp (bản chấm vòng 10, không chặn gộp — mỗi việc một Issue, sửa bằng PR riêng)
+Đã xử lý cả bốn ở ADR-0004.
 1. MEDIUM — Một dự báo thiếu dấu nhận đúng hạn làm kiểm toán đỏ tới `resolve_at` (giới hạn đã ghi ở trên). Việc cần xét: một cơ chế hủy sớm dựa trên bằng chứng mà chủ kho không tự tạo được.
 2. LOW — Tên gọi "thứ tự ghi dự báo" của mẫu chốt (quyết định 3): khóa sắp xếp thật là số Issue của dự báo hoàn tất cặp, không phải vị trí dòng trong `ledger/predictions.jsonl`. Sửa cách gọi thành "theo số Issue hoàn tất cặp" ở mã, báo cáo và văn bản.
 3. MEDIUM — Brier và hiệu chuẩn theo ghế còn chịu ảnh hưởng của VOID có chọn lọc (giới hạn đã ghi ở trên). Việc cần xét: thêm thống kê mô tả tính cả dự báo bị hủy.

@@ -1,6 +1,6 @@
 version: 0.4
 phase: V3_G1_LEDGER_AB_VA_THU_VIEN
-current_focus: "ARCHITECTURE v3.0 giai đoạn G1: ghi dự báo A/B qua Issue 'Forecast', phân định qua Issue 'Resolution', chấm A–B trong reports/scorecard.json; ghim tài liệu gốc vào Thư viện. Điều kiện thoát G1 (§8): ≥ 40 tài liệu gốc có hash, ≥ 60 dự báo A+B, tỷ lệ bất đồng đo được. Mốc ADR-0001: 23/11/2026 cần ≥ 20 dự báo hợp lệ."
+current_focus: "Hoàn thiện kiến trúc v3.0 (Owner 17/11/2026, ADR-0002): đường dự báo → phân định → chấm A–B → kiểm toán đã đi trọn vòng (PR #28); dự báo, Thư viện và các việc khác là việc dài hạn, không có hạn chót trong giai đoạn này. Điều kiện thoát G1 (§8): ≥ 40 tài liệu gốc có hash, ≥ 60 dự báo A+B, tỷ lệ bất đồng đo được. Mốc xét thu hẹp v3.0 (ADR-0002): 31/03/2027 cần ≥ 20 dự báo hợp lệ."
 deployment_level: 0
 open_blockers:
   - "Ledger chưa có dự báo nào (0/60); Owner ghi cặp A/B theo docs/HUONG_DAN_VAN_HANH.md mục 6"
@@ -21,10 +21,11 @@ last_session:
     - "v3.0.2 (PR #28): phân định qua Issue 'Resolution'; chấm A–B kiểm định chốt mẫu 194 hai phía; sổ thử L-06 + Deflated Sharpe + không gian giả thuyết đóng băng; kiểm máy Thư viện (L-01, L-04, L-08); cổng chấm PR có bản chấm trên kho (L-09); kiểm toán sổ chỉ-ghi-thêm và đối chiếu Issue thật (L-05); engine hằng tuần; CI chạy đủ mọi test"
     - "Sáu vòng chấm độc lập của ghế khác nhà cung cấp (25 điểm + 4 điểm HIGH ở vòng 6) + một lượt tự rà toàn bộ; bảng luật ↔ máy kiểm ở ADR-0003"
     - "Vòng 7 (ChatGPT chấm commit 2ba54fc): không loại dòng nào được miễn kiểm; kết quả thử chỉ-ghi-thêm có neo sha256; kiểm toán tự chạy sau mỗi lần robot ghi; tổng số lần thử gồm cả lần bỏ dở"
+    - "v3.0.3 (sau PR #28): ADR-0002 không thu hẹp v3.0, dự báo là việc dài hạn, câu hỏi event_before_date ngoài phép thử A–B; ADR-0004 đóng bốn việc tồn (mốc v3.0.2 cố định trong config.yaml, brier_void_worst, tên khóa chọn mẫu, giữ hành vi dấu nhận trễ); ADR-0005 tạm gác engine kịch bản"
     - "Vòng 10 — vòng chấm cuối (ChatGPT chấm commit 9367976): năm điểm vòng 9 đã đóng; sửa 1 MEDIUM chặn gộp — kiểm toán đọc lại dấu nhận 15 lượt cách nhau 30 giây, phủ hết chuỗi thử lại 200 giây của bước đăng dấu nhận; 4 việc tồn sau gộp ghi ở cuối ADR-0003"
     - "Vòng 9 (ChatGPT chấm commit a69f204): phiên bản prompt ghế B ghim theo ngày mở Issue, một luật cho cả lúc nhận lẫn lúc kiểm lại; chạy lại job không xin được dấu nhận cho dòng robot đã từ chối; VOID chỉ ghi được khi tới hạn; mẫu của kiểm định A–B là 194 cặp bất đồng đầu tiên theo thứ tự ghi dự báo, cặp VOID tính theo hướng bất lợi cho kết luận đang xét; mốc v3.0.2 xác định bằng tổ tiên; kiểm toán đọc lại dấu nhận phân định bất kể tuổi Issue; nguồn phân định chỉ nhận https"
     - "Vòng 8 (ChatGPT chấm commit 69e282a): hai robot ghi khác thứ tự mở Issue không còn làm hỏng sổ (luật theo trạng thái sổ + robot tự kiểm trước khi ghi + hạn ghi); phục hồi bằng ghi thêm (chạy lại job; Issue mới); đường ghi dự báo của engine đóng — sổ chỉ nhận dòng từ Issue; research/trials.csv có một khuôn cố định; kiểm toán đọc lại dấu nhận trước khi báo đỏ"
     - "Vòng 6: máy chủ nguồn tách bằng urllib; số và ngày chặt; đăng ký thử đẩy lên main trước khi chạy backtest; dấu nhận của github-actions[bot] cho từng dòng sổ; CI chạy lại luật nhận trên mọi dòng sổ"
-    - "Soạn đợt dự báo A/B số 1 (10 câu) — chờ Owner lấy câu trả lời ghế B và mở Issue"
+    - "Soạn đợt dự báo A/B số 1 (10 câu) — dài hạn, chưa mở Issue (ADR-0002)"
   tests: "tests/test_*.py: 4 tệp unittest + test_governance + 6 test script engine, tất cả chặn gộp; tools/validate.py 0 cảnh báo"
-next_gap: "(1) Ghi ≥ 20 dự báo A/B trước 23/11/2026. (2) Owner lập ghế thi công để ghim tài liệu gốc và viết ghi chú (hàng đợi library/reading_queue.yaml, 30 mục). (3) Phân định đợt 1 khi tới hạn (từ 10/12/2026). (4) Đề thi Học viện khi Thư viện có ghi chú CITED. (5) ADR riêng cho kho dữ liệu ghi tăng dần (C2). (6) Bốn việc tồn sau gộp của PR #28 (cuối ADR-0003): mỗi việc một Issue, sửa bằng PR riêng."
+next_gap: "(1) Owner sửa hai chỗ chữ của governance/LAWS.md (L-09, L-10; ADR-0003 mục \"Hai chỗ chữ\") và bật ruleset cho main. (2) Dài hạn: ghi dự báo A/B (đợt 1 đã soạn), lập ghế thi công cho Thư viện, đề thi Học viện khi có ghi chú CITED. (3) ADR riêng cho kho dữ liệu ghi tăng dần (C2)."
