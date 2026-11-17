@@ -311,6 +311,16 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
         """Tệp mốc v3.0.2 đã TỪNG có trong lịch sử của commit này (kể cả khi về sau bị xóa)."""
         return bool(git("log", "--full-history", "-1", "--format=%H", rev, "--", V302_MARKER).stdout.strip())
     errs = trials_rows_errors(show(base, TRIALS), show("HEAD", TRIALS))
+    if pull_request:
+        # Cái PR tự thêm = commit gộp so với ĐẦU NHÁNH ĐÍCH lúc gộp (cha thứ nhất của commit gộp mà GitHub dựng cho PR).
+        # Không so với base.sha của sự kiện: giá trị đó có thể cũ, khi ấy kết quả do vòng học ghi lên main sau lúc mở PR
+        # sẽ bị tính nhầm là của PR — và mốc v3.0.2 mà main đã có sau lúc mở PR sẽ không được so (tự rà v3.0.3).
+        parents = git("rev-list", "--parents", "-n", "1", "HEAD").stdout.decode().split()
+        if len(parents) == 3:
+            base = parents[1]
+        else:
+            mb = git("merge-base", base, "HEAD").stdout.decode().strip()
+            base = mb or base
     # Mốc v3.0.2 cố định (ADR-0004), kiểm ở cả chế độ PR lẫn main: mốc đã có ở commit gốc thì không được đổi, không được xóa.
     # Lượt kiểm này vẫn dùng mốc CỦA COMMIT GỐC, nên đổi mốc không miễn được commit nào trong khoảng đang kiểm.
     from tools.laws_checks import v302_boundary, _SHA40_RE
@@ -329,15 +339,6 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
                     "được đổi (ADR-0004)")
         boundary = base_boundary
     if pull_request:
-        # Cái PR tự thêm = commit gộp so với ĐẦU NHÁNH ĐÍCH lúc gộp (cha thứ nhất của commit gộp mà GitHub dựng cho PR).
-        # Không so với base.sha của sự kiện: giá trị đó có thể cũ, khi ấy kết quả do vòng học ghi lên main sau lúc mở PR
-        # sẽ bị tính nhầm là của PR.
-        parents = git("rev-list", "--parents", "-n", "1", "HEAD").stdout.decode().split()
-        if len(parents) == 3:
-            base = parents[1]
-        else:
-            mb = git("merge-base", base, "HEAD").stdout.decode().strip()
-            base = mb or base
         nb, nh = len(_trials(show(base, TRIALS))[1]), len(_trials(show("HEAD", TRIALS))[1])
         if nh > nb:
             errs.append(f"L-06: Pull Request thêm {nh - nb} kết quả vào {TRIALS} — kết quả thử chỉ do vòng học trên main ghi, "
