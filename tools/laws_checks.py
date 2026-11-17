@@ -106,15 +106,21 @@ def check_no_recommendation(root) -> list[str]:
     return errs
 
 
+def _no_constant(name):
+    raise ValueError(name)
+
+
 def _chain_errors(path, label) -> list[str]:
     errs, prev = [], "GENESIS"
     for n, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
         if not raw.strip():
             continue
         try:
-            row = json.loads(raw)
+            row = json.loads(raw, parse_constant=_no_constant)      # NaN/Infinity không phải JSON chuẩn
+            if not isinstance(row, dict):
+                raise ValueError("không phải object")
         except ValueError:
-            errs.append(f"{label}: dòng {n} không phải JSON"); break
+            errs.append(f"{label}: dòng {n} không phải JSON chuẩn (hoặc chứa NaN/Infinity)"); break
         if row.get("prev_hash") != prev:
             errs.append(f"{label}: dòng {n} prev_hash không khớp dòng trước"); break
         if row.get("hash") != line_hash(row):
@@ -130,6 +136,39 @@ def check_ledger_chain(root) -> list[str]:
         if path.is_file():
             errs += _chain_errors(path, label)
     return errs
+
+
+def check_ledger_rows(root) -> list[str]:
+    """L-05: chạy LẠI luật nhận dự báo và luật phân định trên mọi dòng Issue đã có trong sổ (tools/ledger_intake.replay,
+    tools/resolution_intake.replay). Hash chuỗi chỉ cho biết sổ nhất quán; kiểm này cho biết từng dòng đúng luật, kể cả
+    dòng được ghi vòng qua intake. Việc dòng có ĐÚNG LÚC hay không do tools/ledger_audit.py đối chiếu với GitHub."""
+    root = pathlib.Path(root)
+    pred_p, res_p = root / "ledger" / "predictions.jsonl", root / "ledger" / "resolutions.jsonl"
+    def rows(path):
+        out = []
+        for raw in (path.read_text(encoding="utf-8").splitlines() if path.is_file() else []):
+            if raw.strip():
+                try:
+                    r = json.loads(raw, parse_constant=_no_constant)
+                except ValueError:
+                    return None                                  # check_ledger_chain đã báo dòng hỏng
+                if isinstance(r, dict):
+                    out.append(r)
+        return out
+    pred, res = rows(pred_p), rows(res_p)
+    if pred is None or res is None:
+        return []
+    if not any("issue_number" in r for r in pred) and not any(r.get("resolution_issue") is not None for r in res):
+        return []
+    try:
+        import jsonschema  # noqa: F401
+    except ImportError:
+        return ["L-05: thiếu thư viện jsonschema nên không kiểm lại được các dòng Issue trong sổ (pip install jsonschema)"]
+    try:
+        from tools import ledger_intake, resolution_intake      # nạp muộn: hai mô-đun này nhập lại laws_checks
+        return ledger_intake.replay(pred, res) + resolution_intake.replay(pred, res)
+    except Exception as e:  # noqa: BLE001
+        return [f"L-05: không chạy lại được luật nhận trên sổ ({str(e).splitlines()[0]})"]
 
 
 def _frozen_space(root):
@@ -266,24 +305,28 @@ def check_pr_review(body: str) -> list[str]:
 
 
 VERDICT_OK = "GỘP ĐƯỢC"
+_VERDICT_LINE_RE = re.compile(r"GỘP ĐƯỢC\s*[—–:-]?\s*(?:commit\s+)?([0-9a-f]{7,40})\.?", re.I)
 
 
 def check_review_evidence(comments, head_sha: str, owner_login: str) -> list[str]:
-    """L-09 + GitHub-first: bản chấm phải nằm trên kho. Cần ít nhất một bình luận PR do chủ kho đăng, dòng đầu (không rỗng)
-    mở đầu bằng "GỘP ĐƯỢC", và có 7 ký tự đầu SHA của commit đang đứng đầu PR. Đẩy commit mới → SHA đổi → phải chấm lại.
+    """L-09 + GitHub-first: bản chấm phải nằm trên kho. Cần ít nhất một bình luận PR do chủ kho đăng mà DÒNG ĐẦU (không rỗng)
+    là đúng "GỘP ĐƯỢC — commit <SHA>" và không có chữ nào khác, với SHA (7–40 ký tự) là đầu SHA của commit đang đứng đầu PR.
+    Dòng đầu kiểu "GỘP ĐƯỢC nếu sửa…", hay SHA chỉ xuất hiện ở đoạn dưới, không được tính. Đẩy commit mới → phải chấm lại.
     comments: danh sách {"user": login, "body": str}."""
-    sha7 = (head_sha or "")[:7].lower()
-    if len(sha7) < 7:
+    head = (head_sha or "").lower()
+    if len(head) < 7:
         return ["L-09: không xác định được SHA đầu PR để đối chiếu bản chấm"]
     for c in comments or []:
         if (c.get("user") or "").lower() != (owner_login or "").lower():
             continue
         body = re.sub(r"<!--.*?-->", "", nfc(c.get("body")), flags=re.S)
-        first = next((ln.strip().lstrip("#*> ").strip() for ln in body.splitlines() if ln.strip()), "")
-        if first.upper().startswith(VERDICT_OK) and sha7 in body.lower():
+        first = next((ln for ln in body.splitlines() if ln.strip()), "")
+        first = re.sub(r"[*_#>`]", "", first).strip()                       # bỏ ký hiệu markdown (đậm, tiêu đề, trích)
+        m = _VERDICT_LINE_RE.fullmatch(first)
+        if m and head.startswith(m.group(1).lower()):
             return []
-    return [f"L-09: chưa có bình luận của chủ kho dán bản chấm mở đầu '{VERDICT_OK}' kèm SHA {sha7} của commit đang chấm "
-            "(đổi mã thì phải chấm lại bản mới)"]
+    return [f"L-09: chưa có bình luận của chủ kho dán bản chấm có dòng đầu đúng dạng '{VERDICT_OK} — commit {head[:7]}' "
+            "(SHA của commit đang chấm; đổi mã thì phải chấm lại bản mới)"]
 
 
 def check_exams(root, today=None) -> list[str]:
@@ -323,5 +366,5 @@ def check_exams(root, today=None) -> list[str]:
 
 
 def run_all(root) -> list[str]:
-    return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root)
+    return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root) + check_ledger_rows(root)
             + check_trial_registry(root) + check_personal_data(root) + check_exams(root))

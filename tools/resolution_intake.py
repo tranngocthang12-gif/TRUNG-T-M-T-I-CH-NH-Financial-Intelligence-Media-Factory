@@ -2,10 +2,11 @@
 Chạy trong workflow resolution_intake.yml. Đầu vào qua biến môi trường:
   ISSUE_NUMBER, ISSUE_CREATED_AT (ISO, giờ máy chủ GitHub), ISSUE_BODY (thân Issue dạng form),
   ISSUE_AUTHOR và REPO_OWNER (tùy chọn; có đủ cả hai mà khác nhau → từ chối).
-Đầu ra: in JSON {"ok": bool, "message": str}; thoát 0 khi ghi được, 2 khi từ chối (không ghi), 3 khi Issue này đã được ghi,
-1 khi lỗi hệ thống.
+Đầu ra: in JSON {"ok": bool, "message": str, "attest": [...]}; thoát 0 khi ghi được, 2 khi từ chối (không ghi), 3 khi Issue
+này đã được ghi, 1 khi lỗi hệ thống. "attest" là dấu nhận "resolutions F-<n> <hash>" cho từng dòng (xem ledger_intake.py).
 
-Luật (mọi "ngày" tính theo giờ Việt Nam, UTC+7):
+Luật — decide() — (mọi "ngày" tính theo giờ Việt Nam, UTC+7). CI chạy LẠI đúng các luật này trên mọi dòng phân định đã
+có trong sổ (replay(), gọi từ tools/validate.py):
 - Một Issue phân định MỘT CÂU HỎI, và ghi cùng một outcome cho MỌI dự báo Issue của câu hỏi đó (cùng question + resolve_at),
   dù forecast_ids chỉ liệt kê một phần: một câu hỏi chỉ có một sự thật, A và B nhận cùng outcome.
 - Câu hỏi đã có bất kỳ dự báo nào được phân định thì không phân định lại (kể cả VOID).
@@ -13,19 +14,21 @@ Luật (mọi "ngày" tính theo giờ Việt Nam, UTC+7):
 - L-09: resolver bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung GHẾ với bất kỳ người viết dự báo nào
   của câu hỏi (đọc author_seat từng dòng: nhà cung cấp mô hình hoặc Owner; Anthropic luôn bị chặn). author_seat không nhận
   ra được ghế → không ghi. resolver là người ĐỌC NGUỒN và quyết định, không phải người bấm nút.
-- Nguồn: YES/NO phải có resolution_source và trích nguyên văn (quote). Nếu resolution_source của dự báo có nêu tên miền
-  (vd nso.gov.vn) thì nguồn phân định phải thuộc đúng tên miền đó (hoặc tên miền con) — không đổi nguồn sau khi biết kết quả.
-  Nguồn đã hứa không công bố → VOID kèm void_reason.
+- Nguồn: YES/NO phải có trích nguyên văn (quote) và resolution_source chứa ít nhất một đường dẫn http(s) đầy đủ. Máy tách
+  TÊN MÁY CHỦ của từng đường dẫn bằng urllib (không dò chuỗi): MỌI đường dẫn phải thuộc tên miền đã hứa trong dự báo
+  (hoặc tên miền con). Tên miền nằm trong đường dẫn, tham số, hay phần đăng nhập (https://nso.gov.vn@evil.com) không
+  được tính; đường dẫn có '@' hoặc '\' bị từ chối. Nguồn đã hứa không công bố → VOID kèm void_reason.
 - L-02: không chứa từ khóa khuyến nghị mua bán.
 - Mỗi dòng khớp contracts/resolution.schema.json và nối hash chuỗi (prev_hash/hash) như predictions.jsonl.
 Giới hạn: máy không mở được nguồn để kiểm quote; quote và resolver là lời khai có ghi tên, kiểm được bởi người đọc sổ.
 """
 import json, os, pathlib, re, sys
 from datetime import date
+from urllib.parse import urlsplit
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from tools.laws_checks import line_hash, recommendation_hit, recognised_seat, _seats  # noqa: E402
-from tools.ledger_intake import parse_issue_form, qkey, vn_day, load_rows  # noqa: E402
+from tools.ledger_intake import parse_issue_form, qkey, vn_day, load_rows, dumps, promised_domains, _URL_RE, ATTEST_MARK  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PRED = ROOT / "ledger" / "predictions.jsonl"
@@ -33,18 +36,35 @@ RES = ROOT / "ledger" / "resolutions.jsonl"
 SCHEMA = ROOT / "contracts" / "resolution.schema.json"
 OUTCOMES = {"YES": 1, "NO": 0, "VOID": None}
 AUTHOR_PROVIDER = "anthropic"            # prompt chuẩn của A và B đều chạy trên Claude → luôn chặn
-_TLDS = "vn|com|org|net|gov|edu|int|io|co|uk|us|eu|info|asia"
-_DOMAIN_RE = re.compile(r"(?<![a-z0-9@.-])((?:[a-z0-9-]+\.)+(?:" + _TLDS + r"))(?![a-z0-9.-])")   # 'tp.hcm', 'q.iv', 'x.pdf' không phải tên miền
+OUTCOME_KEYS = {1: "YES", 0: "NO", None: "VOID"}
+_HOST_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+")
+_ID_RE = re.compile(r"F-[0-9]+")                      # chữ số ASCII: '\d' của Python nhận cả chữ số Ả Rập, Devanagari…
+SYSTEM_FIELDS = {"prev_hash", "hash"}
 
 
-def domains(text) -> set:
-    """Tên miền nêu trong một chuỗi nguồn (bỏ 'www.'), vd 'https://www.nso.gov.vn — thông cáo…' → {'nso.gov.vn'}."""
-    return {d[4:] if d.startswith("www.") else d for d in _DOMAIN_RE.findall(str(text or "").lower())}
+def url_hosts(text) -> set:
+    """Tên máy chủ (bỏ 'www.') của MỌI đường dẫn http(s) trong chuỗi nguồn, tách bằng urllib chứ không dò chuỗi.
+    ValueError nếu có đường dẫn không tách được chắc chắn: có phần đăng nhập ('@'), dấu '\\' (trình duyệt coi là '/'),
+    hoặc tên máy chủ có ký tự ngoài a-z, 0-9, '-', '.'."""
+    hosts = set()
+    for u in _URL_RE.findall(str(text or "")):
+        try:
+            parts = urlsplit(u)
+            host = (parts.hostname or "").lower().rstrip(".")
+            parts.port                                   # cổng không phải số → ValueError
+        except ValueError:
+            raise ValueError(f"đường dẫn '{u}' không đọc được") from None
+        if "@" in parts.netloc or "\\" in u:
+            raise ValueError(f"đường dẫn '{u}' có '@' hoặc '\\' trong phần máy chủ — ghi đường dẫn thẳng tới trang nguồn")
+        if not _HOST_RE.fullmatch(host):
+            raise ValueError(f"đường dẫn '{u}' có tên máy chủ không hợp lệ")
+        hosts.add(host[4:] if host.startswith("www.") else host)
+    return hosts
 
 
-def source_allowed(promised: set, used: set) -> bool:
-    """Nguồn phân định hợp lệ khi có ít nhất một tên miền trùng hoặc là tên miền con của một tên miền đã hứa."""
-    return any(u == p or u.endswith("." + p) for u in used for p in promised)
+def source_allowed(promised: set, hosts: set) -> bool:
+    """Hợp lệ khi có ít nhất một đường dẫn và MỌI máy chủ đều trùng hoặc là tên miền con của một tên miền đã hứa."""
+    return bool(hosts) and bool(promised) and all(any(h == p or h.endswith("." + p) for p in promised) for h in hosts)
 
 
 def reject(msg) -> int:
@@ -52,93 +72,88 @@ def reject(msg) -> int:
     return 2
 
 
-def main() -> int:
-    number = int(os.environ["ISSUE_NUMBER"])
-    created = os.environ["ISSUE_CREATED_AT"]
-    author, owner = os.environ.get("ISSUE_AUTHOR", "").strip(), os.environ.get("REPO_OWNER", "").strip()
-    if author and owner and author.lower() != owner.lower():
-        return reject(f"chỉ Issue do chủ kho ({owner}) mở mới được ghi vào Ledger")
-    try:
-        data = parse_issue_form(os.environ.get("ISSUE_BODY", ""))
-    except ValueError as e:
-        return reject(str(e))
-    try:
-        import jsonschema
-    except ImportError:
-        print(json.dumps({"ok": False, "message": "Lỗi hệ thống: thiếu thư viện jsonschema"}, ensure_ascii=False))
-        return 1
-    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+def decide(data, number, created, author, pred_rows, res_rows, schema=None):
+    """Luật phân định. data: các trường của form; pred_rows/res_rows: sổ dự báo và các dòng phân định đã có TRƯỚC Issue
+    này. Trả về (lỗi hoặc None, các dòng sẽ ghi — chưa có prev_hash/hash, ghi chú). Hàm thuần — intake và replay() dùng chung."""
+    import jsonschema
+    schema = schema or json.loads(SCHEMA.read_text(encoding="utf-8"))
     created_day = vn_day(created)
-
-    res_rows = load_rows(RES)
-    if any(r.get("resolution_issue") == number for r in res_rows):
-        print(json.dumps({"ok": True, "duplicate": True, "message": f"Phân định #{number} đã có trong Ledger, bỏ qua"}, ensure_ascii=False))
-        return 3
-
-    ids = list(dict.fromkeys(re.findall(r"F-\d+", str(data.get("forecast_ids", "")))))
+    ids = list(dict.fromkeys(_ID_RE.findall(str(data.get("forecast_ids", "")))))
     if not ids:
-        return reject("forecast_ids phải liệt kê mã dạng F-<số Issue>, ví dụ F-101, F-102")
+        return "forecast_ids phải liệt kê mã dạng F-<số Issue>, ví dụ F-101, F-102", [], ""
     outcome_key = str(data.get("outcome", "")).strip().upper()
     if outcome_key not in OUTCOMES:
-        return reject("outcome phải là YES, NO hoặc VOID")
+        return "outcome phải là YES, NO hoặc VOID", [], ""
     resolver = str(data.get("resolver", "")).strip()
     if not resolver:
-        return reject("thiếu resolver (ai đã đọc nguồn và phân định)")
+        return "thiếu resolver (ai đã đọc nguồn và phân định)", [], ""
     if not recognised_seat(resolver):
-        return reject(f"L-09: resolver '{resolver}' phải BẮT ĐẦU bằng tên ghế: 'Owner', hoặc tên mô hình/nhà cung cấp (ví dụ 'ChatGPT (OpenAI)')")
+        return f"L-09: resolver '{resolver}' phải BẮT ĐẦU bằng tên ghế: 'Owner', hoặc tên mô hình/nhà cung cấp (ví dụ 'ChatGPT (OpenAI)')", [], ""
     source, quote, void_reason = (str(data.get(k, "")).strip() for k in ("resolution_source", "quote", "void_reason"))
+    if any(ATTEST_MARK in str(v).lower() for v in data.values()):
+        return f"nội dung chứa chuỗi dành riêng '{ATTEST_MARK}' (chỉ robot được viết dấu nhận)", [], ""
     if outcome_key == "VOID":
         if not void_reason:
-            return reject("VOID phải có void_reason")
+            return "VOID phải có void_reason", [], ""
     elif not source or not quote:
-        return reject("YES/NO phải có resolution_source và trích nguyên văn (quote) từ nguồn")
+        return "YES/NO phải có resolution_source và trích nguyên văn (quote) từ nguồn", [], ""
     hit = recommendation_hit(json.dumps(data, ensure_ascii=False))
     if hit:
-        return reject(f"L-02: nội dung chứa từ khóa khuyến nghị '{hit}'")
+        return f"L-02: nội dung chứa từ khóa khuyến nghị '{hit}'", [], ""
 
-    preds = {p.get("id"): p for p in load_rows(PRED) if "issue_number" in p}
+    preds = {p.get("id"): p for p in pred_rows if "issue_number" in p}
     missing = [i for i in ids if i not in preds]
     if missing:
-        return reject(f"không có dự báo Issue {missing} trong ledger/predictions.jsonl")
+        return f"không có dự báo Issue {missing} trong ledger/predictions.jsonl", [], ""
     keys = {qkey(preds[i]) for i in ids}
     if len(keys) != 1:
-        return reject("các forecast_ids không cùng câu hỏi và cùng resolve_at; mỗi Issue Resolution chỉ phân định một câu hỏi")
+        return "các forecast_ids không cùng câu hỏi và cùng resolve_at; mỗi Issue Resolution chỉ phân định một câu hỏi", [], ""
     key = keys.pop()
     group = sorted((p for p in preds.values() if qkey(p) == key), key=lambda p: p.get("issue_number", 0))
     group_ids = [p["id"] for p in group]
     done = {r.get("prediction_id") for r in res_rows}
     already = [i for i in group_ids if i in done]
     if already:
-        return reject(f"câu hỏi này đã được phân định ({', '.join(already)}); không phân định lại")
+        return f"câu hỏi này đã được phân định ({', '.join(already)}); không phân định lại", [], ""
 
     unknown = [p["id"] for p in group if not recognised_seat(p.get("author_seat"))]
     if unknown:
-        return reject(f"L-09: không nhận ra ghế viết (author_seat) của {', '.join(unknown)} nên không xác định được "
-                      "người phân định độc lập; không ghi (đóng khi không chắc)")
+        return (f"L-09: không nhận ra ghế viết (author_seat) của {', '.join(unknown)} nên không xác định được "
+                "người phân định độc lập; không ghi (đóng khi không chắc)"), [], ""
     authors = {AUTHOR_PROVIDER}
     for p in group:
         authors |= _seats(p.get("author_seat"))          # ghế = nhà cung cấp mô hình HOẶC Owner
     clash = sorted(_seats(resolver) & authors)
     if clash:
-        return reject(f"L-09: '{resolver}' chung ghế với người viết dự báo của câu hỏi ({', '.join(clash)}); "
-                      "người phân định phải là ghế khác: khác nhà cung cấp, và Owner không phân định dự báo do Owner viết")
+        return (f"L-09: '{resolver}' chung ghế với người viết dự báo của câu hỏi ({', '.join(clash)}); "
+                "người phân định phải là ghế khác: khác nhà cung cấp, và Owner không phân định dự báo do Owner viết"), [], ""
 
     try:
         resolve_at = date.fromisoformat(group[0]["resolve_at"])
-    except (KeyError, ValueError):
-        return reject(f"resolve_at của {group_ids[0]} không đọc được; không ghi")
+    except (KeyError, TypeError, ValueError):
+        return f"resolve_at của {group_ids[0]} không đọc được; không ghi", [], ""
     early_ok = outcome_key == "YES" and all(p.get("resolution_rule") == "event_before_date" for p in group)
     if created_day < resolve_at and not early_ok:
-        return reject(f"L-05: chưa tới resolve_at {resolve_at.isoformat()} theo giờ Việt Nam (chỉ YES được phân định sớm, "
-                      "và chỉ khi mọi dự báo của câu hỏi có luật event_before_date)")
+        return (f"L-05: chưa tới resolve_at {resolve_at.isoformat()} theo giờ Việt Nam (chỉ YES được phân định sớm, "
+                "và chỉ khi mọi dự báo của câu hỏi có luật event_before_date)"), [], ""
 
     if outcome_key != "VOID":
-        promised = set().union(*[domains(p.get("resolution_source")) for p in group])
-        if promised and not source_allowed(promised, domains(source)):
-            return reject(f"nguồn phân định phải thuộc tên miền đã hứa trong dự báo ({', '.join(sorted(promised))}); "
-                          "nếu nguồn đó không công bố thì chọn VOID và ghi void_reason")
+        promised = set().union(*[promised_domains(p.get("resolution_source")) for p in group])
+        if not promised:
+            return ("dự báo của câu hỏi này không hứa tên miền nguồn nào nên máy không kiểm được nguồn phân định; "
+                    "chỉ ghi được VOID kèm void_reason (đóng khi không chắc)"), [], ""
+        try:
+            hosts = url_hosts(source)
+        except ValueError as e:
+            return f"nguồn phân định: {e}", [], ""
+        if not hosts:
+            return ("resolution_source phải có đường dẫn đầy đủ bắt đầu bằng https:// tới trang nguồn "
+                    f"(thuộc {', '.join(sorted(promised))})"), [], ""
+        hosts |= promised_domains(source)              # cả tên miền viết trần (không https://) cũng phải thuộc nguồn đã hứa
+        if not source_allowed(promised, hosts):
+            return (f"mọi đường dẫn và tên miền trong nguồn phân định phải thuộc tên miền đã hứa trong dự báo ({', '.join(sorted(promised))}); "
+                    f"đang có {', '.join(sorted(hosts))}. Nếu nguồn đã hứa không công bố thì chọn VOID và ghi void_reason"), [], ""
 
-    prev = res_rows[-1]["hash"] if res_rows else "GENESIS"
     rows = []
     for i in group_ids:
         row = {"prediction_id": i, "resolved_at": created_day.isoformat(), "outcome": OUTCOMES[outcome_key],
@@ -153,18 +168,101 @@ def main() -> int:
         try:
             jsonschema.validate(row, schema)
         except Exception as e:  # noqa: BLE001
-            return reject(f"không khớp resolution.schema.json — {str(e).splitlines()[0]}")
-        row["prev_hash"] = prev
-        row["hash"] = line_hash(row)
-        prev = row["hash"]
+            return f"không khớp resolution.schema.json — {str(e).splitlines()[0]}", [], ""
         rows.append(row)
+    extra = [i for i in group_ids if i not in ids]
+    note = f" (gồm cả {', '.join(extra)} — cùng câu hỏi)" if extra else ""
+    return None, rows, f"Đã phân định {', '.join(group_ids)}: {outcome_key} (resolver: {resolver}){note}"
+
+
+def chain(rows, prev):
+    out = []
+    for r in rows:
+        r = {**r, "prev_hash": prev}
+        r["hash"] = line_hash(r)
+        prev = r["hash"]
+        out.append(r)
+    return out
+
+
+def attest(row) -> str:
+    return f"resolutions {row.get('prediction_id')} {row.get('hash')}"
+
+
+def replay(pred_rows, res_rows) -> list[str]:
+    """Chạy lại luật phân định trên mọi nhóm dòng phân định Issue đã có trong sổ, theo thứ tự: dựng lại form từ các dòng,
+    cho qua decide(), kết quả phải ra đúng các dòng đang có. Trả về danh sách lỗi."""
+    errs, prior, seen, i = [], [], set(), 0
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    while i < len(res_rows):
+        r = res_rows[i]
+        n = r.get("resolution_issue")
+        if n is None:
+            prior.append(r); i += 1; continue             # dòng của engine (luật excess_return_positive): engine/ledger.py lo
+        j = i
+        while j < len(res_rows) and res_rows[j].get("resolution_issue") == n:
+            j += 1
+        group, label = res_rows[i:j], f"phân định Issue #{n}"
+        if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
+            errs.append(f"L-05: {label}: resolution_issue không phải số Issue")
+        elif n in seen:
+            errs.append(f"L-05: {label} xuất hiện ở hai chỗ trong sổ")
+        else:
+            seen.add(n)
+            g0 = group[0]
+            data = {"forecast_ids": ", ".join(str(x.get("prediction_id")) for x in group),
+                    "outcome": OUTCOME_KEYS.get(g0.get("outcome") if not isinstance(g0.get("outcome"), bool) else "?", "?"),
+                    "resolver": g0.get("resolver", ""), "resolution_source": g0.get("resolution_source", ""),
+                    "quote": g0.get("quote", ""), "void_reason": g0.get("void", "")}
+            if g0.get("observed_value"):
+                data["observed_value"] = g0["observed_value"]
+            try:
+                created = g0.get("resolution_issue_created_at")
+                earlier = [p for p in pred_rows if str(p.get("issue_created_at") or "") < str(created)]
+                msg, want, _ = decide(data, n, created, g0.get("resolution_issue_author", ""), earlier, prior, schema)
+            except Exception as e:  # noqa: BLE001
+                msg, want = f"không đọc được ({str(e).splitlines()[0]})", []
+            have = [{k: v for k, v in x.items() if k not in SYSTEM_FIELDS} for x in group]
+            if msg:
+                errs.append(f"L-05: {label} trong sổ không qua luật phân định: {msg}")
+            elif want != have:
+                errs.append(f"L-05: {label}: các dòng trong sổ không khớp kết quả chạy lại luật phân định "
+                            f"(phải có đúng {len(want)} dòng cho {', '.join(w['prediction_id'] for w in want)}, cùng nội dung)")
+        prior += group
+        i = j
+    return errs
+
+
+def main() -> int:
+    number = int(os.environ["ISSUE_NUMBER"])
+    created = os.environ["ISSUE_CREATED_AT"]
+    author, owner = os.environ.get("ISSUE_AUTHOR", "").strip(), os.environ.get("REPO_OWNER", "").strip()
+    if author and owner and author.lower() != owner.lower():
+        return reject(f"chỉ Issue do chủ kho ({owner}) mở mới được ghi vào Ledger")
+    try:
+        data = parse_issue_form(os.environ.get("ISSUE_BODY", ""))
+    except ValueError as e:
+        return reject(str(e))
+    try:
+        import jsonschema  # noqa: F401
+    except ImportError:
+        print(json.dumps({"ok": False, "message": "Lỗi hệ thống: thiếu thư viện jsonschema"}, ensure_ascii=False))
+        return 1
+    res_rows = load_rows(RES)
+    old = [r for r in res_rows if r.get("resolution_issue") == number]
+    if old:                    # chạy lại job: không ghi trùng, trả lại dấu nhận để workflow đăng nếu lần trước chưa đăng được
+        print(json.dumps({"ok": True, "duplicate": True, "attest": [attest(r) for r in old],
+                          "message": f"Phân định #{number} đã có trong Ledger, bỏ qua"}, ensure_ascii=False))
+        return 3
+    msg, rows, note = decide(data, number, created, author, load_rows(PRED), res_rows)
+    if msg:
+        return reject(msg)
+    rows = chain(rows, res_rows[-1]["hash"] if res_rows else "GENESIS")
     RES.parent.mkdir(parents=True, exist_ok=True)
     with RES.open("a", encoding="utf-8") as f:
         for r in rows:
-            f.write(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n")
-    extra = [i for i in group_ids if i not in ids]
-    note = f" (gồm cả {', '.join(extra)} — cùng câu hỏi)" if extra else ""
-    print(json.dumps({"ok": True, "message": f"Đã phân định {', '.join(group_ids)}: {outcome_key} (resolver: {resolver}){note}"}, ensure_ascii=False))
+            f.write(dumps(r) + "\n")
+    print(json.dumps({"ok": True, "attest": [attest(r) for r in rows], "message": note}, ensure_ascii=False))
     return 0
 
 

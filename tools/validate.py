@@ -23,7 +23,7 @@ REQUIRED = ["BOOT.md", "CHANGELOG.md", "config.yaml", ".github/workflows/daily_c
             ".github/ISSUE_TEMPLATE/forecast.yml", ".github/ISSUE_TEMPLATE/resolution.yml",
             ".github/workflows/ledger_intake.yml", ".github/workflows/resolution_intake.yml", ".github/workflows/tests.yml",
             "tools/ledger_intake.py", "tools/resolution_intake.py", "tools/laws_checks.py",
-            "tools/review_gate.py", "tools/ledger_audit.py", ".github/workflows/review_gate.yml",
+            "tools/review_gate.py", "tools/ledger_audit.py", "tools/registry_push.py", ".github/workflows/review_gate.yml",
             ".github/pull_request_template.md", "architecture/adr/ADR-0003-phan-dinh-va-van-hanh.md",
             "docs/HUONG_DAN_VAN_HANH.md", "engine/knowledge_notes.py",
             "library/INDEX.md", "library/SOURCE_MANIFEST.json", "library/reading_queue.yaml", "academy/curriculum.md"]
@@ -103,7 +103,8 @@ expected = len(V1_CONTRACTS) + len(V2_CONTRACTS)
 n_ok = len([c for c in V1_CONTRACTS + V2_CONTRACTS if c in have])
 if todo: errors.append(f"Contract theo kiến trúc v3.0: có {n_ok}/{expected}; thiếu {todo}")
 
-# ---------- 5b) Luật vận hành máy kiểm (governance/LAWS.md: L-02, L-03, L-05 hash chuỗi, L-06, L-07, L-10 đề thi) ----------
+# ---------- 5b) Luật vận hành máy kiểm (governance/LAWS.md: L-02, L-03, L-05 hash chuỗi + chạy lại luật nhận trên từng dòng sổ,
+#              L-06, L-07, L-10 đề thi) ----------
 errors.extend(laws_checks.run_all(ROOT))
 
 # ---------- 5c) Thư viện: L-01 nguồn ghim + trích nguyên văn, L-04 giấy phép, L-08 hiệu lực, L-09 trạng thái ----------
