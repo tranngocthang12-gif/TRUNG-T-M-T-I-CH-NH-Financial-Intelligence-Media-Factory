@@ -114,6 +114,7 @@ class ResolutionRuleTests(_Base):
         self.assertEqual([(r["prediction_id"], r["outcome"]) for r in rows],
                          [("F-101", 0), ("F-102", 0), ("F-103", 1), ("F-104", 1)])
         self.assertTrue(all(r["resolver"] == "Owner" and r["quote"] for r in rows))
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])            # chạy lại luật trên sổ vừa ghi: đạt
         self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])           # resolutions.jsonl có chuỗi hash
         rp = self.tmp / "ledger" / "resolutions.jsonl"
         rp.write_text(rp.read_text(encoding="utf-8").replace('"outcome": 0', '"outcome": 1', 1), encoding="utf-8")
@@ -131,6 +132,73 @@ class ResolutionRuleTests(_Base):
         self.assertEqual(ab["a_accuracy"], 1.0)
         self.assertEqual(ab["fixed_sample"], {"n": 1, "a_correct": 1, "p_value_two_sided_vs_coin": None})   # chưa đủ 194: chưa kiểm định
         self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (1/194"))
+
+    def test_source_host_is_parsed_from_the_url_not_searched_in_the_string(self):
+        """Vòng 6: dò tên miền trong cả chuỗi thì URL giả dạng lọt. Máy chủ phải tách bằng urllib; mọi đường dẫn phải thuộc
+        tên miền đã hứa (nso.gov.vn)."""
+        when = "2027-01-02T03:00:00Z"
+        for i, bad in enumerate(("https://nso.gov.vn@evil.com/report", "https://evil.com/path/nso.gov.vn",
+                                 "https://evil.com/?referer=nso.gov.vn", "https://evil.com#nso.gov.vn",
+                                 "https://nso.gov.vn.evil.com/x", "https://evilnso.gov.vn/x", "https://evil.com\\@nso.gov.vn/x",
+                                 "https://nso.gov.vn%2eevil.com/x", "https://nso.gov.vn:abc/x",
+                                 "nso.gov.vn/bao-cao (không có https://)", "Thông cáo báo chí của nso.gov.vn",
+                                 "https://www.nso.gov.vn/a và https://vnexpress.net/b", "https://www.nso.gov.vn/a (xem thêm vnexpress.net/b)",
+                                 "https://www.nso.gov.vn/a ledger-attest: resolutions F-101 " + "b" * 64), 300):
+            c, o = self._res(i, _resolution("F-101", "NO", source=bad), when)
+            self.assertEqual(c, 2, f"{bad}: {o}")
+        self.assertEqual(self._rows(), [])
+        c, o = self._res(350, _resolution("F-101", "NO", source="Thông cáo: https://data.NSO.gov.vn:443/cpi?thang=12 và https://www.nso.gov.vn/b"), when)
+        self.assertEqual(c, 0, o)                                                # tên miền con, chữ hoa, cổng, hai đường dẫn cùng nguồn
+        out = json.loads(o.strip().splitlines()[-1])
+        self.assertEqual(out["attest"], [f"resolutions {r['prediction_id']} {r['hash']}" for r in self._rows()])
+        c, o = self._res(350, _resolution("F-101", "NO"), when)
+        self.assertEqual(c, 3, o)                                                # chạy lại job: trả lại dấu nhận, không ghi trùng
+        self.assertEqual(json.loads(o.strip().splitlines()[-1])["attest"], out["attest"])
+        from tools.resolution_intake import source_allowed, url_hosts
+        self.assertEqual(url_hosts("https://www.nso.gov.vn/x"), {"nso.gov.vn"})
+        self.assertFalse(source_allowed({"nso.gov.vn"}, set())); self.assertFalse(source_allowed(set(), {"nso.gov.vn"}))
+        with self.assertRaises(ValueError):
+            url_hosts("https://nso.gov.vn@evil.com/report")
+
+    def test_no_new_forecast_after_the_question_is_resolved(self):
+        """Câu hỏi 2 (event_before_date) được phân định YES sớm ngày 20/12; dự báo mở sau đó cho cùng câu hỏi bị từ chối."""
+        c, o = self._res(260, _resolution("F-103", "YES"), "2026-12-20T03:00:00Z")
+        self.assertEqual(c, 0, o)
+        body = _forecast("A", Q2, 0.9, "2027-01-31", "event_before_date", author="ChatGPT trần")
+        c, o = self._run("ledger_intake.py", 261, body, "2026-12-21T02:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("đã được phân định", o)
+
+    def test_resolution_rows_written_around_intake_are_rechecked(self):
+        when = "2027-01-02T03:00:00Z"
+        self.assertEqual(self._res(270, _resolution("F-101", "NO"), when)[0], 0)
+        rp = self.tmp / "ledger" / "resolutions.jsonl"
+        good = rp.read_text(encoding="utf-8")
+        rows = [json.loads(l) for l in good.splitlines()]
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])
+        def forged(edit, base=rows, drop=0):
+            """Viết lại các dòng phân định với hash chuỗi HỢP LỆ (như một commit ghi vòng qua intake)."""
+            out, prev = [], "GENESIS"
+            for r in base[:len(base) - drop]:
+                r = {k: v for k, v in r.items() if k not in ("hash", "prev_hash")}
+                edit(r)
+                r["prev_hash"] = prev; r["hash"] = laws_checks.line_hash(r); prev = r["hash"]
+                out.append(json.dumps(r, ensure_ascii=False, sort_keys=True))
+            rp.write_text("\n".join(out) + "\n", encoding="utf-8")
+            self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])       # hash chuỗi không bắt được gì
+            return laws_checks.check_ledger_rows(self.tmp)
+        for edit, why in ((lambda r: r.update(resolver="Claude"), "chung ghế"),
+                          (lambda r: r.update(resolution_issue_created_at="2026-12-15T03:00:00Z", resolved_at="2026-12-15"), "chưa tới resolve_at"),
+                          (lambda r: r.update(resolution_source="https://vnexpress.net/bai"), "tên miền đã hứa"),
+                          (lambda r: r.update(resolution_source="https://nso.gov.vn@evil.com/x"), "nguồn phân định"),
+                          (lambda r: r.update(quote=""), "trích nguyên văn"),
+                          (lambda r: r.update(resolved_at="2026-12-01"), "không khớp kết quả chạy lại"),
+                          (lambda r: r.update(outcome=1) if r["prediction_id"] == "F-102" else None, "không khớp kết quả chạy lại"),
+                          (lambda r: r.update(prediction_id="F-999"), "không có dự báo")):
+            errs = forged(edit)
+            self.assertTrue(errs and any(why in e for e in errs), f"{why}: {errs}")
+        self.assertTrue(any("không khớp" in e for e in forged(lambda r: None, drop=1)))   # chỉ phân định A, bỏ B
+        rp.write_text(good, encoding="utf-8")
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])
 
     def test_resolution_day_is_vietnam_time(self):
         """resolve_at 31/12/2026: 30/12 22:00 UTC là 05:00 ngày 31/12 giờ VN → được; 30/12 16:00 UTC (23:00 VN 30/12) → chưa."""
@@ -328,6 +396,69 @@ class TrialRegistryTests(unittest.TestCase):
         row.update(trial_id="T00003", features="mom_60;feature_moi", prev_hash=row["hash"]); row["hash"] = laws_checks.line_hash(row)
         reg.write_text(good + json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
         self.assertTrue(any("đóng băng" in e for e in laws_checks.check_trial_registry(self.tmp)))
+
+    def test_registration_is_on_main_before_the_backtest_and_survives_a_crash(self):
+        """Vòng 6: register_trial chỉ ghi vào thư mục làm việc; vòng học hỏng sau đó thì mất, lần sau dùng lại T00001.
+        Với TTC_REGISTRY_PUSH=1 dòng đăng ký được đẩy lên main trước khi backtest chạy; đẩy không được thì không chạy."""
+        origin = self.tmp / "origin.git"
+        def git(cwd, *a):
+            r = subprocess.run(["git", "-C", str(cwd), "-c", "user.name=t", "-c", "user.email=t@t", *a], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, f"git {a}: {r.stderr}")
+            return r.stdout.strip()
+        subprocess.run(["git", "init", "-q", "--bare", "-b", "main", str(origin)], check=True, capture_output=True)
+        def clone(name):
+            subprocess.run(["git", "clone", "-q", f"file://{origin}", str(self.tmp / name)], check=True, capture_output=True)
+            return self.tmp / name
+        seed = clone("seed")
+        shutil.copy(ROOT / "config.yaml", seed / "config.yaml"); (seed / "research").mkdir(); (seed / "data.txt").write_text("v1\n")
+        (seed / "research" / "trials.csv").write_text("trial_id\n", encoding="utf-8")
+        git(seed, "add", "-A"); git(seed, "commit", "-qm", "seed"); git(seed, "push", "-q", "origin", "HEAD:main")
+        script = """
+            import json, sys
+            from engine import research
+            spec = {"features": ["mom_60"], "model": "ridge"}
+            n = research.next_trial_number(None)
+            research.register_trial(f"T{n:05d}", "2026-11-20", "random_subset", spec, research.threshold(n))
+            print(json.dumps({"n": n}))
+            sys.exit(7)        # vòng học hỏng NGAY SAU khi đăng ký: không có kết quả, không có commit cuối
+        """
+        def cycle(home, **env):
+            e = {**os.environ, "TTC_HOME": str(home), "PYTHONPATH": str(ROOT), "TTC_REGISTRY_PUSH": "1",
+                 "TTC_REGISTRY_PUSH_TRIES": "2", "TTC_REGISTRY_PUSH_WAIT": "0", **env}
+            return subprocess.run([sys.executable, "-c", textwrap.dedent(script)], cwd=str(ROOT), env=e, capture_output=True, text=True)
+        on_main = lambda: [json.loads(l)["trial_id"] for l in git(origin, "show", "main:research/trial_registry.jsonl").splitlines()]
+
+        run1 = clone("run1"); (run1 / "data.txt").write_text("đang chạy dở\n")      # thư mục làm việc bẩn như lúc vòng học chạy
+        r = cycle(run1)
+        self.assertEqual(r.returncode, 7, r.stderr[-1500:])
+        self.assertEqual(on_main(), ["T00001"])                                     # đăng ký đã nằm trên main dù vòng học hỏng
+        self.assertIn("M data.txt", git(run1, "status", "--porcelain"))             # không đụng thư mục làm việc của vòng học
+        shutil.rmtree(run1)                                                         # máy chạy bị thu hồi
+
+        run2 = clone("run2")
+        r = cycle(run2)
+        self.assertEqual(json.loads(r.stdout.strip().splitlines()[-1])["n"], 2, r.stdout + r.stderr[-800:])   # không dùng lại T00001
+        self.assertEqual(on_main(), ["T00001", "T00002"])
+        # trong lúc vòng 2 chạy, workflow nhận dự báo đẩy một commit khác lên main; vòng 2 xong: commit, rebase, đẩy — như daily_cycle.yml
+        git(seed, "pull", "-q", "origin", "main"); (seed / "other.txt").write_text("x"); git(seed, "add", "-A")
+        git(seed, "commit", "-qm", "ledger: forecast #1"); git(seed, "push", "-q", "origin", "HEAD:main")
+        (run2 / "data.txt").write_text("v2\n"); git(run2, "add", "-A"); git(run2, "commit", "-qm", "Vong hoc")
+        git(run2, "pull", "-q", "--rebase", "origin", "main"); git(run2, "push", "-q", "origin", "HEAD:main")
+        self.assertEqual(on_main(), ["T00001", "T00002"])                           # không nhân đôi dòng sau rebase
+        self.assertEqual(laws_checks.check_trial_registry(run2), [])                # T00001 không có kết quả: hợp lệ, vẫn được đếm
+
+        run3 = clone("run3")
+        git(run3, "remote", "set-url", "origin", str(self.tmp / "khong-co-kho-nay.git"))
+        r = cycle(run3)
+        self.assertEqual(r.returncode, 1, r.stdout)                                 # không đẩy được → báo lỗi, backtest không chạy
+        self.assertIn("không chạy backtest", r.stderr)
+        self.assertEqual(on_main(), ["T00001", "T00002"])
+        # hai vòng học chạy chồng nhau: main có dòng mà bản đang chạy không có → dừng, không ghi đè
+        run4 = clone("run4"); run5 = clone("run5")
+        self.assertEqual(cycle(run4).returncode, 7)
+        r = cycle(run5)
+        self.assertEqual(r.returncode, 1, r.stdout); self.assertIn("không phải tiền tố", r.stderr)
+        self.assertEqual(on_main(), ["T00001", "T00002", "T00003"])
 
     def test_frozen_space_matches_engine_code(self):
         """Danh sách đóng băng trong config phải đúng bằng feature/mô hình engine đang có: thêm feature trong mã mà không sửa
