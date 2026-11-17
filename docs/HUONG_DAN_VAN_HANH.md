@@ -40,15 +40,19 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
    - `prompt_hash`: ghế B dán mã hash ghi trong `CONTROL_B_PROMPT.md`; ghế A để trống.
 4. Trong 1–2 phút robot `github-actions` bình luận ✅ (đã ghi, kèm mã `F-<số Issue>` và dòng **dấu nhận** `ledger-attest: …`) hoặc ❌ kèm lý do. Bị ❌ thì mở Issue mới đã sửa; không sửa Issue cũ (sửa không có tác dụng).
    - **Không sửa, không xóa bình luận ✅ của robot.** Dòng dấu nhận là bằng chứng dự báo đã có từ lúc Issue mở; mất nó thì kiểm toán sổ báo đỏ.
-   - Nếu việc "Ledger intake" đỏ mà dự báo đã vào sổ nhưng chưa có bình luận ✅: vào tab **Actions**, mở lần chạy đó, bấm **Re-run all jobs** trong vòng 6 giờ kể từ lúc mở Issue (và trước ngày `resolve_at`). Robot sẽ đăng bổ sung dấu nhận, không ghi trùng. Quá hạn đó thì báo kiến trúc sư: dòng ấy không còn bằng chứng thời điểm.
-5. Mỗi ghế chỉ một dự báo cho một câu hỏi. Ghi nhầm thì không xóa được: sổ chỉ ghi thêm.
+   - Nếu việc "Ledger intake" đỏ mà dự báo đã vào sổ nhưng chưa có bình luận ✅: vào tab **Actions**, mở lần chạy đó, bấm **Re-run all jobs** trong vòng 6 giờ kể từ lúc mở Issue (và trước ngày `resolve_at`). Robot sẽ đăng bổ sung dấu nhận, không ghi trùng.
+   - Quá 6 giờ mà dự báo đã nằm trong sổ nhưng chưa có dấu nhận: vẫn bấm **Re-run all jobs** để robot đăng dấu nhận muộn, rồi **hủy câu hỏi đó** — mở Issue mẫu **Resolution**, chọn `VOID`, ghi lý do ở `void_reason` (ví dụ "F-123 không có dấu nhận đúng hạn do sự cố ngày …"). VOID ghi được ngay, không phải chờ `resolve_at`. Câu hỏi bị hủy không được chấm; muốn hỏi lại thì viết câu hỏi mới (khác câu chữ).
+   - Mở Issue dự báo **ít nhất 30 phút trước nửa đêm** của ngày liền trước `resolve_at`; sát hơn thì robot từ chối (dấu nhận sẽ rơi sang ngày phân định).
+5. Mỗi ghế chỉ một dự báo cho một câu hỏi. Ghi nhầm thì không xóa được: sổ chỉ ghi thêm. Muốn bỏ một câu hỏi viết sai, dùng Issue **Resolution** với `VOID` (cả hai ghế của câu hỏi cùng bị hủy).
 
 ## 7. Phân định khi tới hạn
 1. Tới ngày `resolve_at` (giờ Việt Nam), **Owner hoặc một ghế AI khác nhà cung cấp với ghế viết** (ví dụ ChatGPT) mở nguồn đã ghi trong dự báo, tìm con số hoặc sự kiện.
 2. **Issues** → **New issue** → mẫu **Resolution**: mã dự báo (`F-101`), YES/NO/VOID, đường dẫn nguồn, đoạn trích nguyên văn, `resolver` = người đã đọc nguồn ("Owner" hoặc "ChatGPT (OpenAI)"; không được là Claude).
    - Đường dẫn nguồn: dán **đường dẫn đầy đủ bắt đầu bằng `https://`** tới đúng trang đã đọc. Mọi đường dẫn ghi trong ô này phải thuộc tên miền đã ghi trong dự báo (tên miền con như `data.nso.gov.vn` được nhận); không dán kèm đường dẫn của trang khác.
    - Robot bình luận ✅ kèm dấu nhận như ở mục 6; cũng không sửa, không xóa bình luận đó.
+   - Việc "Resolution intake" đỏ mà kết quả đã vào sổ nhưng chưa có bình luận ✅: bấm **Re-run all jobs** (lúc nào cũng được; phân định không có hạn 6 giờ).
 3. Một Issue phân định một câu hỏi; ghế A và ghế B của câu hỏi nhận cùng kết quả. Đã phân định thì không sửa được. Nguồn đã hứa không công bố → chọn VOID và ghi lý do.
+   - **Chỉ mở Issue phân định khi mọi dự báo của câu hỏi đã có bình luận ✅.** Robot nhận dự báo và robot phân định chạy riêng. Nếu một dự báo của câu hỏi được mở sau (hoặc cùng lúc với) Issue phân định, robot phân định trả ❌ và không ghi gì: mở Issue Resolution mới. Nếu Issue phân định đã được ghi trước khi robot kịp ghi một dự báo mở trước đó, dự báo ấy bị ❌ (câu hỏi đã có kết quả). Cả hai trường hợp sổ đều không hỏng và không phải sửa gì.
 4. Điểm số cập nhật ở vòng học kế tiếp: `reports/scorecard.json` mục `issue_forecasts`, và cuối tệp `reports/cycle_<ngày>.md`.
 
 ## 8. Chấm và gộp một PR (L-09, L-10)
@@ -66,7 +70,10 @@ Settings → Rules → Rulesets → New branch ruleset → áp cho `main` → b�
 - "L-09 nguoi cham" đỏ: thiếu người chấm hoặc thiếu bình luận bản chấm đúng commit — xem mục 8.
 - Vòng học đỏ ở bước "Kiem lai sau khi chay": kết quả vòng đó trái luật nên không được ghi; chụp log gửi kiến trúc sư.
 - Vòng học đỏ với dòng `LỖI L-06` (không đẩy được đăng ký thử lên `main`): backtest chưa chạy, không mất gì; bấm **Re-run all jobs**. Lần thử đã đăng ký mà không có kết quả vẫn nằm trong sổ và vẫn được đếm — đó là chủ ý.
-- "Kiem toan so sau khi ghi" đỏ: đây là việc kiểm tự chạy sau mỗi lần robot ghi sổ, sau vòng học và mỗi sáng. Nếu nó đỏ ngay sau khi vừa mở Issue, bấm **Re-run all jobs** một lần sau ít phút (robot có thể chưa kịp đăng dấu nhận). Vẫn đỏ thì chụp log gửi kiến trúc sư.
+- "Kiem toan so sau khi ghi" đỏ: đây là việc kiểm tự chạy sau mỗi lần robot ghi sổ, sau vòng học và mỗi sáng. Nó đã tự chờ và đọc lại dấu nhận khoảng 2,5 phút trước khi báo đỏ, nên đỏ là có việc phải làm: đọc dòng `LỖI:` trong log và xem các mục dưới đây.
+- Bình luận ❌ ghi "Lỗi hệ thống: ghi … sẽ làm sổ không qua kiểm lại luật … nên KHÔNG ghi": robot tự phát hiện luật ghi và luật kiểm lệch nhau và đã dừng trước khi ghi. Sổ không bị đụng tới. Chụp bình luận gửi kiến trúc sư; sau khi sửa mã, mở Issue mới.
 - Log có `L-06: Pull Request thêm … kết quả` hoặc `kết quả … đã bị sửa`: có người đưa kết quả thử vào kho không qua vòng học, hoặc sửa kết quả cũ. Không gộp PR đó.
-- Log có `L-05: … không có bình luận dấu nhận`: một dòng trong sổ không có dấu nhận của robot (dòng ghi sai đường, hoặc bình luận ✅ bị xóa/sửa). Không tự sửa sổ; chụp log gửi kiến trúc sư.
-- Log có `L-05: dòng … trong sổ không qua luật nhận`: một dòng trong sổ trái luật nhận (ghi không qua robot). Xử lý như trên.
+- Log có `L-05: … không có bình luận dấu nhận` hoặc `… quá 6 giờ`: một dòng trong sổ không có dấu nhận hợp lệ của robot. Dòng phân định: chạy lại job "Resolution intake" của Issue đó. Dòng dự báo: làm theo mục 6 bước 4 (chạy lại job; quá 6 giờ thì chạy lại job rồi hủy câu hỏi bằng VOID). Không tự sửa sổ. Nếu dòng đó không do robot ghi (không ai mở Issue ấy cho dự báo ấy): chụp log gửi kiến trúc sư.
+- Log có `L-05: dòng … trong sổ không qua luật nhận`, `không có issue_number` hoặc `không có resolution_issue`: một dòng trong sổ không đến từ Issue hoặc trái luật nhận (ghi không qua robot). Không gộp PR chứa dòng đó; chụp log gửi kiến trúc sư.
+- Log có `L-06: tiêu đề research/trials.csv…` hoặc `…không ở dạng chuẩn`: tệp kết quả thử bị sửa tay hoặc ghi lại bằng công cụ khác. Không gộp PR đó.
+- Log có `ledger.engine_forecasts`: ai đó đổi công tắc đường ghi dự báo của engine trong `config.yaml`. Giá trị duy nhất được nhận là `closed` (ADR-0003 quyết định 11).
