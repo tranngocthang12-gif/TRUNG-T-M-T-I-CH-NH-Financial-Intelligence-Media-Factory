@@ -2,6 +2,9 @@ name: Resolution intake (Resolution issue)
 
 # Phan dinh du bao da toi han (ADR-0003). Cung khuon voi ledger_intake.yml:
 # chi Issue luc MO, do chinh chu kho mo, tieu de "[Resolution]" hoac nhan "resolution"; moi run tu thu lai khi bi trung.
+# Thu tu (ADR-0003 quyet dinh 10): mot Issue phan dinh chi ghi ket qua cho du bao mo TRUOC no; neu so dang co du bao cua cau
+# hoi mo cung luc hoac sau Issue nay thi khong ghi gi (mo Issue Resolution moi). Truoc khi ghi, tools/resolution_intake.py
+# tu chay lai toan bo luat kiem tren trang thai sau khi ghi va khong ghi khi da sat han dau nhan.
 # Than Issue va moi gia tri do nguoi dung nhap chi di qua bien moi truong, khong chen vao lenh.
 on:
   issues:
@@ -90,8 +93,20 @@ jobs:
             let body = (r.ok ? "✅ " : "❌ ") + String(r.message || "").replace(/ledger-attest/gi, "ledger_attest");
             if (marks.length) body += "\n\nDấu nhận của sổ (máy kiểm toán đọc các dòng dưới đây — không sửa, không xóa bình luận này):\n" +
               marks.map(m => "`" + m + "`").join("\n");
-            await github.rest.issues.createComment({...where, body});
-            if (process.env.CODE !== "3") await github.rest.issues.addLabels({...where, labels: [r.ok ? "ledgered" : "rejected"]});
+            // Dong da nam tren main thi dau nhan PHAI duoc dang: thu lai toi 5 lan (cho 20, 40, 60, 80 giay) khi GitHub tam loi.
+            // Van hong thi job do: chay lai job nay trong vong 6 gio ke tu luc Issue mo (ma 3 se dang bo sung dau nhan).
+            for (let i = 1; ; i++) {
+              try { await github.rest.issues.createComment({...where, body}); break; }
+              catch (e) {
+                if (i >= 5) throw e;
+                core.warning("Dang binh luan loi (lan " + i + "): " + e.message);
+                await new Promise(done => setTimeout(done, 20000 * i));
+              }
+            }
+            if (process.env.CODE !== "3") {
+              try { await github.rest.issues.addLabels({...where, labels: [r.ok ? "ledgered" : "rejected"]}); }
+              catch (e) { core.warning("Khong gan duoc nhan (dau nhan da dang, so khong anh huong): " + e.message); }
+            }
       - name: Loi he thong (ma 1) lam job do; tu choi (2) va trung (3) la ket qua hop le
         if: steps.intake.outputs.code == '1'
         env:
