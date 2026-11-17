@@ -1,13 +1,14 @@
 """PREDICTION LEDGER — trái tim của v1.0.
 Dự báo ghi TRƯỚC khi biết kết quả (append-only, commit vào git). Kết quả ghi ở file riêng.
 Auditor, Resolution, Scorecard đều là code tất định — không LLM nào tự chấm mình."""
-import hashlib, json, math, re, sys
+import hashlib, json, math, sys
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, REPO, path, save_json
 
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
 from tools.laws_checks import line_hash  # noqa: E402  một thuật toán hash chuỗi cho mọi bên ghi Ledger
+from tools.ledger_intake import qkey as _qkey, vn_day  # noqa: E402  một định nghĩa "câu hỏi" và "ngày" cho nhận/phân định/chấm
 
 PRED, RES = "ledger/predictions.jsonl", "ledger/resolutions.jsonl"
 
@@ -120,8 +121,7 @@ def resolve(close, as_of, bad=None):
 # ---------------- SCORECARD (code) ----------------
 TARGET_DISAGREEMENTS = 194        # ARCHITECTURE v3.0 §4.2: phát hiện A đúng 60% so với 50%, độ mạnh 80%, α 0,05
 
-def _qkey(p):
-    return (re.sub(r"\s+", " ", str(p.get("question", ""))).strip().lower(), str(p.get("resolve_at", "")))
+MIN_PAIRS_FOR_RATE_WARNING = 60   # governance/CONTROL_B_PROMPT.md: "dưới 10% sau 60 câu" thì mở ADR đổi nhóm B
 
 def _calibration(ps, os_):
     out = {}
@@ -141,60 +141,89 @@ def _binom_two_sided(k, n):
     m = max(k, n - k)
     return float(min(1.0, 2 * sum(math.comb(n, j) for j in range(m, n + 1)) / 2 ** n))
 
+def _valid_issue_row(p):
+    """Dòng Issue đủ để chấm: có id, seat A/B, p là số trong (0, 1). Dòng hỏng không được làm vỡ vòng học."""
+    try:
+        return bool(p.get("id")) and str(p.get("seat")) in ("A", "B") and 0.0 < float(p["p"]) < 1.0
+    except (KeyError, TypeError, ValueError):
+        return False
+
+def _same_day(a, b):
+    try:
+        return vn_day(a["issue_created_at"]) == vn_day(b["issue_created_at"])
+    except (KeyError, TypeError, ValueError):
+        return False
+
 def issue_summary(all_rows, R):
-    """Chấm dự báo từ Issue theo ARCHITECTURE v3.0 §4.1 bước 5: theo ghế (n, Brier, Brier xác suất nền, hiệu chuẩn);
-    cặp A–B cùng câu hỏi: tỷ lệ bất đồng (hai ghế ở hai phía 0,5) và độ đúng của A trên tập bất đồng đã phân định."""
-    done = {r.get("prediction_id") for r in R}
-    outcome = {r.get("prediction_id"): r.get("outcome") for r in R if r.get("outcome") is not None}
-    issue = [p for p in all_rows if is_issue_row(p)]
+    """Chấm dự báo từ Issue theo ARCHITECTURE v3.0 §4.1 bước 5 và ADR-0003.
+    Theo ghế: n, đã phân định, VOID, chờ; Brier, Brier của xác suất nền, hiệu chuẩn.
+    Cặp A–B: cùng câu hỏi (question + resolve_at), ghi cùng ngày (giờ VN, §4.2). Bất đồng = hai ghế ở hai phía 0,5.
+    Chỉ chấm cặp mà cả A và B đã phân định cùng một sự thật.
+    Kiểm định CHỐT MẪU: phán quyết chỉ tính trên đúng 194 bất đồng được phân định ĐẦU TIÊN (theo thứ tự ghi trong sổ),
+    kiểm định nhị thức hai phía với p0 = 0,5 — không xem lại mỗi vòng trên mẫu lớn dần (tránh dừng tùy ý)."""
+    res_order = {r.get("prediction_id"): i for i, r in enumerate(R)}
+    done = set(res_order)
+    outcome = {r.get("prediction_id"): int(r["outcome"]) for r in R if r.get("outcome") in (0, 1)}
+    void_ids = {r.get("prediction_id") for r in R if r.get("outcome") is None}
+    raw = [p for p in all_rows if is_issue_row(p)]
+    issue = [p for p in raw if _valid_issue_row(p)]
     by_seat, scores = {}, {}
     for p in issue:
-        s = str(p.get("seat", "?"))
-        d = by_seat.setdefault(s, {"n": 0, "resolved": 0, "pending": 0})
+        d = by_seat.setdefault(str(p["seat"]), {"n": 0, "resolved": 0, "void": 0, "pending": 0})
         d["n"] += 1
-        if p.get("id") in done: d["resolved"] += 1
-        else: d["pending"] += 1
+        if p["id"] in outcome: d["resolved"] += 1
+        elif p["id"] in void_ids: d["void"] += 1
+        elif p["id"] not in done: d["pending"] += 1
     for s in sorted(by_seat):
-        rows = [p for p in issue if str(p.get("seat")) == s and p.get("id") in outcome]
+        rows = [p for p in issue if str(p["seat"]) == s and p["id"] in outcome]
         if not rows:
             continue
-        ps = [float(p["p"]) for p in rows]; os_ = [int(outcome[p["id"]]) for p in rows]
-        bs = [float(p.get("base_rate", 0.5)) for p in rows]
+        ps = [float(p["p"]) for p in rows]; os_ = [outcome[p["id"]] for p in rows]
+        bs = []
+        for p in rows:
+            try: bs.append(min(1.0, max(0.0, float(p.get("base_rate", 0.5)))))
+            except (TypeError, ValueError): bs.append(0.5)
         scores[s] = {"n": len(rows), "brier": round(float(np.mean([(a - b) ** 2 for a, b in zip(ps, os_)])), 4),
                      "brier_base_rate": round(float(np.mean([(a - b) ** 2 for a, b in zip(bs, os_)])), 4),
+                     "brier_coin": round(float(np.mean([(0.5 - b) ** 2 for b in os_])), 4),
                      "mean_p": round(float(np.mean(ps)), 3), "hit_rate": round(float(np.mean(os_)), 3),
                      "calibration": _calibration(ps, os_)}
-    # Ghép cặp A–B theo câu hỏi (question + resolve_at): A thứ i ghép B thứ i theo thứ tự số Issue; ghế lẻ không ghép.
     by_q = {}
     for p in sorted(issue, key=lambda r: r.get("issue_number", 0)):
-        by_q.setdefault(_qkey(p), {"A": [], "B": []}).setdefault(str(p.get("seat")), []).append(p)
-    pairs, unpaired = [], 0
+        by_q.setdefault(_qkey(p), {"A": [], "B": []})[str(p["seat"])].append(p)
+    pairs, unpaired, not_same_day = [], 0, 0
     for g in by_q.values():
-        pairs += list(zip(g["A"], g["B"]))
+        for a, b in zip(g["A"], g["B"]):
+            if _same_day(a, b): pairs.append((a, b))
+            else: not_same_day += 1
         unpaired += abs(len(g["A"]) - len(g["B"]))
     dis = [(a, b) for a, b in pairs if (float(a["p"]) - 0.5) * (float(b["p"]) - 0.5) < 0]
-    # Chỉ tính khi CẢ HAI đã phân định và cùng một sự thật (resolution_intake ghi cùng outcome cho cả câu hỏi;
-    # dòng engine không vào đây). Hai outcome khác nhau = dữ liệu hỏng → đếm riêng, không chấm.
-    dis_res = [(a, b) for a, b in dis if a.get("id") in outcome and b.get("id") in outcome]
-    inconsistent = sum(1 for a, b in dis_res if outcome[a["id"]] != outcome[b["id"]])
-    dis_res = [(a, b) for a, b in dis_res if outcome[a["id"]] == outcome[b["id"]]]
-    a_right = sum(1 for a, _ in dis_res if (float(a["p"]) > 0.5) == (int(outcome[a["id"]]) == 1))
-    n = len(dis_res)
-    pval = _binom_two_sided(a_right, n) if n else None
-    ab = {"pairs": len(pairs), "unpaired": unpaired, "disagreements": len(dis),
+    both = [(a, b) for a, b in dis if a["id"] in outcome and b["id"] in outcome]
+    inconsistent = sum(1 for a, b in both if outcome[a["id"]] != outcome[b["id"]])
+    dis_res = sorted(((a, b) for a, b in both if outcome[a["id"]] == outcome[b["id"]]),
+                     key=lambda ab: (res_order.get(ab[0]["id"], 0), ab[0].get("issue_number", 0)))
+    def right(a): return (float(a["p"]) > 0.5) == (outcome[a["id"]] == 1)
+    n_all, a_all = len(dis_res), sum(1 for a, _ in dis_res if right(a))
+    fixed = dis_res[:TARGET_DISAGREEMENTS]
+    n, a_right = len(fixed), sum(1 for a, _ in fixed if right(a))
+    pval = _binom_two_sided(a_right, n) if n == TARGET_DISAGREEMENTS else None
+    ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "disagreements": len(dis),
           "disagreement_rate": round(len(dis) / len(pairs), 3) if pairs else None,
-          "disagreements_resolved": n, "inconsistent_outcomes": inconsistent, "a_correct": a_right,
-          "a_accuracy": round(a_right / n, 3) if n else None,
-          "p_value_two_sided_vs_coin": round(pval, 4) if n else None,
+          "disagreements_resolved": n_all, "inconsistent_outcomes": inconsistent, "a_correct": a_all,
+          "a_accuracy": round(a_all / n_all, 3) if n_all else None,
           "target_disagreements": TARGET_DISAGREEMENTS,
+          "fixed_sample": {"n": n, "a_correct": a_right, "p_value_two_sided_vs_coin": round(pval, 4) if pval is not None else None},
           "verdict": (f"CHƯA ĐỦ MẪU ({n}/{TARGET_DISAGREEMENTS} bất đồng đã phân định)" if n < TARGET_DISAGREEMENTS else
                       "A HƠN B CÓ Ý NGHĨA" if pval < 0.05 and a_right > n / 2 else
                       "B HƠN A CÓ Ý NGHĨA" if pval < 0.05 else "CHƯA THẤY KHÁC BIỆT A–B")}
     if inconsistent:
         ab["warning_inconsistent"] = f"{inconsistent} cặp có hai outcome khác nhau cho cùng câu hỏi — kiểm ledger/resolutions.jsonl"
-    if pairs and len(dis) / len(pairs) < 0.10 and len(pairs) >= 20:
-        ab["warning"] = "tỷ lệ bất đồng < 10%: thư viện chưa làm A khác B (ARCHITECTURE v3.0 §9)"
-    return {"total": len(issue), "by_seat": by_seat, "scores": scores, "ab": ab}
+    if len(pairs) >= MIN_PAIRS_FOR_RATE_WARNING and len(dis) / len(pairs) < 0.10:
+        ab["warning"] = "tỷ lệ bất đồng < 10% sau 60 cặp: mở ADR đổi nhóm B sang nhà cung cấp khác (CONTROL_B_PROMPT, ARCHITECTURE §9)"
+    out = {"total": len(raw), "by_seat": by_seat, "scores": scores, "ab": ab}
+    if len(raw) != len(issue):
+        out["malformed"] = len(raw) - len(issue)
+    return out
 
 def scorecard(as_of):
     all_rows = _load(PRED)

@@ -9,9 +9,11 @@ Quy ước trên đĩa (library/sources/README.md):
   data_source (tên trong governance/DATA_SOURCES.yaml, không được là nguồn "forbidden"), legal_status, license,
   kind, effective_from, effective_to, superseded_by.
 - library/notes/<KN-id>.json: KNOWLEDGE_NOTE theo contracts/knowledge_note.schema.json.
-- library/audits/<KN-id>.json: biên bản chấm {note_id, auditor, verdict: PASS|FAIL, date} — chỉ biên bản PASS mà auditor
-  và read_by đều bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung ghế mới cho phép trạng thái ngoài
-  DRAFT/OUTDATED (CITED chỉ do Auditor gán).
+- library/audits/<KN-id>.json: biên bản chấm {note_id, auditor, verdict: PASS|FAIL, date, note_sha256}.
+  note_sha256 = note_digest() của ghi chú (mọi trường trừ status) → sửa ghi chú sau khi chấm thì biên bản hết hiệu lực.
+  auditor và read_by đều bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung ghế (L-09).
+  Trạng thái: DRAFT, OUTDATED tự do; CITED cần biên bản PASS; DISPUTED cần biên bản FAIL; TESTED/PROVEN chưa có cơ chế
+  gán (Học viện chưa vận hành) → bị từ chối, đóng khi không chắc.
 
 Địa chỉ: "<doc_id>:p<trang>:<đoạn>" hoặc "<doc_id>:t<bảng>:<dòng>". Trích dẫn (quote) phải nằm nguyên văn (so sau khi gộp
 khoảng trắng) trong ít nhất một chỗ được trỏ tới.
@@ -28,19 +30,22 @@ from .config import REPO
 
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
-from tools.laws_checks import recognised_seat, same_provider  # noqa: E402
+from tools.laws_checks import nfc, recognised_seat, same_provider  # noqa: E402
 
 LIB = "library"
 MAX_NOTE_BYTES = 16_000
+MIN_QUOTE_CHARS = 15                      # trích ngắn hơn thế chỉ hợp lệ khi là nguyên cả đoạn/dòng được trỏ tới
 LEGAL_KINDS = {"LAW", "DECREE", "CIRCULAR", "DECISION", "STANDARD", "REGULATION"}
 FREE_STATUS = {"DRAFT", "OUTDATED"}
+AUDIT_VERDICT_FOR = {"CITED": "PASS", "DISPUTED": "FAIL"}     # TESTED/PROVEN: do mã Học viện gán — chưa có → từ chối
 ADDR_RE = re.compile(r"^([a-z0-9_-]+):(p|t)([0-9]+):([0-9]+)$")
 MANIFEST_KEYS = ["sha256", "bytes", "issuer", "issued_on", "accessed_on", "source_url", "data_source", "legal_status",
                  "license", "kind", "effective_from", "effective_to", "superseded_by"]
 
 
 def _norm(s):
-    return re.sub(r"\s+", " ", str(s or "")).strip()
+    """Chuẩn hóa để so nguyên văn: Unicode NFC (văn bản rút từ PDF hay ở dạng tổ hợp) và gộp khoảng trắng. Không đổi chữ."""
+    return re.sub(r"\s+", " ", nfc(str(s or ""))).strip()
 
 
 def parse_text(text):
@@ -144,16 +149,36 @@ def check_manifest(root):
     return errs, docs, man
 
 
-def _audit_pass(root, note):
+def note_digest(note: dict) -> str:
+    """sha256 của ghi chú không kể trường status (status đổi theo biên bản chấm và theo L-08)."""
+    body = {k: v for k, v in note.items() if k != "status"}
+    return hashlib.sha256(json.dumps(body, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def audit_problem(root, note):
+    """None nếu trạng thái của ghi chú được một biên bản chấm hợp lệ cho phép; ngược lại trả về lý do (chuỗi)."""
+    want = AUDIT_VERDICT_FOR.get(note.get("status"))
+    if want is None:
+        return f"status {note.get('status')} chưa có cơ chế gán bằng mã (Học viện chưa vận hành)"
     p = pathlib.Path(root) / LIB / "audits" / f"{note.get('id')}.json"
     if not p.is_file():
-        return False
-    a = json.loads(p.read_text(encoding="utf-8"))
+        return f"status {note['status']} cần biên bản library/audits/{note.get('id')}.json"
+    try:
+        a = json.loads(p.read_text(encoding="utf-8"))
+    except ValueError:
+        return "biên bản chấm không phải JSON"
     auditor, reader = _norm(a.get("auditor")), _norm(note.get("read_by"))
-    # L-09: cả người đọc và người chấm phải ghi bắt đầu bằng tên ghế (không nhận ra ghế thì không so được),
-    # và không chung ghế nào (cùng nhà cung cấp, hoặc cùng là Owner).
-    return (a.get("note_id") == note.get("id") and a.get("verdict") == "PASS"
-            and recognised_seat(auditor) and recognised_seat(reader) and not same_provider(auditor, reader))
+    if a.get("note_id") != note.get("id"):
+        return "biên bản chấm ghi note_id khác"
+    if a.get("verdict") != want:
+        return f"status {note['status']} cần biên bản verdict {want}, biên bản ghi {a.get('verdict')}"
+    if a.get("note_sha256") != note_digest(note):
+        return "biên bản chấm không khớp nội dung hiện tại của ghi chú (note_sha256) — sửa ghi chú thì phải chấm lại"
+    if not (recognised_seat(auditor) and recognised_seat(reader)):
+        return "auditor và read_by phải bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp)"
+    if same_provider(auditor, reader):
+        return "người chấm chung ghế với người đọc (cùng nhà cung cấp, hoặc cùng là Owner)"
+    return None
 
 
 def check_note(root, path, docs, man, today):
@@ -201,8 +226,13 @@ def check_note(root, path, docs, man, today):
                 errs.append(f"{nid}/{p['id']}: địa chỉ {a} không tồn tại trong library/sources/{d}/text.md")
             else:
                 segs.append(seg)
-        if segs and not any(_norm(p["quote"]) in _norm(s) for s in segs):
+        q = _norm(p["quote"])
+        if segs and not any(q in _norm(s) for s in segs):
             errs.append(f"{nid}/{p['id']}: quote không nằm nguyên văn trong chỗ được trỏ tới (L-01)")
+        elif segs and len(q) < MIN_QUOTE_CHARS and not any(q == _norm(s) for s in segs):
+            errs.append(f"{nid}/{p['id']}: quote dưới {MIN_QUOTE_CHARS} ký tự không đủ để kiểm nguyên văn (L-01)")
+        if p["kind"] == "CROSS_TEXT_SYNTHESIS" and len(set(p["addresses"])) < 2:
+            errs.append(f"{nid}/{p['id']}: CROSS_TEXT_SYNTHESIS phải dẫn ít nhất hai địa chỉ")
     def addr_exists(a, where):
         m = ADDR_RE.match(a)
         if not m:
@@ -215,11 +245,15 @@ def check_note(root, path, docs, man, today):
     for c in note.get("counts") or []:
         for a in c["addresses"]:
             addr_exists(a, "counts")
+    if note.get("counts") and not note["self_check"]["counts_from_source"]:
+        errs.append(f"{nid}: có counts nhưng self_check.counts_from_source = false (số phải đếm từ nguồn)")
     for fl in note.get("reading_flags") or []:
         for a in fl["addresses"]:
             addr_exists(a, "reading_flags")
-    if note["status"] not in FREE_STATUS and not _audit_pass(root, note):
-        errs.append(f"{nid}: status {note['status']} cần biên bản library/audits/{nid}.json PASS của người khác read_by (L-09)")
+    if note["status"] not in FREE_STATUS:
+        why = audit_problem(root, note)
+        if why:
+            errs.append(f"{nid}: {why} (L-09)")
     expired = [d for d in note["doc_ids"] if d in man and _expired(man[d], today)]
     if expired and note["status"] != "OUTDATED":
         warns.append(f"{nid}: dựa trên văn bản hết hiệu lực {expired} — vòng học sẽ chuyển OUTDATED (L-08)")
@@ -243,6 +277,26 @@ def check_library(root=REPO, today=None):
     for p in notes:
         e, w = check_note(root, p, docs, man, today)
         errs += e; warns += w
+    q = root / LIB / "reading_queue.yaml"
+    if q.is_file():
+        try:
+            items = (yaml.safe_load(q.read_text(encoding="utf-8")) or {}).get("items") or []
+        except Exception as e:  # noqa: BLE001
+            items = []; errs.append(f"library/reading_queue.yaml đọc lỗi ({str(e).splitlines()[0]})")
+        noted = set()
+        for p in notes:
+            try:
+                noted |= set(json.loads(p.read_text(encoding="utf-8")).get("doc_ids") or [])
+            except (ValueError, AttributeError):
+                pass                                   # ghi chú hỏng đã được báo lỗi ở check_note
+        for it in items:
+            d, st = it.get("doc_id"), it.get("status")
+            if st == "QUEUED" and d in man:
+                warns.append(f"reading_queue: {d} đã ghim trong manifest nhưng hàng đợi còn QUEUED")
+            if st not in (None, "QUEUED") and d not in man:
+                warns.append(f"reading_queue: {d} ghi {st} nhưng chưa có trong SOURCE_MANIFEST.json")
+            if st == "NOTE_WRITTEN" and d not in noted:
+                warns.append(f"reading_queue: {d} ghi NOTE_WRITTEN nhưng chưa có ghi chú nào dẫn tài liệu này")
     index = (root / LIB / "INDEX.md").read_text(encoding="utf-8") if (root / LIB / "INDEX.md").is_file() else ""
     for p in notes:
         if p.stem not in index:

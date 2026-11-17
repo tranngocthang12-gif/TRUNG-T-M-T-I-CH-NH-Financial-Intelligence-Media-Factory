@@ -97,11 +97,12 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
                                    f"Devil's Advocate {ex.get('devils_advocate', 0)}" if ex.get("ran")
                                    else "KHÔNG CHẠY — " + "; ".join(ex.get("reasons", []))),
              f"- Dự báo đã chấm hôm nay: {len(resolved)} | Tổng: {sc['total_predictions']} dự báo, {sc['resolved']} đã chấm",
-             "- Dự báo từ Issue: " + (", ".join(f"ghế {k}: {v['n']} (chờ {v['pending']})"
+             "- Dự báo từ Issue: " + (", ".join(f"ghế {k}: {v['n']} (đã phân định {v['resolved']}, VOID {v['void']}, chờ {v['pending']})"
                                                  for k, v in sorted(sc["issue_forecasts"]["by_seat"].items()))
-                                       or "chưa có"),
-             "- Cặp A–B: {pairs} cặp (lẻ {unpaired}), bất đồng {disagreements}, đã phân định {disagreements_resolved}, "
-             "A đúng {a_correct}, mâu thuẫn {inconsistent_outcomes} — {verdict}".format(**sc["issue_forecasts"]["ab"])
+                                       or "chưa có")
+             + (f" | dòng hỏng bị bỏ qua: {sc['issue_forecasts']['malformed']}" if sc["issue_forecasts"].get("malformed") else ""),
+             "- Cặp A–B: {pairs} cặp (lẻ {unpaired}, khác ngày {not_same_day}), bất đồng {disagreements}, đã phân định "
+             "{disagreements_resolved}, A đúng {a_correct}, mâu thuẫn {inconsistent_outcomes} — {verdict}".format(**sc["issue_forecasts"]["ab"])
              + ("  ⚠ " + sc["issue_forecasts"]["ab"]["warning_inconsistent"] if "warning_inconsistent" in sc["issue_forecasts"]["ab"] else ""),
              f"- Ghi chú chuyển OUTDATED (L-08): {', '.join(outdated) if outdated else 'không có'}", ""]
         if sc["procedures"]:

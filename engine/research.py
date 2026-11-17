@@ -182,6 +182,12 @@ def register_trial(trial_id, cycle_date, method, spec, thr):
     old = _registry_rows()
     if any(r.get("trial_id") == trial_id for r in old):
         raise RuntimeError(f"L-06: {trial_id} đã có trong sổ đăng ký — không chạy lại cùng mã thử")
+    fs = CFG["research"].get("frozen_space")
+    if fs:
+        extra = [f for f in spec["features"] if f not in fs["features"]]
+        if extra or spec["model"] not in fs["models"]:
+            raise RuntimeError(f"L-06: lần thử nằm ngoài không gian giả thuyết đóng băng (feature lạ {extra}, mô hình "
+                               f"{spec['model']}) — giả thuyết mới phải qua ADR và sửa config.yaml research.frozen_space")
     row = {"trial_id": trial_id, "cycle_date": cycle_date,
            "registered_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
            "method": method, "spec_id": spec_id(spec), "features": ";".join(spec["features"]),
