@@ -1,9 +1,9 @@
 # ADR-0001: Hợp nhất sáu bản kiến trúc thành ARCHITECTURE.md v3.0
 - Ngày: 2026-10-22
-- Trạng thái: PROPOSED
+- Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026)
 - Người đề xuất: Claude (kiến trúc sư trưởng)
 - Người chấm: chưa có (Owner quyết định giai đoạn xây kiến trúc do Claude làm một mình); ghế thi công độc lập sẽ phản biện hồi cứu khi được lập
-- Owner duyệt: khi gộp PR TTC-0
+- Owner duyệt: 24/10/2026, PR #3
 
 ## Quyết định
 Một tệp kiến trúc duy nhất có hiệu lực (`architecture/ARCHITECTURE.md`, v3.0). Sáu bản cũ giữ nguyên chỗ, liệt kê trong `architecture/ARCHIVE.md` là SUPERSEDED. Ban hành `governance/LAWS.md` (L-01…L-10). Mở đường ghi dự báo qua GitHub Issue "Forecast" + workflow đóng dấu thời gian và hash chuỗi, không cần API trả phí.

@@ -27,7 +27,7 @@ trung-tam-tai-chinh/
 │   └── engines/                 # Đặc tả từng engine
 ├── orchestrator/                # Vòng điều phối + AUTO MODE
 ├── experts/                     # Vai trò chuyên gia (đầu tư + newsroom)
-├── contracts/                   # 18 JSON Schema — ranh giới dữ liệu duy nhất
+├── contracts/                   # 25 JSON Schema — ranh giới dữ liệu duy nhất
 ├── state/                       # Trạng thái dự án, năng lực, mô hình
 ├── knowledge/                   # Tri thức canonical (chỉ ghi sau validation)
 ├── memory/                      # 6 loại bộ nhớ + nhật ký episodic
@@ -37,7 +37,7 @@ trung-tam-tai-chinh/
 ├── templates/                   # Mẫu điền nhanh
 ├── engine/                      # BỘ NÃO HỌC MÁY — vòng học tự động
 ├── tests/                       # Chống look-ahead + diễn tập giả lập
-├── .github/workflows/           # Chạy vòng học 16:30 mỗi ngày giao dịch
+├── .github/workflows/           # Vòng học 16:30 thứ Sáu hằng tuần; nhận dự báo/phân định qua Issue; CI
 ├── config.yaml                  # Universe, chi phí, ngưỡng thống kê
 ├── data/ paper/ reports/        # Engine tự ghi
 ├── docs/HUONG_DAN_VAN_HANH.md

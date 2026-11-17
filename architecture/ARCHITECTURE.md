@@ -1,6 +1,6 @@
 # TRUNG TÂM TÀI CHÍNH — ARCHITECTURE v3.0 (bản hợp nhất, duy nhất có hiệu lực)
 
-Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: DRAFT chờ Owner gộp. Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
+Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0003 (17/11/2026). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
 Bản này **thay thế** v0.1, v0.2, v1.0, v2.0, v2.1, v2.2. Các bản cũ giữ nguyên chỗ nhưng được liệt kê là SUPERSEDED trong `architecture/ARCHIVE.md`, không xóa (luật INVALIDATED không xóa); `tools/validate.py` từ chối bất kỳ `ARCHITECTURE_v*.md` nào không có trong danh sách đó. Từ đây chỉ một tệp kiến trúc có hiệu lực; thay đổi đi qua ADR (`architecture/adr/`), mỗi ADR có điều kiện hoàn tác (L-07).
 
 > KHÔNG XÂY AI ĐOÁN THỊ TRƯỜNG. XÂY MỘT HỆ THỐNG biết thu thập bằng chứng, biết nghi ngờ chính nó, biết đo lường độ không chắc chắn, biết quản trị rủi ro, biết học từ kết quả, và biết cải thiện cách nó học.
@@ -41,7 +41,7 @@ Thêm (từ nghiên cứu 2025–2026): (4) **thời điểm**: mọi kiểm đ�
 |---|---|---|
 | Owner | ký OWNER_MISSION, gộp `main`, đổi luật/phạm vi, giữ danh mục thật ngoài kho | commit số liệu cá nhân |
 | Claude (kiến trúc sư trưởng) | thiết kế, soạn lệnh, chấm PR, ra và giữ đề thi, chấm thi | tự gộp, tự ghi kho, là phản biện độc lập cho thiết kế của mình |
-| Ghế thi công (ChatGPT, "MINH TRÍ") | chép nguồn, viết ghi chú, mệnh đề, mã công cụ theo đặc tả, mở PR nháp | merge, sửa luật, mở API, chạm engine ngoài lệnh |
+| Ghế thi công (chưa lập; **không phải MINH TRÍ** — Owner 22/10/2026, ADR-0003) | chép nguồn, viết ghi chú, mệnh đề, mã công cụ theo đặc tả, mở PR nháp | merge, sửa luật, mở API, chạm engine ngoài lệnh |
 | Nhóm B | Claude trần, phiên mới không dự án không tệp, prompt cố định có hash | thấy thư viện hay câu trả lời của A |
 | CI | kiểm schema, địa chỉ, trích nguyên văn, dấu thời gian Ledger, test | — |
 
@@ -51,16 +51,16 @@ Kênh lệnh: Gmail `[TTC] #N — …` (kết `Dừng.`) → `BAO CAO #N`. Tệp
 
 ### 4.1 Prediction Ledger không cần API
 1. Ghế chat (A) xuất mỗi dự báo thành khối YAML theo `contracts/prediction.schema.json` mở rộng: `id, question, resolution_source, resolution_rule, resolve_at, p (0.05–0.95), base_rate, invalidation_conditions, author_seat, library_refs`.
-2. Owner dán vào GitHub Issue mẫu **Forecast**; nhãn `A` hoặc `B`.
-3. GitHub Actions kiểm schema, chép vào `ledger/predictions.jsonl` kèm `issue_created_at` (giờ máy chủ GitHub), `sha256` của nội dung và hash chuỗi (mỗi dòng chứa hash dòng trước). Dự báo thiếu nguồn giải quyết hoặc ghi sau `resolve_at` bị loại tự động.
-4. Chấm: `engine/ledger.py` mở rộng luật chấm ngoài `excess_return_positive`: `numeric_range` (chỉ tiêu BCTC/NHNN trong khoảng), `event_before_date`, `comparison` (quý này so quý trước). Người chấm khác nhà với người viết; kết quả `ledger/resolutions.jsonl`.
+2. Owner dán vào GitHub Issue mẫu **Forecast**; trường `seat` = `A` hoặc `B`. Chỉ Issue do Owner mở, nhận lúc mở; mỗi ghế một dự báo cho một câu hỏi; ghế B kèm `prompt_hash` của prompt chuẩn (ADR-0003).
+3. GitHub Actions kiểm schema, chép vào `ledger/predictions.jsonl` kèm `issue_created_at` (giờ máy chủ GitHub), `sha256` của nội dung và hash chuỗi (mỗi dòng chứa hash dòng trước). Dự báo thiếu nguồn giải quyết hoặc ghi sau `resolve_at` bị loại tự động; câu hỏi đã có kết quả trong sổ thì không nhận thêm dự báo. Workflow đăng hash của dòng vừa ghi thành bình luận của `github-actions[bot]` trên Issue (dấu nhận); CI đối chiếu từng dòng sổ với dấu nhận đó và chạy lại luật nhận trên mọi dòng (ADR-0003 mục 7).
+4. Phân định (ADR-0003): tới `resolve_at`, Owner hoặc ghế khác nhà cung cấp đọc nguồn và mở Issue mẫu **Resolution** (mã dự báo, YES/NO/VOID, nguồn, trích nguyên văn, người phân định); `resolution_intake.yml` kiểm (đúng hạn, một câu hỏi một sự thật, không phân định lại, người phân định khác ghế với mọi người viết, mọi đường dẫn nguồn có máy chủ thuộc tên miền đã hứa) và ghi `ledger/resolutions.jsonl`; một Issue phân định chỉ ghi kết quả cho dự báo mở trước nó; VOID (hủy câu hỏi) cũng chỉ ghi được khi tới hạn. Sổ chỉ nhận dòng từ Issue: đường để engine tự ghi và tự chấm dự báo giá (`excess_return_positive`, mã `P-…`) đóng cho tới khi có ADR kèm cơ chế bằng chứng xuất xứ (ADR-0003 quyết định 11).
 5. Scorecard theo ghế: Brier, hiệu chuẩn theo nhóm, n; **tập bất đồng A–B** và độ đúng của A trên tập đó; tỷ lệ bất đồng (dưới 10% nghĩa là thư viện chưa đổi gì).
 
 ### 4.2 Nhóm đối chứng B
-Cùng ngày, cùng câu hỏi; phiên Claude mới không dự án, không tệp; prompt chuẩn trong `governance/CONTROL_B_PROMPT.md` (có hash, đổi phải qua ADR). Mục tiêu cỡ mẫu: ~194 bất đồng đã chấm để phát hiện A đúng 60% so với 50% (độ mạnh 80%, α 0,05); với tỷ lệ bất đồng ~25% cần ~800 câu, nên câu hỏi phải nhỏ, giải nhanh (tháng/quý), lấy từ BCTC và dữ liệu NHNN.
+Cùng ngày, cùng câu hỏi; phiên Claude mới không dự án, không tệp; prompt chuẩn trong `governance/CONTROL_B_PROMPT.md` (có hash, đổi phải qua ADR; các phiên bản đã có hiệu lực ghim theo ngày trong `governance/control_b_prompts.jsonl`). Mục tiêu cỡ mẫu: ~194 bất đồng đã chấm để phát hiện A đúng 60% so với 50% (độ mạnh 80%, α 0,05 hai phía; phán quyết chốt trên đúng 194 cặp bất đồng đầu tiên theo thứ tự ghi dự báo, chỉ ra khi cả 194 cặp đã phân định hoặc VOID, không xem lại trên mẫu lớn dần; cặp VOID tính theo hướng bất lợi cho kết luận đang xét — ADR-0003 quyết định 3); với tỷ lệ bất đồng ~25% cần ~800 câu, nên câu hỏi phải nhỏ, giải nhanh (tháng/quý), lấy từ BCTC và dữ liệu NHNN.
 
 ### 4.3 Engine định lượng = đối chứng âm
-Giữ nguyên mã; chạy hằng tuần thay vì hằng ngày; đóng băng không gian giả thuyết (13 feature × 3 mô hình × VN30); thêm Deflated Sharpe và sổ đăng ký thử `research/trial_registry.jsonl`; giả thuyết mới chỉ chạy khi đã đăng ký trước. Kho dữ liệu đổi sang ghi tăng dần (append) để git không phình (C2). Benchmark ghi rõ là "bình quân đều VN30 hiện tại", không gọi là VN-Index (C6).
+Giữ nguyên mã; chạy hằng tuần thay vì hằng ngày (thứ Sáu, từ v3.0.2); đóng băng không gian giả thuyết (13 feature × 3 mô hình × VN30); thêm Deflated Sharpe và sổ đăng ký thử `research/trial_registry.jsonl` (đã làm v3.0.2: mỗi lần thử đăng ký có hash chuỗi và được đẩy lên `main` trước khi chạy, lần thử bỏ dở vẫn được đếm, kết quả chỉ-ghi-thêm có neo lịch sử, CI đối chiếu); giả thuyết mới chỉ chạy khi đã đăng ký trước. Kho dữ liệu đổi sang ghi tăng dần (append) để git không phình (C2 — chưa làm, ADR riêng). Benchmark ghi rõ là "bình quân đều VN30 hiện tại", không gọi là VN-Index (C6).
 
 ## 5. Nửa HỌC (Thư viện + Học viện) — cỗ máy học hiểu từ MINH TRÍ
 

@@ -1,25 +1,30 @@
-version: 0.3
-phase: V1_STAGE_1_PREDICTION_LEDGER
-current_focus: "GĐ1: Prediction Ledger chạy hằng ngày trên GIÁ ĐIỀU CHỈNH có kiểm tra chất lượng; chờ Owner mở cổng ngân sách để chuyên gia Claude hoạt động. Điều kiện thoát: 30 ngày, >=100 dự báo đã chấm, 0 claim thiếu nguồn lọt Auditor"
+version: 0.4
+phase: V3_G1_LEDGER_AB_VA_THU_VIEN
+current_focus: "ARCHITECTURE v3.0 giai đoạn G1: ghi dự báo A/B qua Issue 'Forecast', phân định qua Issue 'Resolution', chấm A–B trong reports/scorecard.json; ghim tài liệu gốc vào Thư viện. Điều kiện thoát G1 (§8): ≥ 40 tài liệu gốc có hash, ≥ 60 dự báo A+B, tỷ lệ bất đồng đo được. Mốc ADR-0001: 23/11/2026 cần ≥ 20 dự báo hợp lệ."
 deployment_level: 0
 open_blockers:
+  - "Ledger chưa có dự báo nào (0/60); Owner ghi cặp A/B theo docs/HUONG_DAN_VAN_HANH.md mục 6"
+  - "Thư viện rỗng (0/40 tài liệu gốc ghim, 0 ghi chú); ghế thi công chưa lập — không phải MINH TRÍ (Owner 22/10/2026)"
+  - "OWNER GATE: nhánh main chưa có ruleset cấm force-push / cấm xóa nhánh (L-10; hướng dẫn mục 9)"
+  - "OWNER GATE: 19 PR nháp dòng UMLF và 5 Issue đang mở của ghế khác — hướng kiến trúc song song chưa có ADR (L-07); Owner quyết giữ hay đóng"
+  - "OWNER GATE: hai chỗ chữ trong governance/LAWS.md (L-09, L-10 cột Máy kiểm) cần Owner sửa — xem ADR-0003"
   - "OWNER_MISSION chưa được Owner ký"
   - "GOVERNOR_POLICY còn TODO"
-  - "OWNER GATE: autonomous_spending_enabled, api_budget, đơn giá API, secret ANTHROPIC_API_KEY"
-  - "Nguồn RSS tin tức chưa kiểm chứng với mạng thật"
-  - "OWNER GATE: chưa có nguồn giá chính thức — vnstock bị PyPI cách ly (quarantined), Yahoo là nguồn tạm có lỗi; SSI FastConnect / DNSE cần tài khoản Owner"
+  - "OWNER GATE: chưa có nguồn giá chính thức — vnstock bị PyPI cách ly, Yahoo là nguồn tạm có lỗi; SSI FastConnect / DNSE cần tài khoản Owner"
   - "Sự kiện quyền TCB 11/06/2024 và VCB 03/03/2025 trong data/corporate_actions.csv ở trạng thái CAN_DOI_CHIEU — cần đường dẫn CBTT chính thức"
-  - "147 ô giá Yahoo vượt biên độ sàn chưa giải thích (0,20%; phần lớn phiên 09/07/2021, 25/08/2025, 20/10/2025) — đang bị loại khỏi feature/nhãn; một số có thể là cổ tức cổ phiếu chưa nhập"
+  - "Kho dữ liệu giá ghi đè cả tệp mỗi vòng (C2) — đổi sang ghi tăng dần cần ADR riêng"
 last_session:
-  date: 2026-09-26
-  type: "KIỂM TRA + SỬA 🔴/🟠"
+  date: 2026-11-17
+  type: "RÀ SOÁT TOÀN BỘ + SỬA (v3.0.1, v3.0.2)"
   done:
-    - "Giá điều chỉnh point-in-time (engine/adjust.py) + kiểm tra chất lượng + cổng dừng khi lỗi > 1%"
-    - "Xóa kết quả nghiên cứu học trên giá sai (research/trials.csv, state/bandit.json, state/model_registry.json)"
-    - "Bỏ vnstock (PyPI cách ly); Yahoo là nguồn chính; lỗi nguồn ghi vào báo cáo + ENGINE_STATE"
-    - "llm_review đi qua Budget Governor"
-    - "ARCHITECTURE_v2.0.md vào architecture/"
-    - "tools/validate.py kiểm cấu trúc v2.x"
-    - "Hạ tin_tuc_su_kien, dinh_luong về SYNTHESIZED"
-  tests: "7/7 đạt: validate, test_adjustment, test_ingest_errors, test_ledger_pipeline, test_llm_review_budget, test_no_lookahead, test_quality_gate"
-next_gap: "GĐ1 còn thiếu (mục 🟡): khung library/ (INDEX, foundations/playbooks, vietnam/*, dossiers, lessons), academy/curriculum.md + exams/ + results/, 3 contract knowledge_note / exam_item / dossier, playbook doc_bctc + phan_bien. Song song: theo dõi vòng Actions đầu tiên chạy code mới (Ledger lần đầu với dữ liệu thật)."
+    - "v3.0.1 (PR #27, đã gộp): dòng dự báo Issue không còn làm vỡ vòng học; intake chỉ nhận Issue do chủ kho mở, lúc mở"
+    - "v3.0.2 (PR #28): phân định qua Issue 'Resolution'; chấm A–B kiểm định chốt mẫu 194 hai phía; sổ thử L-06 + Deflated Sharpe + không gian giả thuyết đóng băng; kiểm máy Thư viện (L-01, L-04, L-08); cổng chấm PR có bản chấm trên kho (L-09); kiểm toán sổ chỉ-ghi-thêm và đối chiếu Issue thật (L-05); engine hằng tuần; CI chạy đủ mọi test"
+    - "Sáu vòng chấm độc lập của ghế khác nhà cung cấp (25 điểm + 4 điểm HIGH ở vòng 6) + một lượt tự rà toàn bộ; bảng luật ↔ máy kiểm ở ADR-0003"
+    - "Vòng 7 (ChatGPT chấm commit 2ba54fc): không loại dòng nào được miễn kiểm; kết quả thử chỉ-ghi-thêm có neo sha256; kiểm toán tự chạy sau mỗi lần robot ghi; tổng số lần thử gồm cả lần bỏ dở"
+    - "Vòng 10 — vòng chấm cuối (ChatGPT chấm commit 9367976): năm điểm vòng 9 đã đóng; sửa 1 MEDIUM chặn gộp — kiểm toán đọc lại dấu nhận 15 lượt cách nhau 30 giây, phủ hết chuỗi thử lại 200 giây của bước đăng dấu nhận; 4 việc tồn sau gộp ghi ở cuối ADR-0003"
+    - "Vòng 9 (ChatGPT chấm commit a69f204): phiên bản prompt ghế B ghim theo ngày mở Issue, một luật cho cả lúc nhận lẫn lúc kiểm lại; chạy lại job không xin được dấu nhận cho dòng robot đã từ chối; VOID chỉ ghi được khi tới hạn; mẫu của kiểm định A–B là 194 cặp bất đồng đầu tiên theo thứ tự ghi dự báo, cặp VOID tính theo hướng bất lợi cho kết luận đang xét; mốc v3.0.2 xác định bằng tổ tiên; kiểm toán đọc lại dấu nhận phân định bất kể tuổi Issue; nguồn phân định chỉ nhận https"
+    - "Vòng 8 (ChatGPT chấm commit 69e282a): hai robot ghi khác thứ tự mở Issue không còn làm hỏng sổ (luật theo trạng thái sổ + robot tự kiểm trước khi ghi + hạn ghi); phục hồi bằng ghi thêm (chạy lại job; Issue mới); đường ghi dự báo của engine đóng — sổ chỉ nhận dòng từ Issue; research/trials.csv có một khuôn cố định; kiểm toán đọc lại dấu nhận trước khi báo đỏ"
+    - "Vòng 6: máy chủ nguồn tách bằng urllib; số và ngày chặt; đăng ký thử đẩy lên main trước khi chạy backtest; dấu nhận của github-actions[bot] cho từng dòng sổ; CI chạy lại luật nhận trên mọi dòng sổ"
+    - "Soạn đợt dự báo A/B số 1 (10 câu) — chờ Owner lấy câu trả lời ghế B và mở Issue"
+  tests: "tests/test_*.py: 4 tệp unittest + test_governance + 6 test script engine, tất cả chặn gộp; tools/validate.py 0 cảnh báo"
+next_gap: "(1) Ghi ≥ 20 dự báo A/B trước 23/11/2026. (2) Owner lập ghế thi công để ghim tài liệu gốc và viết ghi chú (hàng đợi library/reading_queue.yaml, 30 mục). (3) Phân định đợt 1 khi tới hạn (từ 10/12/2026). (4) Đề thi Học viện khi Thư viện có ghi chú CITED. (5) ADR riêng cho kho dữ liệu ghi tăng dần (C2). (6) Bốn việc tồn sau gộp của PR #28 (cuối ADR-0003): mỗi việc một Issue, sửa bằng PR riêng."

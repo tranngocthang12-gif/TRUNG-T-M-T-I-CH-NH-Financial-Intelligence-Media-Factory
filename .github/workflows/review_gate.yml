@@ -1,0 +1,34 @@
+name: L-09 nguoi cham
+
+# governance/LAWS.md L-09 + ADR-0003. PR chi xanh khi: (1) than PR ghi authored_by va reviewed_by khac ghe;
+# (2) chu kho da dan ban cham "GỘP ĐƯỢC" kem SHA cua commit dang cham thanh binh luan PR (ban cham nam tren kho).
+# Hai su kien:
+#   pull_request_target  -> chay ma kiem cua nhanh main: PR khong tu noi long duoc cong cua chinh no (co hieu luc sau khi tep nay len main)
+#   pull_request         -> chay ma kiem trong PR: de PR dua cong nay len main cung duoc kiem
+# Khong check out ma cua PR o su kien pull_request_target. Than PR va binh luan doc qua API, khong chen vao lenh.
+on:
+  pull_request:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+  pull_request_target:
+    types: [opened, edited, synchronize, reopened, ready_for_review]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: read
+
+jobs:
+  l09:
+    name: L-09 nguoi cham khac nha cung cap (${{ github.event_name }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Kiem authored_by / reviewed_by va ban cham tren kho
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: python tools/review_gate.py

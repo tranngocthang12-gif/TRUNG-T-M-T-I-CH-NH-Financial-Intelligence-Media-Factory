@@ -8,16 +8,16 @@
   "properties": {
     "seat": {"type": "string", "enum": ["A", "B"]},
     "question": {"type": "string", "minLength": 10},
-    "resolution_source": {"type": "string", "minLength": 5, "description": "URL hoặc địa chỉ văn bản công khai dùng để phân định"},
+    "resolution_source": {"type": "string", "minLength": 5, "description": "Nguồn công khai dùng để phân định; phải nêu ít nhất một tên miền (vd nso.gov.vn) — máy kiểm lúc nhận và lúc phân định"},
     "resolution_rule": {"type": "string", "enum": ["excess_return_positive", "numeric_range", "event_before_date", "comparison"]},
-    "resolve_at": {"type": "string", "format": "date"},
+    "resolve_at": {"type": "string", "format": "date", "description": "YYYY-MM-DD, sau ngày tạo Issue theo giờ Việt Nam (L-05)"},
     "p": {"type": "number", "minimum": 0.05, "maximum": 0.95},
     "base_rate": {"type": "number", "minimum": 0, "maximum": 1},
     "invalidation_conditions": {"type": "string", "minLength": 5},
-    "author_seat": {"type": "string", "minLength": 1},
-    "model_cutoff": {"type": "string", "minLength": 4},
+    "author_seat": {"type": "string", "minLength": 1, "description": "Bắt đầu bằng tên mô hình/nhà cung cấp hoặc Owner (L-09)"},
+    "model_cutoff": {"type": "string", "minLength": 4, "description": "YYYY-MM hoặc YYYY-MM-DD, không ở tương lai (L-05)"},
     "library_refs": {"type": "string"},
-    "prompt_hash": {"type": "string"}
+    "prompt_hash": {"type": "string", "description": "Bắt buộc với seat B: sha256 của phiên bản prompt chuẩn có hiệu lực vào ngày Issue mở (governance/control_b_prompts.jsonl); seat A không được có"}
   },
   "additionalProperties": false
 }

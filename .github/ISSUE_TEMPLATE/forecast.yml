@@ -14,13 +14,13 @@ body:
     id: question
     attributes:
       label: question
-      description: Câu hỏi có/không, có luật phân định rõ. Không phải khuyến nghị mua bán.
+      description: Câu hỏi có/không, có luật phân định rõ. Không phải khuyến nghị mua bán. Ghế A và ghế B dán CÙNG một câu chữ; mỗi ghế chỉ một dự báo cho một câu hỏi.
     validations: {required: true}
   - type: input
     id: resolution_source
     attributes:
       label: resolution_source
-      description: URL hoặc địa chỉ văn bản công khai dùng để phân định
+      description: Nguồn công khai dùng để phân định. BẮT BUỘC nêu tên miền (vd nso.gov.vn hoặc https://www.sbv.gov.vn) — lúc phân định máy chỉ nhận đường dẫn thuộc tên miền ghi ở đây.
     validations: {required: true}
   - type: dropdown
     id: resolution_rule
@@ -38,13 +38,13 @@ body:
     id: p
     attributes:
       label: p
-      description: Xác suất mệnh đề đúng, từ 0.05 đến 0.95
+      description: Xác suất mệnh đề đúng, từ 0.05 đến 0.95 (chỉ ghi con số, ví dụ 0.35)
     validations: {required: true}
   - type: input
     id: base_rate
     attributes:
       label: base_rate
-      description: Xác suất nền, từ 0 đến 1
+      description: Xác suất nền, từ 0 đến 1 (chỉ ghi con số, ví dụ 0.5)
     validations: {required: true}
   - type: textarea
     id: invalidation_conditions
@@ -56,13 +56,13 @@ body:
     id: author_seat
     attributes:
       label: author_seat
-      description: Ghế và mô hình đã trả lời (ví dụ "Claude Project TTC" hoặc "Claude trần")
+      description: Ghế đã trả lời — BẮT ĐẦU bằng tên mô hình, ví dụ "Claude Project TTC" hoặc "Claude trần" (L-09)
     validations: {required: true}
   - type: input
     id: model_cutoff
     attributes:
       label: model_cutoff
-      description: Ngày cắt dữ liệu của mô hình theo mô hình tự khai (L-05)
+      description: Tháng cắt dữ liệu của mô hình theo mô hình tự khai, dạng YYYY-MM, ví dụ 2026-06 (L-05)
     validations: {required: true}
   - type: textarea
     id: library_refs
@@ -73,4 +73,4 @@ body:
     id: prompt_hash
     attributes:
       label: prompt_hash
-      description: Chỉ với seat B — sha256 khối prompt trong governance/CONTROL_B_PROMPT.md
+      description: BẮT BUỘC với seat B — sha256 của prompt chuẩn đang có hiệu lực (dòng cuối của governance/control_b_prompts.jsonl); seat A để trống

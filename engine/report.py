@@ -62,10 +62,15 @@ def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, t
     if alerts:
         L += ["## Cảnh báo suy thoái", *[f"- {a}" for a in alerts], ""]
     if trials:
-        L += ["## Thử nghiệm trong chu kỳ", "", "| Phương pháp | Feature | Mô hình | IC | t | Ròng/năm | Kết luận |",
-              "|---|---|---|---|---|---|---|"]
-        L += [f"| {t['method']} | {t['features']} | {t['model']} | {t['ic_mean']:.3f} | {t['ic_t']:.2f} | "
-              f"{t['net_ann']:.1%} | {t['status']} |" for t in trials]
+        # L-06: báo Sharpe kèm Deflated Sharpe (xác suất Sharpe thật > 0 sau khi trừ số lần đã thử)
+        def _f(v, spec):
+            try: return format(float(v), spec) if v == v and v is not None else "–"
+            except (TypeError, ValueError): return "–"
+        L += ["## Thử nghiệm trong chu kỳ", "",
+              "| Mã thử | Phương pháp | Feature | Mô hình | IC | t | Ròng/năm | Sharpe (năm) | Deflated Sharpe | Kết luận |",
+              "|---|---|---|---|---|---|---|---|---|---|"]
+        L += [f"| {t.get('trial_id', '–')} | {t['method']} | {t['features']} | {t['model']} | {t['ic_mean']:.3f} | {t['ic_t']:.2f} | "
+              f"{t['net_ann']:.1%} | {_f(t.get('sharpe_ann'), '.2f')} | {_f(t.get('dsr'), '.3f')} | {t['status']} |" for t in trials]
         L.append("")
     L += ["## Meta-learning: hiệu quả phương pháp nghiên cứu", "", "| Phương pháp | Số thử | Sống sót | Kỳ vọng hậu nghiệm |",
           "|---|---|---|---|"]

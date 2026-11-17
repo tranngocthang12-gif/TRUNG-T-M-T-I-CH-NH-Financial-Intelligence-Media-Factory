@@ -15,16 +15,37 @@ for t, d, lo in [("TCB", "2024-06-11", -0.45), ("VCB", "2025-03-03", -0.30)]:
     assert not bad.at[raw.index[i], t]                          # không bị cờ lỗi (đã có sự kiện quyền giải thích)
     assert adj[t].iloc[-1] == raw[t].iloc[-1]                   # neo tại ngày cuối: giá điều chỉnh = giá gốc
     print(f"OK 1: {t} {d}: giá gốc {r_raw:+.2%} → điều chỉnh {r_adj:+.2%}, không bị cờ lỗi")
-st = mk["events"].set_index("ticker").status
-assert st["TCB"] == "APPLIED" and st["VCB"] == "APPLIED"
+def ev_status(events, ticker, ex_date):
+    """Trạng thái của ĐÚNG sự kiện (mã, ngày GDKHQ). Mỗi mã có thể có nhiều sự kiện (nguồn Yahoo bổ sung cổ tức tiền)."""
+    m = (events.ticker == ticker) & (pd.to_datetime(events.ex_date) == pd.Timestamp(ex_date))
+    return list(events.loc[m, "status"])
+
+assert ev_status(mk["events"], "TCB", "2024-06-11") == ["APPLIED"]
+assert ev_status(mk["events"], "VCB", "2025-03-03") == ["APPLIED"]
 
 # Point-in-time: tính tại 10/06/2024 thì sự kiện TCB CHƯA tồn tại → không điều chỉnh quá khứ bằng thông tin tương lai
+# Point-in-time: tính tại 10/06/2024 thì sự kiện 11/06/2024 CHƯA tồn tại. Nguồn Yahoo có thêm cổ tức tiền TCB 21/05/2024
+# nên "giá điều chỉnh = giá gốc" không còn đúng; kiểm chặt theo hệ số: (1) ngày neo as_of hệ số = 1 đúng bằng 1;
+# (2) chỉ có cổ tức tiền nên raw/close ∈ [1, 1,05) — điều chỉnh ngược chiều (< 1) hay rò chia tách (≥ 1,05) đều đỏ;
+# (3) không sự kiện nào có ex_date > as_of được APPLIED.
 mk0 = data.load_market("2024-06-10")
-assert ((mk0["close"]["TCB"] - mk0["raw_close"]["TCB"]).abs().max()) < 1e-9
-assert mk0["events"].set_index("ticker").status["TCB"] == "CHUA_DEN_HAN"
-d9 = pd.Timestamp("2024-06-10")
-assert abs(mk["close"].at[d9, "TCB"] - mk["raw_close"].at[d9, "TCB"] / 2) < 1e-6
-print("OK 2: point-in-time — tại 10/06/2024 chưa điều chỉnh; tính tại hôm nay thì giá 10/06/2024 = gốc / 2")
+f0 = (mk0["raw_close"]["TCB"] / mk0["close"]["TCB"]).dropna()
+d9, d11 = pd.Timestamp("2024-06-10"), pd.Timestamp("2024-06-11")
+assert f0[d9] == 1.0, f0[d9]
+assert 1.0 <= f0.min() and f0.max() < 1.05, (f0.min(), f0.max())
+ev0 = mk0["events"]
+assert not ((pd.to_datetime(ev0.ex_date) > d9) & (ev0.status == "APPLIED")).any()
+assert ev_status(ev0, "TCB", "2024-06-11") == ["CHUA_DEN_HAN"]
+# Tính tại hôm nay: close/raw tại ngày d phải ĐÚNG BẰNG tích price_factor của mọi sự kiện APPLIED có ex_date > d
+# (bảng sự kiện là nguồn; chuỗi giá là dẫn xuất). Kiểm tại 10/06/2024 và một ngày trước cổ tức tiền 21/05/2024.
+ap = mk["events"][(mk["events"].ticker == "TCB") & (mk["events"].status == "APPLIED")]
+for d in (d9, pd.Timestamp("2024-05-20")):
+    expect = float(ap.loc[pd.to_datetime(ap.ex_date) > d, "price_factor"].prod())
+    got = float(mk["close"].at[d, "TCB"] / mk["raw_close"].at[d, "TCB"])
+    assert abs(got - expect) < 1e-9, (str(d.date()), got, expect)
+assert abs(ap.loc[pd.to_datetime(ap.ex_date) == d11, "price_factor"].item() - 0.5) < 1e-9   # chia tách 1:1 đúng hệ số 1/2
+print("OK 2: point-in-time — tại 10/06/2024 hệ số neo = 1, chỉ cổ tức tiền, không sự kiện tương lai; "
+      "tính hôm nay close/raw = tích hệ số các sự kiện sau ngày đó")
 
 # Nhãn 20 phiên của TCB quanh ngày GDKHQ không còn chứa cú rơi -50%
 y = features.labels_wide(adj, 20, bad)
@@ -74,9 +95,11 @@ print("OK 5: feature/nhãn chạm ô lỗi bị loại; phần sạch giữ nguy
 
 # Ledger: dự báo có ô lỗi trong cửa sổ chấm → VOID, không chấm điểm
 import engine.ledger as LG
-LG._load = lambda rel: [{"id": "P-x", "created_at": str(idx[140].date()), "procedure": "t",
-                         "resolution_rule": {"ticker": "B", "horizon": 20}}] if rel == LG.PRED else []
-LG._append = lambda rel, rows: None
+LG.CFG["ledger"]["engine_forecasts"] = "open"                 # chỉ trong tiến trình test: kho thật đóng đường ghi của engine
+_row = LG._engine_row({"procedure": "t", "claim": "x", "ticker": "B", "horizon": 20, "probability": 0.5}, str(idx[140].date()), 0.5)
+assert LG.engine_row_error(_row) is None
+LG._load = lambda rel: [_row] if rel == LG.PRED else []
+LG._append = LG._append_chained = lambda rel, rows: None      # không ghi gì vào kho (resolve ghi theo chuỗi hash)
 r = ledger.resolve(a.ffill(), str(idx[-1].date()), bad2)
 assert r[0]["outcome"] is None and "lỗi dữ liệu" in r[0]["void"], r
 print("OK 6: Ledger đặt VOID cho dự báo có ô lỗi dữ liệu trong cửa sổ chấm")

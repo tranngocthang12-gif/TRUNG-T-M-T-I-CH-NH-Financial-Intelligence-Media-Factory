@@ -20,19 +20,34 @@ from engine.config import path
 dates = make_store(n_days=900)
 d0 = str(dates[700].date())
 
-# 1) Governor phải CHẶN khi chưa được Owner cho phép
+# 1) Governor phải CHẶN khi chưa được Owner cho phép; cổng ghi dự báo của engine đóng theo config.yaml của kho
+assert cfg["ledger"]["engine_forecasts"] == "closed", cfg["ledger"]
 r = run_cycle.cycle(d0, trials=0, write_report=False, use_llm=True)
 assert r["experts"]["ran"] is False and any("autonomous_spending" in x for x in r["experts"]["reasons"]), r["experts"]
-print("OK 1: Budget Governor chặn khi Owner chưa cho phép chi tiêu")
+assert any("engine_forecasts" in x for x in r["experts"]["reasons"]), r["experts"]
+print("OK 1: Budget Governor chặn khi Owner chưa cho phép chi tiêu; cổng ghi dự báo của engine đóng")
 
-# Owner cho phép (chỉ trong môi trường kiểm thử)
+def reload_engine():
+    import importlib, engine.config as C; importlib.reload(C)
+    for m in ["engine.budget", "engine.facts", "engine.ledger", "engine.experts", "engine.run_cycle"]:
+        importlib.reload(importlib.import_module(m))
+
+# Owner cho phép chi tiêu (chỉ trong môi trường kiểm thử) nhưng cổng vẫn đóng → chuyên gia vẫn KHÔNG chạy, sổ không có dòng nào
 (home / "governance/SAFETY_STATE.yaml").write_text(yaml.safe_dump({"autonomous_spending_enabled": True}))
 (home / "governance/GOVERNOR_POLICY.yaml").write_text(yaml.safe_dump({"api_budget": {"daily_cap_usd": 1, "monthly_cap_usd": 10}}))
 cfg["experts"]["price_input_per_mtok"] = 1; cfg["experts"]["price_output_per_mtok"] = 1
 (home / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
-import importlib, engine.config as C; importlib.reload(C)
-for m in ["engine.budget", "engine.facts", "engine.ledger", "engine.experts", "engine.run_cycle"]:
-    importlib.reload(importlib.import_module(m))
+reload_engine()
+from engine import run_cycle
+r = run_cycle.cycle(str(dates[701].date()), trials=0, write_report=False, use_llm=True)
+assert r["experts"]["ran"] is False and r["experts"]["reasons"] and all("engine_forecasts" in x for x in r["experts"]["reasons"]), r["experts"]
+assert not (home / "ledger/predictions.jsonl").exists()
+print("OK 1b: đủ ngân sách nhưng cổng đóng → chuyên gia không chạy, không ghi dòng nào vào sổ")
+
+# Mở cổng CHỈ trong thư mục tạm của test, để mã của đường ghi này vẫn được chạy thử (kho thật: validate chỉ nhận closed)
+cfg["ledger"]["engine_forecasts"] = "open"
+(home / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+reload_engine()
 from engine import run_cycle, ledger, facts
 
 # 2) Auditor phải loại dự báo có nguồn bịa / xác suất sai / mã lạ
@@ -44,8 +59,8 @@ _, rej = ledger.record([{"procedure": "test", "ticker": "S01", "horizon": 20, "p
 assert len(rej) == 3, rej
 print("OK 2: Auditor loại 3/3 dự báo sai luật:", [r["audit_errors"][0] for r in rej])
 
-# 3) Chạy 60 phiên, mỗi phiên có tin giả nhắc S01, S05
-for i in range(701, 761):
+# 3) Chạy 59 phiên, mỗi phiên có tin giả nhắc S01, S05
+for i in range(702, 761):
     d = dates[i]
     with open(path(facts.NEWS), "a", encoding="utf-8") as f:
         for t in ["S01", "S05"]:

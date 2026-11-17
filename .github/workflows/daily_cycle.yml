@@ -1,8 +1,12 @@
-name: Vong hoc hang ngay
+name: Vong hoc hang tuan
 
+# ARCHITECTURE v3.0 §4.3 + ADR-0003: engine la doi chung am, chay HANG TUAN (thu Sau 16:30 gio VN) de so lan thu
+# khong phinh nguong Bonferroni; ingest tai bu moi phien tu ngay cuoi trong kho nen khong mat du lieu.
+# L-06: TTC_REGISTRY_PUSH=1 -> moi lan thu duoc DAY len main (tools/registry_push.py) TRUOC khi chay backtest. Vong hoc hong
+# giua chung thi dang ky cua lan thu do van nam tren main, lan sau khong dung lai ma thu va van dem no vao so lan thu.
 on:
   schedule:
-    - cron: "30 9 * * 1-5"
+    - cron: "30 9 * * 5"
   workflow_dispatch:
     inputs:
       trials:
@@ -34,15 +38,21 @@ jobs:
         run: python -m tests.test_no_lookahead
       - name: Kiem tra cau truc bo nao
         run: python tools/validate.py
-      - name: Chay vong hoc
+      - name: Chay vong hoc (dang ky tung lan thu len main truoc khi chay)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python -m engine.run_cycle --source live --trials ${{ github.event.inputs.trials || '6' }}
+          TTC_REGISTRY_PUSH: "1"
+          TRIALS: ${{ github.event.inputs.trials || '6' }}
+        run: |
+          case "$TRIALS" in ''|*[!0-9]*) echo "trials phai la so nguyen khong am: '$TRIALS'"; exit 1;; esac
+          python -m engine.run_cycle --source live --trials "$TRIALS"
+      - name: Kiem lai sau khi chay (ket qua trai luat thi khong ghi vao main)
+        run: python tools/validate.py
       - name: Ghi ket qua vao bo nao
         run: |
           git config user.name "ttc-engine"
           git config user.email "ttc-engine@users.noreply.github.com"
-          git add -A data state research knowledge paper reports fact ledger memory
+          git add -A data state research knowledge paper reports fact ledger memory library/notes
           git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F)"
           # Ledger intake co the da day du bao len main trong luc vong hoc chay: rebase roi day, thu lai toi 5 lan
           for i in 1 2 3 4 5; do

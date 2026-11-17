@@ -37,6 +37,19 @@ research:
   min_t: 3.0               # ngưỡng t tối thiểu
   family_wise_alpha: 0.05  # ngưỡng tăng dần theo tổng số thử nghiệm (chống data mining)
   min_fold_positive: 0.6
+  # ARCHITECTURE v3.0 §4.3 + L-06: không gian giả thuyết ĐÓNG BĂNG (13 feature × 3 mô hình). Thêm feature/mô hình mới
+  # = giả thuyết mới: phải qua ADR rồi mới sửa danh sách này; engine từ chối đăng ký lần thử nằm ngoài danh sách.
+  frozen_space:
+    features: [dist_ma120, dist_ma20, lowvol_20, lowvol_60, maxret_20, mom_120_skip20, mom_20, mom_60, rel_mom_20,
+               rev_1, rev_5, volu_ratio, volu_trend]
+    models: [ridge, gbm, signed_sum]
+  # L-06 (ADR-0003, vòng chấm 7): GHIM 210 kết quả thử đầu tiên của research/trials.csv như chúng có tại v3.0.2.
+  # tools/validate.py so sha256 của đúng 210 dòng đầu với giá trị này; sửa, xóa hay chèn một ô là đỏ. Các kết quả sau đó
+  # được chốt bằng dòng neo ở đầu research/trial_registry.jsonl (engine ghi lúc tạo sổ). Không sửa ba dòng dưới đây.
+  legacy_pin:
+    results: 210
+    last_trial_id: T00210
+    sha256: 53b28e246c1bba842d93eac30478942422e00000da2519a93ece6c12498548af
 registry:
   max_active: 5
   refit_days: 20
@@ -52,6 +65,10 @@ llm_review:
   model: claude-sonnet-5
 # ---- v1.0 Giai đoạn 1 ----
 ledger:
+  # ADR-0003 quyết định 11 (vòng chấm 8): đường ghi dự báo của engine (chuyên gia LLM tự ghi, engine tự chấm bằng giá) ĐÓNG.
+  # Sổ dự báo chỉ nhận dòng từ Issue 'Forecast'/'Resolution' — có Issue thật và dấu nhận của robot. tools/validate.py chỉ
+  # chấp nhận giá trị closed; mở lại phải qua ADR mới kèm cơ chế bằng chứng xuất xứ cho dòng engine, không phải sửa chữ này.
+  engine_forecasts: closed
   horizons: [5, 20]
   min_p: 0.05
   max_p: 0.95

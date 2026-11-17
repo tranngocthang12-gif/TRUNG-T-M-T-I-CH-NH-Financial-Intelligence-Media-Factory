@@ -1,9 +1,13 @@
 name: Ledger intake (Forecast issue)
 
-# Chi nhan Issue luc MO (opened), do chinh Owner mo, co nhan "forecast" ngay tu mau.
+# Chi nhan Issue luc MO (opened), do chinh chu kho mo, co nhan "forecast" hoac tieu de "[Forecast]".
 # Khong nhan su kien "labeled": Issue cu duoc gan nhan muon co the da bi sua than sau khi biet ket qua (L-05).
 # Khong dung nhom concurrency chung: GitHub huy run dang cho khi run thu ba toi, mo nhieu Issue lien tiep se mat du bao.
-# Thay vao do moi run tu thu lai: lay main moi nhat, tinh lai hash chuoi, ghi, day len; trung thi lam lai.
+# Moi run tu thu lai: lay main moi nhat, tinh lai hash chuoi, ghi, day len; trung thi lam lai. Vi quyet dinh luon duoc
+# tinh lai tren dung trang thai main duoc ghi tiep len, thu tu CHAY XONG cua robot nay va robot phan dinh co khac thu tu MO
+# Issue thi so van nhat quan (ADR-0003 quyet dinh 10): cau hoi da co ket qua thi khong nhan them du bao; truoc khi ghi,
+# tools/ledger_intake.py tu chay lai toan bo luat kiem tren trang thai sau khi ghi va khong ghi khi da sat han dau nhan.
+# Than Issue va moi gia tri do nguoi dung nhap chi di qua bien moi truong, khong chen vao lenh.
 on:
   issues:
     types: [opened]
@@ -39,11 +43,14 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_CREATED_AT: ${{ github.event.issue.created_at }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           set +e
           git config user.name "ttc-ledger"
           git config user.email "ttc-ledger@users.noreply.github.com"
-          out='{"ok":false,"message":"Khong day duoc len main sau 8 lan thu"}'
+          fail='{"ok":false,"message":"Loi he thong: khong ghi duoc vao main sau 8 lan thu"}'
+          out="$fail"
           code=1
           for i in 1 2 3 4 5 6 7 8; do
             git fetch -q origin main && git reset -q --hard origin/main
@@ -53,23 +60,59 @@ jobs:
             git add ledger/predictions.jsonl
             git commit -q -m "ledger: forecast #${ISSUE_NUMBER}"
             if git push -q origin HEAD:main; then break; fi
-            out='{"ok":false,"message":"Khong day duoc len main sau 8 lan thu"}'
+            out="$fail"
             code=1
             sleep $(( (RANDOM % 15) + 5 ))
           done
+          if [ -z "$out" ]; then out='{"ok":false,"message":"Loi he thong: script khong in ket qua (xem log)"}'; code=1; fi
           echo "result=$out" >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "$out"
           exit 0
-      - name: Binh luan ket qua
-        if: steps.intake.outputs.code != '3'
+      # Binh luan nay la DAU NHAN: github-actions[bot] dang hash cua dong vua ghi, gio dang do may chu GitHub ghi.
+      # tools/ledger_audit.py doi chieu tung dong so voi dau nhan (dung Issue, bot dang, chua sua, trong 6 gio sau khi mo, truoc ngay resolve_at).
+      # Chay lai job (ma 3 = da ghi): chi dang lai dau nhan neu lan truoc chua dang duoc.
+      - name: Binh luan ket qua va dau nhan
+        id: comment
         uses: actions/github-script@v7
         env:
           RESULT: ${{ steps.intake.outputs.result }}
+          CODE: ${{ steps.intake.outputs.code }}
         with:
+          retries: 3
           script: |
-            const r = JSON.parse(process.env.RESULT || '{"ok":false,"message":"khong co ket qua"}');
-            await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: context.issue.number, body: (r.ok ? "✅ " : "❌ ") + r.message});
-            await github.rest.issues.addLabels({owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: context.issue.number, labels: [r.ok ? "ledgered" : "rejected"]});
+            let r;
+            try { r = JSON.parse(process.env.RESULT); } catch (e) { r = {ok: false, message: "Loi he thong: ket qua khong doc duoc (xem log)"}; }
+            const where = {owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number};
+            const marks = (r.ok && Array.isArray(r.attest) ? r.attest : []).map(a => "ledger-attest: " + a);
+            if (process.env.CODE === "3") {
+              const old = await github.paginate(github.rest.issues.listComments, {...where, per_page: 100});
+              const have = marks.length > 0 && old.some(c => c.user && c.user.login === "github-actions[bot]" &&
+                c.created_at === c.updated_at && marks.every(m => (c.body || "").includes(m)));
+              if (have || marks.length === 0) return;
+            }
+            // Thong bao co the nhac lai chu nguoi dung nhap: vo hieu moi chuoi "ledger-attest" trong do; dau nhan chi nam o cac dong duoi.
+            let body = (r.ok ? "✅ " : "❌ ") + String(r.message || "").replace(/ledger-attest/gi, "ledger_attest");
+            if (marks.length) body += "\n\nDấu nhận của sổ (máy kiểm toán đọc các dòng dưới đây — không sửa, không xóa bình luận này):\n" +
+              marks.map(m => "`" + m + "`").join("\n");
+            // Dong da nam tren main thi dau nhan PHAI duoc dang: thu lai toi 5 lan (cho 20, 40, 60, 80 giay) khi GitHub tam loi.
+            // Van hong thi job do: chay lai job nay trong vong 6 gio ke tu luc Issue mo (ma 3 se dang bo sung dau nhan).
+            for (let i = 1; ; i++) {
+              try { await github.rest.issues.createComment({...where, body}); break; }
+              catch (e) {
+                if (i >= 5) throw e;
+                core.warning("Dang binh luan loi (lan " + i + "): " + e.message);
+                await new Promise(done => setTimeout(done, 20000 * i));
+              }
+            }
+            if (process.env.CODE !== "3") {
+              try { await github.rest.issues.addLabels({...where, labels: [r.ok ? "ledgered" : "rejected"]}); }
+              catch (e) { core.warning("Khong gan duoc nhan (dau nhan da dang, so khong anh huong): " + e.message); }
+            }
+      - name: Loi he thong (ma 1) lam job do; tu choi (2) va trung (3) la ket qua hop le
+        if: steps.intake.outputs.code == '1'
+        env:
+          RESULT: ${{ steps.intake.outputs.result }}
+        run: |
+          echo "Intake loi he thong hoac khong day duoc len main: $RESULT"
+          exit 1
