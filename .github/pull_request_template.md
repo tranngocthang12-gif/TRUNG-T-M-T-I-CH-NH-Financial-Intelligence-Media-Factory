@@ -1,11 +1,16 @@
 ## Thay đổi
 <!-- tóm tắt; tệp nào, vì sao -->
 
-## Ghế (L-09 — người viết khác nhà cung cấp với người chấm)
+## Ghế (L-09 — người viết khác ghế với người chấm)
 authored_by: 
 reviewed_by: 
 
-<!-- Mỗi trường đúng một dòng. authored_by phải BẮT ĐẦU bằng tên ghế viết ("Claude (Anthropic)", "ChatGPT (OpenAI)", "Owner"…).
-     reviewed_by để trống khi mở PR; sau khi chấm xong mới điền, cũng BẮT ĐẦU bằng tên ghế chấm, và không chung ghế với
-     authored_by: khác nhà cung cấp; Owner viết thì Owner không tự chấm. Ví dụ "ChatGPT (OpenAI)", "Grok (xAI)", "Owner".
-     Workflow "L-09 nguoi cham" đỏ cho tới khi có reviewed_by hợp lệ. Owner gộp main (L-10). -->
+<!--
+Cách điền (cổng "L-09 nguoi cham" đỏ cho tới khi đủ cả hai việc):
+1. Dòng người viết: bắt đầu bằng tên ghế viết, ví dụ "Claude (Anthropic)", "ChatGPT (OpenAI)", "Owner". Mỗi trường đúng một dòng.
+2. Để trống dòng người chấm khi mở PR. Sau khi ghế khác nhà cung cấp chấm xong:
+   a) dán nguyên bản chấm thành một bình luận của PR — dòng đầu phải là "GỘP ĐƯỢC", và có 7 ký tự đầu SHA của commit được chấm;
+   b) rồi mới điền dòng người chấm, bắt đầu bằng tên ghế chấm ("ChatGPT (OpenAI)", "Grok (xAI)", "Owner"…).
+   Người chấm không được chung ghế với người viết: khác nhà cung cấp; Owner viết thì Owner không tự chấm.
+3. Đẩy thêm commit sau khi chấm thì phải chấm lại bản mới. Owner là người bấm Merge (L-10).
+-->
