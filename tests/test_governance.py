@@ -656,6 +656,85 @@ class WorkflowLintTests(unittest.TestCase):
         self.assertEqual(d["permissions"], {"contents": "read", "pull-requests": "read", "issues": "read"})
 
 
+class PriceStoreTests(unittest.TestCase):
+    """ADR-0006 (C2): kho giá ghi tăng dần — kho cũ đóng băng, dòng mới nối vào tệp tháng, kiểm toán bắt mọi lần viết lại."""
+
+    def setUp(self):
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+
+    @staticmethod
+    def _rows(spec, observed):
+        import pandas as pd
+        return pd.DataFrame([{"date": pd.Timestamp(d), "ticker": t, "open": c, "high": c, "low": c, "close": c,
+                              "volume": 100, "observed_at": pd.Timestamp(observed), "source": "yahoo"} for d, t, c in spec])
+
+    def test_save_appends_new_rows_only_and_never_rewrites(self):
+        from engine import data
+        cfg = data.CFG["data"]
+        legacy = self._rows([("2026-09-30", "AAA", 10.0), ("2026-09-30", "BBB", 20.0)], "2026-10-01 00:00:00")
+        (self.tmp / cfg["store"]).parent.mkdir(parents=True)
+        legacy.to_csv(self.tmp / cfg["store"], index=False, compression="gzip")
+        frozen = (self.tmp / cfg["store"]).read_bytes()
+        s = data.load_store(self.tmp)
+        new = self._rows([("2026-10-30", "AAA", 11.0), ("2026-11-02", "AAA", 12.0)], "2026-11-03 09:00:00")
+        self.assertEqual(data.save_store(data.append_rows(s, new), self.tmp), 2)
+        d = self.tmp / cfg["store_dir"]
+        self.assertEqual(sorted(f.name for f in d.glob("*.csv")), ["2026-10.csv", "2026-11.csv"])
+        oct_before = (d / "2026-10.csv").read_bytes()
+        # lần sau: một dòng trễ của tháng cũ + giá "đã sửa" của dòng đã có → chỉ dòng mới được nối, dòng cũ giữ nguyên
+        s = data.load_store(self.tmp)
+        s.loc[(s.ticker == "AAA") & (s.date == "2026-10-30"), "close"] = 99.0
+        late = self._rows([("2026-10-30", "BBB", 21.0)], "2026-11-10 09:00:00")
+        self.assertEqual(data.save_store(data.append_rows(s, late), self.tmp), 1)
+        oct_after = (d / "2026-10.csv").read_bytes()
+        self.assertTrue(oct_after.startswith(oct_before) and len(oct_after) > len(oct_before))
+        self.assertEqual((self.tmp / cfg["store"]).read_bytes(), frozen)                   # kho cũ không bị ghi lại
+        out = data.load_store(self.tmp)
+        self.assertEqual(len(out), 5)
+        self.assertEqual(float(out[(out.ticker == "AAA") & (out.date == "2026-10-30")].close.iloc[0]), 11.0)
+        self.assertEqual(data.save_store(out, self.tmp), 0)                                # không có gì mới: không đụng tệp
+        self.assertEqual((d / "2026-10.csv").read_bytes(), oct_after)
+        # mã của engine: không còn đường ghi lại cả kho
+        src = (ROOT / "engine" / "data.py").read_text(encoding="utf-8")
+        self.assertNotIn('compression="gzip"', src)
+        self.assertIn("git add -A data ", (ROOT / ".github" / "workflows" / "daily_cycle.yml").read_text(encoding="utf-8"))
+
+    def test_audit_catches_rewrites_of_the_price_store(self):
+        legacy, part = "data/store/prices.csv.gz", "data/store/prices/2026-11.csv"
+        base = {legacy: b"gz", part: b"h\n1\n"}
+        f = lambda head: ledger_audit.store_errors(base, head, legacy)
+        self.assertEqual(f({legacy: b"gz", part: b"h\n1\n2\n"}), [])
+        self.assertTrue(any("bị ghi lại" in e for e in f({legacy: b"gz2", part: b"h\n1\n"})))
+        self.assertTrue(any("bị xóa" in e for e in f({legacy: None, part: b"h\n1\n"})))
+        self.assertTrue(any("chỉ-ghi-thêm" in e for e in f({legacy: b"gz", part: b"h\n9\n2\n"})))
+        self.assertTrue(any("đã bị xóa" in e for e in f({legacy: b"gz", part: None})))
+        # trên git thật: commit gốc trước ADR-0006 (chưa có store_dir) → không kiểm; sau đó → bắt việc ghi lại kho cũ
+        repo = self.tmp / "repo"; (repo / "data" / "store" / "prices").mkdir(parents=True)
+        def git(*a):
+            r = subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *a], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, r.stderr); return r.stdout.strip()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, capture_output=True)
+        (repo / legacy).write_bytes(b"cu")
+        (repo / "config.yaml").write_text(yaml.safe_dump({"data": {"store": legacy}}), encoding="utf-8")
+        git("add", "-A"); git("commit", "-qm", "truoc ADR-0006"); old = git("rev-parse", "HEAD")
+        (repo / legacy).write_bytes(b"cu-ghi-lai")
+        self.assertEqual(ledger_audit.store_snapshot_errors(repo, old), [])                # vòng học bản cũ: còn được ghi lại
+        (repo / "config.yaml").write_text(yaml.safe_dump({"data": {"store": legacy, "store_dir": "data/store/prices"}}), encoding="utf-8")
+        (repo / part).write_bytes(b"h\n1\n")
+        git("add", "-A"); git("commit", "-qm", "ADR-0006"); new = git("rev-parse", "HEAD")
+        self.assertEqual(ledger_audit.store_snapshot_errors(repo, new), [])
+        (repo / part).write_bytes(b"h\n1\n2\n")
+        self.assertEqual(ledger_audit.store_snapshot_errors(repo, new), [])                # nối thêm: đạt
+        (repo / legacy).write_bytes(b"lai-ghi")
+        self.assertTrue(any("bị ghi lại" in e for e in ledger_audit.store_snapshot_errors(repo, new)))
+        (repo / legacy).write_bytes(b"cu-ghi-lai"); (repo / part).write_bytes(b"h\n0\n")
+        self.assertTrue(any("chỉ-ghi-thêm" in e for e in ledger_audit.store_snapshot_errors(repo, new)))
+        self.assertIn("store_snapshot_errors(ROOT, base)", (ROOT / "tools" / "ledger_audit.py").read_text(encoding="utf-8"))
+        real = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))["data"]
+        self.assertEqual((real["store"], real["store_dir"]), (legacy, "data/store/prices"))
+
+
 class DocsConsistencyTests(unittest.TestCase):
     def test_adr_maps_every_law_to_a_machine_check_that_exists(self):
         adr = (ROOT / "architecture" / "adr" / "ADR-0003-phan-dinh-va-van-hanh.md").read_text(encoding="utf-8")

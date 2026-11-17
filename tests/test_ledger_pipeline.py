@@ -14,7 +14,7 @@ os.environ["TTC_HOME"] = str(home)
 os.environ["TTC_MOCK_LLM"] = "1"
 import pandas as pd
 from engine.synthetic import make_store
-from engine import run_cycle, ledger, facts, budget
+from engine import run_cycle, ledger, facts, budget, data
 from engine.config import path
 
 dates = make_store(n_days=900)
@@ -51,7 +51,7 @@ reload_engine()
 from engine import run_cycle, ledger, facts
 
 # 2) Auditor phải loại dự báo có nguồn bịa / xác suất sai / mã lạ
-close = pd.read_csv(home / cfg["data"]["store"], parse_dates=["date"]).pivot(index="date", columns="ticker", values="close")
+close = data.load_store().pivot(index="date", columns="ticker", values="close")   # kho ghi tăng dần (ADR-0006)
 _, rej = ledger.record([{"procedure": "test", "ticker": "S01", "horizon": 20, "probability": 0.6, "claim": "x", "evidence_refs": ["N-bia"]},
                         {"procedure": "test", "ticker": "XXX", "horizon": 20, "probability": 0.6, "claim": "x", "evidence_refs": []},
                         {"procedure": "test", "ticker": "S01", "horizon": 7, "probability": 1.0, "claim": "x", "evidence_refs": []}],

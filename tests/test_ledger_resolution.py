@@ -1030,12 +1030,15 @@ class ScoringTests(_Base):
         ab = self._score(preds, res)["ab"]
         self.assertEqual((ab["pairs"], ab["disagreements"], ab["disagreements_out_of_scope"]), (194, 0, 194))
         self.assertEqual(ab["disagreement_rate"], 1.0)
+        self.assertEqual(ab["disagreements_all"], 194)                         # ADR-0007: mẫu số của tỷ lệ, in rõ
         self.assertEqual((ab["fixed_sample"]["n"], ab["disagreements_resolved"]), (0, 0))
         self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (0/194"), ab["verdict"])
         more_p, more_r = self._fake(194, 100, start=5000)                         # 194 cặp comparison: chỉ chúng vào mẫu
         ab = self._score(preds + more_p, res + more_r)["ab"]
         self.assertEqual((ab["fixed_sample"]["n"], ab["fixed_sample"]["a_correct"]), (194, 100))
         self.assertEqual(ab["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
+        self.assertEqual(ab["disagreements_all"], ab["disagreements"] + ab["disagreements_out_of_scope"])
+        self.assertEqual(ab["disagreement_rate"], round(ab["disagreements_all"] / ab["pairs"], 3))
         report = (ROOT / "engine" / "run_cycle.py").read_text(encoding="utf-8")
         self.assertIn("{disagreements_out_of_scope}", report)
 
