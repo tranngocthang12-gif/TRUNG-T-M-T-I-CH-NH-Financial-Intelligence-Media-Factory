@@ -1,8 +1,8 @@
 # ADR-0006: Kho giá ghi tăng dần (C2)
 - Ngày: 2026-11-17
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này)
+- Trạng thái: ACCEPTED 17/11/2026 (Owner gộp PR #30, commit gộp `f9f3417`)
 - Người đề xuất: Claude (kiến trúc sư trưởng)
-- Người chấm: ghế khác nhà cung cấp (L-09), ghi ở PR
+- Người chấm: Gemini (Google) — `GỘP ĐƯỢC — commit 5b90973` (bình luận PR #30)
 - Owner duyệt: khi gộp PR. Lệnh gốc của Owner (17/11/2026, chat vận hành): "Bạn làm được gì thì làm ngay" cho các việc còn lại sau rà soát kiến trúc.
 
 ## Quyết định

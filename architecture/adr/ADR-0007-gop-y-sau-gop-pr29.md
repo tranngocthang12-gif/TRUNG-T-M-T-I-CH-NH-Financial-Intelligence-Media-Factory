@@ -1,8 +1,8 @@
 # ADR-0007: Hai góp ý sau gộp PR #29 — điều kiện mở lại engine kịch bản; tên khóa bất đồng
 - Ngày: 2026-11-17
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này)
+- Trạng thái: ACCEPTED 17/11/2026 (Owner gộp PR #30, commit gộp `f9f3417`)
 - Người đề xuất: Claude (kiến trúc sư trưởng), theo phản biện tư vấn của Grok (xAI) đăng ở PR #29 sau khi gộp (không phải bản chấm L-09)
-- Người chấm: ghế khác nhà cung cấp (L-09), ghi ở PR
+- Người chấm: Gemini (Google) — `GỘP ĐƯỢC — commit 5b90973` (bình luận PR #30)
 - Owner duyệt: khi gộp PR
 
 ## Quyết định

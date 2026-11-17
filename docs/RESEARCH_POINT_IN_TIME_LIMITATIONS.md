@@ -9,7 +9,7 @@
 - `load_market(as_of)` hiện lọc `date <= as_of`, nhưng không tái hiện một cách tổng quát bản dữ liệu/phiên bản nguồn và sự kiện quyền mà hệ thống *biết được* ở `as_of`. Dữ liệu lịch sử nhập về sau có thể vẫn được dùng trong backtest tại ngày trước thời điểm nhập.
 - `tests/test_no_lookahead.py` kiểm tính nhân quả của feature với dữ liệu giá đã cho; nó không chứng minh toàn bộ nguồn giá, corporate actions, lịch sử thành phần VN30 và báo cáo tài chính đều point-in-time.
 - Hai sự kiện quyền TCB và VCB trong `data/corporate_actions.csv` hiện vẫn là `CAN_DOI_CHIEU`; `engine/adjust.py` trên `main` không kiểm tra status này trước khi tự gán `APPLIED`. Các phép thử thực nghiệm dựa trên chuỗi điều chỉnh cần ghi giới hạn này.
-- Backtest theo VN30 hiện tại có rủi ro thiên lệch sống sót. PR #31 / ADR-0008 mới *đề xuất* đưa nhãn cảnh báo, chưa cung cấp lịch sử VN30 theo từng kỳ.
+- Backtest theo VN30 hiện tại có rủi ro thiên lệch sống sót. ADR-0008 đã được Owner đưa vào `main` qua PR #31 (merge commit `8c4fd4305b8154adda2ea0e1abf4e43cd7b647ab`) và bổ sung nhãn cảnh báo; danh sách VN30 theo từng kỳ vẫn chưa được cung cấp.
 
 ## Quy tắc diễn giải
 

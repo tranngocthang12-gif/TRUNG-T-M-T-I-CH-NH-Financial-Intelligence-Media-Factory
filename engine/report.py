@@ -1,6 +1,24 @@
 """Báo cáo chu kỳ dạng markdown + ENGINE_STATE cho AI/Owner đọc."""
 import pandas as pd
-from .config import CFG, save_json, path
+from .config import CFG, ROOT, save_json, path
+from .research import nav_drawdown
+
+# ADR-0008: mọi kết quả backtest chạy trên danh sách cố định trong config.yaml (VN30 HIỆN TẠI) cho toàn bộ lịch sử —
+# chọn trước những mã đã lớn lên, nên lợi nhuận và IC bị đẩy lên so với một danh sách theo từng kỳ.
+SURVIVORSHIP_NOTE = ("Danh sách mã: {n} mã VN30 HIỆN TẠI dùng cho toàn bộ lịch sử backtest — có THIÊN LỆCH SỐNG SÓT: "
+                     "lợi nhuận, IC và Sharpe của backtest bị đẩy lên so với danh sách VN30 theo từng kỳ (ADR-0008)")
+
+def survivorship_note():
+    return SURVIVORSHIP_NOTE.format(n=len(CFG["universe"])) if CFG.get("universe_basis", "CURRENT") == "CURRENT" else None
+
+def paper_drawdown():
+    p = ROOT / "paper" / "nav.csv"
+    if not p.exists():
+        return None
+    try:
+        return nav_drawdown(pd.read_csv(p)["nav"].astype(float).tolist())
+    except Exception:  # noqa: BLE001
+        return None
 
 def _quality_lines(q):
     if not q:
@@ -44,7 +62,8 @@ def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, t
     act = {s: sum(1 for v in reg.values() if v["state"] == s) for s in
            ["ACTIVE", "WATCH", "DEGRADING", "PAUSED", "INVALIDATED", "RETIRED"]}
     state = {"as_of": as_of, "regime": regime_now, "total_trials": n_total, "current_t_threshold": round(thr, 2),
-             "models": act, "paper_nav": nav, "alerts": alerts,
+             "models": act, "paper_nav": nav, "paper_max_drawdown": paper_drawdown(),
+             "universe_basis": CFG.get("universe_basis", "CURRENT"), "universe_bias": survivorship_note(), "alerts": alerts,
              "data_quality": {k: v for k, v in (quality or {}).items() if k != "flags_window"} | (
                  {"flags_window": (quality or {}).get("flags_window", [])[:50]} if quality else {}),
              "data_ingest": ingest, "news_errors": news_errors or [],
@@ -54,7 +73,13 @@ def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, t
     L = [f"# Báo cáo chu kỳ {as_of}", "", f"- Regime hiện tại: **{regime_now}**",
          f"- Tổng số thử nghiệm từ trước tới nay: {n_total} → ngưỡng t hiện hành: **{thr:.2f}**",
          f"- Mô hình: " + ", ".join(f"{k} {v}" for k, v in act.items()),
-         f"- NAV giao dịch giấy: {nav:,.0f} VND" if nav else "- Chưa có giao dịch giấy", ""]
+         f"- NAV giao dịch giấy: {nav:,.0f} VND" if nav else "- Chưa có giao dịch giấy"]
+    dd = paper_drawdown()
+    if dd is not None:
+        L.append(f"- Sụt giảm lớn nhất của NAV giấy (từ đỉnh): {dd:.2%}")
+    if survivorship_note():
+        L.append(f"- **{survivorship_note()}**")
+    L.append("")
     L += _ingest_lines(ingest, news_errors)
     L += _quality_lines(quality)
     if decision:
@@ -66,11 +91,13 @@ def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, t
         def _f(v, spec):
             try: return format(float(v), spec) if v == v and v is not None else "–"
             except (TypeError, ValueError): return "–"
-        L += ["## Thử nghiệm trong chu kỳ", "",
-              "| Mã thử | Phương pháp | Feature | Mô hình | IC | t | Ròng/năm | Sharpe (năm) | Deflated Sharpe | Kết luận |",
-              "|---|---|---|---|---|---|---|---|---|---|"]
+        L += ["## Thử nghiệm trong chu kỳ", ""]
+        if survivorship_note():
+            L += [f"> {survivorship_note()}", ""]
+        L += ["| Mã thử | Phương pháp | Feature | Mô hình | IC | t | Ròng/năm | Sụt giảm lớn nhất | Sharpe (năm) | Deflated Sharpe | Kết luận |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
         L += [f"| {t.get('trial_id', '–')} | {t['method']} | {t['features']} | {t['model']} | {t['ic_mean']:.3f} | {t['ic_t']:.2f} | "
-              f"{t['net_ann']:.1%} | {_f(t.get('sharpe_ann'), '.2f')} | {_f(t.get('dsr'), '.3f')} | {t['status']} |" for t in trials]
+              f"{t['net_ann']:.1%} | {_f(t.get('max_dd'), '.1%')} | {_f(t.get('sharpe_ann'), '.2f')} | {_f(t.get('dsr'), '.3f')} | {t['status']} |" for t in trials]
         L.append("")
     L += ["## Meta-learning: hiệu quả phương pháp nghiên cứu", "", "| Phương pháp | Số thử | Sống sót | Kỳ vọng hậu nghiệm |",
           "|---|---|---|---|"]
