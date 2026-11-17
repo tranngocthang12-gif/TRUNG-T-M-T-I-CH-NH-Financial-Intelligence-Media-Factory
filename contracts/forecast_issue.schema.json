@@ -17,7 +17,7 @@
     "author_seat": {"type": "string", "minLength": 1, "description": "Bắt đầu bằng tên mô hình/nhà cung cấp hoặc Owner (L-09)"},
     "model_cutoff": {"type": "string", "minLength": 4, "description": "YYYY-MM hoặc YYYY-MM-DD, không ở tương lai (L-05)"},
     "library_refs": {"type": "string"},
-    "prompt_hash": {"type": "string", "description": "Bắt buộc với seat B: sha256 khối prompt hiện hành trong governance/CONTROL_B_PROMPT.md; seat A không được có"}
+    "prompt_hash": {"type": "string", "description": "Bắt buộc với seat B: sha256 của phiên bản prompt chuẩn có hiệu lực vào ngày Issue mở (governance/control_b_prompts.jsonl); seat A không được có"}
   },
   "additionalProperties": false
 }
