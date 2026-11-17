@@ -24,7 +24,7 @@ Dùng: python -m engine.knowledge_notes          kiểm toàn thư viện, in l�
       run_cycle gọi mark_outdated() để tự chuyển OUTDATED (L-08).
 """
 import hashlib, json, pathlib, re, sys
-from datetime import date
+from datetime import date, datetime
 
 import yaml
 
@@ -117,7 +117,14 @@ def usable_on(man, doc_id, day):
     """True nếu tại ngày `day` thị trường đã biết nội dung tài liệu doc_id. Mọi nơi dùng số liệu BCTC cho một ngày phải qua
     hàm này: dự báo, đề thi, backtest. Thiếu ngày công bố → False (đóng khi không chắc)."""
     d = usable_from(man.get(doc_id, {}))
-    return d is not None and d <= (day if isinstance(day, date) else _date(day) or date.max)
+    if d is None:
+        return False
+    # A wrong or missing historical cutoff must never become an unlimited future date.
+    if isinstance(day, datetime):
+        day = day.date()
+    elif not isinstance(day, date):
+        day = _date(day)
+    return day is not None and d <= day
 
 def _expired(entry, today):
     if entry.get("superseded_by"):

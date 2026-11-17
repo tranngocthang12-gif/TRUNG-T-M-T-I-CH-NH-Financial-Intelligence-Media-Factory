@@ -224,6 +224,9 @@ class LibraryTests(unittest.TestCase):
         self.assertTrue(kn.usable_on(man, "bctc_vcb_2025_q4", date(2026, 1, 30)))
         self.assertTrue(kn.usable_on(man, "luat_ke_toan_88_2015", "2016-01-01"))      # tài liệu khác: từ issued_on
         self.assertFalse(kn.usable_on(man, "khong_co", date(2030, 1, 1)))              # không biết → không dùng
+        for invalid_day in (None, "", "not-a-date", "2026-02-30"):
+            with self.subTest(day=invalid_day):
+                self.assertFalse(kn.usable_on(man, "bctc_vcb_2025_q4", invalid_day))
         note = copy.deepcopy(NOTE); note["id"] = "KN-T3-vcb-no-nhom3"; note["tier"] = 3
         note["doc_ids"] = ["bctc_vcb_2025_q4"]
         for p in note["points"]:

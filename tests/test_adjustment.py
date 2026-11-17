@@ -1,6 +1,7 @@
 """Chứng minh giá ĐIỀU CHỈNH đúng và kiểm tra chất lượng hoạt động. Chỉ đọc dữ liệu, không ghi gì vào repo.
 Chạy: python -m tests.test_adjustment"""
 import numpy as np, pandas as pd
+from unittest.mock import patch
 from engine import adjust, data, features, ledger
 
 # ---------- 1) Dữ liệu THẬT: TCB 11/06/2024 và VCB 03/03/2025 không còn là cú rơi giả ----------
@@ -94,25 +95,27 @@ assert w["A"].iloc[21:].notna().all()
 print("OK 5: feature/nhãn chạm ô lỗi bị loại; phần sạch giữ nguyên")
 
 # Ledger: dự báo có ô lỗi trong cửa sổ chấm → VOID, không chấm điểm
+# All patches are scoped; pytest collection must not alter subsequent tests.
 import engine.ledger as LG
-LG.CFG["ledger"]["engine_forecasts"] = "open"                 # chỉ trong tiến trình test: kho thật đóng đường ghi của engine
-_row = LG._engine_row({"procedure": "t", "claim": "x", "ticker": "B", "horizon": 20, "probability": 0.5}, str(idx[140].date()), 0.5)
-assert LG.engine_row_error(_row) is None
-LG._load = lambda rel: [_row] if rel == LG.PRED else []
-LG._append = LG._append_chained = lambda rel, rows: None      # không ghi gì vào kho (resolve ghi theo chuỗi hash)
-r = ledger.resolve(a.ffill(), str(idx[-1].date()), bad2)
-assert r[0]["outcome"] is None and "lỗi dữ liệu" in r[0]["void"], r
+with patch.dict(LG.CFG["ledger"], {"engine_forecasts": "open"}):
+    _row = LG._engine_row({"procedure": "t", "claim": "x", "ticker": "B", "horizon": 20, "probability": 0.5}, str(idx[140].date()), 0.5)
+    assert LG.engine_row_error(_row) is None
+    with patch.object(LG, "_load", lambda rel: [_row] if rel == LG.PRED else []), \
+         patch.object(LG, "_append", lambda rel, rows: None), \
+         patch.object(LG, "_append_chained", lambda rel, rows: None):
+        r = ledger.resolve(a.ffill(), str(idx[-1].date()), bad2)
+        assert r[0]["outcome"] is None and "lỗi dữ liệu" in r[0]["void"], r
 print("OK 6: Ledger đặt VOID cho dự báo có ô lỗi dữ liệu trong cửa sổ chấm")
 
 # Paper trading: sự kiện quyền khi đang nắm giữ được áp vào vị thế (không ghi file ra repo)
 from engine import paper
 logs = []
-paper._append = lambda rel, row: logs.append(row)
-st = {"cash": 0.0, "positions": {"A": 1000, "C": 300}, "last_date": str(idx[99].date())}
-paper.apply_corporate_actions(st, ev, str(idx[100].date()), str(idx[100].date()))
-assert st["positions"]["A"] == 2000 and st["cash"] == 0.0
-st["last_date"] = str(idx[199].date())
-paper.apply_corporate_actions(st, ev, str(idx[200].date()), str(idx[200].date()))
-tax = paper.CFG["costs"]["dividend_tax"]
-assert abs(st["cash"] - 300 * 500 * (1 - tax)) < 1e-6 and st["positions"]["A"] == 2000
+with patch.object(paper, "_append", lambda rel, row: logs.append(row)):
+    st = {"cash": 0.0, "positions": {"A": 1000, "C": 300}, "last_date": str(idx[99].date())}
+    paper.apply_corporate_actions(st, ev, str(idx[100].date()), str(idx[100].date()))
+    assert st["positions"]["A"] == 2000 and st["cash"] == 0.0
+    st["last_date"] = str(idx[199].date())
+    paper.apply_corporate_actions(st, ev, str(idx[200].date()), str(idx[200].date()))
+    tax = paper.CFG["costs"]["dividend_tax"]
+    assert abs(st["cash"] - 300 * 500 * (1 - tax)) < 1e-6 and st["positions"]["A"] == 2000
 print(f"OK 7: paper — chia tách 2:1 nhân đôi số cổ phiếu; cổ tức tiền cộng {st['cash']:,.0f}đ (sau thuế {tax:.0%})")
