@@ -321,6 +321,7 @@ def issue_summary(all_rows, R):
                "B HƠN A CÓ Ý NGHĨA" if p_b < 0.05 and k + v < n / 2 else "CHƯA THẤY KHÁC BIỆT A–B")
     ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "disagreements": len(dis),
           "disagreements_out_of_scope": len(dis_all) - len(dis),
+          "disagreements_all": len(dis_all),          # ADR-0007: mẫu số của disagreement_rate (gồm cả event_before_date)
           "disagreement_rate": round(len(dis_all) / len(pairs), 3) if pairs else None,
           "disagreements_resolved": n_all, "disagreements_void": len(dis_void), "inconsistent_outcomes": inconsistent,
           "a_correct": a_all, "a_accuracy": round(a_all / n_all, 3) if n_all else None,

@@ -59,6 +59,8 @@
 - L-10 cột "Máy kiểm" ghi "Branch protection trên main". Bắt buộc mọi thay đổi qua PR sẽ chặn vòng học và việc ghi dự báo tự động. Đề nghị ghi: "ruleset cấm force-push và cấm xóa nhánh; CI cảnh báo khi chưa bật".
 - L-09 cột "Máy kiểm" nên thêm: "bản chấm GỘP ĐƯỢC kèm SHA dán thành bình luận PR".
 
+Đã sửa theo lệnh Owner ngày 17/11/2026 (v3.0.4); hiệu lực khi Owner gộp.
+
 ## Lý do
 - Đánh giá 16/11/2026: không có đường phân định thì Ledger không bao giờ ra điểm; sáu luật ghi "máy kiểm" nhưng chưa có mã; 4 test engine hỏng bị CI bỏ qua; engine chạy hằng ngày trái §4.3.
 - Năm vòng chấm độc lập 17/11/2026 tìm ra 25 điểm, phần lớn cùng một gốc: luật L-09 so chuỗi rời rạc ở ba nơi, và một câu hỏi có thể nhận hai sự thật. Bản tự rà gom về một định nghĩa ghế (`recognised_seat`, `same_provider`), một định nghĩa câu hỏi và ngày (`qkey`, `vn_day`), và thêm các neo nằm ngoài tệp (mục 6, 7).

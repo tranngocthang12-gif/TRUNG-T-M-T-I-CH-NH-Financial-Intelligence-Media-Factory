@@ -26,6 +26,7 @@ tick = sorted(s.ticker.unique())[:12]
 for j, t in enumerate(tick):
     d = dates[705 + j]
     s.loc[(s.ticker == t) & (s.date == d), "close"] *= 0.75
+shutil.rmtree(home / "data" / "store")   # kho chỉ ghi tăng dần (ADR-0006): cấy lỗi = dựng lại kho tạm từ đầu
 data.save_store(s)
 d_bad = str(dates[720].date())
 r = run_cycle.cycle(d_bad, trials=2, write_report=True, use_llm=True, seed=2)

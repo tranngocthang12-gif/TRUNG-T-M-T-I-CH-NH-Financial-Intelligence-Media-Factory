@@ -6,6 +6,9 @@ thứ nằm NGOÀI tệp:
    paper/*.csv ở commit gốc (--base) phải là tiền tố nguyên từng byte của bản hiện tại. Sửa, xóa hay chèn dòng cũ → lỗi.
    research/trials.csv kiểm theo dòng: mọi kết quả đã có ở commit gốc phải còn nguyên từng ô; tiêu đề chỉ được giữ
    nguyên hoặc đi từ 13 cột gốc lên đúng 17 cột (khuôn của tệp do laws_checks.trials_format_errors kiểm).
+1a. KHO GIÁ (ADR-0006, C2) — từ khi config.yaml ở commit gốc có data.store_dir: kho cũ data.store (prices.csv.gz) phải
+   giữ nguyên từng byte; mỗi tệp tháng trong data.store_dir ở commit gốc phải còn và là tiền tố nguyên từng byte của bản
+   hiện tại (chỉ nối thêm). Tệp tháng mới thì được thêm.
 1b. KẾT QUẢ THỬ (L-06) — trong một Pull Request không được thêm kết quả vào research/trials.csv hay thêm dòng vào sổ đăng
    ký: hai tệp đó chỉ do vòng học trên main ghi. Trên main, mỗi commit thêm kết quả phải có dòng đăng ký của kết quả đó
    nằm sẵn ở commit liền trước (đăng ký được đẩy lên main trước khi backtest chạy).
@@ -92,6 +95,49 @@ def append_only_errors(base: dict, head: dict) -> list[str]:
                      min(len(b.splitlines()), len(h.splitlines())) + 1)
             errs.append(f"L-05: {path} không còn là chỉ-ghi-thêm — dòng {n} của commit gốc đã bị sửa, xóa hoặc chèn")
     return errs
+
+
+def store_errors(base: dict, head: dict, legacy: str) -> list[str]:
+    """ADR-0006 (C2). base/head: {đường dẫn: bytes hoặc None} cho kho cũ `legacy` và mọi tệp tháng có ở commit gốc.
+    Gọi khi commit gốc đã ở chế độ ghi tăng dần (config.yaml có data.store_dir)."""
+    errs = []
+    b, h = base.get(legacy), head.get(legacy)
+    if b is not None and h != b:
+        errs.append(f"L-05: {legacy} (kho giá cũ) đã {'bị xóa' if h is None else 'bị ghi lại'} — kho cũ đóng băng từ ADR-0006; "
+                    "dòng mới chỉ được nối vào tệp tháng")
+    for path in sorted(k for k in base if k != legacy):
+        b, h = base[path], head.get(path)
+        if b is None:
+            continue
+        if h is None:
+            errs.append(f"L-05: {path} (tệp tháng của kho giá) có ở commit gốc nhưng đã bị xóa"); continue
+        if not h.startswith(b):
+            errs.append(f"L-05: {path} (tệp tháng của kho giá) không còn là chỉ-ghi-thêm — dòng cũ bị sửa, xóa hoặc chèn (ADR-0006)")
+    return errs
+
+
+def store_snapshot_errors(root, base) -> list[str]:
+    """Dựng base/head cho store_errors từ git (commit gốc) và cây tệp hiện tại; chỉ kiểm khi commit gốc đã có data.store_dir."""
+    import yaml
+    def cfg_of(text):
+        try:
+            c = yaml.safe_load(text or b"")
+            return (c.get("data") or {}) if isinstance(c, dict) else {}
+        except Exception:  # noqa: BLE001
+            return {}
+    def show(rev, path):
+        r = subprocess.run(["git", "-C", str(root), "show", f"{rev}:{path}"], capture_output=True)
+        return r.stdout if r.returncode == 0 else None
+    base_data = cfg_of(show(base, "config.yaml"))
+    sdir = base_data.get("store_dir")
+    if not sdir:
+        return []                    # commit gốc còn ở trước ADR-0006: kho cũ còn được vòng học bản cũ ghi lại
+    legacy = base_data.get("store") or "data/store/prices.csv.gz"
+    ls = subprocess.run(["git", "-C", str(root), "ls-tree", "-r", "--name-only", base, "--", sdir], capture_output=True)
+    paths = [legacy] + [x for x in ls.stdout.decode().split("\n") if x.endswith(".csv")]
+    base_files = {x: show(base, x) for x in paths}
+    head_files = {x: ((pathlib.Path(root) / x).read_bytes() if (pathlib.Path(root) / x).is_file() else None) for x in paths}
+    return store_errors(base_files, head_files, legacy)
 
 
 def issue_crosscheck_errors(pred_rows, res_rows, issues: dict, owner: str) -> list[str]:
@@ -446,6 +492,7 @@ def main() -> int:
         else:
             head = {p: ((ROOT / p).read_bytes() if (ROOT / p).is_file() else None) for p in APPEND_ONLY}
             errs += append_only_errors({p: _git_show(base, p) for p in APPEND_ONLY}, head)
+            errs += store_snapshot_errors(ROOT, base)
             errs += trials_history_errors(ROOT, base, pull_request=os.environ.get("GITHUB_EVENT_NAME", "").startswith("pull_request"))
     else:
         print("(bỏ qua kiểm chỉ-ghi-thêm: không có commit gốc)")

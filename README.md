@@ -1,8 +1,8 @@
 # TRUNG TÂM TÀI CHÍNH — Bộ não
 
-**Financial Intelligence & Media Factory — Architecture v0.2**
+**Financial Intelligence & Media Factory — Architecture v3.0 (cập nhật theo các ADR hiện hành)**
 
-Hai bộ não: **bộ não lập luận** (LLM, đọc `BOOT.md`) và **bộ não học máy** (`engine/`, tự chạy mỗi ngày trên GitHub Actions). Xem `architecture/ARCHITECTURE_v0.2.md` và `docs/HUONG_DAN_VAN_HANH.md`.
+Hai bộ não: **bộ não lập luận** (LLM, đọc `BOOT.md`) và **bộ não học máy** (`engine/`, chạy theo lịch thứ Sáu 16:30 giờ Việt Nam trên GitHub Actions). Kiến trúc có hiệu lực duy nhất: `architecture/ARCHITECTURE.md` (v3.0), bổ sung bằng `architecture/adr/`. Xem `docs/HUONG_DAN_VAN_HANH.md` để ghi dự báo A/B, phân định và chấm PR. Các kiến trúc v0.1–v2.2 là bản lưu trữ, không còn hiệu lực.
 
 Repo này là **bộ não** của Trung Tâm Tài Chính: kiến trúc, luật quản trị, hợp đồng dữ liệu (contracts), trạng thái hệ thống và tri thức đã được kiểm chứng.
 Mọi AI làm việc cho dự án phải đọc `BOOT.md` trước khi làm bất cứ việc gì.
@@ -22,9 +22,10 @@ trung-tam-tai-chinh/
 │   ├── SAFETY_STATE.yaml
 │   ├── GATES.md
 │   └── INVESTMENT_MEDIA_FIREWALL.md
-├── architecture/                # Kiến trúc gốc v0.1 (32 mục)
-│   ├── ARCHITECTURE_v0.1.md
-│   └── engines/                 # Đặc tả từng engine
+├── architecture/                # Một kiến trúc hiện hành: ARCHITECTURE.md v3.0
+│   ├── ARCHITECTURE.md
+│   ├── adr/                     # Quyết định kiến trúc (ADR)
+│   └── ARCHIVE.md               # Bản cũ (SUPERSEDED)
 ├── orchestrator/                # Vòng điều phối + AUTO MODE
 ├── experts/                     # Vai trò chuyên gia (đầu tư + newsroom)
 ├── contracts/                   # 25 JSON Schema — ranh giới dữ liệu duy nhất
@@ -32,12 +33,11 @@ trung-tam-tai-chinh/
 ├── knowledge/                   # Tri thức canonical (chỉ ghi sau validation)
 ├── memory/                      # 6 loại bộ nhớ + nhật ký episodic
 ├── research/                    # Hypothesis, báo cáo, backtest
-├── decisions/                   # Gói quyết định gửi Owner
 ├── media/                       # Financial Media OS
 ├── templates/                   # Mẫu điền nhanh
 ├── engine/                      # BỘ NÃO HỌC MÁY — vòng học tự động
 ├── tests/                       # Chống look-ahead + diễn tập giả lập
-├── .github/workflows/           # Vòng học 16:30 thứ Sáu hằng tuần; nhận dự báo/phân định qua Issue; CI
+├── .github/workflows/           # Vòng học thứ Sáu 16:30 VN; nhận dự báo/phân định qua Issue; CI
 ├── config.yaml                  # Universe, chi phí, ngưỡng thống kê
 ├── data/ paper/ reports/        # Engine tự ghi
 ├── docs/HUONG_DAN_VAN_HANH.md
@@ -48,7 +48,7 @@ trung-tam-tai-chinh/
 
 ## Nguyên tắc cốt lõi
 
-1. **Một Orchestrator + module chuyên gia + hợp đồng chặt.** Không bầy agent tự nói chuyện.
+1. **Owner + GitHub Actions + hợp đồng dữ liệu chặt** trong giai đoạn đầu; chưa triển khai Orchestrator tự trị (kiến trúc v3.0 §2).
 2. **Bằng chứng trước kết luận.** Mọi claim trỏ tới evidence, có bằng chứng ngược và ngày hết hạn.
 3. **Không tự nhảy tầng vốn.** Research → Simulation → Backtest → Paper → Vốn nhỏ → Bình thường → Scale.
 4. **Risk Gate có quyền chặn.** Lợi nhuận kỳ vọng cao không vượt được Risk Gate.
