@@ -569,6 +569,18 @@ class TrialRegistryTests(unittest.TestCase):
         self.assertTrue(any("đã bị sửa" in e for e in f(base)))
         tp.write_text(self.LEGACY.split("\n", 2)[0] + "\n" + self.LEGACY.split("\n", 2)[1] + "\n", encoding="utf-8"); commit("xoa ket qua cu")
         self.assertTrue(any("mất kết quả" in e for e in f(base)))
+        # PR mở từ lâu, main đã đi tiếp: vòng học ghi thêm kết quả lên main sau lúc mở PR. GitHub dựng commit gộp từ main hiện
+        # tại, còn base.sha của sự kiện có thể là main cũ. Kết quả của main không được tính là của PR (lỗi gặp thật ở CI).
+        git("reset", "-q", "--hard", base)
+        git("checkout", "-q", "-b", "pr"); (repo / "doc.txt").write_text("PR chi sua tai lieu"); pr_head = commit("PR: sua tai lieu")
+        git("checkout", "-q", "main")
+        rg.write_text(json.dumps({"trial_id": "T00003"}) + "\n", encoding="utf-8"); commit("L-06: dang ky thu T00003")
+        tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("Vong hoc tren main")
+        git("merge", "-q", "--no-ff", "-m", "Merge PR", pr_head)                 # commit gộp như refs/pull/N/merge
+        self.assertEqual(f(base, pr=True), [])                                   # base = main cũ (trước vòng học)
+        tp.write_text(self.LEGACY + res3 + res3.replace("T00003", "T00004"), encoding="utf-8"); commit("PR lai them ket qua")
+        git("reset", "-q", "--soft", "HEAD~1"); git("commit", "-q", "--amend", "-m", "Merge PR co them ket qua")   # nhét vào commit gộp
+        self.assertTrue(any("Pull Request thêm 1 kết quả" in e for e in f(base, pr=True)))
         # thêm cột mới và ô rỗng vào dòng cũ (đúng như engine làm lần đầu) không bị coi là sửa
         self.assertEqual(ledger_audit.trials_rows_errors(self.LEGACY.encode(), (self.LEGACY.split("\n")[0] + ",sharpe\n"
                          + "\n".join(l + "," for l in self.LEGACY.strip().split("\n")[1:]) + "\n").encode()), [])
