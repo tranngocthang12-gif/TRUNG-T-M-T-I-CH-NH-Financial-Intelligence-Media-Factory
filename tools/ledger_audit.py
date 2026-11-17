@@ -198,6 +198,15 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
         return r.stdout if r.returncode == 0 else None
     errs = trials_rows_errors(show(base, TRIALS), show("HEAD", TRIALS))
     if pull_request:
+        # Cái PR tự thêm = commit gộp so với ĐẦU NHÁNH ĐÍCH lúc gộp (cha thứ nhất của commit gộp mà GitHub dựng cho PR).
+        # Không so với base.sha của sự kiện: giá trị đó có thể cũ, khi ấy kết quả do vòng học ghi lên main sau lúc mở PR
+        # sẽ bị tính nhầm là của PR.
+        parents = git("rev-list", "--parents", "-n", "1", "HEAD").stdout.decode().split()
+        if len(parents) == 3:
+            base = parents[1]
+        else:
+            mb = git("merge-base", base, "HEAD").stdout.decode().strip()
+            base = mb or base
         nb, nh = len(_trials(show(base, TRIALS))[1]), len(_trials(show("HEAD", TRIALS))[1])
         if nh > nb:
             errs.append(f"L-06: Pull Request thêm {nh - nb} kết quả vào {TRIALS} — kết quả thử chỉ do vòng học trên main ghi, "
