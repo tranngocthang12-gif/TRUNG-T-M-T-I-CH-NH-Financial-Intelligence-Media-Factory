@@ -1,0 +1,49 @@
+name: Kiem toan so sau khi ghi
+
+# ADR-0003 muc 7. Commit do workflow day len main bang GITHUB_TOKEN KHONG kich hoat su kien push, nen tests.yml khong tu chay
+# sau khi robot ghi du bao, ghi phan dinh hay sau vong hoc. Workflow nay chay SAU moi lan ba workflow do ket thuc
+# (workflow_run), va moi ngay mot lan: kiem lai luat tren toan bo so (validate), so chi-ghi-them so voi commit truoc khi
+# ghi, doi chieu Issue that va dau nhan cua tung dong. Do la do, khong co khoang mien kiem.
+on:
+  workflow_run:
+    workflows: ["Ledger intake (Forecast issue)", "Resolution intake (Resolution issue)", "Vong hoc hang tuan"]
+    types: [completed]
+  schedule:
+    - cron: "17 2 * * *"          # 09:17 gio Viet Nam moi ngay
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: read
+
+concurrency:
+  group: ledger-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: Kiem toan so (sau khi robot ghi)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0          # can lich su de so voi commit truoc khi ghi
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Cai thu vien
+        run: pip install -r requirements.txt
+      - name: Kiem lai luat tren toan bo so va bo nao
+        run: python tools/validate.py
+      - name: So chi-ghi-them + ket qua thu + doi chieu Issue that + dau nhan
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          # Sau workflow ghi so: commit goc la commit truoc khi robot ghi. Chay theo lich hoac bam tay: so voi main cua 26 gio truoc,
+          # de moi thay doi trong ngay (ke ca PR vua gop) deu duoc kiem chi-ghi-them.
+          if [ -z "$BASE_SHA" ]; then BASE_SHA="$(git rev-list -1 --before='26 hours ago' HEAD)"; fi
+          python tools/ledger_audit.py --base "$BASE_SHA" --github
