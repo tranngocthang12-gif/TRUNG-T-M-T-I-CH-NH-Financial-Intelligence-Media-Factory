@@ -487,7 +487,7 @@ class IntakeOrderTests(_Base):
         sc = self._summary()
         self.assertEqual(sc["by_seat"]["A"]["void"], 1); self.assertEqual(sc["ab"]["disagreements_resolved"], 0)   # không có điểm
         self.assertEqual((sc["ab"]["pairs"], sc["ab"]["disagreements"], sc["ab"]["disagreements_void"]), (2, 1, 1))   # vẫn là một cặp bất đồng, ghi rõ là VOID
-        self.assertEqual(sc["void"]["by_seat"]["A"], {"void": 1, "closed": 1, "rate": 1.0})
+        self.assertEqual(sc["void"]["by_seat"]["A"], {"void": 1, "closed": 1, "rate": 1.0, "brier_void_worst": 0.49})   # A=0,3 → 0,7²
         self.assertEqual(sc["void"]["disagreements"], {"void": 1, "closed": 1, "rate": 1.0})
         # tiến độ (tools/validate.py) không đếm dự báo đã VOID: chạy validate trên một bản sao kho mang sổ này
         repo = self.tmp / "repo"
@@ -992,7 +992,7 @@ class ScoringTests(_Base):
         self.assertTrue(out["ab"]["verdict"].startswith("CHƯA ĐỦ MẪU (100/194"))
         self.assertEqual(out["ab"]["fixed_sample"]["p_value_void_as_a_wrong"], None)
         # báo cáo tỷ lệ hủy theo ghế, theo cặp, theo cặp bất đồng
-        self.assertEqual(out["void"]["by_seat"]["A"], {"void": 10, "closed": 100, "rate": 0.1})
+        self.assertEqual({k: out["void"]["by_seat"]["A"][k] for k in ("void", "closed", "rate")}, {"void": 10, "closed": 100, "rate": 0.1})
         self.assertEqual(out["void"]["pairs"], {"void": 10, "closed": 100, "rate": 0.1})
         self.assertEqual(out["void"]["disagreements"], {"void": 10, "closed": 100, "rate": 0.1})
         self.assertEqual(out["ab"]["pairs"], 100)                                # cặp VOID vẫn là cặp, vẫn tính vào tỷ lệ bất đồng
@@ -1019,6 +1019,37 @@ class ScoringTests(_Base):
         self.assertEqual(full["fixed_sample"], self._score(preds + more_p, res + more_r)["ab"]["fixed_sample"])
         self.assertEqual((full["fixed_sample"]["a_correct"], full["fixed_sample"]["open"]), (100, 0))
         self.assertEqual(full["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
+
+    def test_event_before_date_pairs_are_outside_the_ab_test(self):
+        """ADR-0002: ghế A được tìm web, ghế B thì không. Với câu hỏi event_before_date, sự kiện có thể đã xảy ra trước khi
+        hỏi, nên bất đồng đo việc tìm web chứ không đo thư viện: các cặp đó không vào mẫu chốt, nhưng vẫn là cặp, vẫn vào tỷ
+        lệ bất đồng và được báo riêng."""
+        preds, res = self._fake(194, 194)                                         # 194 cặp A đúng cả, nhưng toàn event_before_date
+        for p in preds:
+            p["resolution_rule"] = "event_before_date"
+        ab = self._score(preds, res)["ab"]
+        self.assertEqual((ab["pairs"], ab["disagreements"], ab["disagreements_out_of_scope"]), (194, 0, 194))
+        self.assertEqual(ab["disagreement_rate"], 1.0)
+        self.assertEqual((ab["fixed_sample"]["n"], ab["disagreements_resolved"]), (0, 0))
+        self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (0/194"), ab["verdict"])
+        more_p, more_r = self._fake(194, 100, start=5000)                         # 194 cặp comparison: chỉ chúng vào mẫu
+        ab = self._score(preds + more_p, res + more_r)["ab"]
+        self.assertEqual((ab["fixed_sample"]["n"], ab["fixed_sample"]["a_correct"]), (194, 100))
+        self.assertEqual(ab["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
+        report = (ROOT / "engine" / "run_cycle.py").read_text(encoding="utf-8")
+        self.assertIn("{disagreements_out_of_scope}", report)
+
+    def test_brier_with_voids_counted_as_wrong_is_reported_per_seat(self):
+        """ADR-0004: Brier theo ghế chỉ tính dự báo YES/NO, nên hủy có chọn lọc làm đẹp được nó. In thêm Brier trong đó mỗi
+        dự báo VOID tính như kết quả ngược phía nó đứng."""
+        preds, res = self._fake(4, 4)                                             # A=0,7 đúng cả 4; B=0,3 sai cả 4
+        res = self._void(res, [3])                                                # cặp thứ tư bị hủy
+        v = self._score(preds, res)["void"]["by_seat"]
+        self.assertAlmostEqual(v["A"]["brier_void_worst"], round((3 * 0.3 ** 2 + 0.7 ** 2) / 4, 4))
+        self.assertAlmostEqual(v["B"]["brier_void_worst"], round((3 * 0.7 ** 2 + 0.7 ** 2) / 4, 4))
+        self.assertEqual((v["A"]["void"], v["A"]["closed"]), (1, 4))
+        report = (ROOT / "engine" / "run_cycle.py").read_text(encoding="utf-8")
+        self.assertIn("brier_void_worst", report)
 
     def test_pairs_need_same_day_and_both_outcomes(self):
         preds, res = self._fake(3, 3, b_day="2026-11-18T03:00:00Z")              # B ghi hôm sau → không thành cặp
@@ -1243,6 +1274,66 @@ class TrialRegistryTests(unittest.TestCase):
         self.assertTrue(any("đã ghim" in e for e in check("\n".join(lines[:1] + lines[2:]))))                # xóa dòng đầu
         self.assertTrue(any("ít hơn 210" in e for e in check("\n".join(lines[:150]) + "\n")))                # cắt bớt
         self.assertTrue(any("đã ghim" in e for e in check("\n".join(lines[:5] + [lines[5]] + lines[5:]))))    # chèn dòng
+
+    def test_fixed_v302_boundary_from_config(self):
+        """ADR-0004 (việc tồn 4 của ADR-0003): kho thật ghim mốc v3.0.2 cố định trong config.yaml. Chỉ commit nằm trong lịch
+        sử của mốc mới được miễn; nhánh tách từ lịch sử cũ rồi gộp vào sau không được miễn ở BẤT KỲ lượt kiểm nào, kể cả lượt
+        có commit gốc ở trước mốc. Mốc không đổi được; commit mốc vắng trong kho là lỗi."""
+        import yaml
+        from tools import ledger_audit
+        repo = self.tmp / "repo"; (repo / "research").mkdir(parents=True)
+        def git(*a):
+            r = subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *a], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, f"git {a}: {r.stderr}")
+            return r.stdout.strip()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, capture_output=True)
+        tp = repo / "research" / "trials.csv"
+        def commit(msg):
+            git("add", "-A"); git("commit", "-qm", msg); return git("rev-parse", "HEAD")
+        res3 = "T00003,2026-11-16,random_subset,M-c,mom_60,ridge,0.02,1.1,0.01,0.6,3.2,REJECTED,{}\n"
+        res4 = res3.replace("T00003", "T00004")
+        tp.write_text(self.LEGACY, encoding="utf-8")
+        first = commit("kho cu")
+        tp.write_text(self.LEGACY + res3, encoding="utf-8")
+        old_main = commit("Vong hoc ban cu (truoc moc)")
+        def cfg(boundary):
+            (repo / "config.yaml").write_text(yaml.safe_dump({"research": {"v302_boundary": boundary}}), encoding="utf-8")
+        cfg(old_main); merged = commit("gop v3.0.2: ghim moc")
+        f = lambda b: ledger_audit.trials_history_errors(repo, b)
+        self.assertEqual(f(first), [])                                           # vòng học bản cũ (trong lịch sử mốc): miễn
+        # nhánh tách từ lịch sử cũ, ghi kết quả không đăng ký, gộp vào sau mốc → lỗi, kể cả khi commit gốc ở trước mốc
+        git("checkout", "-q", "-b", "nhanh-cu", first)
+        tp.write_text(self.LEGACY + res4, encoding="utf-8"); side = commit("ket qua tren nhanh tach tu lich su cu")
+        git("checkout", "-q", "main"); git("merge", "-q", "--no-ff", "-X", "theirs", "-m", "gop nhanh cu", side)
+        for base in (first, old_main, merged):
+            self.assertTrue(any("T00004" in e and "commit liền trước chưa có" in e for e in f(base)), (base, f(base)))
+        # đổi mốc sang một commit sau → lỗi
+        git("reset", "-q", "--hard", merged)
+        tp.write_text(self.LEGACY + res3 + res4, encoding="utf-8"); cfg(git("rev-parse", "HEAD")); commit("doi moc + ket qua")
+        errs = f(merged)
+        self.assertTrue(any("khác giá trị ở commit gốc" in e for e in errs), errs)
+        self.assertTrue(any("T00004" in e and "commit liền trước chưa có" in e for e in errs), errs)   # …và không miễn được gì: vẫn dùng mốc cũ
+        self.assertTrue(any("khác giá trị ở commit gốc" in e for e in ledger_audit.trials_history_errors(repo, merged, pull_request=True)))   # PR cũng bị bắt
+        git("reset", "-q", "--hard", merged); (repo / "config.yaml").unlink(); commit("xoa moc")
+        self.assertTrue(any("khác giá trị ở commit gốc" in e for e in f(merged)))   # xóa mốc cũng là đổi mốc
+        tp.write_text(self.LEGACY + res3 + res4, encoding="utf-8"); commit("ket qua khong dang ky sau khi xoa moc")
+        self.assertTrue(any("T00004" in e and "commit liền trước chưa có" in e for e in f(merged)), f(merged))
+        # commit mốc không có trong kho → lỗi (đóng khi không chắc); mốc sai dạng → lỗi
+        git("reset", "-q", "--hard", merged); cfg("0" * 40); commit("moc khong ton tai")
+        errs = f(merged)
+        self.assertTrue(any("khác giá trị ở commit gốc" in e for e in errs), errs)          # so với commit gốc: đổi mốc
+        self.assertTrue(any("không tìm thấy commit mốc" in e for e in f(first)), f(first))   # commit gốc chưa có mốc: mốc lạ
+        git("reset", "-q", "--hard", merged); cfg("abc"); commit("moc sai dang")
+        self.assertTrue(any("40 ký tự" in e for e in f(merged)))
+        # validate: kho có legacy_pin thì phải có mốc; kho thật có mốc đúng dạng
+        self.assertEqual(laws_checks.check_v302_boundary(ROOT), [])
+        self.assertIsNotNone(laws_checks.v302_boundary(ROOT))
+        self.assertIn("check_v302_boundary(root)", (ROOT / "tools" / "laws_checks.py").read_text(encoding="utf-8").split("def run_all")[1])
+        tmp = self.tmp / "cfgchk"; tmp.mkdir()
+        real = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+        real["research"].pop("v302_boundary")
+        (tmp / "config.yaml").write_text(yaml.safe_dump(real, allow_unicode=True), encoding="utf-8")
+        self.assertTrue(any("thiếu research.v302_boundary" in e for e in laws_checks.check_v302_boundary(tmp)))
 
     def test_trial_results_only_from_the_cycle_on_main(self):
         """Vòng 7 điểm 2, phần cần git: PR không được thêm kết quả hay dòng đăng ký; trên main, commit ghi kết quả phải có đăng
