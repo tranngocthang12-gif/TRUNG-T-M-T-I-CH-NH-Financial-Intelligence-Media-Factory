@@ -7,7 +7,7 @@ body:
     id: forecast_ids
     attributes:
       label: forecast_ids
-      description: Mã các dự báo của CÙNG một câu hỏi, cách nhau dấu phẩy (ví dụ "F-101, F-102" cho cặp A/B)
+      description: Mã dự báo của MỘT câu hỏi (ví dụ "F-101, F-102"). Ghi một mã cũng được — mọi dự báo cùng câu hỏi nhận cùng kết quả.
     validations: {required: true}
   - type: dropdown
     id: outcome
@@ -25,7 +25,7 @@ body:
     id: resolution_source
     attributes:
       label: resolution_source
-      description: URL hoặc địa chỉ văn bản công khai đã dùng để phân định
+      description: URL đã dùng để phân định — phải thuộc tên miền đã ghi trong dự báo; nguồn đó không công bố thì chọn VOID
   - type: textarea
     id: quote
     attributes:
@@ -35,7 +35,7 @@ body:
     id: resolver
     attributes:
       label: resolver
-      description: Ai đọc nguồn và phân định. Ghi BẮT ĐẦU bằng tên ghế — "Owner", hoặc mô hình khác nhà cung cấp với ghế viết dự báo, ví dụ "ChatGPT (OpenAI)". Không được là Claude (L-09)
+      description: Ai đọc nguồn và phân định. Ghi BẮT ĐẦU bằng tên ghế — "Owner", hoặc mô hình khác nhà cung cấp với ghế viết dự báo, ví dụ "ChatGPT (OpenAI)". Đây là người ĐỌC NGUỒN và quyết định, không phải người bấm nút. Không được là Claude (L-09)
     validations: {required: true}
   - type: textarea
     id: void_reason
