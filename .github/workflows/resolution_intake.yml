@@ -64,19 +64,34 @@ jobs:
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "$out"
           exit 0
-      - name: Binh luan ket qua
-        if: steps.intake.outputs.code != '3'
+      # Binh luan nay la DAU NHAN: github-actions[bot] dang hash cua dong vua ghi, gio dang do may chu GitHub ghi.
+      # tools/ledger_audit.py doi chieu tung dong so voi dau nhan (dung Issue, bot dang, chua sua, trong 6 gio sau khi mo, truoc ngay resolve_at).
+      # Chay lai job (ma 3 = da ghi): chi dang lai dau nhan neu lan truoc chua dang duoc.
+      - name: Binh luan ket qua va dau nhan
+        id: comment
         uses: actions/github-script@v7
         env:
           RESULT: ${{ steps.intake.outputs.result }}
+          CODE: ${{ steps.intake.outputs.code }}
         with:
+          retries: 3
           script: |
             let r;
             try { r = JSON.parse(process.env.RESULT); } catch (e) { r = {ok: false, message: "Loi he thong: ket qua khong doc duoc (xem log)"}; }
-            await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: context.issue.number, body: (r.ok ? "✅ " : "❌ ") + r.message});
-            await github.rest.issues.addLabels({owner: context.repo.owner, repo: context.repo.repo,
-              issue_number: context.issue.number, labels: [r.ok ? "ledgered" : "rejected"]});
+            const where = {owner: context.repo.owner, repo: context.repo.repo, issue_number: context.issue.number};
+            const marks = (r.ok && Array.isArray(r.attest) ? r.attest : []).map(a => "ledger-attest: " + a);
+            if (process.env.CODE === "3") {
+              const old = await github.paginate(github.rest.issues.listComments, {...where, per_page: 100});
+              const have = marks.length > 0 && old.some(c => c.user && c.user.login === "github-actions[bot]" &&
+                c.created_at === c.updated_at && marks.every(m => (c.body || "").includes(m)));
+              if (have || marks.length === 0) return;
+            }
+            // Thong bao co the nhac lai chu nguoi dung nhap: vo hieu moi chuoi "ledger-attest" trong do; dau nhan chi nam o cac dong duoi.
+            let body = (r.ok ? "✅ " : "❌ ") + String(r.message || "").replace(/ledger-attest/gi, "ledger_attest");
+            if (marks.length) body += "\n\nDấu nhận của sổ (máy kiểm toán đọc các dòng dưới đây — không sửa, không xóa bình luận này):\n" +
+              marks.map(m => "`" + m + "`").join("\n");
+            await github.rest.issues.createComment({...where, body});
+            if (process.env.CODE !== "3") await github.rest.issues.addLabels({...where, labels: [r.ok ? "ledgered" : "rejected"]});
       - name: Loi he thong (ma 1) lam job do; tu choi (2) va trung (3) la ket qua hop le
         if: steps.intake.outputs.code == '1'
         env:
