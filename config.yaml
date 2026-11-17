@@ -37,6 +37,12 @@ research:
   min_t: 3.0               # ngưỡng t tối thiểu
   family_wise_alpha: 0.05  # ngưỡng tăng dần theo tổng số thử nghiệm (chống data mining)
   min_fold_positive: 0.6
+  # ARCHITECTURE v3.0 §4.3 + L-06: không gian giả thuyết ĐÓNG BĂNG (13 feature × 3 mô hình). Thêm feature/mô hình mới
+  # = giả thuyết mới: phải qua ADR rồi mới sửa danh sách này; engine từ chối đăng ký lần thử nằm ngoài danh sách.
+  frozen_space:
+    features: [dist_ma120, dist_ma20, lowvol_20, lowvol_60, maxret_20, mom_120_skip20, mom_20, mom_60, rel_mom_20,
+               rev_1, rev_5, volu_ratio, volu_trend]
+    models: [ridge, gbm, signed_sum]
 registry:
   max_active: 5
   refit_days: 20

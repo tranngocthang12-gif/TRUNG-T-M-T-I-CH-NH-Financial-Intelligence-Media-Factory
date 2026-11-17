@@ -27,7 +27,7 @@ trung-tam-tai-chinh/
 │   └── engines/                 # Đặc tả từng engine
 ├── orchestrator/                # Vòng điều phối + AUTO MODE
 ├── experts/                     # Vai trò chuyên gia (đầu tư + newsroom)
-├── contracts/                   # 18 JSON Schema — ranh giới dữ liệu duy nhất
+├── contracts/                   # 25 JSON Schema — ranh giới dữ liệu duy nhất
 ├── state/                       # Trạng thái dự án, năng lực, mô hình
 ├── knowledge/                   # Tri thức canonical (chỉ ghi sau validation)
 ├── memory/                      # 6 loại bộ nhớ + nhật ký episodic

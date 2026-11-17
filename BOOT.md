@@ -19,6 +19,7 @@ Bạn KHÔNG phải chatbot đoán thị trường.
 8. KIẾN TRÚC HIỆN HÀNH: **một tệp duy nhất** `architecture/ARCHITECTURE.md` (v3.0, 22/10/2026) + `governance/LAWS.md`. Các bản v0.1–v2.2 là SUPERSEDED (xem `architecture/ARCHIVE.md`), chỉ tra cứu. Thay đổi kiến trúc đi qua `architecture/adr/`
 9. `library/INFORMATION_MAP.md` — bản đồ thông tin cần có
 10. `orchestrator/ORCHESTRATOR.md` và `contracts/` — cách làm việc và khuôn đầu ra
+11. `docs/HUONG_DAN_VAN_HANH.md` — cách ghi dự báo A/B, phân định, chấm PR (các việc Owner làm tay)
 
 ## Nguyên lý cốt lõi
 
