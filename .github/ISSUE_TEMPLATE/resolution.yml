@@ -25,7 +25,7 @@ body:
     id: resolution_source
     attributes:
       label: resolution_source
-      description: URL đã dùng để phân định — phải thuộc tên miền đã ghi trong dự báo; nguồn đó không công bố thì chọn VOID
+      description: Đường dẫn ĐẦY ĐỦ bắt đầu bằng https:// tới trang đã đọc. Mọi đường dẫn ghi ở đây phải thuộc tên miền đã ghi trong dự báo (tên miền con được nhận). Nguồn đó không công bố thì chọn VOID
   - type: textarea
     id: quote
     attributes:

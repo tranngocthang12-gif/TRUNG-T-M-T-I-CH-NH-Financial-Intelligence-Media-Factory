@@ -20,7 +20,7 @@ body:
     id: resolution_source
     attributes:
       label: resolution_source
-      description: URL hoặc địa chỉ văn bản công khai dùng để phân định. Tên miền ghi ở đây (vd nso.gov.vn) là nguồn duy nhất được dùng khi phân định.
+      description: Nguồn công khai dùng để phân định. BẮT BUỘC nêu tên miền (vd nso.gov.vn hoặc https://www.sbv.gov.vn) — lúc phân định máy chỉ nhận đường dẫn thuộc tên miền ghi ở đây.
     validations: {required: true}
   - type: dropdown
     id: resolution_rule
