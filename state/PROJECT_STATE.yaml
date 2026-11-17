@@ -5,7 +5,6 @@ deployment_level: 0
 open_blockers:
   - "Ledger chưa có dự báo nào (0/60); Owner ghi cặp A/B theo docs/HUONG_DAN_VAN_HANH.md mục 6"
   - "Thư viện rỗng (0/40 tài liệu gốc ghim, 0 ghi chú); ghế thi công chưa lập — không phải MINH TRÍ (Owner 22/10/2026)"
-  - "OWNER GATE: nhánh main chưa có ruleset cấm force-push / cấm xóa nhánh (L-10; hướng dẫn mục 9)"
   - "OWNER_MISSION chưa được Owner ký"
   - "GOVERNOR_POLICY còn TODO"
   - "OWNER GATE: chưa có nguồn giá chính thức — vnstock bị PyPI cách ly, Yahoo là nguồn tạm có lỗi; SSI FastConnect / DNSE cần tài khoản Owner"
@@ -14,7 +13,7 @@ last_session:
   date: 2026-11-17
   type: "RÀ SOÁT TOÀN BỘ + SỬA (v3.0.1 → v3.0.4)"
   done:
-    - "v3.0.4 (lệnh Owner 17/11/2026): danh mục ADR ghi ADR-0002/0004/0005 ACCEPTED (PR #29); sửa chữ cột Máy kiểm của L-09, L-10 trong governance/LAWS.md theo ADR-0003 (hiệu lực khi Owner gộp); đóng 19 PR nháp dòng UMLF (#2, #4–#7, #9, #11–#16, #18–#20, #22, #23, #25, #26) và 5 Issue (#8, #10, #17, #21, #24) theo L-07 — hướng kiến trúc song song chưa có ADR; nhánh giữ nguyên, mở lại được; ADR-0006 kho giá ghi tăng dần (C2): kho cũ đóng băng, dòng mới nối vào tệp tháng data/store/prices/, kiểm toán bắt mọi lần viết lại; ADR-0007 điều kiện mở lại engine kịch bản là phán quyết A–B, scorecard thêm disagreements_all; chạy tay kiểm toán sổ trên main lần đầu (17/11/2026): đạt"
+    - "v3.0.4 (ĐANG Ở PR #30 — chưa gộp, chưa có hiệu lực trên main): đề xuất ghi ADR-0002/0004/0005 ACCEPTED sau PR #29; đề xuất sửa cột Máy kiểm L-09/L-10 theo lệnh Owner (chỉ hiệu lực sau khi Owner gộp PR #30); ADR-0006 kho giá ghi tăng dần (C2) và ADR-0007 hai góp ý sau PR #29 đang chờ L-09. Đã đóng 19 PR nháp UMLF (#2, #4–#7, #9, #11–#16, #18–#20, #22, #23, #25, #26) và 5 Issue (#8, #10, #17, #21, #24) theo L-07 (nhánh giữ nguyên, mở lại được); đã chạy tay kiểm toán sổ trên main 17/11/2026: đạt"
     - "v3.0.3 (PR #29, Owner gộp 17/11/2026, commit b8158be; Gemini chấm GỘP ĐƯỢC tại 6201090): ADR-0002, ADR-0004, ADR-0005; registry_push dừng khi hai vòng học đăng ký trùng từng byte"
     - "v3.0.1 (PR #27, đã gộp): dòng dự báo Issue không còn làm vỡ vòng học; intake chỉ nhận Issue do chủ kho mở, lúc mở"
     - "v3.0.2 (PR #28): phân định qua Issue 'Resolution'; chấm A–B kiểm định chốt mẫu 194 hai phía; sổ thử L-06 + Deflated Sharpe + không gian giả thuyết đóng băng; kiểm máy Thư viện (L-01, L-04, L-08); cổng chấm PR có bản chấm trên kho (L-09); kiểm toán sổ chỉ-ghi-thêm và đối chiếu Issue thật (L-05); engine hằng tuần; CI chạy đủ mọi test"
@@ -27,4 +26,4 @@ last_session:
     - "Vòng 6: máy chủ nguồn tách bằng urllib; số và ngày chặt; đăng ký thử đẩy lên main trước khi chạy backtest; dấu nhận của github-actions[bot] cho từng dòng sổ; CI chạy lại luật nhận trên mọi dòng sổ"
     - "Soạn đợt dự báo A/B số 1 (10 câu) — dài hạn, chưa mở Issue (ADR-0002)"
   tests: "tests/test_*.py: 4 tệp unittest + test_governance + 6 test script engine, tất cả chặn gộp; tools/validate.py 0 cảnh báo"
-next_gap: "(1) Owner bật ruleset cho main (docs/HUONG_DAN_VAN_HANH.md mục 9). (2) Lần chạy thật đầu tiên của phần mới: vòng học hằng tuần 16:30 thứ Sáu 20/11/2026 (lần đầu đẩy sổ đăng ký thử lên main trước backtest); lần đầu ghi kho giá vào tệp tháng (ADR-0006); hai robot nhận khi có Issue Forecast/Resolution đầu tiên. (3) Dài hạn: ghi dự báo A/B (đợt 1 đã soạn), lập ghế thi công cho Thư viện, đề thi Học viện khi có ghi chú CITED."
+next_gap: "(1) PR #30: hai chỗ chữ L-09/L-10 trong governance/LAWS.md chờ Owner nghiệm thu; sửa README/PROJECT_STATE, lấy phản biện độc lập đúng HEAD và cho hai cổng L-09 xanh trước khi Owner cân nhắc merge. Ruleset Protect main history (#27474018) đã Active trên main với đúng Restrict deletions + Block force pushes, không chặn robot. (2) Lần chạy thật đầu tiên của phần mới: vòng học hằng tuần 16:30 thứ Sáu 20/11/2026 (lần đầu đẩy sổ đăng ký thử lên main trước backtest); chỉ sau khi PR #30 được gộp mới có đường ghi giá tệp tháng (ADR-0006); hai robot nhận khi có Issue Forecast/Resolution đầu tiên. (3) Dài hạn: ghi dự báo A/B (đợt 1 đã soạn), lập ghế thi công cho Thư viện, đề thi Học viện khi có ghi chú CITED."
