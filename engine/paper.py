@@ -1,8 +1,27 @@
 """Paper Trading: quyết định tại close ngày d, KHỚP tại close ngày giao dịch kế tiếp, lô 100, phí + thuế + trượt giá VN.
 Giá dùng là GIÁ ĐIỀU CHỈNH neo tại as_of (= giá gốc ngày as_of). Sự kiện quyền xảy ra khi đang nắm giữ được áp vào vị thế:
-cổ tức cổ phiếu/chia tách → nhân số cổ phiếu; cổ tức tiền → cộng tiền (sau thuế)."""
+cổ tức cổ phiếu/chia tách → nhân số cổ phiếu; cổ tức tiền → cộng tiền (sau thuế).
+Phiên khóa biên độ (ADR-0008): mã đóng cửa sát giá trần thì lệnh mua KHÔNG khớp, sát giá sàn thì lệnh bán KHÔNG khớp;
+lệnh đó giữ lại và thử lại phiên sau. "Sát" = biến động phiên ≥ LOCK_SHARE × biên độ của mã hôm đó (adjust.limits)."""
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
+from . import adjust
+
+LOCK_SHARE = 0.95          # 95% biên độ: HOSE ±7% → ≥ +6,65% coi như khóa trần (giá trần làm tròn bước giá nên thấp hơn 7%)
+
+def locked(close, as_of):
+    """→ (mã khóa trần, mã khóa sàn) tại phiên as_of, theo biến động giá điều chỉnh so với phiên trước trong bảng giá.
+    Phép xấp xỉ thận trọng: đóng cửa ở giá trần không luôn nghĩa là trắng bên bán, nhưng giấy không được giả định khớp
+    ở nơi thị trường thật có thể không khớp."""
+    t = pd.Timestamp(as_of)
+    hist = close.loc[:t]
+    if len(hist) < 2 or hist.index[-1] != t:
+        return set(), set()
+    r = hist.iloc[-1] / hist.iloc[-2] - 1
+    L = adjust.limits(pd.Index([t]), close.columns).iloc[0]
+    up = {c for c in close.columns if pd.notna(r.get(c)) and r[c] >= LOCK_SHARE * L[c]}
+    down = {c for c in close.columns if pd.notna(r.get(c)) and r[c] <= -LOCK_SHARE * L[c]}
+    return up, down
 
 ST = "paper/state.json"
 
@@ -46,7 +65,14 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
     if st["pending"] is not None and not frozen:
         target = st["pending"]
         traded = False
+        up, down = locked(close, as_of)
+        blocked = []
         for t in [t for t in st["positions"] if t not in target]:
+            if t in down:                                   # khóa sàn: không bán được, giữ lại và thử phiên sau
+                blocked.append(t)
+                _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "UNFILLED_LIMIT_DOWN",
+                                             "quantity": 0, "price": round(float(px[t]), 2), "fees": 0})
+                continue
             sh = st["positions"].pop(t); p = px[t] * (1 - c["slippage"])
             st["cash"] += sh * p * (1 - c["sell_fee"] - c["sell_tax"])
             cost = sh * px[t] * c["slippage"] + sh * p * (c["sell_fee"] + c["sell_tax"])
@@ -56,7 +82,11 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
         nav = st["cash"] + sum(s * px[t] for t, s in st["positions"].items())
         buys = [t for t in target if t not in st["positions"] and pd.notna(px.get(t))]
         per = nav / max(1, len(target)) * 0.995
-        for t in buys:
+        for t in [t for t in buys if t in up]:              # khóa trần: không mua được, giữ lại và thử phiên sau
+            blocked.append(t)
+            _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "UNFILLED_LIMIT_UP",
+                                         "quantity": 0, "price": round(float(px[t]), 2), "fees": 0})
+        for t in [t for t in buys if t not in up]:
             unit = px[t] * (1 + c["slippage"]) * (1 + c["buy_fee"])
             sh = int(min(per, st["cash"]) // unit // lot * lot)
             if sh <= 0:
@@ -66,7 +96,8 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
             _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "BUY", "quantity": sh,
                                          "price": round(px[t] * (1 + c["slippage"]), 2),
                                          "fees": round(sh * px[t] * (c["slippage"] + c["buy_fee"]), 0)})
-        st["pending"], st["last_rebalance"] = None, d
+        st["pending"] = target if blocked else None         # còn lệnh chưa khớp vì khóa biên độ → thử lại phiên sau
+        st["last_rebalance"] = d
         st["n_rebalance"] += int(traded)
     # 2) Định giá cuối phiên
     nav = st["cash"] + sum(s * px[t] for t, s in st["positions"].items())

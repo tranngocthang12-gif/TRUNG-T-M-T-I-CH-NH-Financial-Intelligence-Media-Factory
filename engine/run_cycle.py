@@ -49,7 +49,8 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
                "features": ";".join(spec["features"]), "model": spec["model"], "ic_mean": m["ic_mean"],
                "ic_t": m["ic_t"], "net_ann": m["net_ann"], "fold_pos": m["fold_pos"], "threshold": thr,
                "status": status, "regimes": json.dumps(m["regimes"]),
-               "sharpe": m["sharpe"], "sharpe_ann": m["sharpe_ann"], "dsr": dsr, "registry_hash": reg_hash}
+               "sharpe": m["sharpe"], "sharpe_ann": m["sharpe_ann"], "dsr": dsr, "registry_hash": reg_hash,
+               "max_dd": m["max_dd"]}        # max_dd chỉ vào báo cáo; research/trials.csv giữ đúng 17 cột (L-06)
         ledger_df = pd.concat([ledger_df, pd.DataFrame([row])], ignore_index=True) if ledger_df is not None else pd.DataFrame([row])
         meta.update(bandit, method, status)
         if status != "REJECTED":
