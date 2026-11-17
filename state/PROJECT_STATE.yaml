@@ -19,7 +19,8 @@ last_session:
   done:
     - "v3.0.1 (PR #27, đã gộp): dòng dự báo Issue không còn làm vỡ vòng học; intake chỉ nhận Issue do chủ kho mở, lúc mở"
     - "v3.0.2 (PR #28): phân định qua Issue 'Resolution'; chấm A–B kiểm định chốt mẫu 194 hai phía; sổ thử L-06 + Deflated Sharpe + không gian giả thuyết đóng băng; kiểm máy Thư viện (L-01, L-04, L-08); cổng chấm PR có bản chấm trên kho (L-09); kiểm toán sổ chỉ-ghi-thêm và đối chiếu Issue thật (L-05); engine hằng tuần; CI chạy đủ mọi test"
-    - "Năm vòng chấm độc lập của ghế khác nhà cung cấp (25 điểm) + một lượt tự rà toàn bộ; bảng luật ↔ máy kiểm ở ADR-0003"
+    - "Sáu vòng chấm độc lập của ghế khác nhà cung cấp (25 điểm + 4 điểm HIGH ở vòng 6) + một lượt tự rà toàn bộ; bảng luật ↔ máy kiểm ở ADR-0003"
+    - "Vòng 6: máy chủ nguồn tách bằng urllib; số và ngày chặt; đăng ký thử đẩy lên main trước khi chạy backtest; dấu nhận của github-actions[bot] cho từng dòng sổ; CI chạy lại luật nhận trên mọi dòng sổ"
     - "Soạn đợt dự báo A/B số 1 (10 câu) — chờ Owner lấy câu trả lời ghế B và mở Issue"
   tests: "tests/test_*.py: 4 tệp unittest + test_governance + 6 test script engine, tất cả chặn gộp; tools/validate.py 0 cảnh báo"
 next_gap: "(1) Ghi ≥ 20 dự báo A/B trước 23/11/2026. (2) Owner lập ghế thi công để ghim tài liệu gốc và viết ghi chú (hàng đợi library/reading_queue.yaml, 30 mục). (3) Phân định đợt 1 khi tới hạn (từ 10/12/2026). (4) Đề thi Học viện khi Thư viện có ghi chú CITED. (5) ADR riêng cho kho dữ liệu ghi tăng dần (C2)."
