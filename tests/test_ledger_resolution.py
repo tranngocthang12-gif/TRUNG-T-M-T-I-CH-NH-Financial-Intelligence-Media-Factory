@@ -1329,6 +1329,8 @@ class TrialRegistryTests(unittest.TestCase):
         errs = f(merged)
         self.assertTrue(any("khác giá trị ở commit gốc" in e for e in errs), errs)          # so với commit gốc: đổi mốc
         self.assertTrue(any("không tìm thấy commit mốc" in e for e in f(first)), f(first))   # commit gốc chưa có mốc: mốc lạ
+        pr_missing = ledger_audit.trials_history_errors(repo, first, pull_request=True)
+        self.assertTrue(any("không tìm thấy commit mốc" in e for e in pr_missing), pr_missing)  # PR cũng phải đóng khi thiếu mốc
         git("reset", "-q", "--hard", merged); cfg("abc"); commit("moc sai dang")
         self.assertTrue(any("40 ký tự" in e for e in f(merged)))
         # validate: kho có legacy_pin thì phải có mốc; kho thật có mốc đúng dạng
