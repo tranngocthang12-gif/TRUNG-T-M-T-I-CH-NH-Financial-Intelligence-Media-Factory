@@ -1,9 +1,11 @@
 # Changelog
 
-## v3.0.4 — 2026-11-17 (giấy tờ sau PR #29, lệnh Owner) — Claude soạn, Owner gộp
+## v3.0.4 — 2026-11-17 (giấy tờ sau PR #29; kho giá ghi tăng dần; lệnh Owner) — Claude soạn, Owner gộp; ADR-0006, ADR-0007
 - Danh mục ADR và ba tệp ADR-0002, ADR-0004, ADR-0005: ACCEPTED 17/11/2026 (PR #29, commit gộp `b8158be`; người chấm Gemini, `GỘP ĐƯỢC — commit 6201090`).
 - `governance/LAWS.md` (Owner ra lệnh; hiệu lực khi Owner gộp): cột "Máy kiểm" của L-09 thêm "bản chấm GỘP ĐƯỢC kèm SHA dán thành bình luận PR"; của L-10 thay "Branch protection trên `main`" bằng "ruleset cho `main` cấm force-push và cấm xóa nhánh; CI cảnh báo khi chưa bật" (ADR-0003 mục "Hai chỗ chữ"). Nội dung các luật không đổi.
 - Đóng 19 PR nháp dòng UMLF và 5 Issue đi kèm theo L-07 (một kiến trúc; hướng song song chưa có ADR). Nhánh giữ nguyên, mở lại được. `state/PROJECT_STATE.yaml` cập nhật.
+- **ADR-0006 — kho giá ghi tăng dần (C2).** `data/store/prices.csv.gz` đóng băng; dòng mới vào `data/store/prices/YYYY-MM.csv`, chỉ nối thêm (`engine/data.save_store`, `load_store`; `config.yaml` `data.store_dir`). Kiểm toán mục 1a (`tools/ledger_audit.store_errors`, `store_snapshot_errors`): kho cũ giữ nguyên từng byte, tệp tháng cũ là tiền tố của bản mới; chỉ kiểm khi commit gốc đã có `data.store_dir`. `tests/test_quality_gate.py` cấy lỗi bằng cách dựng lại kho tạm.
+- **ADR-0007** (theo phản biện tư vấn của Grok ở PR #29): điều kiện mở lại engine kịch bản (ADR-0005) là phán quyết của phép thử A–B, không phải 60 dự báo; scorecard thêm `disagreements_all` (mẫu số của `disagreement_rate`).
 
 ## v3.0.3 — 2026-11-17 (hoàn thiện kiến trúc sau PR #28) — Claude soạn, Owner gộp; ADR-0002, ADR-0004, ADR-0005
 - **ADR-0002** (quyết định của Owner 17/11/2026): không thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001; dự báo là việc dài hạn; mốc xét lại mới 31/03/2027. Câu hỏi `event_before_date` không vào phép kiểm định chốt mẫu A–B (ghế A được tìm web, ghế B thì không) — vẫn là cặp, vẫn vào tỷ lệ bất đồng; báo riêng `disagreements_out_of_scope` (`engine/ledger.py`, báo cáo vòng học).
