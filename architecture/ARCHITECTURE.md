@@ -61,11 +61,12 @@ Cùng ngày, cùng câu hỏi; phiên Claude mới không dự án, không tệp
 
 ### 4.3 Engine định lượng = đối chứng âm
 Giữ nguyên mã; chạy hằng tuần thay vì hằng ngày (thứ Sáu, từ v3.0.2); đóng băng không gian giả thuyết (13 feature × 3 mô hình × VN30); thêm Deflated Sharpe và sổ đăng ký thử `research/trial_registry.jsonl` (đã làm v3.0.2: mỗi lần thử đăng ký có hash chuỗi và được đẩy lên `main` trước khi chạy, lần thử bỏ dở vẫn được đếm, kết quả chỉ-ghi-thêm có neo lịch sử, CI đối chiếu); giả thuyết mới chỉ chạy khi đã đăng ký trước. Kho dữ liệu đổi sang ghi tăng dần (append) để git không phình (C2 — đã làm, ADR-0006: kho cũ đóng băng, dòng mới nối vào tệp tháng, kiểm toán bắt mọi lần viết lại). Benchmark ghi rõ là "bình quân đều VN30 hiện tại", không gọi là VN-Index (C6).
+ADR-0008: báo cáo gắn nhãn thiên lệch sống sót khi danh sách là VN30 hiện tại; giấy không khớp ở phiên khóa trần/sàn; báo cáo có sụt giảm lớn nhất (backtest và NAV giấy).
 
 ## 5. Nửa HỌC (Thư viện + Học viện) — cỗ máy học hiểu từ MINH TRÍ
 
 Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2_20261022.md`; tóm tắt luật:
-- Nguồn: chỉ tài liệu gốc công khai, ghim sha256 + ngày phát hành + ngày truy cập + trạng thái pháp lý + **trạng thái hiệu lực** (`effective_from`, `superseded_by`) (L-01, L-08). Thứ cấp chỉ là CROSS_TEXT_SYNTHESIS.
+- Nguồn: chỉ tài liệu gốc công khai, ghim sha256 + ngày phát hành + ngày truy cập + trạng thái pháp lý + **trạng thái hiệu lực** (`effective_from`, `superseded_by`) (L-01, L-08); BCTC thêm `period_end` và `published_on` — số liệu chỉ dùng từ ngày công bố (ADR-0008, `knowledge_notes.usable_on`). Thứ cấp chỉ là CROSS_TEXT_SYNTHESIS.
 - Địa chỉ: `<doc_id>:p<trang>:<đoạn>` / `<doc_id>:t<bảng>:<dòng>`; trích nguyên văn máy kiểm.
 - Đơn vị: KNOWLEDGE_NOTE (`contracts/knowledge_note.schema.json`) với `not_said ≥ 2`, `testable_implications`, `self_check`; DRAFT không dùng cho mệnh đề hay quyết định.
 - Mệnh đề = `knowledge_item` + `hypothesis.invalidation_conditions`; mỗi mệnh đề có `chain`, `supports ≥ 3`, hạn hiệu lực; trần 60 đang dùng; thay thế bằng `supersedes`.
