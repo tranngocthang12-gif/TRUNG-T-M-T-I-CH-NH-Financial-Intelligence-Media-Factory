@@ -48,6 +48,12 @@ class ReviewGateTests(unittest.TestCase):
             self.assertTrue(f(f"authored_by: {ab}\nreviewed_by: Claude"), ab)
         self.assertTrue(laws_checks.recognised_seat("Claude (Anthropic) — kiến trúc sư trưởng"))
         self.assertFalse(laws_checks.recognised_seat("kiến trúc sư trưởng Claude"))
+        # chú thích HTML của mẫu PR (có chữ "authored_by: …") không phải nội dung: mẫu thật + hai dòng điền → đạt
+        tpl = (ROOT / ".github" / "pull_request_template.md").read_text(encoding="utf-8")
+        self.assertIn("thiếu dòng", f(tpl)[0])                                  # mẫu chưa điền: thiếu authored_by, KHÔNG phải "trùng dòng"
+        filled = tpl.replace("authored_by: \n", "authored_by: Claude (Anthropic)\n", 1).replace("reviewed_by: \n", "reviewed_by: Grok (xAI)\n", 1)
+        self.assertEqual(f(filled), [], f(filled))
+        self.assertTrue(f("<!-- authored_by: Claude\nreviewed_by: Grok -->\nKhông có trường thật"))
         # mỗi trường một dòng: không chèn dòng thứ hai để đè
         self.assertTrue(f("authored_by: Claude\nauthored_by: ChatGPT\nreviewed_by: Claude"))
         self.assertTrue(f("authored_by: Claude\nreviewed_by: Claude\nreviewed_by: Grok"))
@@ -72,6 +78,10 @@ class LawsChecksTests(unittest.TestCase):
         self.assertEqual(laws_checks.check_one_architecture(self.tmp), [])
         (a / "ARCHITECTURE_v9.9.md").write_text("new", encoding="utf-8")     # bản mới không được liệt kê → lỗi
         self.assertTrue(laws_checks.check_one_architecture(self.tmp))
+        # tên tệp nhắc ở một dòng, chữ SUPERSEDED ở dòng khác → vẫn lỗi (phải cùng một dòng)
+        (a / "ARCHIVE.md").write_text("| ARCHITECTURE_v2.0.md | SUPERSEDED |\nXem thêm ARCHITECTURE_v9.9.md (đang soạn)", encoding="utf-8")
+        errs = laws_checks.check_one_architecture(self.tmp)
+        self.assertEqual(len(errs), 1); self.assertIn("v9.9", errs[0])
 
     def test_l02_flags_recommendation_keywords(self):
         (self.tmp / "reports" / "x.md").write_text("Phân tích biên lợi nhuận.", encoding="utf-8")
@@ -108,18 +118,20 @@ class LawsChecksTests(unittest.TestCase):
     def test_intake_writes_chain_and_rejects_past_date(self):
         code, out = self._run_intake(self.BODY.format(resolve="2027-02-15"))
         self.assertEqual(code, 0, out); self.assertTrue(out["ok"])
-        code, out = self._run_intake(self.BODY.format(resolve="2027-03-01"), number=8)
-        self.assertEqual(code, 0)
+        body8 = self.BODY.format(resolve="2027-03-01").replace("ngân hàng X", "ngân hàng Y")
+        code, out = self._run_intake(body8, number=8)
+        self.assertEqual(code, 0, out)
         self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
         lines = (self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()
         self.assertEqual(len(lines), 2)
         self.assertEqual(json.loads(lines[1])["prev_hash"], json.loads(lines[0])["hash"])
-        code, out = self._run_intake(self.BODY.format(resolve="2027-03-01"), number=8)     # cùng Issue ghi lần hai → bỏ qua
+        code, out = self._run_intake(body8, number=8)                                       # cùng Issue ghi lần hai → bỏ qua
         self.assertEqual(code, 3); self.assertTrue(out.get("duplicate"))
         self.assertEqual(len((self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()), 2)
-        code, out = self._run_intake(self.BODY.format(resolve="2026-10-01"), number=9)     # ngày đã qua → L-05
+        body9 = self.BODY.replace("ngân hàng X", "ngân hàng Z")
+        code, out = self._run_intake(body9.format(resolve="2026-10-01"), number=9)         # ngày đã qua → L-05
         self.assertEqual(code, 2); self.assertFalse(out["ok"])
-        code, out = self._run_intake(self.BODY.format(resolve="2027-01-01").replace("0.6", "0.99"), number=10)  # p ngoài khoảng
+        code, out = self._run_intake(body9.format(resolve="2027-01-01").replace("0.6", "0.99"), number=10)  # p ngoài khoảng
         self.assertEqual(code, 2)
         self.assertEqual(len((self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()), 2)
 

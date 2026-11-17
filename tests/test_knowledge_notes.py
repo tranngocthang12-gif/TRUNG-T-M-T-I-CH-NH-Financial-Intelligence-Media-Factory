@@ -80,6 +80,16 @@ class LibraryTests(unittest.TestCase):
         self._note(NOTE)
         self.assertEqual(self._check(), ([], []))
 
+    def test_quote_matches_across_unicode_forms(self):
+        """text.md rút từ PDF ở dạng tổ hợp (NFD), quote gõ dạng dựng sẵn (NFC) → vẫn là nguyên văn."""
+        import unicodedata
+        d = self.tmp / "library" / "sources" / "luat_ke_toan_88_2015" / "text.md"
+        d.write_text(unicodedata.normalize("NFD", TEXT), encoding="utf-8")
+        b = d.read_bytes()
+        self._manifest({"luat_ke_toan_88_2015": dict(self.entry, sha256=hashlib.sha256(b).hexdigest(), bytes=len(b))})
+        self._note(NOTE)
+        self.assertEqual(self._check()[0], [])
+
     def test_quote_and_address_errors(self):
         bad = copy.deepcopy(NOTE)
         bad["points"][0]["quote"] = "quy định về mọi hoạt động tài chính"
@@ -103,26 +113,76 @@ class LibraryTests(unittest.TestCase):
         p.write_text(TEXT.replace("1.350", "1.360"), encoding="utf-8")
         self.assertTrue(any("sha256" in x for x in self._check()[0]))
 
-    def test_status_needs_independent_audit(self):
+    def _audit(self, note, auditor, verdict="PASS", digest=None):
+        a = self.tmp / "library" / "audits"; a.mkdir(exist_ok=True)
+        (a / f"{note['id']}.json").write_text(json.dumps({"note_id": note["id"], "auditor": auditor, "verdict": verdict,
+            "date": "2026-11-17", "note_sha256": digest or kn.note_digest(note)}), encoding="utf-8")
+
+    def _l09(self):
+        return [e for e in self._check()[0] if "L-09" in e]
+
+    def test_status_needs_independent_audit_bound_to_content(self):
         cited = dict(NOTE, status="CITED")
         self._note(cited)
-        self.assertTrue(any("L-09" in e for e in self._check()[0]))
-        a = self.tmp / "library" / "audits"; a.mkdir()
+        self.assertTrue(self._l09())                                          # chưa có biên bản
         for auditor in ("ChatGPT (ghế thi công)", "GPT-5.5", "ai đó", "ghe-cham"):   # tự chấm, cùng nhà, hoặc không nhận ra ghế
-            (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": auditor, "verdict": "PASS"}), encoding="utf-8")
-            self.assertTrue(any("L-09" in e for e in self._check()[0]), auditor)
-        self._note(dict(cited, read_by="ghe-thi-cong"))                      # người đọc không nhận ra ghế: Owner chấm cũng không tính
-        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Owner", "verdict": "PASS"}), encoding="utf-8")
-        self.assertTrue(any("L-09" in e for e in self._check()[0]))
-        self._note(dict(cited, read_by="Claude"))
-        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Opus 5.5", "verdict": "PASS"}), encoding="utf-8")
-        self.assertTrue(any("L-09" in e for e in self._check()[0]))          # khác tên nhưng cùng nhà cung cấp: không tính
-        self._note(dict(cited, read_by="Owner"))
-        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Owner (xem lại)", "verdict": "PASS"}), encoding="utf-8")
-        self.assertTrue(any("L-09" in e for e in self._check()[0]))          # Owner đọc thì Owner không tự chấm
+            self._audit(cited, auditor)
+            self.assertTrue(self._l09(), auditor)
+        self._note(dict(cited, read_by="ghe-thi-cong")); self._audit(dict(cited, read_by="ghe-thi-cong"), "Owner")
+        self.assertTrue(self._l09())                                          # người đọc không nhận ra ghế
+        self._note(dict(cited, read_by="Claude")); self._audit(dict(cited, read_by="Claude"), "Opus 5.5")
+        self.assertTrue(self._l09())                                          # khác tên nhưng cùng nhà cung cấp
+        self._note(dict(cited, read_by="Owner")); self._audit(dict(cited, read_by="Owner"), "Owner (xem lại)")
+        self.assertTrue(self._l09())                                          # Owner đọc thì Owner không tự chấm
+        self._note(cited); self._audit(cited, "Owner", verdict="FAIL")
+        self.assertTrue(self._l09())                                          # CITED cần PASS
+        self._audit(cited, "Owner")
+        self.assertEqual(self._check()[0], [])                                # hợp lệ: Owner chấm ghi chú do ChatGPT đọc
+        edited = copy.deepcopy(cited); edited["points"][0]["vi"] = "Ý đã bị sửa sau khi chấm"
+        self._note(edited)
+        self.assertTrue(any("note_sha256" in e for e in self._l09()))         # sửa ghi chú sau khi chấm → biên bản hết hiệu lực
         self._note(cited)
-        (a / f"{NOTE['id']}.json").write_text(json.dumps({"note_id": NOTE["id"], "auditor": "Owner", "verdict": "PASS"}), encoding="utf-8")
         self.assertEqual(self._check()[0], [])
+        self._note(dict(cited, status="OUTDATED"))                            # đổi status không làm hỏng biên bản (digest bỏ status)
+        self.assertEqual(self._check()[0], [])
+
+    def test_disputed_needs_fail_audit_and_tested_proven_fail_closed(self):
+        disputed = dict(NOTE, status="DISPUTED")
+        self._note(disputed); self._audit(disputed, "Owner", verdict="PASS")
+        self.assertTrue(self._l09())
+        self._audit(disputed, "Owner", verdict="FAIL")
+        self.assertEqual(self._check()[0], [])
+        for st in ("TESTED", "PROVEN"):
+            n = dict(NOTE, status=st)
+            self._note(n); self._audit(n, "Owner")
+            self.assertTrue(any("chưa có cơ chế" in e for e in self._l09()), st)
+
+    def test_quote_must_be_long_enough_and_synthesis_needs_two_addresses(self):
+        bad = copy.deepcopy(NOTE)
+        bad["points"][0]["quote"] = "kế toán"                                  # có trong đoạn nhưng quá ngắn để kiểm
+        bad["points"][1]["kind"] = "CROSS_TEXT_SYNTHESIS"                      # tổng hợp mà chỉ một địa chỉ
+        bad["counts"] = [{"what": "số nhóm nợ", "n": 2, "addresses": ["luat_ke_toan_88_2015:t1:1"]}]
+        bad["self_check"]["counts_from_source"] = False
+        self._note(bad)
+        errs, _ = self._check()
+        self.assertTrue(any("P1" in e and "ký tự" in e for e in errs), errs)
+        self.assertTrue(any("P2" in e and "hai địa chỉ" in e for e in errs), errs)
+        self.assertTrue(any("counts_from_source" in e for e in errs), errs)
+        ok = copy.deepcopy(NOTE)
+        ok["points"][0].update(quote="Điều 1. Phạm vi điều chỉnh", addresses=["luat_ke_toan_88_2015:p1:1"])   # nguyên cả đoạn ngắn
+        ok["points"][1].update(kind="CROSS_TEXT_SYNTHESIS", addresses=["luat_ke_toan_88_2015:p2:2", "luat_ke_toan_88_2015:p1:2"])
+        self._note(ok)
+        self.assertEqual(self._check()[0], [])
+
+    def test_reading_queue_consistency_warnings(self):
+        self._note(NOTE)
+        (self.tmp / "library" / "reading_queue.yaml").write_text(json.dumps({"items": [
+            {"doc_id": "luat_ke_toan_88_2015", "status": "QUEUED"},
+            {"doc_id": "tt_99_2025", "status": "NOTE_WRITTEN"}]}), encoding="utf-8")
+        errs, warns = self._check()
+        self.assertEqual(errs, [])
+        self.assertTrue(any("luat_ke_toan_88_2015" in w and "QUEUED" in w for w in warns), warns)
+        self.assertTrue(any("tt_99_2025" in w for w in warns), warns)
 
     def test_outdated_source_warns_then_marked(self):
         self._note(NOTE)
@@ -161,6 +221,10 @@ class LibraryTests(unittest.TestCase):
         (self.tmp / "research").mkdir()
         (self.tmp / "research" / "note.jsonl").write_text('{"x": "Số tài khoản 0123 4567 8910"}\n', encoding="utf-8")
         self.assertTrue(laws_checks.check_personal_data(self.tmp))              # research/ không được bỏ qua
+        (self.tmp / "research" / "note.jsonl").unlink()
+        src = self.tmp / "library" / "sources" / "luat_ke_toan_88_2015" / "phu_luc.md"
+        src.write_text("Số tài khoản của doanh nghiệp: 0123 4567 8910 (trích nguyên văn BCTC)\n", encoding="utf-8")
+        self.assertEqual(laws_checks.check_personal_data(self.tmp), [])         # tài liệu gốc công khai chép nguyên văn: không quét
 
 
 if __name__ == "__main__":

@@ -6,140 +6,177 @@ import csv, json, math, os, pathlib, shutil, subprocess, sys, tempfile, textwrap
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import laws_checks  # noqa: E402
+from tools.ledger_intake import control_b_hash  # noqa: E402
+
+B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
+Q1 = "Nợ nhóm 3-5 của VCB tại 31/12/2026 cao hơn tại 30/9/2026?"
+Q2 = "NHNN đổi lãi suất tái cấp vốn trước 31/01/2027?"
 
 
-def _forecast(seat, question, p, resolve_at="2026-12-31", rule="comparison", author=None):
-    f = {"seat": seat, "question": question, "resolution_source": "https://example.org/nguon",
+def _forecast(seat, question, p, resolve_at="2026-12-31", rule="comparison", author=None, source="https://www.nso.gov.vn — thông cáo"):
+    f = {"seat": seat, "question": question, "resolution_source": source,
          "resolution_rule": rule, "resolve_at": resolve_at, "p": str(p), "base_rate": "0.5",
          "invalidation_conditions": "Nguồn đổi định nghĩa chỉ tiêu",
          "author_seat": author or ("Claude Project TTC" if seat == "A" else "Claude trần"), "model_cutoff": "2026-06"}
+    if seat == "B":
+        f["prompt_hash"] = B_HASH
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items())
 
 
-def _resolution(ids, outcome, resolver="Owner", quote="Tỷ lệ nợ xấu 1,12%", source="https://example.org/bctc",
-                void_reason="_No response_"):
+def _resolution(ids, outcome, resolver="Owner", quote="Tỷ lệ nợ xấu 1,12% tại 31/12/2026",
+                source="https://www.nso.gov.vn/thong-cao.pdf", void_reason="_No response_"):
     f = {"forecast_ids": ids, "outcome": outcome, "observed_value": "_No response_", "resolution_source": source,
          "quote": quote, "resolver": resolver, "void_reason": void_reason}
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items())
 
 
-class ResolutionTests(unittest.TestCase):
+class _Base(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
-        (self.tmp / "contracts").mkdir()
+        (self.tmp / "contracts").mkdir(); (self.tmp / "governance").mkdir(); (self.tmp / "ledger").mkdir()
         for c in ("forecast_issue.schema.json", "resolution.schema.json"):
             shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
+        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
-        (self.tmp / "ledger").mkdir()
-        q1, q2 = "Nợ nhóm 3-5 của VCB tại 31/12/2026 cao hơn tại 30/9/2026?", "NHNN đổi lãi suất tái cấp vốn trước 31/01/2027?"
-        for n, seat, q, p, ra, rule in [(101, "A", q1, 0.30, "2026-12-31", "comparison"),
-                                         (102, "B", q1, 0.60, "2026-12-31", "comparison"),
-                                         (103, "A", q2, 0.70, "2027-01-31", "event_before_date"),
-                                         (104, "B", q2, 0.80, "2027-01-31", "event_before_date")]:
-            code, out = self._run("ledger_intake.py", n, _forecast(seat, q, p, ra, rule), "2026-11-17T02:00:00Z")
-            self.assertEqual(code, 0, out)
+        for n, seat, q, p, ra, rule in [(101, "A", Q1, 0.30, "2026-12-31", "comparison"),
+                                         (102, "B", Q1, 0.60, "2026-12-31", "comparison"),
+                                         (103, "A", Q2, 0.70, "2027-01-31", "event_before_date"),
+                                         (104, "B", Q2, 0.80, "2027-01-31", "event_before_date")]:
+            self._fc(n, _forecast(seat, q, p, ra, rule))
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _run(self, script, number, body, created):
-        env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body}
-        r = subprocess.run([sys.executable, str(self.tmp / "tools" / script)], env=env, capture_output=True, text=True)
+    def _run(self, script, number, body, created, **env):
+        e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body, **env}
+        r = subprocess.run([sys.executable, str(self.tmp / "tools" / script)], env=e, capture_output=True, text=True)
         return r.returncode, r.stdout + r.stderr
+
+    def _fc(self, number, body, created="2026-11-17T02:00:00Z", expect=0):
+        c, o = self._run("ledger_intake.py", number, body, created)
+        self.assertEqual(c, expect, o)
+        return o
 
     def _res(self, number, body, created):
         return self._run("resolution_intake.py", number, body, created)
 
-    def _rows(self):
-        p = self.tmp / "ledger" / "resolutions.jsonl"
+    def _rows(self, name="resolutions.jsonl"):
+        p = self.tmp / "ledger" / name
         return [json.loads(l) for l in p.read_text(encoding="utf-8").splitlines() if l.strip()] if p.exists() else []
 
+    def _raw_prediction(self, **kw):
+        """Chèn thẳng một dòng dự báo (giả lập dòng cũ ghi trước khi có luật) — không qua intake."""
+        led = self.tmp / "ledger" / "predictions.jsonl"
+        row = dict(self._rows("predictions.jsonl")[0]); row.update(kw)
+        with led.open("a", encoding="utf-8") as f:
+            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+    def _summary(self, as_of="2027-02-05"):
+        env = {**os.environ, "TTC_HOME": str(self.tmp), "PYTHONPATH": str(ROOT)}
+        code = textwrap.dedent(f"""
+            import json
+            from engine import ledger
+            print(json.dumps(ledger.scorecard("{as_of}")["issue_forecasts"], ensure_ascii=False))
+        """)
+        r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+class ResolutionRuleTests(_Base):
     def test_rules_then_ab_scorecard(self):
+        when = "2027-01-02T03:00:00Z"
         c, o = self._res(201, _resolution("F-101, F-102", "NO"), "2026-12-15T03:00:00Z")
         self.assertEqual(c, 2, o); self.assertIn("L-05", o)                      # phân định trước hạn
-        for who in ("Claude Opus", "Opus 5.5", "Sonnet", "Anthropic Haiku"):     # cùng nhà với ghế viết, dù không có chữ "claude"
-            c, o = self._res(202, _resolution("F-101, F-102", "NO", resolver=who), "2027-01-02T03:00:00Z")
-            self.assertEqual(c, 2, o); self.assertIn("L-09", o)
-        c, o = self._res(203, _resolution("F-101, F-103", "NO"), "2027-01-02T03:00:00Z")
+        c, o = self._res(203, _resolution("F-101, F-103", "NO"), when)
         self.assertEqual(c, 2, o)                                                # hai câu hỏi khác nhau
-        c, o = self._res(204, _resolution("F-101, F-102", "NO", quote="_No response_"), "2027-01-02T03:00:00Z")
+        c, o = self._res(204, _resolution("F-101, F-102", "NO", quote="_No response_"), when)
         self.assertEqual(c, 2, o)                                                # YES/NO thiếu trích nguyên văn
-        # Thêm một dự báo A thứ hai cùng câu hỏi 1 nhưng luật event_before_date: YES sớm phải bị chặn vì câu hỏi có
-        # dự báo luật comparison (lỗi "chỉ nhìn targets[0]")
-        q1 = "Nợ nhóm 3-5 của VCB tại 31/12/2026 cao hơn tại 30/9/2026?"
-        self.assertEqual(self._run("ledger_intake.py", 105, _forecast("A", q1, 0.3, "2026-12-31", "event_before_date"),
-                                   "2026-11-17T02:10:00Z")[0], 0)
-        c, o = self._res(209, _resolution("F-105", "YES"), "2026-12-20T03:00:00Z")
-        self.assertEqual(c, 2, o); self.assertIn("L-05", o)
-        # Chỉ liệt kê F-101 nhưng câu hỏi có F-101, F-102, F-105 → ghi cả ba cùng một outcome (một câu hỏi một sự thật)
-        c, o = self._res(205, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z")
-        self.assertEqual(c, 0, o); self.assertIn("F-102", o); self.assertIn("F-105", o)
-        self.assertEqual(self._res(205, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z")[0], 3)         # chạy lại
+        c, o = self._res(210, _resolution("F-101", "NO", source="https://vnexpress.net/bai-bao"), when)
+        self.assertEqual(c, 2, o); self.assertIn("tên miền", o)                  # đổi nguồn sau khi biết kết quả
+        c, o = self._res(211, _resolution("F-101", "NO", source="https://nso.gov.vn.evil.com/x"), when)
+        self.assertEqual(c, 2, o)                                                # tên miền giả dạng
+        c, o = self._res(212, _resolution("F-101", "NO") + "\n\n### outcome\n\nYES", when)
+        self.assertEqual(c, 2, o); self.assertIn("hai tiêu đề", o)               # chèn tiêu đề thứ hai để đè
+        c, o = self._run("resolution_intake.py", 213, _resolution("F-101", "NO"), when, ISSUE_AUTHOR="nguoi-la", REPO_OWNER="chu-kho")
+        self.assertEqual(c, 2, o); self.assertIn("chủ kho", o)                   # không phải chủ kho mở
+        # Chỉ liệt kê F-101 nhưng câu hỏi có F-101 và F-102 → ghi cả hai cùng một outcome (một câu hỏi một sự thật)
+        c, o = self._res(205, _resolution("F-101", "NO"), when)
+        self.assertEqual(c, 0, o); self.assertIn("F-102", o)
+        self.assertEqual(self._res(205, _resolution("F-101", "NO"), when)[0], 3)                  # chạy lại cùng Issue
         c, o = self._res(206, _resolution("F-102", "YES"), "2027-01-03T03:00:00Z")
         self.assertEqual(c, 2, o); self.assertIn("không phân định lại", o)       # không gán sự thật thứ hai cho B
         c, o = self._res(207, _resolution("F-103, F-104", "VOID"), "2027-02-02T03:00:00Z")
         self.assertEqual(c, 2, o)                                                # VOID thiếu lý do
         c, o = self._res(208, _resolution("F-103, F-104", "YES"), "2026-12-20T03:00:00Z")
-        self.assertEqual(c, 0, o)                                                # YES của event_before_date (cả câu hỏi) được sớm
+        self.assertEqual(c, 0, o)                                                # YES khi cả câu hỏi là event_before_date: được sớm
         rows = self._rows()
         self.assertEqual([(r["prediction_id"], r["outcome"]) for r in rows],
-                         [("F-101", 0), ("F-102", 0), ("F-105", 0), ("F-103", 1), ("F-104", 1)])
+                         [("F-101", 0), ("F-102", 0), ("F-103", 1), ("F-104", 1)])
         self.assertTrue(all(r["resolver"] == "Owner" and r["quote"] for r in rows))
-        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])          # resolutions.jsonl có chuỗi hash
+        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])           # resolutions.jsonl có chuỗi hash
         rp = self.tmp / "ledger" / "resolutions.jsonl"
         rp.write_text(rp.read_text(encoding="utf-8").replace('"outcome": 0', '"outcome": 1', 1), encoding="utf-8")
         self.assertTrue(any("phân định" in e for e in laws_checks.check_ledger_chain(self.tmp)))   # sửa kết quả → đỏ
         rp.write_text(rp.read_text(encoding="utf-8").replace('"outcome": 1', '"outcome": 0', 1), encoding="utf-8")
-        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
 
-        env = {**os.environ, "TTC_HOME": str(self.tmp), "PYTHONPATH": str(ROOT)}
-        code = textwrap.dedent("""
-            import json
-            from engine import ledger
-            print(json.dumps(ledger.scorecard("2027-01-05")["issue_forecasts"], ensure_ascii=False))
-        """)
-        r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
-        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
-        sc = json.loads(r.stdout.strip().splitlines()[-1])
-        self.assertEqual(sc["by_seat"]["A"], {"n": 3, "resolved": 3, "pending": 0})
-        self.assertAlmostEqual(sc["scores"]["A"]["brier"], 0.09, places=4)       # ((0,3-0)² + (0,7-1)² + (0,3-0)²)/3 = 0,09
+        sc = self._summary()
+        self.assertEqual(sc["by_seat"]["A"], {"n": 2, "resolved": 2, "void": 0, "pending": 0})
+        self.assertAlmostEqual(sc["scores"]["A"]["brier"], 0.09, places=4)       # ((0,3-0)² + (0,7-1)²)/2
         self.assertAlmostEqual(sc["scores"]["B"]["brier"], 0.2, places=4)        # ((0,6-0)² + (0,8-1)²)/2
+        self.assertAlmostEqual(sc["scores"]["A"]["brier_coin"], 0.25, places=4)
         ab = sc["ab"]
-        # câu 1: A=[F-101, F-105], B=[F-102] → 1 cặp + 1 lẻ; câu 2: 1 cặp. Bất đồng chỉ ở câu 1 (0,3 vs 0,6).
-        self.assertEqual((ab["pairs"], ab["unpaired"], ab["disagreements"], ab["disagreements_resolved"], ab["a_correct"]),
-                         (2, 1, 1, 1, 1))
-        self.assertEqual(ab["inconsistent_outcomes"], 0)
+        self.assertEqual((ab["pairs"], ab["unpaired"], ab["not_same_day"], ab["disagreements"]), (2, 0, 0, 1))
+        self.assertEqual((ab["disagreements_resolved"], ab["a_correct"], ab["inconsistent_outcomes"]), (1, 1, 0))
         self.assertEqual(ab["a_accuracy"], 1.0)
-        self.assertEqual(ab["p_value_two_sided_vs_coin"], 1.0)                   # n=1: 2·P(X≥1)=1
+        self.assertEqual(ab["fixed_sample"], {"n": 1, "a_correct": 1, "p_value_two_sided_vs_coin": None})   # chưa đủ 194: chưa kiểm định
         self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (1/194"))
-        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
+
+    def test_resolution_day_is_vietnam_time(self):
+        """resolve_at 31/12/2026: 30/12 22:00 UTC là 05:00 ngày 31/12 giờ VN → được; 30/12 16:00 UTC (23:00 VN 30/12) → chưa."""
+        c, o = self._res(220, _resolution("F-101", "NO"), "2026-12-30T16:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("L-05", o)
+        c, o = self._res(221, _resolution("F-101", "NO"), "2026-12-30T22:00:00Z")
+        self.assertEqual(c, 0, o)
+        self.assertEqual(self._rows()[0]["resolved_at"], "2026-12-31")
+
+    def test_void_is_counted_separately(self):
+        c, o = self._res(230, _resolution("F-101", "VOID", void_reason="Nguồn đã hứa không công bố chỉ tiêu này"), "2027-01-05T03:00:00Z")
+        self.assertEqual(c, 0, o)
+        sc = self._summary()
+        self.assertEqual(sc["by_seat"]["A"], {"n": 2, "resolved": 0, "void": 1, "pending": 1})
+        self.assertEqual(sc["ab"]["disagreements_resolved"], 0)
+        c, o = self._res(231, _resolution("F-102", "NO"), "2027-01-06T03:00:00Z")
+        self.assertEqual(c, 2, o)                                                # VOID cũng khóa câu hỏi
+
+    def test_early_yes_needs_every_forecast_to_be_event_rule(self):
+        """Dòng cũ (không qua intake) cùng câu hỏi 2 nhưng luật comparison → YES sớm bị chặn cho cả câu hỏi."""
+        self._raw_prediction(id="F-150", issue_number=150, question=Q2, resolve_at="2027-01-31", resolution_rule="comparison")
+        c, o = self._res(240, _resolution("F-103", "YES"), "2026-12-20T03:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("L-05", o)
 
 
+class ResolverSeatTests(_Base):
     def test_resolver_must_be_recognised_and_differ_from_every_author(self):
-        """L-09: resolver bắt đầu bằng tên ghế; không chung nhà cung cấp với bất kỳ ghế viết nào của câu hỏi."""
         q3 = "Tín dụng năm 2026 tăng từ 15% trở lên?"
-        self.assertEqual(self._run("ledger_intake.py", 111, _forecast("A", q3, 0.7), "2026-11-17T02:20:00Z")[0], 0)
-        self.assertEqual(self._run("ledger_intake.py", 112, _forecast("B", q3, 0.4, author="ChatGPT trần (OpenAI)"),
-                                   "2026-11-17T02:21:00Z")[0], 0)
+        self._fc(111, _forecast("A", q3, 0.7))
+        self._fc(112, _forecast("B", q3, 0.4, author="ChatGPT trần (OpenAI)"))
         when = "2027-01-05T03:00:00Z"
         for who in ("ai đó", "người phân định", "not_an_owner", "kế toán trưởng Owner"):       # không nhận ra ghế
             c, o = self._res(301, _resolution("F-111", "YES", resolver=who), when)
             self.assertEqual(c, 2, o); self.assertIn("L-09", o)
-        for who in ("ChatGPT (OpenAI)", "GPT-5.5", "Claude", "Opus 5.5"):                       # trùng một ghế viết của câu hỏi
-            c, o = self._res(302, _resolution("F-111", "YES", resolver=who), when)
+        for who in ("ChatGPT (OpenAI)", "GPT-5.5", "Claude", "Claude Opus", "Opus 5.5", "Sonnet", "Anthropic Haiku"):
+            c, o = self._res(302, _resolution("F-111", "YES", resolver=who), when)              # trùng một ghế viết của câu hỏi
             self.assertEqual(c, 2, o); self.assertIn("L-09", o)
         self.assertEqual(self._rows(), [])
         c, o = self._res(303, _resolution("F-111", "YES", resolver="Grok (xAI)"), when)         # khác cả hai ghế viết
         self.assertEqual(c, 0, o)
-        # câu hỏi 1 chỉ có ghế viết Claude: ChatGPT phân định được
-        c, o = self._res(304, _resolution("F-101", "NO", resolver="ChatGPT (OpenAI)"), when)
+        c, o = self._res(304, _resolution("F-101", "NO", resolver="ChatGPT (OpenAI)"), when)    # câu 1 chỉ có Claude viết
         self.assertEqual(c, 0, o)
 
     def test_owner_authored_forecast_cannot_be_resolved_by_owner(self):
-        """L-09: Owner cũng là một ghế viết. Dự báo do Owner viết thì Owner không phân định."""
         q4 = "Tỷ giá trung tâm ngày 31/12/2026 từ 25.650 đồng trở lên?"
-        self.assertEqual(self._run("ledger_intake.py", 121, _forecast("A", q4, 0.6, author="Owner (Trần Ngọc Thắng)"),
-                                   "2026-11-17T02:30:00Z")[0], 0)
+        self._fc(121, _forecast("A", q4, 0.6, author="Owner (Trần Ngọc Thắng)"))
         when = "2027-01-05T03:00:00Z"
         for who in ("Owner", "Owner (Trần Ngọc Thắng)", "owner — kiểm lại", "Claude"):
             c, o = self._res(401, _resolution("F-121", "YES", resolver=who), when)
@@ -148,37 +185,92 @@ class ResolutionTests(unittest.TestCase):
         c, o = self._res(402, _resolution("F-121", "YES", resolver="ChatGPT (OpenAI)"), when)
         self.assertEqual(c, 0, o)
 
-    def test_unrecognised_author_seat_is_refused_at_intake_and_fails_closed_at_resolution(self):
-        c, o = self._run("ledger_intake.py", 131, _forecast("A", "Câu hỏi thử có ghế viết lạ?", 0.6, author="ai đó"),
-                         "2026-11-17T02:40:00Z")
-        self.assertEqual(c, 2, o); self.assertIn("L-09", o)                   # không vào sổ
-        # Dòng cũ (giả lập ghi trước khi có luật) có author_seat không nhận ra: phân định đóng lại, kể cả với Owner
-        led = self.tmp / "ledger" / "predictions.jsonl"
-        row = json.loads(led.read_text(encoding="utf-8").splitlines()[0])
-        row.update(id="F-141", issue_number=141, question="Dòng cũ không rõ ghế viết?", author_seat="người viết")
-        with led.open("a", encoding="utf-8") as f:
-            f.write(json.dumps(row, ensure_ascii=False) + "\n")
+    def test_unrecognised_author_seat_fails_closed(self):
+        self._fc(131, _forecast("A", "Câu hỏi thử có ghế viết lạ?", 0.6, author="ai đó"), expect=2)
+        self._raw_prediction(id="F-141", issue_number=141, question="Dòng cũ không rõ ghế viết?", author_seat="người viết")
         for who in ("Owner", "ChatGPT (OpenAI)"):
             c, o = self._res(501, _resolution("F-141", "NO", resolver=who), "2027-01-05T03:00:00Z")
             self.assertEqual(c, 2, o); self.assertIn("không nhận ra ghế viết", o)
         self.assertEqual(self._rows(), [])
 
 
-class TwoSidedTests(unittest.TestCase):
-    def test_binom_two_sided_matches_sample_size_logic(self):
-        sys.path.insert(0, str(ROOT))
+class ScoringTests(_Base):
+    def _fake(self, n_pairs, a_right, start=1000, a_day="2026-11-17T02:00:00Z", b_day="2026-11-17T03:00:00Z"):
+        """Ghi thẳng n cặp bất đồng đã phân định (A=0,7; B=0,3), A đúng ở a_right cặp đầu."""
+        preds, res = [], []
+        for i in range(n_pairs):
+            q = f"Câu hỏi giả lập số {i}?"
+            for seat, p, num, day in (("A", 0.7, start + 2 * i, a_day), ("B", 0.3, start + 2 * i + 1, b_day)):
+                preds.append({"id": f"F-{num}", "issue_number": num, "issue_created_at": day, "seat": seat, "question": q,
+                              "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5})
+                res.append({"prediction_id": f"F-{num}", "outcome": 1 if i < a_right else 0})
+        return preds, res
+
+    def _score(self, preds, res):
+        env = {**os.environ, "TTC_HOME": str(self.tmp), "PYTHONPATH": str(ROOT)}
+        (self.tmp / "p.json").write_text(json.dumps([preds, res]), encoding="utf-8")
+        code = "import json;from engine import ledger;p,r=json.load(open(r'%s'));print(json.dumps(ledger.issue_summary(p,r),ensure_ascii=False))" % (self.tmp / "p.json")
+        r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr[-2000:])
+        return json.loads(r.stdout.strip().splitlines()[-1])
+
+    def test_fixed_sample_test_uses_only_first_194(self):
+        """Phán quyết chốt ở 194 bất đồng đầu tiên: 109/194 (hai phía p≈0,098) → chưa thấy khác biệt, dù sau đó A đúng thêm 100 lần."""
+        preds, res = self._fake(194, 109)
+        ab = self._score(preds, res)["ab"]
+        self.assertEqual(ab["fixed_sample"]["n"], 194)
+        self.assertGreater(ab["fixed_sample"]["p_value_two_sided_vs_coin"], 0.05)
+        self.assertEqual(ab["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
+        more_p, more_r = self._fake(100, 100, start=5000)
+        ab2 = self._score(preds + more_p, res + more_r)["ab"]
+        self.assertEqual(ab2["fixed_sample"], ab["fixed_sample"])                # mẫu chốt không đổi
+        self.assertEqual(ab2["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
+        self.assertEqual(ab2["disagreements_resolved"], 294)                     # số chạy vẫn báo đủ
+        win_p, win_r = self._fake(194, 112)
+        self.assertEqual(self._score(win_p, win_r)["ab"]["verdict"], "A HƠN B CÓ Ý NGHĨA")
+        lose_p, lose_r = self._fake(194, 82)
+        self.assertEqual(self._score(lose_p, lose_r)["ab"]["verdict"], "B HƠN A CÓ Ý NGHĨA")
+
+    def test_pairs_need_same_day_and_both_outcomes(self):
+        preds, res = self._fake(3, 3, b_day="2026-11-18T03:00:00Z")              # B ghi hôm sau → không thành cặp
+        ab = self._score(preds, res)["ab"]
+        self.assertEqual((ab["pairs"], ab["not_same_day"], ab["disagreements_resolved"]), (0, 3, 0))
+        preds, res = self._fake(2, 2)
+        res[1]["outcome"] = 0                                                    # A=1, B=0 cho cùng câu hỏi: dữ liệu hỏng
+        ab = self._score(preds, [r for r in res if r["prediction_id"] != "F-1003"])["ab"]   # cặp thứ hai: B chưa phân định
+        self.assertEqual((ab["pairs"], ab["disagreements_resolved"], ab["inconsistent_outcomes"]), (2, 0, 1))
+        self.assertIn("warning_inconsistent", ab)
+
+    def test_malformed_rows_do_not_crash_scoring(self):
+        preds, res = self._fake(1, 1)
+        preds += [{"issue_number": 9, "id": "F-9", "seat": "A", "p": "không phải số", "question": "x", "resolve_at": "2026-12-31"},
+                  {"issue_number": 10, "seat": "C", "p": 0.5}, {"issue_number": 11}]
+        out = self._score(preds, res)
+        self.assertEqual(out["malformed"], 3)
+        self.assertEqual(out["ab"]["pairs"], 1)
+
+    def test_low_disagreement_warning_only_after_60_pairs(self):
+        preds, res = [], []
+        for i in range(60):
+            for seat, num in (("A", 2000 + 2 * i), ("B", 2001 + 2 * i)):
+                preds.append({"id": f"F-{num}", "issue_number": num, "issue_created_at": "2026-11-17T02:00:00Z", "seat": seat,
+                              "question": f"q{i}", "resolve_at": "2026-12-31", "p": 0.6, "base_rate": 0.5})
+        self.assertIn("warning", self._score(preds, res)["ab"])
+        self.assertNotIn("warning", self._score(preds[:118], res)["ab"])         # 59 cặp: chưa cảnh báo
+
+    def test_binom_two_sided(self):
         from engine import ledger
-        # 109/194 đúng: một phía ≈ 0,049 nhưng hai phía ≈ 0,098 → KHÔNG có ý nghĩa (khớp cỡ mẫu 194 tính hai phía)
-        self.assertGreater(ledger._binom_two_sided(109, 194), 0.05)
+        self.assertGreater(ledger._binom_two_sided(109, 194), 0.05)             # một phía ≈ 0,049 nhưng hai phía ≈ 0,098
         self.assertLess(ledger._binom_two_sided(112, 194), 0.05)
         self.assertEqual(ledger._binom_two_sided(0, 0), 1.0)
-        self.assertAlmostEqual(ledger._binom_two_sided(2, 4), 1.0)                # đúng nửa → p = 1
+        self.assertAlmostEqual(ledger._binom_two_sided(2, 4), 1.0)
 
 
 class TrialRegistryTests(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
         (self.tmp / "research").mkdir()
+        shutil.copy(ROOT / "config.yaml", self.tmp / "config.yaml")
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -197,32 +289,59 @@ class TrialRegistryTests(unittest.TestCase):
             n = research.next_trial_number(None)
             h1 = research.register_trial(f"T{n:05d}", "2026-11-20", "random_subset", spec, research.threshold(n))
             n2 = research.next_trial_number(None)          # T00001 đăng ký nhưng chưa có kết quả → vẫn được đếm
-            try:
-                research.register_trial(f"T{n:05d}", "2026-11-20", "random_subset", spec, 3.0)
-                dup = False
-            except RuntimeError:
-                dup = True
-            print(json.dumps({"n": n, "n2": n2, "h1": h1, "dup": dup, "spec_id": research.spec_id(spec),
-                              "thr": research.threshold(n)}))
+            def refused(tid, sp):
+                try:
+                    research.register_trial(tid, "2026-11-20", "random_subset", sp, 3.0); return False
+                except RuntimeError:
+                    return True
+            print(json.dumps({"n": n, "n2": n2, "h1": h1, "dup": refused(f"T{n:05d}", spec),
+                              "new_feature": refused("T00009", {"features": ["mom_60", "feature_moi"], "model": "ridge"}),
+                              "new_model": refused("T00010", {"features": ["mom_60"], "model": "transformer"}),
+                              "spec_id": research.spec_id(spec), "thr": research.threshold(n)}))
         """)
         self.assertEqual(code, 0, err[-2000:])
         d = json.loads(out.strip().splitlines()[-1])
         self.assertEqual((d["n"], d["n2"], d["dup"]), (1, 2, True))
+        self.assertTrue(d["new_feature"] and d["new_model"])                    # ngoài không gian đóng băng → engine từ chối
         self.assertEqual(laws_checks.check_trial_registry(self.tmp), [])
         cols = ["trial_id", "cycle_date", "spec_id", "threshold", "registry_hash"]
         old = {"trial_id": "T00000", "cycle_date": "2026-11-20", "spec_id": "M-old", "threshold": "3.6", "registry_hash": ""}
         new = {"trial_id": "T00001", "cycle_date": "2026-11-20", "spec_id": d["spec_id"], "threshold": repr(d["thr"]),
                "registry_hash": d["h1"]}
-        with (self.tmp / "research" / "trials.csv").open("w", encoding="utf-8", newline="") as f:
+        tp = self.tmp / "research" / "trials.csv"
+        with tp.open("w", encoding="utf-8", newline="") as f:
             w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); w.writerow(old); w.writerow(new)
         self.assertEqual(laws_checks.check_trial_registry(self.tmp), [])        # lần thử cũ (mã trước sổ, kể cả cùng ngày) không bị đòi
-        rogue = {"trial_id": "T00002", "cycle_date": "2026-11-20", "spec_id": "M-x", "threshold": "3.7", "registry_hash": ""}
-        with (self.tmp / "research" / "trials.csv").open("a", encoding="utf-8", newline="") as f:
-            csv.DictWriter(f, fieldnames=cols).writerow(rogue)
-        self.assertTrue(any("T00002" in e for e in laws_checks.check_trial_registry(self.tmp)))
+        with tp.open("a", encoding="utf-8", newline="") as f:
+            csv.DictWriter(f, fieldnames=cols).writerow(new)                    # hai kết quả cho một lần đăng ký
+        self.assertTrue(any("hai kết quả" in e for e in laws_checks.check_trial_registry(self.tmp)))
+        with tp.open("w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); w.writerow(new)
+            w.writerow({"trial_id": "T00002", "cycle_date": "2026-11-20", "spec_id": "M-x", "threshold": "3.7", "registry_hash": ""})
+        self.assertTrue(any("T00002" in e for e in laws_checks.check_trial_registry(self.tmp)))   # chạy không đăng ký
         reg = self.tmp / "research" / "trial_registry.jsonl"
-        reg.write_text(reg.read_text(encoding="utf-8").replace("random_subset", "cross_family"), encoding="utf-8")
-        self.assertTrue(any("hash" in e for e in laws_checks.check_trial_registry(self.tmp)))   # sửa sổ bị bắt
+        good = reg.read_text(encoding="utf-8")
+        reg.write_text(good.replace("random_subset", "cross_family"), encoding="utf-8")
+        self.assertTrue(any("hash" in e for e in laws_checks.check_trial_registry(self.tmp)))     # sửa sổ bị bắt
+        # dòng đăng ký ngoài không gian đóng băng, hash hợp lệ (viết tay) → kiểm máy vẫn bắt
+        row = json.loads(good.splitlines()[0])
+        row.update(trial_id="T00003", features="mom_60;feature_moi", prev_hash=row["hash"]); row["hash"] = laws_checks.line_hash(row)
+        reg.write_text(good + json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+        self.assertTrue(any("đóng băng" in e for e in laws_checks.check_trial_registry(self.tmp)))
+
+    def test_frozen_space_matches_engine_code(self):
+        """Danh sách đóng băng trong config phải đúng bằng feature/mô hình engine đang có: thêm feature trong mã mà không sửa
+        config (và ADR) thì test đỏ."""
+        code, out, err = self._engine("""
+            import json
+            from engine.features import FEATURES
+            from engine.research import MODELS
+            from engine.config import CFG
+            fs = CFG["research"]["frozen_space"]
+            print(json.dumps([sorted(FEATURES) == sorted(fs["features"]), sorted(MODELS) == sorted(fs["models"])]))
+        """)
+        self.assertEqual(code, 0, err[-2000:])
+        self.assertEqual(json.loads(out.strip().splitlines()[-1]), [True, True])
 
     def test_deflated_sharpe_penalises_many_trials(self):
         code, out, err = self._engine("""

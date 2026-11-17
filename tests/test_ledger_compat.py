@@ -7,6 +7,9 @@ Mọi thứ chạy trong thư mục tạm (TTC_HOME, bản sao tools/) và tiế
 import json, os, pathlib, shutil, subprocess, sys, tempfile, textwrap, unittest
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.ledger_intake import control_b_hash  # noqa: E402
+B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
 
 
 def _form(seat, question, resolve_at="2099-02-15", p="0.25"):
@@ -16,7 +19,7 @@ def _form(seat, question, resolve_at="2099-02-15", p="0.25"):
               "invalidation_conditions": "Ngân hàng đổi cách phân loại nợ",
               "author_seat": "Claude Project TTC" if seat == "A" else "Claude trần",
               "model_cutoff": "2026-06", "library_refs": "_No response_" if seat == "B" else "KN-T2-vas-01",
-              "prompt_hash": "d3b1d7c2" if seat == "B" else "_No response_"}
+              "prompt_hash": B_HASH if seat == "B" else "_No response_"}
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in fields.items())
 
 
@@ -26,6 +29,8 @@ class LedgerCompatTests(unittest.TestCase):
         (self.tmp / "contracts").mkdir()
         shutil.copy(ROOT / "contracts" / "forecast_issue.schema.json", self.tmp / "contracts")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
+        (self.tmp / "governance").mkdir()
+        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
         (self.tmp / "ledger").mkdir()
 
     def tearDown(self):
@@ -78,8 +83,9 @@ class LedgerCompatTests(unittest.TestCase):
         self.assertEqual(sc["total_predictions"], 3)
         self.assertEqual(sc["resolved"], 1)
         self.assertEqual(sc["issue_forecasts"]["total"], 2)
-        self.assertEqual(sc["issue_forecasts"]["by_seat"]["A"], {"n": 1, "resolved": 0, "pending": 1})
-        self.assertEqual(sc["issue_forecasts"]["by_seat"]["B"], {"n": 1, "resolved": 0, "pending": 1})
+        self.assertEqual(sc["issue_forecasts"]["by_seat"]["A"], {"n": 1, "resolved": 0, "void": 0, "pending": 1})
+        self.assertEqual(sc["issue_forecasts"]["by_seat"]["B"], {"n": 1, "resolved": 0, "void": 0, "pending": 1})
+        self.assertEqual(sc["issue_forecasts"]["ab"]["pairs"], 1)
         self.assertIn("test", sc["procedures"])
 
         # Issue tiếp theo nối chuỗi sau dòng engine; toàn tệp vẫn đúng hash chuỗi
