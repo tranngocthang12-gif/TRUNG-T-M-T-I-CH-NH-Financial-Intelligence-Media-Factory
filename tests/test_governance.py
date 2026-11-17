@@ -437,8 +437,36 @@ class LedgerAuditTests(unittest.TestCase):
         # main() dùng bản có đọc lại; tổng thời gian chờ mặc định hữu hạn và ngắn hơn hạn chạy của job kiểm toán
         src = (ROOT / "tools" / "ledger_audit.py").read_text(encoding="utf-8")
         self.assertIn("errs += attestation_errors_with_retry(pred, res, issues, lambda: fetch_comments(repo, token)", src.split("def main")[1])
-        self.assertGreaterEqual(ledger_audit.ATTEST_TRIES, 2)
-        wait = (ledger_audit.ATTEST_TRIES - 1) * ledger_audit.ATTEST_WAIT
+        # vòng 10: khoảng chờ của kiểm toán phải PHỦ HẾT chuỗi thử lại của bước đăng dấu nhận. Hai workflow nhận thử 5 lần, chờ
+        # 20, 40, 60, 80 giây (200 giây); bản trước kiểm toán chỉ đọc lại trong 150 giây → dấu nhận hợp lệ tới ở lần thử thứ năm
+        # của robot bị báo đỏ giả. Hai bộ số phải đi cùng nhau: đổi một bên mà quên bên kia thì test này đỏ.
+        la = ledger_audit
+        for wf in ("ledger_intake.yml", "resolution_intake.yml"):
+            text = (WF / wf).read_text(encoding="utf-8")
+            self.assertIn(f"if (i >= {la.POST_TRIES}) throw e;", text, wf)
+            self.assertIn(f"setTimeout(done, {la.POST_BACKOFF * 1000} * i)", text, wf)
+        self.assertEqual(la.POST_SPAN, 200)
+        wait = (la.ATTEST_TRIES - 1) * la.ATTEST_WAIT
+        self.assertGreaterEqual(wait, la.POST_SPAN + 120)                         # dư ít nhất 2 phút cho các lần gọi API hỏng
+        # mô phỏng: bình luận của robot B chỉ xuất hiện 230 giây sau lượt đọc đầu (lần thử thứ năm, sau 200 giây chờ)
+        clock = [0.0]
+        late8 = bot("2026-11-17T02:05:20Z", f"✅ Đã ghi dự báo #8\n\n`ledger-attest: predictions F-8 {h2}`")
+        late9 = bot("2026-12-11T05:04:20Z", f"✅ Đã phân định\n`ledger-attest: resolutions F-7 {hr}`")
+        tick = lambda sec: clock.__setitem__(0, clock[0] + sec)
+        def slow_fetch(extra, base=None):
+            return lambda: {**(base or {7: [c7]}), **(extra if clock[0] >= 230 else {})}
+        clock[0] = 0.0
+        self.assertEqual(f(pred, [], issues, slow_fetch({8: [late8]}), sleep=tick, now=now), [])               # dự báo mới: không đỏ giả
+        self.assertGreaterEqual(clock[0], 230); self.assertLessEqual(clock[0], wait)
+        clock[0] = 0.0
+        self.assertEqual(len(f(pred, [], issues, slow_fetch({8: [late8]}), tries=6, wait=30, sleep=tick, now=now)), 1)   # cửa chờ cũ (150 giây): đỏ giả
+        clock[0] = 0.0
+        self.assertEqual(f(pred, res, old_issues, slow_fetch({9: [late9]}, {7: [c7], 8: [c8]}), sleep=tick, now=next_day), [])   # phân định Issue cũ: cũng vậy
+        self.assertGreaterEqual(clock[0], 230)
+        clock[0] = 0.0
+        errs = f(pred, [], issues, slow_fetch({}), sleep=tick, now=now)           # không bao giờ tới: vẫn là LỖI, sau khoảng chờ hữu hạn
+        self.assertEqual(len(errs), 1); self.assertEqual(clock[0], wait)
+        self.assertGreaterEqual(la.ATTEST_TRIES, 2)
         for wf, job in (("ledger_audit.yml", "audit"), ("tests.yml", "gate")):
             self.assertLess(wait, yaml.safe_load((WF / wf).read_text(encoding="utf-8"))["jobs"][job]["timeout-minutes"] * 60 / 2, wf)
         self.assertFalse(hasattr(ledger_audit, "ATTEST_GRACE"))
