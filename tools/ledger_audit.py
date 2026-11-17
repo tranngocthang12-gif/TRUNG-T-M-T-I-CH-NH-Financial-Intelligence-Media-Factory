@@ -22,8 +22,9 @@ thứ nằm NGOÀI tệp:
    dấu nhận. Chạy lại job nhận chỉ trả lại dấu nhận cho dòng đúng là dòng robot dựng từ thân Issue lúc mở.
    - Không có khoảng miễn kiểm: dòng nào thiếu dấu nhận là lỗi, kể cả khi Issue vừa mở. Nhưng robot nhận đẩy commit
      TRƯỚC rồi mới đăng dấu nhận, và hai robot có thể chạy xen kẽ; nên khi thấy một dòng thiếu dấu nhận mà Issue của nó
-     còn trong hạn 6 giờ, kiểm toán ĐỌC LẠI bình luận trong một khoảng chờ hữu hạn (mặc định 6 lượt, cách nhau 30 giây)
-     rồi mới kết luận. Hết lượt vẫn thiếu thì vẫn là lỗi; không dòng nào được coi là đạt khi chưa có dấu nhận.
+     còn trong hạn 6 giờ, kiểm toán ĐỌC LẠI bình luận trong một khoảng chờ hữu hạn (mặc định 15 lượt cách nhau 30 giây =
+     420 giây — dài hơn toàn bộ chuỗi thử lại của bước đăng dấu nhận ở hai workflow nhận, vốn chờ 20 + 40 + 60 + 80 =
+     200 giây) rồi mới kết luận. Hết lượt vẫn thiếu thì vẫn là lỗi; không dòng nào được coi là đạt khi chưa có dấu nhận.
    - Dấu nhận của dòng PHÂN ĐỊNH không có hạn 6 giờ. Lùi giờ một phân định không đổi được gì: thứ tự chấm là thứ tự dòng
      trong sổ, và luật phân định đã buộc Issue phân định mở sau mọi dự báo của câu hỏi, không trước resolve_at. Nhờ vậy
      job phân định hỏng ở bước đăng dấu nhận luôn chạy lại được.
@@ -51,7 +52,7 @@ gọi qua workflow_run), và mỗi ngày một lần.
 Dùng trong CI:  python tools/ledger_audit.py --base "$BASE_SHA" --github
 Môi trường: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/repo). Thoát 1 khi có lỗi.
 """
-import argparse, csv, io, json, os, pathlib, re, subprocess, sys, time, urllib.request
+import argparse, csv, io, json, math, os, pathlib, re, subprocess, sys, time, urllib.request
 from datetime import datetime, timedelta, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
@@ -66,7 +67,15 @@ V302_MARKER = "tools/registry_push.py"   # có từ v3.0.2 và thuộc danh sác
 ZERO_SHA = "0" * 40
 BOT = "github-actions[bot]"
 # ATTEST_WINDOW (6 giờ, từ laws_checks): dấu nhận phải có trong khoảng đó sau khi Issue mở (bình thường: khoảng 1 phút).
-ATTEST_TRIES, ATTEST_WAIT = 6, 30.0      # đọc lại bình luận tối đa 6 lần, cách nhau 30 giây (2,5 phút) rồi mới kết luận thiếu dấu nhận
+# Khoảng chờ của kiểm toán phải PHỦ HẾT chuỗi thử lại của robot (vòng chấm 10). Bước đăng dấu nhận của hai workflow nhận
+# (.github/workflows/ledger_intake.yml, resolution_intake.yml) thử tối đa POST_TRIES lần và chờ POST_BACKOFF giây × số lần đã
+# hỏng: 20 + 40 + 60 + 80 = 200 giây từ lần thử đầu tới lần thử cuối. Bản trước chỉ đọc lại trong 150 giây, nên một dấu
+# nhận hợp lệ tới ở lần thử thứ năm của robot bị báo đỏ giả. tests/test_governance.py buộc hai bộ số này đi cùng nhau.
+POST_TRIES, POST_BACKOFF = 5, 20
+POST_SPAN = POST_BACKOFF * sum(range(1, POST_TRIES))                        # 200 giây
+ATTEST_MARGIN = 220                                                         # biên: thời gian của các lần gọi API hỏng, độ trễ hiển thị bình luận
+ATTEST_WAIT = 30.0                                                          # giây giữa hai lượt đọc bình luận
+ATTEST_TRIES = 1 + math.ceil((POST_SPAN + ATTEST_MARGIN) / ATTEST_WAIT)     # 15 lượt đọc: 420 giây từ lượt đầu tới lượt cuối
 
 
 def append_only_errors(base: dict, head: dict) -> list[str]:
