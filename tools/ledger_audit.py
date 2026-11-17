@@ -295,9 +295,13 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
     - Pull Request: không được thêm kết quả, không được thêm dòng đăng ký (hai tệp chỉ do vòng học trên main ghi).
     - Trên main: với mỗi commit trong (base, HEAD] có thêm kết quả, dòng đăng ký của từng kết quả mới phải có sẵn trong sổ
       ở commit liền trước nó. Chỉ bỏ qua commit của kho TRƯỚC v3.0.2 — vòng học bản cũ, kết quả của nó do ghim trong
-      config.yaml và dòng neo lịch sử chốt. "Trước v3.0.2" xác định bằng tổ tiên: tools/registry_push.py (tệp bắt buộc từ
-      v3.0.2) chưa từng xuất hiện trong lịch sử của commit đó, VÀ commit gốc của lượt kiểm cũng còn ở trước v3.0.2. Từ
-      v3.0.2 trở đi không commit nào được miễn, kể cả khi tệp mốc tạm thời bị xóa."""
+      config.yaml và dòng neo lịch sử chốt. "Trước v3.0.2":
+      * kho có mốc cố định research.v302_boundary (ADR-0004; kho thật): commit nằm trong lịch sử của mốc đó. Mốc không đổi
+        được: khác giá trị ở commit gốc (hoặc bị xóa) là lỗi ở cả chế độ PR lẫn main, và lượt kiểm vẫn dùng mốc của
+        commit gốc; commit mốc không có trong kho là lỗi (đóng khi không chắc).
+      * kho chưa khai mốc (kho giả lập trong test): tools/registry_push.py chưa từng xuất hiện trong lịch sử của commit đó
+        VÀ commit gốc của lượt kiểm cũng còn ở trước v3.0.2.
+      Từ v3.0.2 trở đi không commit nào được miễn, kể cả khi tệp mốc tạm thời bị xóa."""
     def git(*a):
         return subprocess.run(["git", "-C", str(root), *a], capture_output=True)
     def show(rev, path):
@@ -307,6 +311,23 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
         """Tệp mốc v3.0.2 đã TỪNG có trong lịch sử của commit này (kể cả khi về sau bị xóa)."""
         return bool(git("log", "--full-history", "-1", "--format=%H", rev, "--", V302_MARKER).stdout.strip())
     errs = trials_rows_errors(show(base, TRIALS), show("HEAD", TRIALS))
+    # Mốc v3.0.2 cố định (ADR-0004), kiểm ở cả chế độ PR lẫn main: mốc đã có ở commit gốc thì không được đổi, không được xóa.
+    # Lượt kiểm này vẫn dùng mốc CỦA COMMIT GỐC, nên đổi mốc không miễn được commit nào trong khoảng đang kiểm.
+    from tools.laws_checks import v302_boundary, _SHA40_RE
+    try:
+        boundary = v302_boundary(root)
+    except ValueError as e:
+        return errs + [f"L-06: {e}"]
+    try:
+        import yaml
+        base_cfg = yaml.safe_load(show(base, "config.yaml") or b"")
+        base_boundary = (base_cfg.get("research") or {}).get("v302_boundary") if isinstance(base_cfg, dict) else None
+    except Exception:  # noqa: BLE001
+        base_boundary = None
+    if isinstance(base_boundary, str) and _SHA40_RE.fullmatch(base_boundary) and base_boundary != boundary:
+        errs.append("L-06: research.v302_boundary trong config.yaml khác giá trị ở commit gốc (hoặc bị xóa) — mốc v3.0.2 không "
+                    "được đổi (ADR-0004)")
+        boundary = base_boundary
     if pull_request:
         # Cái PR tự thêm = commit gộp so với ĐẦU NHÁNH ĐÍCH lúc gộp (cha thứ nhất của commit gộp mà GitHub dựng cho PR).
         # Không so với base.sha của sự kiện: giá trị đó có thể cũ, khi ấy kết quả do vòng học ghi lên main sau lúc mở PR
@@ -331,13 +352,20 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
     # - commit gốc của lượt kiểm đã thuộc v3.0.2 (tệp mốc từng có trong lịch sử của nó) → KHÔNG commit nào trong khoảng được
     #   miễn, kể cả commit nằm trên một nhánh tách ra từ lịch sử cũ rồi gộp vào sau;
     # - commit gốc còn ở trước v3.0.2 (khoảng kiểm vắt qua lúc gộp) → chỉ miễn commit mà lịch sử của nó chưa từng có tệp mốc.
-    base_is_v302 = ever_had_marker(base)
+    if boundary is not None:
+        if git("cat-file", "-e", f"{boundary}^{{commit}}").returncode != 0:
+            return errs + [f"L-06: không tìm thấy commit mốc v3.0.2 {boundary[:7]} trong kho (cần lịch sử đầy đủ: fetch-depth 0)"]
+    def pre_v302(c):
+        if boundary is not None:
+            return git("merge-base", "--is-ancestor", c, boundary).returncode == 0
+        return not base_is_v302 and not ever_had_marker(c)
+    base_is_v302 = boundary is None and ever_had_marker(base)
     commits = git("rev-list", "--reverse", f"{base}..HEAD", "--", TRIALS).stdout.decode().split()
     for c in commits:
         parent = git("rev-parse", "--verify", "-q", f"{c}^").stdout.decode().strip()
         if not parent:
             continue
-        if not base_is_v302 and not ever_had_marker(c):
+        if pre_v302(c):
             continue          # vòng học bản cũ (trước v3.0.2, chưa có sổ đăng ký): kết quả đó do ghim và dòng neo chốt
         before, after = _trials(show(parent, TRIALS))[1], _trials(show(c, TRIALS))[1]
         new = [t.get("trial_id") for t in after[len(before):]]
