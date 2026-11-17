@@ -43,6 +43,13 @@ research:
     features: [dist_ma120, dist_ma20, lowvol_20, lowvol_60, maxret_20, mom_120_skip20, mom_20, mom_60, rel_mom_20,
                rev_1, rev_5, volu_ratio, volu_trend]
     models: [ridge, gbm, signed_sum]
+  # L-06 (ADR-0003, vòng chấm 7): GHIM 210 kết quả thử đầu tiên của research/trials.csv như chúng có tại v3.0.2.
+  # tools/validate.py so sha256 của đúng 210 dòng đầu với giá trị này; sửa, xóa hay chèn một ô là đỏ. Các kết quả sau đó
+  # được chốt bằng dòng neo ở đầu research/trial_registry.jsonl (engine ghi lúc tạo sổ). Không sửa ba dòng dưới đây.
+  legacy_pin:
+    results: 210
+    last_trial_id: T00210
+    sha256: 53b28e246c1bba842d93eac30478942422e00000da2519a93ece6c12498548af
 registry:
   max_active: 5
   refit_days: 20
