@@ -66,5 +66,7 @@ Settings → Rules → Rulesets → New branch ruleset → áp cho `main` → b�
 - "L-09 nguoi cham" đỏ: thiếu người chấm hoặc thiếu bình luận bản chấm đúng commit — xem mục 8.
 - Vòng học đỏ ở bước "Kiem lai sau khi chay": kết quả vòng đó trái luật nên không được ghi; chụp log gửi kiến trúc sư.
 - Vòng học đỏ với dòng `LỖI L-06` (không đẩy được đăng ký thử lên `main`): backtest chưa chạy, không mất gì; bấm **Re-run all jobs**. Lần thử đã đăng ký mà không có kết quả vẫn nằm trong sổ và vẫn được đếm — đó là chủ ý.
+- "Kiem toan so sau khi ghi" đỏ: đây là việc kiểm tự chạy sau mỗi lần robot ghi sổ, sau vòng học và mỗi sáng. Nếu nó đỏ ngay sau khi vừa mở Issue, bấm **Re-run all jobs** một lần sau ít phút (robot có thể chưa kịp đăng dấu nhận). Vẫn đỏ thì chụp log gửi kiến trúc sư.
+- Log có `L-06: Pull Request thêm … kết quả` hoặc `kết quả … đã bị sửa`: có người đưa kết quả thử vào kho không qua vòng học, hoặc sửa kết quả cũ. Không gộp PR đó.
 - Log có `L-05: … không có bình luận dấu nhận`: một dòng trong sổ không có dấu nhận của robot (dòng ghi sai đường, hoặc bình luận ✅ bị xóa/sửa). Không tự sửa sổ; chụp log gửi kiến trúc sư.
 - Log có `L-05: dòng … trong sổ không qua luật nhận`: một dòng trong sổ trái luật nhận (ghi không qua robot). Xử lý như trên.
