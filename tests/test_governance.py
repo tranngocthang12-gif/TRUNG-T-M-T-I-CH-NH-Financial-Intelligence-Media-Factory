@@ -735,6 +735,71 @@ class PriceStoreTests(unittest.TestCase):
         self.assertEqual((real["store"], real["store_dir"]), (legacy, "data/store/prices"))
 
 
+class RiskAndBiasTests(unittest.TestCase):
+    """ADR-0008: nhãn thiên lệch sống sót, giấy không khớp ở phiên khóa biên độ, sụt giảm lớn nhất trong báo cáo."""
+
+    def setUp(self):
+        from unittest import mock
+        from engine import config, paper, report
+        self.tmp = pathlib.Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp, True)
+        for mod in (config, paper, report):                     # mọi tệp paper/, reports/, state/ ghi vào thư mục tạm
+            p = mock.patch.object(mod, "ROOT", self.tmp); p.start(); self.addCleanup(p.stop)
+
+    def test_max_drawdown(self):
+        from engine import research
+        self.assertAlmostEqual(research.max_drawdown([0.1, -0.2, 0.05, -0.1]), 0.8316 / 1.1 - 1, places=6)
+        self.assertEqual(research.max_drawdown([0.01, 0.02]), 0.0)
+        self.assertEqual(research.max_drawdown([]), 0.0)
+        self.assertAlmostEqual(research.nav_drawdown([100, 120, 90, 130]), -0.25)
+        self.assertIsNone(research.nav_drawdown([]))
+
+    def test_paper_does_not_fill_at_locked_limits(self):
+        import pandas as pd
+        from engine import paper
+        d = pd.bdate_range("2026-11-02", periods=4)
+        close = pd.DataFrame({"AAA": [20000, 20000, 21400, 21600],      # phiên 3: +7% → khóa trần
+                              "BBB": [30000, 30000, 30300, 30300],      # +1% → khớp bình thường
+                              "CCC": [10000, 10000, 9300, 9300]},       # −7% → khóa sàn
+                             index=d, dtype=float)
+        (self.tmp / "paper").mkdir()
+        (self.tmp / "paper" / "state.json").write_text(json.dumps({
+            "cash": 500_000_000, "positions": {"CCC": 1000}, "pending": ["AAA", "BBB"], "last_rebalance": None,
+            "costs_paid": 0.0, "n_rebalance": 0, "last_date": str(d[1].date())}), encoding="utf-8")
+        none = pd.DataFrame(columns=["date", "model_id", "ticker", "score"])
+        self.assertEqual(paper.locked(close, d[2]), ({"AAA"}, {"CCC"}))
+        paper.run(str(d[2].date()), close, none, {}, d)
+        st = json.loads((self.tmp / "paper" / "state.json").read_text(encoding="utf-8"))
+        self.assertIn("BBB", st["positions"]); self.assertNotIn("AAA", st["positions"])
+        self.assertEqual(st["positions"]["CCC"], 1000)                  # không bán được ở giá sàn
+        self.assertEqual(st["pending"], ["AAA", "BBB"])                 # lệnh còn lại thử lại phiên sau
+        trades = (self.tmp / "paper" / "trades.csv").read_text(encoding="utf-8")
+        self.assertIn("UNFILLED_LIMIT_UP", trades); self.assertIn("UNFILLED_LIMIT_DOWN", trades)
+        paper.run(str(d[3].date()), close, none, {}, d)                 # phiên sau hết khóa: khớp nốt
+        st = json.loads((self.tmp / "paper" / "state.json").read_text(encoding="utf-8"))
+        self.assertEqual(sorted(st["positions"]), ["AAA", "BBB"])
+        self.assertIsNone(st["pending"])
+        self.assertEqual(paper.locked(close, d[3]), (set(), set()))
+
+    def test_report_labels_survivorship_and_drawdown(self):
+        from engine import report
+        (self.tmp / "paper").mkdir()
+        (self.tmp / "paper" / "nav.csv").write_text("date,nav,cash,n_positions\n2026-11-02,100,100,0\n"
+                                                    "2026-11-03,120,0,1\n2026-11-04,90,0,1\n", encoding="utf-8")
+        trial = {"trial_id": "T00001", "method": "m", "features": "f", "model": "ridge", "ic_mean": 0.01, "ic_t": 1.0,
+                 "net_ann": 0.05, "max_dd": -0.123, "sharpe_ann": 0.5, "dsr": 0.4, "status": "WEAK"}
+        report.write("2026-11-04", "UNKNOWN", [trial], {}, {}, 90.0, None, None, [], 3.0, 1)
+        md = (self.tmp / "reports" / "cycle_2026-11-04.md").read_text(encoding="utf-8")
+        self.assertIn("THIÊN LỆCH SỐNG SÓT", md)
+        self.assertIn("Sụt giảm lớn nhất của NAV giấy (từ đỉnh): -25.00%", md)
+        self.assertIn("| -12.3% |", md)
+        self.assertIsNone(laws_checks._RE.search(md))                  # nhãn mới không vướng luật L-02
+        st = json.loads((self.tmp / "state" / "ENGINE_STATE.json").read_text(encoding="utf-8"))
+        self.assertEqual(st["universe_basis"], "CURRENT")
+        self.assertIn("THIÊN LỆCH SỐNG SÓT", st["universe_bias"])
+        self.assertAlmostEqual(st["paper_max_drawdown"], -0.25)
+
+
 class DocsConsistencyTests(unittest.TestCase):
     def test_adr_maps_every_law_to_a_machine_check_that_exists(self):
         adr = (ROOT / "architecture" / "adr" / "ADR-0003-phan-dinh-va-van-hanh.md").read_text(encoding="utf-8")

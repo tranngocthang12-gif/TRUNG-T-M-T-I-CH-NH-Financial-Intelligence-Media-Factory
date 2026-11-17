@@ -210,6 +210,35 @@ class LibraryTests(unittest.TestCase):
         self.assertTrue(any("review_by" in e for e in errs), errs)
         self.assertTrue(any("effective_to" in e for e in errs), errs)
 
+    def test_financial_statements_are_usable_only_from_publication_date(self):
+        """ADR-0008: BCTC ghi period_end và published_on; ghi chú trích BCTC có effective_date ≥ ngày công bố."""
+        d = self.tmp / "library" / "sources" / "bctc_vcb_2025_q4"; d.mkdir(parents=True)
+        (d / "text.md").write_text(TEXT, encoding="utf-8")
+        b = (d / "text.md").read_bytes()
+        fin = dict(self.entry, sha256=hashlib.sha256(b).hexdigest(), bytes=len(b), issuer="Vietcombank",
+                   issued_on="2026-01-20", kind="FINANCIAL_STATEMENT", effective_from=None,
+                   period_end="2025-12-31", published_on="2026-01-30", source_url="https://example.vn/cbtt")
+        self._manifest({"luat_ke_toan_88_2015": self.entry, "bctc_vcb_2025_q4": fin})
+        man = kn.load_manifest(self.tmp)
+        self.assertFalse(kn.usable_on(man, "bctc_vcb_2025_q4", date(2026, 1, 29)))    # chưa công bố
+        self.assertTrue(kn.usable_on(man, "bctc_vcb_2025_q4", date(2026, 1, 30)))
+        self.assertTrue(kn.usable_on(man, "luat_ke_toan_88_2015", "2016-01-01"))      # tài liệu khác: từ issued_on
+        self.assertFalse(kn.usable_on(man, "khong_co", date(2030, 1, 1)))              # không biết → không dùng
+        note = copy.deepcopy(NOTE); note["id"] = "KN-T3-vcb-no-nhom3"; note["tier"] = 3
+        note["doc_ids"] = ["bctc_vcb_2025_q4"]
+        for p in note["points"]:
+            p["addresses"] = [a.replace("luat_ke_toan_88_2015", "bctc_vcb_2025_q4") for a in p["addresses"]]
+        (self.tmp / "library" / "INDEX.md").write_text("| KN-T2-luat-ke-toan-pham-vi | KN-T3-vcb-no-nhom3 |", encoding="utf-8")
+        for eff, bad in (("2025-12-31", True), (None, True), ("2026-01-30", False)):
+            note["effective_date"] = eff; self._note(note)
+            errs = [e for e in self._check()[0] if "KN-T3-vcb-no-nhom3" in e and "ADR-0008" in e]
+            self.assertEqual(bool(errs), bad, (eff, errs))
+        for k, v, msg in (("published_on", None, "phải có period_end và published_on"),
+                          ("published_on", "2025-12-30", "trước period_end"),
+                          ("published_on", "2026-12-01", "sau ngày truy cập")):
+            self._manifest({"luat_ke_toan_88_2015": self.entry, "bctc_vcb_2025_q4": dict(fin, **{k: v})})
+            self.assertTrue(any(msg in e for e in self._check()[0]), msg)
+
     def test_personal_data_l03(self):
         (self.tmp / "governance" / "ghi_chu.md").write_text("Phân tích NIM của ngân hàng.\n", encoding="utf-8")
         self.assertEqual(laws_checks.check_personal_data(self.tmp), [])
