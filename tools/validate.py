@@ -24,6 +24,7 @@ REQUIRED = ["BOOT.md", "CHANGELOG.md", "config.yaml", ".github/workflows/daily_c
             ".github/workflows/ledger_intake.yml", ".github/workflows/resolution_intake.yml", ".github/workflows/tests.yml",
             "tools/ledger_intake.py", "tools/resolution_intake.py", "tools/laws_checks.py",
             "tools/review_gate.py", "tools/ledger_audit.py", "tools/registry_push.py", ".github/workflows/review_gate.yml",
+            ".github/workflows/ledger_audit.yml",
             ".github/pull_request_template.md", "architecture/adr/ADR-0003-phan-dinh-va-van-hanh.md",
             "docs/HUONG_DAN_VAN_HANH.md", "engine/knowledge_notes.py",
             "library/INDEX.md", "library/SOURCE_MANIFEST.json", "library/reading_queue.yaml", "academy/curriculum.md"]
@@ -128,7 +129,8 @@ try:
     sch = json.loads((ROOT / "contracts/hypothesis.schema.json").read_text(encoding="utf-8"))
     jsonschema.validate(ex, sch)
 except ImportError:
-    print("(bỏ qua kiểm tra mẫu — chưa cài jsonschema)")
+    errors.append("Thiếu thư viện jsonschema: không kiểm được hợp đồng nào (pip install -r requirements.txt). "
+                  "Bỏ qua lặng lẽ là để lọt lỗi, nên đây là lỗi.")
 except Exception as e: errors.append(f"Mẫu hypothesis không khớp schema: {e}")
 
 for w in warnings: print("CẢNH BÁO: " + w)

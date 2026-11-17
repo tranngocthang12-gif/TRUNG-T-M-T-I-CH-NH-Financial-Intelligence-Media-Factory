@@ -28,7 +28,7 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from tools.laws_checks import line_hash, recommendation_hit, recognised_seat, _seats  # noqa: E402
-from tools.ledger_intake import parse_issue_form, qkey, vn_day, load_rows, dumps, promised_domains, _URL_RE, ATTEST_MARK  # noqa: E402
+from tools.ledger_intake import parse_issue_form, qkey, vn_day, load_rows, dumps, promised_domains, is_engine_row, _URL_RE, ATTEST_MARK  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PRED = ROOT / "ledger" / "predictions.jsonl"
@@ -194,11 +194,28 @@ def replay(pred_rows, res_rows) -> list[str]:
     cho qua decide(), kết quả phải ra đúng các dòng đang có. Trả về danh sách lỗi."""
     errs, prior, seen, i = [], [], set(), 0
     schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    engine_preds = {p.get("id"): p for p in pred_rows if is_engine_row(p)}
+    engine_done = set()
     while i < len(res_rows):
         r = res_rows[i]
         n = r.get("resolution_issue")
         if n is None:
-            prior.append(r); i += 1; continue             # dòng của engine (luật excess_return_positive): engine/ledger.py lo
+            # Dòng không qua Issue Resolution chỉ được là dòng engine tự chấm một dự báo CỦA ENGINE. Một dòng thiếu
+            # resolution_issue mà trỏ tới dự báo Issue (F-…) sẽ né được chạy lại luật và dấu nhận — phải là lỗi.
+            pid = r.get("prediction_id")
+            p = engine_preds.get(pid)
+            if p is None:
+                errs.append(f"L-05: dòng phân định cho {pid!r} không có resolution_issue và không trỏ tới dự báo nào của engine — "
+                            "dự báo từ Issue chỉ được phân định qua Issue 'Resolution'")
+            else:
+                if pid in engine_done:
+                    errs.append(f"L-05: dự báo engine {pid} có hai dòng phân định")
+                engine_done.add(pid)
+                if isinstance(r.get("outcome"), bool) or r.get("outcome") not in (0, 1, None):
+                    errs.append(f"L-05: dòng phân định engine {pid} có outcome không hợp lệ")
+                if str(r.get("resolved_at") or "") < str(p.get("created_at") or ""):
+                    errs.append(f"L-05: dòng phân định engine {pid} ghi resolved_at trước ngày tạo dự báo")
+            prior.append(r); i += 1; continue
         j = i
         while j < len(res_rows) and res_rows[j].get("resolution_issue") == n:
             j += 1

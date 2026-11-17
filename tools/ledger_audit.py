@@ -2,11 +2,16 @@
 được hash, và hash đúng chỉ nói nội dung nhất quán, không nói nội dung ấy có từ LÚC NÀO. Các kiểm tra ở đây neo sổ vào
 thứ nằm NGOÀI tệp:
 
-1. CHỈ GHI THÊM — nội dung ledger/predictions.jsonl, ledger/resolutions.jsonl, research/trial_registry.jsonl ở commit gốc
-   (--base) phải là tiền tố nguyên từng byte của bản hiện tại. Sửa, xóa hay chèn dòng cũ → lỗi.
+1. CHỈ GHI THÊM — nội dung ledger/predictions.jsonl, ledger/resolutions.jsonl, research/trial_registry.jsonl và các tệp
+   paper/*.csv ở commit gốc (--base) phải là tiền tố nguyên từng byte của bản hiện tại. Sửa, xóa hay chèn dòng cũ → lỗi.
+   research/trials.csv kiểm theo dòng: mọi kết quả đã có ở commit gốc phải còn nguyên từng ô.
+1b. KẾT QUẢ THỬ (L-06) — trong một Pull Request không được thêm kết quả vào research/trials.csv hay thêm dòng vào sổ đăng
+   ký: hai tệp đó chỉ do vòng học trên main ghi. Trên main, mỗi commit thêm kết quả phải có dòng đăng ký của kết quả đó
+   nằm sẵn ở commit liền trước (đăng ký được đẩy lên main trước khi backtest chạy).
 2. ĐỐI CHIẾU ISSUE (--github) — mỗi dòng dự báo/phân định từ Issue phải ứng với một Issue thật của kho: có tồn tại, không
    phải PR, do chủ kho mở, và giờ tạo trùng issue_created_at trong sổ (giờ máy chủ GitHub, không do người ghi tự khai).
-3. DẤU NHẬN (--github) — bằng chứng gốc về NỘI DUNG lúc Issue mở: workflow nhận (chạy khi Issue mở, đọc thân Issue lúc mở)
+3. DẤU NHẬN (--github) — không có khoảng miễn kiểm: dòng nào thiếu dấu nhận là lỗi, kể cả khi Issue vừa mở. Bằng chứng
+   gốc về NỘI DUNG lúc Issue mở: workflow nhận (chạy khi Issue mở, đọc thân Issue lúc mở)
    đăng một bình luận dưới tên github-actions[bot] chứa "ledger-attest: <sổ> <mã> <hash dòng>". Mỗi dòng Issue trong sổ
    phải có một bình luận ✅ như thế trên đúng Issue của nó: do bot đăng, chưa từng bị sửa (updated_at = created_at), đăng
    trong vòng 6 giờ sau giờ tạo Issue và (với dự báo) trước ngày resolve_at, chứa đúng hash của dòng; bot không được
@@ -25,18 +30,24 @@ lận vẫn có một đường: tự viết workflow khác để bot đăng tr�
 không lưu vết bình luận đã xóa). Máy không chặn được việc này; nó cần chủ ý, nhiều bước, và để lại workflow lạ trong
 lịch sử kho.
 
+Chạy ở hai nơi: trong tests.yml (mọi PR và mọi push lên main) và trong ledger_audit.yml — tự chạy SAU mỗi lần workflow
+nhận dự báo, nhận phân định hoặc vòng học kết thúc (commit do GITHUB_TOKEN đẩy không kích hoạt sự kiện push, nên phải
+gọi qua workflow_run), và mỗi ngày một lần.
+
 Dùng trong CI:  python tools/ledger_audit.py --base "$BASE_SHA" --github
 Môi trường: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/repo). Thoát 1 khi có lỗi.
 """
-import argparse, json, os, pathlib, re, subprocess, sys, urllib.request
+import argparse, csv, io, json, os, pathlib, re, subprocess, sys, urllib.request
 from datetime import datetime, timedelta, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
-APPEND_ONLY = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "research/trial_registry.jsonl")
+APPEND_ONLY = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "research/trial_registry.jsonl",
+               "paper/nav.csv", "paper/decisions.csv", "paper/trades.csv")
+TRIALS, REGISTRY = "research/trials.csv", "research/trial_registry.jsonl"
+V302_MARKER = "tools/registry_push.py"   # có từ v3.0.2 và thuộc danh sách tệp bắt buộc của validate.py
 ZERO_SHA = "0" * 40
 BOT = "github-actions[bot]"
 ATTEST_WINDOW = timedelta(hours=6)       # dấu nhận phải có trong 6 giờ sau khi Issue mở (bình thường: khoảng 1 phút)
-ATTEST_GRACE = timedelta(minutes=15)     # Issue mới mở dưới 15 phút mà chưa có dấu nhận: workflow có thể đang chạy → chỉ cảnh báo
 
 
 def append_only_errors(base: dict, head: dict) -> list[str]:
@@ -88,14 +99,13 @@ _MARK_RE = re.compile(r"ledger-attest:\s*(predictions|resolutions)\s+(\S+)\s+([0
 VN = timezone(timedelta(hours=7))
 
 
-def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict, now=None):
+def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict) -> list[str]:
     """comments: {số Issue: [{"user": login, "created_at": iso, "updated_at": iso, "body": str}]}.
-    Trả về (lỗi, cảnh báo). Một dòng đạt khi Issue của nó có bình luận ✅ của github-actions[bot], chưa sửa, đăng trong
+    Trả về danh sách lỗi; KHÔNG có khoảng miễn kiểm cho Issue vừa mở. Một dòng đạt khi Issue của nó có bình luận ✅ của github-actions[bot], chưa sửa, đăng trong
     ATTEST_WINDOW sau giờ tạo Issue (với dự báo: còn phải trước ngày resolve_at, giờ Việt Nam), chứa
     'ledger-attest: <sổ> <mã> <hash>' đúng hash của dòng — và mọi bình luận của bot trên Issue đó không nêu hash nào
     KHÁC cho cùng mã (không ai "đặt trước" hai nội dung rồi chọn một)."""
-    errs, warns = [], []
-    now = now or datetime.now(timezone.utc)
+    errs = []
     def check(label, number, ledger, rid, rhash, before_day=None):
         it = issues.get(number)
         if it is None:
@@ -131,19 +141,89 @@ def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict, now=No
             ok, why = False, f"robot còn đăng dấu nhận với hash khác cho cùng mã {rid} — không xác định được nội dung nào có trước"
         if ok:
             return
-        msg = (f"L-05: {label} — Issue #{number}: {why}. Dòng này không có bằng chứng là nội dung đã có từ lúc Issue mở "
-               "(dòng ghi vòng qua workflow nhận, hoặc dấu nhận bị xóa/sửa)")
-        if now - opened <= ATTEST_GRACE and why.startswith("không có"):
-            warns.append(msg + " — Issue vừa mở, workflow nhận có thể đang chạy")
-        else:
-            errs.append(msg)
+        errs.append(f"L-05: {label} — Issue #{number}: {why}. Dòng này không có bằng chứng là nội dung đã có từ lúc Issue mở "
+                    "(dòng ghi vòng qua workflow nhận, hoặc dấu nhận bị xóa/sửa; nếu workflow nhận vừa chạy xong thì chạy lại "
+                    "kiểm toán sau ít phút)")
     for r in pred_rows:
         if "issue_number" in r:
             check(f"dự báo {r.get('id')}", r.get("issue_number"), "predictions", r.get("id"), r.get("hash"), r.get("resolve_at"))
     for r in res_rows:
         if r.get("resolution_issue") is not None:
             check(f"phân định {r.get('prediction_id')}", r.get("resolution_issue"), "resolutions", r.get("prediction_id"), r.get("hash"))
-    return errs, warns
+    return errs
+
+
+def _trials(data):
+    """bytes của trials.csv → (tiêu đề, danh sách dict), giữ nguyên chuỗi từng ô."""
+    rows = list(csv.reader(io.StringIO((data or b"").decode("utf-8", "replace"))))
+    if not rows:
+        return [], []
+    return rows[0], [dict(zip(rows[0], r)) for r in rows[1:] if r]
+
+
+def _reg_ids(data) -> set:
+    out = set()
+    for line in (data or b"").decode("utf-8", "replace").splitlines():
+        if line.strip():
+            try:
+                out.add(json.loads(line).get("trial_id"))
+            except ValueError:
+                pass
+    return out
+
+
+def trials_rows_errors(base_trials, head_trials) -> list[str]:
+    """Mọi kết quả thử đã có ở commit gốc phải còn nguyên từng ô, đúng thứ tự (so theo tên cột của commit gốc)."""
+    bh, br = _trials(base_trials)
+    _, hr = _trials(head_trials)
+    for i, row in enumerate(br):
+        if i >= len(hr):
+            return [f"L-06: {TRIALS} mất kết quả {row.get('trial_id')} (và các dòng sau) so với commit gốc"]
+        if any(hr[i].get(c, "") != row.get(c, "") for c in bh):
+            return [f"L-06: {TRIALS} — kết quả {row.get('trial_id')} đã bị sửa so với commit gốc (kết quả thử chỉ được ghi thêm)"]
+    return []
+
+
+def trials_history_errors(root, base, pull_request=False) -> list[str]:
+    """L-06, cần git. base: commit gốc. Trả về lỗi về việc THÊM kết quả thử:
+    - Pull Request: không được thêm kết quả, không được thêm dòng đăng ký (hai tệp chỉ do vòng học trên main ghi).
+    - Trên main: với mỗi commit trong (base, HEAD] có thêm kết quả, dòng đăng ký của từng kết quả mới phải có sẵn trong sổ
+      ở commit liền trước nó. Chỉ bỏ qua commit của kho TRƯỚC v3.0.2 (nhận biết bằng việc chưa có tools/registry_push.py —
+      tệp bắt buộc từ v3.0.2, thiếu nó thì validate đỏ): đó là vòng học bản cũ, kết quả của nó do ghim trong config.yaml
+      và dòng neo lịch sử chốt. Từ v3.0.2 trở đi không commit nào được miễn."""
+    def git(*a):
+        return subprocess.run(["git", "-C", str(root), *a], capture_output=True)
+    def show(rev, path):
+        r = git("show", f"{rev}:{path}")
+        return r.stdout if r.returncode == 0 else None
+    errs = trials_rows_errors(show(base, TRIALS), show("HEAD", TRIALS))
+    if pull_request:
+        nb, nh = len(_trials(show(base, TRIALS))[1]), len(_trials(show("HEAD", TRIALS))[1])
+        if nh > nb:
+            errs.append(f"L-06: Pull Request thêm {nh - nb} kết quả vào {TRIALS} — kết quả thử chỉ do vòng học trên main ghi, "
+                        "sau khi đăng ký đã nằm trên main")
+        extra = _reg_ids(show("HEAD", REGISTRY)) - _reg_ids(show(base, REGISTRY))
+        if extra:
+            errs.append(f"L-06: Pull Request thêm dòng vào sổ đăng ký thử ({', '.join(sorted(map(str, extra)))}) — sổ chỉ do vòng "
+                        "học trên main ghi, trước khi chạy backtest")
+        return errs
+    commits = git("rev-list", "--reverse", f"{base}..HEAD", "--", TRIALS).stdout.decode().split()
+    for c in commits:
+        parent = git("rev-parse", "--verify", "-q", f"{c}^").stdout.decode().strip()
+        if not parent:
+            continue
+        if show(c, V302_MARKER) is None:
+            continue          # commit của kho trước v3.0.2 (vòng học bản cũ, chưa có sổ đăng ký): kết quả đó do ghim và dòng neo chốt
+        before, after = _trials(show(parent, TRIALS))[1], _trials(show(c, TRIALS))[1]
+        new = [t.get("trial_id") for t in after[len(before):]]
+        if not new:
+            continue
+        have = _reg_ids(show(parent, REGISTRY))
+        missing = [t for t in new if t not in have]
+        if missing:
+            errs.append(f"L-06: commit {c[:7]} ghi kết quả {', '.join(map(str, missing))} khi sổ đăng ký ở commit liền trước chưa có "
+                        "các mã đó — kết quả chỉ được ghi sau khi đăng ký đã nằm trên main")
+    return errs
 
 
 def _no_constant(name):
@@ -210,6 +290,7 @@ def main() -> int:
         else:
             head = {p: ((ROOT / p).read_bytes() if (ROOT / p).is_file() else None) for p in APPEND_ONLY}
             errs += append_only_errors({p: _git_show(base, p) for p in APPEND_ONLY}, head)
+            errs += trials_history_errors(ROOT, base, pull_request=os.environ.get("GITHUB_EVENT_NAME", "").startswith("pull_request"))
     else:
         print("(bỏ qua kiểm chỉ-ghi-thêm: không có commit gốc)")
     if a.github:
@@ -223,10 +304,7 @@ def main() -> int:
                 if need:
                     issues = fetch_issues(repo, token)
                     errs += issue_crosscheck_errors(pred, res, issues, repo.split("/")[0])
-                    a_errs, a_warns = attestation_errors(pred, res, issues, fetch_comments(repo, token))
-                    errs += a_errs
-                    for w in a_warns:
-                        print("::warning::" + w)
+                    errs += attestation_errors(pred, res, issues, fetch_comments(repo, token))
                 br = _api(f"https://api.github.com/repos/{repo}/branches/main", token)
                 rules = _api(f"https://api.github.com/repos/{repo}/rules/branches/main", token)
                 if not br.get("protected") and not rules:

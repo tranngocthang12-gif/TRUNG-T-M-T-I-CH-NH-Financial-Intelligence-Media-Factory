@@ -220,7 +220,7 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, prompt_h
     same_q = [r for r in issue_rows if qkey(r) == key]
     same_ids = {r.get("id") for r in same_q}
     done = sorted({str(r.get("prediction_id")) for r in res_rows if r.get("prediction_id") in same_ids
-                   and str(r.get("resolution_issue_created_at") or "") <= created})
+                   and r.get("resolution_issue") is not None and str(r.get("resolution_issue_created_at") or "") <= created})
     if done:
         return f": câu hỏi này đã được phân định ({', '.join(done)}); không nhận thêm dự báo sau khi đã có kết quả", ""
     for r in same_q:
@@ -242,6 +242,14 @@ def build_row(data, number, created, author, prev):
     return row
 
 
+def is_engine_row(row) -> bool:
+    """Dòng dự báo do engine ghi (engine/ledger.record): không issue_number, mã "P-…", luật chấm là dict có ticker,
+    không mang ghế A/B của thí nghiệm Issue."""
+    rr = row.get("resolution_rule")
+    return ("issue_number" not in row and str(row.get("id", "")).startswith("P-") and isinstance(rr, dict) and "ticker" in rr
+            and str(row.get("seat", "")) not in ("A", "B"))
+
+
 def attest(row) -> str:
     """Dấu nhận của một dòng dự báo: workflow đăng thành bình luận, kiểm toán đối chiếu (tools/ledger_audit.py)."""
     return f"predictions {row.get('id')} {row.get('hash')}"
@@ -253,7 +261,12 @@ def replay(pred_rows, res_rows=()) -> list[str]:
     schema = _schema()
     for row in pred_rows:
         if "issue_number" not in row:
-            continue                                        # dòng của engine: hợp đồng khác, engine/ledger.py lo
+            # Dòng không từ Issue chỉ được là dòng của engine: mã "P-…", luật chấm bằng giá (dict có ticker). Một dòng "F-…"
+            # hay mang ghế A/B mà thiếu issue_number là dòng tìm cách né kiểm lại và né dấu nhận.
+            if not is_engine_row(row):
+                errs.append(f"L-05: dòng dự báo {row.get('id')!r} không có issue_number và cũng không phải dòng của engine "
+                            "(mã P-…, luật chấm bằng giá) — dòng lạ không được nằm trong sổ")
+            continue
         n, label = row.get("issue_number"), row.get("id")
         if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
             errs.append(f"L-05: dòng dự báo {label}: issue_number {n!r} không phải số Issue"); continue

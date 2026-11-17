@@ -16,7 +16,7 @@ L-09  người viết ≠ người chấm: thân PR (bỏ chú thích HTML) có 
       đổi mã thì phải chấm lại). recognised_seat()/same_provider() dùng chung cho người phân định và biên bản ghi chú.
 L-10  đề thi: tệp trong academy/exams/ khớp exam_item.schema.json và released_at không ở tương lai (đề chỉ vào kho sau khi thi).
 """
-import csv, hashlib, json, pathlib, re, unicodedata
+import csv, io, hashlib, json, pathlib, re, unicodedata
 from datetime import date
 
 RECOMMEND_PATTERNS = [r"mua ngay", r"n[êe]n mua", r"b[áa]n ngay", r"n[êe]n b[áa]n", r"gi[áa] m[ụu]c ti[êe]u",
@@ -139,8 +139,9 @@ def check_ledger_chain(root) -> list[str]:
 
 
 def check_ledger_rows(root) -> list[str]:
-    """L-05: chạy LẠI luật nhận dự báo và luật phân định trên mọi dòng Issue đã có trong sổ (tools/ledger_intake.replay,
-    tools/resolution_intake.replay). Hash chuỗi chỉ cho biết sổ nhất quán; kiểm này cho biết từng dòng đúng luật, kể cả
+    """L-05: chạy LẠI luật nhận dự báo và luật phân định trên MỌI dòng của sổ (tools/ledger_intake.replay,
+    tools/resolution_intake.replay). Dòng không từ Issue chỉ được là dòng của engine (mã P-…); dòng phân định thiếu
+    resolution_issue chỉ được trỏ tới dự báo của engine — không dòng nào né được kiểm lại bằng cách bỏ một trường. Hash chuỗi chỉ cho biết sổ nhất quán; kiểm này cho biết từng dòng đúng luật, kể cả
     dòng được ghi vòng qua intake. Việc dòng có ĐÚNG LÚC hay không do tools/ledger_audit.py đối chiếu với GitHub."""
     root = pathlib.Path(root)
     pred_p, res_p = root / "ledger" / "predictions.jsonl", root / "ledger" / "resolutions.jsonl"
@@ -158,12 +159,12 @@ def check_ledger_rows(root) -> list[str]:
     pred, res = rows(pred_p), rows(res_p)
     if pred is None or res is None:
         return []
-    if not any("issue_number" in r for r in pred) and not any(r.get("resolution_issue") is not None for r in res):
+    if not pred and not res:
         return []
     try:
         import jsonschema  # noqa: F401
     except ImportError:
-        return ["L-05: thiếu thư viện jsonschema nên không kiểm lại được các dòng Issue trong sổ (pip install jsonschema)"]
+        return ["L-05: thiếu thư viện jsonschema nên không kiểm lại được các dòng trong sổ (pip install jsonschema)"]
     try:
         from tools import ledger_intake, resolution_intake      # nạp muộn: hai mô-đun này nhập lại laws_checks
         return ledger_intake.replay(pred, res) + resolution_intake.replay(pred, res)
@@ -182,37 +183,116 @@ def _frozen_space(root):
     return {"features": set(fs.get("features") or []), "models": set(fs.get("models") or [])} if fs else None
 
 
+def _legacy_pin(root):
+    """research.legacy_pin trong config.yaml: {results, last_trial_id, sha256}; None nếu chưa khai."""
+    try:
+        import yaml
+        cfg = yaml.safe_load((pathlib.Path(root) / "config.yaml").read_text(encoding="utf-8")) or {}
+    except Exception:  # noqa: BLE001
+        return None
+    pin = (cfg.get("research") or {}).get("legacy_pin")
+    return pin if isinstance(pin, dict) else None
+
+
+def _pin_errors(pin, trials) -> list[str]:
+    if not pin:
+        return []
+    n = pin.get("results")
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        return ["L-06: research.legacy_pin.results trong config.yaml không hợp lệ"]
+    if len(trials) < n:
+        return [f"L-06: trials.csv có {len(trials)} kết quả, ít hơn {n} kết quả đã ghim trong config.yaml — kết quả cũ bị xóa"]
+    if trials_digest(trials[:n]) != pin.get("sha256") or (n and trials[n - 1].get("trial_id") != pin.get("last_trial_id")):
+        return [f"L-06: {n} kết quả thử đầu tiên của trials.csv không khớp sha256 đã ghim trong config.yaml (research.legacy_pin) — "
+                "kết quả lịch sử bị sửa, xóa hoặc chèn"]
+    return []
+
+
+TRIAL_LEGACY_COLS = ("trial_id", "cycle_date", "method", "spec_id", "features", "model", "ic_mean", "ic_t", "net_ann",
+                     "fold_pos", "threshold", "status", "regimes")
+LEGACY_ANCHOR = "LEGACY-ANCHOR"
+
+
+def read_trials(text):
+    """Đọc research/trials.csv (chuỗi) → (tiêu đề, danh sách dict theo cột). Giữ nguyên chuỗi từng ô, không đổi kiểu."""
+    rows = list(csv.reader(io.StringIO(text or "")))
+    if not rows:
+        return [], []
+    head = rows[0]
+    return head, [dict(zip(head, r)) for r in rows[1:] if r]
+
+
+def trials_digest(rows) -> str:
+    """sha256 của các kết quả thử theo đúng chuỗi từng ô (13 cột gốc). Engine chỉ GHI THÊM dòng vào trials.csv và không
+    viết lại dòng cũ (research.append_trial_results), nên chuỗi ô cũ không bao giờ đổi."""
+    h = hashlib.sha256()
+    for r in rows:
+        h.update("\x1f".join(str(r.get(c, "")) for c in TRIAL_LEGACY_COLS).encode("utf-8") + b"\n")
+    return h.hexdigest()
+
+
 def check_trial_registry(root) -> list[str]:
+    """L-06. Sổ đăng ký mở đầu bằng một DÒNG NEO LỊCH SỬ (engine ghi lúc tạo sổ): số kết quả đã có trước khi có sổ và
+    sha256 của chúng. Thêm một GHIM TĨNH trong config.yaml (research.legacy_pin) cho 210 kết quả đầu, có hiệu lực ngay cả
+    khi chưa có sổ. Từ đó: (a) các kết quả lịch sử bị sửa, xóa, chèn → lỗi; (b) MỌI kết quả sau dòng neo phải có dòng
+    đăng ký khớp mã, spec, ngưỡng và hash — không còn ngoại lệ "registry_hash rỗng"; (c) mã thử trong sổ không trùng,
+    tăng dần, nằm sau mã lịch sử cuối. Khi chưa có sổ, kết quả không được mang registry_hash; việc THÊM kết quả khi chưa
+    có sổ do tools/ledger_audit.py chặn (so với commit gốc)."""
     root = pathlib.Path(root)
     reg_path, trials_path = root / "research" / "trial_registry.jsonl", root / "research" / "trials.csv"
-    trials = list(csv.DictReader(trials_path.open(encoding="utf-8"))) if trials_path.is_file() else []
-    if not reg_path.is_file():
-        bad = [t["trial_id"] for t in trials if (t.get("registry_hash") or "").strip()]
-        return [f"L-06: trials.csv có {len(bad)} lần thử mang registry_hash nhưng thiếu research/trial_registry.jsonl"] if bad else []
-    errs = _chain_errors(reg_path, "L-06 sổ đăng ký")
-    reg = [json.loads(l) for l in reg_path.read_text(encoding="utf-8").splitlines() if l.strip()]
-    if errs or not reg:
+    _, trials = read_trials(trials_path.read_text(encoding="utf-8")) if trials_path.is_file() else ([], [])
+    reg_text = reg_path.read_text(encoding="utf-8") if reg_path.is_file() else ""
+    pin = _legacy_pin(root)
+    pin_errs = _pin_errors(pin, trials)                 # ghim tĩnh trong config.yaml: có hiệu lực cả khi chưa có sổ đăng ký
+    if not reg_text.strip():
+        bad = [t.get("trial_id") for t in trials if (t.get("registry_hash") or "").strip()]
+        return pin_errs + ([f"L-06: trials.csv có {len(bad)} lần thử mang registry_hash nhưng thiếu research/trial_registry.jsonl"] if bad else [])
+    errs = pin_errs + _chain_errors(reg_path, "L-06 sổ đăng ký")
+    if errs:
         return errs
-    ids = [r.get("trial_id") for r in reg]
+    reg = [json.loads(l) for l in reg_text.splitlines() if l.strip()]
+    anchor = reg[0]
+    if anchor.get("kind") != "legacy_anchor" or anchor.get("trial_id") != LEGACY_ANCHOR:
+        return ["L-06: sổ đăng ký phải mở đầu bằng dòng neo lịch sử (kind=legacy_anchor) do engine ghi lúc tạo sổ"]
+    n = anchor.get("results")
+    if isinstance(n, bool) or not isinstance(n, int) or n < 0:
+        return ["L-06: dòng neo lịch sử ghi số kết quả không hợp lệ"]
+    if pin and isinstance(pin.get("results"), int) and n < pin["results"]:
+        return [f"L-06: dòng neo lịch sử khai {n} kết quả, ít hơn {pin['results']} kết quả đã ghim trong config.yaml"]
+    if len(trials) < n:
+        errs.append(f"L-06: trials.csv có {len(trials)} kết quả, ít hơn {n} kết quả lịch sử đã neo — kết quả cũ bị xóa")
+    elif trials_digest(trials[:n]) != anchor.get("legacy_sha256"):
+        errs.append(f"L-06: {n} kết quả lịch sử trong trials.csv không khớp sha256 đã neo — kết quả cũ bị sửa, xóa hoặc chèn")
+    regs = reg[1:]
+    for r in regs:
+        if r.get("kind") == "legacy_anchor" or r.get("trial_id") == LEGACY_ANCHOR:
+            errs.append("L-06: sổ đăng ký có hơn một dòng neo lịch sử")
+    regs = [r for r in regs if r.get("kind") != "legacy_anchor"]
+    ids = [str(r.get("trial_id")) for r in regs]
     for d in sorted({i for i in ids if ids.count(i) > 1}):
         errs.append(f"L-06: sổ đăng ký có mã thử trùng {d}")
+    last_legacy = str(anchor.get("last_trial_id") or "")
+    prev = last_legacy
+    for i in ids:
+        if not re.fullmatch(r"T[0-9]{5,}", i) or i <= prev:
+            errs.append(f"L-06: mã thử {i} trong sổ đăng ký không tăng dần sau {prev or 'đầu sổ'}"); break
+        prev = i
     frozen = _frozen_space(root)
     if frozen:
-        for r in reg:
+        for r in regs:
             extra = [f for f in str(r.get("features", "")).split(";") if f and f not in frozen["features"]]
             if extra or r.get("model") not in frozen["models"]:
                 errs.append(f"L-06: {r.get('trial_id')} nằm ngoài không gian giả thuyết đóng băng "
                             f"(feature lạ {extra}, mô hình {r.get('model')}) — giả thuyết mới phải qua ADR")
-    start = min(r["trial_id"] for r in reg)          # mã thử đánh số liên tục T00001…; sổ bắt đầu từ mã này
-    by_id = {r["trial_id"]: r for r in reg}
-    tids = [t.get("trial_id") for t in trials if t.get("trial_id", "") >= start]
+    by_id = {r.get("trial_id"): r for r in regs}
+    new = trials[n:]
+    tids = [t.get("trial_id") for t in new]
     for d in sorted({i for i in tids if tids.count(i) > 1}):
         errs.append(f"L-06: trials.csv có hai kết quả cho cùng mã thử {d}")
-    since = [t for t in trials if t.get("trial_id", "") >= start]
-    for t in since:
-        r = by_id.get(t["trial_id"])
+    for t in new:
+        r = by_id.get(t.get("trial_id"))
         if r is None:
-            errs.append(f"L-06: {t['trial_id']} ({t.get('cycle_date')}) có kết quả nhưng không có dòng đăng ký trước"); continue
+            errs.append(f"L-06: {t.get('trial_id')} ({t.get('cycle_date')}) có kết quả nhưng không có dòng đăng ký trước"); continue
         if r.get("spec_id") != t.get("spec_id"):
             errs.append(f"L-06: {t['trial_id']} spec_id lệch sổ đăng ký")
         try:
@@ -222,8 +302,6 @@ def check_trial_registry(root) -> list[str]:
             errs.append(f"L-06: {t['trial_id']} ngưỡng không đọc được")
         if (t.get("registry_hash") or "") != r.get("hash"):
             errs.append(f"L-06: {t['trial_id']} registry_hash không khớp dòng đăng ký")
-    if len(reg) < len(since):
-        errs.append(f"L-06: {len(since)} lần thử từ {start} nhưng sổ đăng ký chỉ có {len(reg)} dòng")
     return errs
 
 
@@ -343,6 +421,8 @@ def check_exams(root, today=None) -> list[str]:
         schema = json.loads((root / "contracts" / "exam_item.schema.json").read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         jsonschema = schema = None
+    if jsonschema is None and any(d.rglob("*.json")):
+        return ["L-10: thiếu jsonschema hoặc exam_item.schema.json nên không kiểm được đề thi trong kho"]
     for p in sorted(d.rglob("*.json")):
         rel = p.relative_to(root).as_posix()
         try:
