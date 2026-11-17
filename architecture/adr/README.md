@@ -28,3 +28,4 @@ Mẫu tệp `ADR-NNNN-<slug>.md`:
 | ADR-0005 | Tạm gác "engine cờ kinh tế" (engine kịch bản) | ACCEPTED 17/11/2026 (PR #29); điều kiện mở lại sửa bởi ADR-0007 |
 | ADR-0006 | Kho giá ghi tăng dần (C2) | PROPOSED |
 | ADR-0007 | Hai góp ý sau gộp PR #29: điều kiện mở lại engine kịch bản; tên khóa bất đồng | PROPOSED |
+| ADR-0009 | Phiên bản và nguồn gốc giá dẫn xuất, không sửa raw ADR-0006 | PROPOSED |
