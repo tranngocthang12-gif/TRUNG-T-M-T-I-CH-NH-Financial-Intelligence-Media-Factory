@@ -33,7 +33,8 @@ class LedgerCompatTests(unittest.TestCase):
             shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         (self.tmp / "governance").mkdir()
-        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
+        for g in ("CONTROL_B_PROMPT.md", "control_b_prompts.jsonl"):
+            shutil.copy(ROOT / "governance" / g, self.tmp / "governance")
         (self.tmp / "ledger").mkdir()
 
     def tearDown(self):

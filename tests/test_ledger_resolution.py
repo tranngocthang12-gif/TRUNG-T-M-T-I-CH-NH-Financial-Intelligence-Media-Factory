@@ -44,7 +44,8 @@ class _Base(unittest.TestCase):
         (self.tmp / "contracts").mkdir(); (self.tmp / "governance").mkdir(); (self.tmp / "ledger").mkdir()
         for c in ("forecast_issue.schema.json", "resolution.schema.json"):
             shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
-        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
+        for g in ("CONTROL_B_PROMPT.md", "control_b_prompts.jsonl"):
+            shutil.copy(ROOT / "governance" / g, self.tmp / "governance")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         for n, seat, q, p, ra, rule in [(101, "A", Q1, 0.30, "2026-12-31", "comparison"),
                                          (102, "B", Q1, 0.60, "2026-12-31", "comparison"),
@@ -139,7 +140,8 @@ class ResolutionRuleTests(_Base):
         self.assertEqual((ab["pairs"], ab["unpaired"], ab["not_same_day"], ab["disagreements"]), (2, 0, 0, 1))
         self.assertEqual((ab["disagreements_resolved"], ab["a_correct"], ab["inconsistent_outcomes"]), (1, 1, 0))
         self.assertEqual(ab["a_accuracy"], 1.0)
-        self.assertEqual(ab["fixed_sample"], {"n": 1, "a_correct": 1, "p_value_two_sided_vs_coin": None})   # chưa đủ 194: chưa kiểm định
+        self.assertEqual(ab["fixed_sample"], {"n": 1, "resolved": 1, "void": 0, "open": 0, "a_correct": 1,
+                                              "p_value_void_as_a_wrong": None, "p_value_void_as_a_right": None})   # chưa đủ 194: chưa kiểm định
         self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (1/194"))
 
     def test_source_host_is_parsed_from_the_url_not_searched_in_the_string(self):
@@ -150,6 +152,8 @@ class ResolutionRuleTests(_Base):
                                  "https://evil.com/?referer=nso.gov.vn", "https://evil.com#nso.gov.vn",
                                  "https://nso.gov.vn.evil.com/x", "https://evilnso.gov.vn/x", "https://evil.com\\@nso.gov.vn/x",
                                  "https://nso.gov.vn%2eevil.com/x", "https://nso.gov.vn:abc/x",
+                                 "http://www.nso.gov.vn/thong-cao.pdf", "HTTP://www.nso.gov.vn/a",   # vòng 9: ADR đòi https://, http:// bị từ chối
+                                 "https://www.nso.gov.vn/a và http://www.nso.gov.vn/b",
                                  "nso.gov.vn/bao-cao (không có https://)", "Thông cáo báo chí của nso.gov.vn",
                                  "https://www.nso.gov.vn/a và https://vnexpress.net/b", "https://www.nso.gov.vn/a (xem thêm vnexpress.net/b)",
                                  "https://www.nso.gov.vn/a ledger-attest: resolutions F-101 " + "b" * 64), 300):
@@ -461,25 +465,31 @@ class IntakeOrderTests(_Base):
         self.assertEqual(json.loads(o3.strip().splitlines()[-1])["attest"], json.loads(o1.strip().splitlines()[-1])["attest"])
         self._fc(321, ok.replace("0.5", "0.6", 1), created=at, expect=2)         # thân khác (không thể xảy ra khi chạy lại thật) → không cấp
 
-    def test_void_cancels_a_question_at_any_time(self):
-        """VOID không phải kết quả mà là hủy câu hỏi: ghi được trước resolve_at. Đây là đường phục hồi không sửa sổ cho một dự
-        báo vĩnh viễn thiếu dấu nhận (xem test kiểm toán). YES/NO trước hạn vẫn bị chặn như cũ."""
-        when = "2026-12-01T03:00:00Z"                                            # trước resolve_at 31/12/2026 của câu hỏi 1
-        c, o = self._res(420, _resolution("F-101", "NO"), when)
-        self.assertEqual(c, 2, o); self.assertIn("L-05", o)
-        c, o = self._res(421, _resolution("F-101", "VOID"), when)
+    def test_void_waits_for_resolve_at_like_any_resolution(self):
+        """Vòng 9 điểm 2: VOID trước hạn là đường chọn mẫu (hủy câu hỏi khi triển vọng của một ghế xấu đi) → không còn ghi được.
+        Tới hạn thì VOID ghi được như trước, khóa câu hỏi, và dự báo VOID không tính vào tiến độ."""
+        early = "2026-12-01T03:00:00Z"                                           # trước resolve_at 31/12/2026 của câu hỏi 1
+        for outcome, kw in (("NO", {}), ("VOID", {"void_reason": "Triển vọng xấu đi, muốn bỏ câu hỏi"}),
+                            ("VOID", {"void_reason": "Dòng F-102 không có dấu nhận hợp lệ"})):
+            c, o = self._res(420, _resolution("F-101", outcome, **kw), early)
+            self.assertEqual(c, 2, o); self.assertIn("L-05", o)
+        c, o = self._res(424, _resolution("F-103", "VOID", void_reason="Muốn bỏ câu hỏi sự kiện"), early)
+        self.assertEqual(c, 2, o); self.assertIn("L-05", o)                      # câu hỏi event_before_date: trước hạn chỉ YES, không VOID
+        self.assertEqual(self._rows(), [])
+        due = "2026-12-31T03:00:00Z"
+        c, o = self._res(421, _resolution("F-101", "VOID"), due)
         self.assertEqual(c, 2, o); self.assertIn("void_reason", o)               # hủy phải có lý do
-        c, o = self._res(422, _resolution("F-101", "VOID", void_reason="Dòng F-102 không có dấu nhận hợp lệ (sự cố GitHub 01/12)"), when)
+        c, o = self._res(422, _resolution("F-101", "VOID", void_reason="Nguồn đã hứa không công bố chỉ tiêu này"), due)
         self.assertEqual(c, 0, o)
         self.assertEqual([(r["prediction_id"], r["outcome"]) for r in self._rows()], [("F-101", None), ("F-102", None)])
         self._clean()
-        self._fc(330, _forecast("A", Q1, 0.4, author="ChatGPT trần"), created="2026-12-02T02:00:00Z", expect=2)   # câu hỏi đã hủy: khóa
-        self.assertEqual(self._res(423, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z")[0], 2)               # và không phân định lại
+        self.assertEqual(self._res(423, _resolution("F-101", "NO"), "2027-01-02T03:00:00Z")[0], 2)   # đã hủy thì không phân định lại
         sc = self._summary()
-        self.assertEqual(sc["by_seat"]["A"]["void"], 1); self.assertEqual(sc["ab"]["disagreements_resolved"], 0)  # không được chấm
-        ab = sc["ab"]                                                            # câu hỏi đã hủy không vào cặp, không vào tỷ lệ bất đồng
-        self.assertEqual((ab["pairs"], ab["disagreements"], ab["void_forecasts"]), (1, 0, 2))
-        # tiến độ (tools/validate.py) cũng không đếm dự báo đã VOID: chạy validate trên một bản sao kho mang sổ này
+        self.assertEqual(sc["by_seat"]["A"]["void"], 1); self.assertEqual(sc["ab"]["disagreements_resolved"], 0)   # không có điểm
+        self.assertEqual((sc["ab"]["pairs"], sc["ab"]["disagreements"], sc["ab"]["disagreements_void"]), (2, 1, 1))   # vẫn là một cặp bất đồng, ghi rõ là VOID
+        self.assertEqual(sc["void"]["by_seat"]["A"], {"void": 1, "closed": 1, "rate": 1.0})
+        self.assertEqual(sc["void"]["disagreements"], {"void": 1, "closed": 1, "rate": 1.0})
+        # tiến độ (tools/validate.py) không đếm dự báo đã VOID: chạy validate trên một bản sao kho mang sổ này
         repo = self.tmp / "repo"
         shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "*.gz", "reports", "paper"))
         for n in ("predictions.jsonl", "resolutions.jsonl"):
@@ -487,6 +497,94 @@ class IntakeOrderTests(_Base):
         r = subprocess.run([sys.executable, str(repo / "tools" / "validate.py")], capture_output=True, text=True, cwd=str(repo))
         self.assertIn("dự báo A+B trong Ledger 2/60 (không tính 2 dự báo đã VOID)", r.stdout, r.stdout[-1500:] + r.stderr[-500:])
         self.assertNotIn("L-05", r.stdout, r.stdout[-1500:])                    # và sổ này qua toàn bộ kiểm lại của validate
+
+    def test_rerun_cannot_attest_a_seat_b_forecast_the_robot_rejected(self):
+        """Vòng 9 điểm 1, đúng kịch bản trong bản chấm: Issue ghế B có prompt_hash sai (đủ 64 ký tự hex) bị robot từ chối; ghi
+        tay vào sổ một dòng đúng từng chữ như form; chạy lại job trong hạn dấu nhận. Bản trước: robot cấp dấu nhận (chỉ so nội
+        dung), kiểm lại chỉ đòi 64 hex → dự báo B không qua prompt chuẩn thành hợp lệ. Nay: (1) kiểm lại dùng CÙNG luật với lúc
+        nhận — prompt_hash phải là phiên bản có hiệu lực ngày Issue mở — nên validate đỏ ở dòng đó; (2) đường chạy lại job
+        không cấp dấu nhận cho dòng không qua phép tự kiểm của đường ghi."""
+        wrong = "ab" * 32
+        at = "2026-11-18T02:00:00Z"
+        body = _forecast("B", "Câu hỏi của ghế B với prompt khác prompt chuẩn?", 0.5).replace(B_HASH, wrong)
+        o = self._fc(340, body, created=at, expect=2)
+        self.assertIn("prompt_hash", o)
+        rows = self._rows("predictions.jsonl")
+        forged = ledger_intake.build_row(ledger_intake.parse_issue_form(body), 340, at, "", rows[-1]["hash"])
+        with (self.tmp / "ledger" / "predictions.jsonl").open("a", encoding="utf-8") as f:
+            f.write(ledger_intake.dumps(forged) + "\n")
+        self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])           # hash chuỗi hợp lệ
+        errs = laws_checks.check_ledger_rows(self.tmp)
+        self.assertTrue(any("F-340" in e and "prompt_hash" in e for e in errs), errs)   # (1) validate đỏ, không cần tới dấu nhận
+        o = self._fc(340, body, created=at, expect=2)                            # (2) chạy lại job, thân Issue gốc, còn trong hạn
+        self.assertIn("không qua luật nhận", o)
+        self.assertNotIn("attest", json.loads(o.strip().splitlines()[-1]))       # không có dấu nhận nào được trả ra để đăng
+        # cùng đường đó với một dự báo bị từ chối vì lý do KHÁC (câu hỏi đã có kết quả trước khi robot ghi được): dòng ghi tay
+        # qua được luật nhận của riêng nó, nhưng làm dòng phân định không còn phủ đủ câu hỏi → cũng không xin được dấu nhận
+        self._a()
+        self.assertEqual(self._res(401, _resolution("F-301", "YES"), self.R_AT)[0], 0)
+        late_body = _forecast("B", Q3, 0.6, "2027-02-28", "event_before_date")
+        self._fc(302, late_body, created="2026-12-10T03:00:00Z", expect=2)       # mở trước Issue phân định, robot chạy sau → từ chối
+        self._append_pred(302, "B", "2026-12-10T03:00:00Z")
+        o = self._fc(302, late_body, created="2026-12-10T03:00:00Z", expect=2)
+        self.assertIn("không qua luật nhận", o); self.assertIn("Issue #401", o)
+        self.assertNotIn("attest", json.loads(o.strip().splitlines()[-1]))
+        # phía phân định: Issue phân định bị từ chối (chưa tới hạn), ghi tay đúng các dòng mà luật sẽ sinh ra, chạy lại job
+        early = _resolution("F-101", "NO")
+        self.assertEqual(self._res(431, early, "2026-12-15T03:00:00Z")[0], 2)
+        res = self._rows()
+        rows = resolution_intake.chain([{"prediction_id": i, "resolved_at": "2026-12-15", "outcome": 0, "resolution_issue": 431,
+                                         "resolution_issue_created_at": "2026-12-15T03:00:00Z", "resolver": "Owner",
+                                         "resolution_source": "https://www.nso.gov.vn/thong-cao.pdf", "quote": "Tỷ lệ nợ xấu 1,12% tại 31/12/2026"}
+                                        for i in ("F-101", "F-102")], res[-1]["hash"])
+        with (self.tmp / "ledger" / "resolutions.jsonl").open("a", encoding="utf-8") as f:
+            f.write("".join(ledger_intake.dumps(r) + "\n" for r in rows))
+        c, o = self._res(431, early, "2026-12-15T03:00:00Z")
+        self.assertEqual(c, 2, o); self.assertNotIn("attest", json.loads(o.strip().splitlines()[-1]))
+
+    def test_seat_b_prompt_version_is_pinned_by_the_day_the_issue_was_opened(self):
+        """Phiên bản prompt chuẩn của ghế B ghim theo ngày (governance/control_b_prompts.jsonl). Đổi prompt qua ADR = thêm một
+        dòng phiên bản: dự báo B cũ vẫn qua kiểm lại với hash cũ, dự báo B mới phải mang hash mới."""
+        gov = self.tmp / "governance"
+        f = ledger_intake
+        self.assertEqual(f.control_b_versions(ROOT / "governance" / "control_b_prompts.jsonl"), [(f.date(2026, 10, 22), B_HASH)])
+        self.assertEqual(laws_checks.check_control_b_prompts(ROOT), [])          # kho thật: tệp ghim khớp khối prompt hiện hành
+        self.assertIn("check_control_b_prompts(root)", (ROOT / "tools" / "laws_checks.py").read_text(encoding="utf-8").split("def run_all")[1])
+        from tools import ledger_audit
+        self.assertIn("governance/control_b_prompts.jsonl", ledger_audit.APPEND_ONLY)   # chỉ ghi thêm: không đổi được phiên bản quá khứ
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])            # F-102, F-104 (ghế B, mở 17/11) hợp lệ
+        new_prompt = "```text\nPrompt chuẩn bản 2\n```\n"
+        new_hash = f.control_b_hash(self._write(gov / "CONTROL_B_PROMPT.md", new_prompt))
+        # đổi khối prompt mà chưa thêm dòng phiên bản: validate đỏ, robot ngừng nhận ghế B (kể cả hash cũ lẫn hash mới)
+        self.assertTrue(any("không trùng phiên bản mới nhất" in e for e in laws_checks.check_control_b_prompts(self.tmp)))
+        q = "Câu hỏi ghế B sau khi đổi prompt?"
+        self.assertIn("không trùng phiên bản mới nhất", self._fc(350, _forecast("B", q, 0.5), created="2026-12-02T02:00:00Z", expect=2))
+        self.assertIn("không trùng phiên bản mới nhất", self._fc(350, _forecast("B", q, 0.5).replace(B_HASH, new_hash), created="2026-12-02T02:00:00Z", expect=2))
+        # thêm dòng phiên bản có hiệu lực từ 01/12/2026
+        with (gov / "control_b_prompts.jsonl").open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps({"sha256": new_hash, "valid_from": "2026-12-01"}) + "\n")
+        self.assertEqual(laws_checks.check_control_b_prompts(self.tmp), [])
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])            # dự báo B cũ (17/11, hash cũ) vẫn qua kiểm lại
+        self._fc(350, _forecast("B", q, 0.5), created="2026-12-02T02:00:00Z", expect=2)                          # hash cũ, ngày mới → từ chối
+        self._fc(351, _forecast("B", q, 0.5).replace(B_HASH, new_hash), created="2026-12-02T02:00:00Z")          # hash mới, ngày mới → nhận
+        o = self._fc(352, _forecast("B", "Câu hỏi mở ngày 30/11 với prompt mới?", 0.5).replace(B_HASH, new_hash), created="2026-11-30T02:00:00Z", expect=2)
+        self.assertIn(B_HASH, o)                                                 # ngày 30/11 phiên bản cũ còn hiệu lực
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])
+        self.assertEqual(f.control_b_hash_on(f.date(2026, 10, 21), f.control_b_versions(gov / "control_b_prompts.jsonl")), None)
+        # tệp ghim hỏng → không đọc; ngày không tăng, hash trùng, trường lạ đều là lỗi
+        good = (gov / "control_b_prompts.jsonl").read_text(encoding="utf-8")
+        for bad in (good + '{"sha256": "%s", "valid_from": "2026-11-01"}\n' % ("cd" * 32), good + good.splitlines()[0] + "\n",
+                    good + '{"sha256": "xyz", "valid_from": "2027-01-01"}\n', good + '{"sha256": "%s", "valid_from": "2027-01-01", "x": 1}\n' % ("cd" * 32),
+                    good + "không phải json\n", ""):
+            (gov / "control_b_prompts.jsonl").write_text(bad, encoding="utf-8")
+            self.assertTrue(laws_checks.check_control_b_prompts(self.tmp), bad[-60:])
+        (gov / "control_b_prompts.jsonl").unlink()
+        self.assertTrue(laws_checks.check_control_b_prompts(self.tmp))           # thiếu tệp ghim
+        self._fc(353, _forecast("B", "Câu hỏi khi thiếu tệp ghim?", 0.5).replace(B_HASH, new_hash), created="2026-12-03T02:00:00Z", expect=2)
+
+    def _write(self, path, text):
+        path.write_text(text, encoding="utf-8")
+        return path
 
     def test_an_old_error_does_not_lock_new_issues(self):
         """Tự kiểm so với trạng thái trước khi ghi: lỗi cũ đang chờ xử lý không khóa Issue mới; lỗi MỚI thì chặn."""
@@ -541,7 +639,8 @@ class IntakeWorkflowRaceTests(unittest.TestCase):
         (seed / "contracts").mkdir(); (seed / "governance").mkdir(); (seed / "ledger").mkdir()
         for c in ("forecast_issue.schema.json", "resolution.schema.json"):
             shutil.copy(ROOT / "contracts" / c, seed / "contracts")
-        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", seed / "governance")
+        for g in ("CONTROL_B_PROMPT.md", "control_b_prompts.jsonl"):
+            shutil.copy(ROOT / "governance" / g, seed / "governance")
         shutil.copytree(ROOT / "tools", seed / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         (seed / "ledger" / ".gitkeep").write_text("")
         self._git(seed, "add", "-A"); self._git(seed, "commit", "-qm", "seed"); self._git(seed, "push", "-q", "origin", "HEAD:main")
@@ -837,7 +936,8 @@ class ScoringTests(_Base):
         preds, res = self._fake(194, 109)
         ab = self._score(preds, res)["ab"]
         self.assertEqual(ab["fixed_sample"]["n"], 194)
-        self.assertGreater(ab["fixed_sample"]["p_value_two_sided_vs_coin"], 0.05)
+        self.assertGreater(ab["fixed_sample"]["p_value_void_as_a_wrong"], 0.05)
+        self.assertEqual(ab["fixed_sample"]["p_value_void_as_a_right"], ab["fixed_sample"]["p_value_void_as_a_wrong"])   # không có VOID: một phép thử
         self.assertEqual(ab["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
         more_p, more_r = self._fake(100, 100, start=5000)
         ab2 = self._score(preds + more_p, res + more_r)["ab"]
@@ -848,6 +948,77 @@ class ScoringTests(_Base):
         self.assertEqual(self._score(win_p, win_r)["ab"]["verdict"], "A HƠN B CÓ Ý NGHĨA")
         lose_p, lose_r = self._fake(194, 82)
         self.assertEqual(self._score(lose_p, lose_r)["ab"]["verdict"], "B HƠN A CÓ Ý NGHĨA")
+
+    def _void(self, res, pairs, start=1000):
+        """Đổi kết quả của các cặp (theo số thứ tự cặp trong _fake) thành VOID cho cả A và B."""
+        ids = {f"F-{start + 2 * i + d}" for i in pairs for d in (0, 1)}
+        return [{**r, "outcome": None, "void": "hủy"} if r["prediction_id"] in ids else r for r in res]
+
+    def test_void_pairs_count_against_whichever_verdict_is_being_tested(self):
+        """Vòng 9 điểm 2: bỏ cặp VOID khỏi mẫu rồi lấy cặp đến sau bù vào là đường chọn mẫu — hủy đúng những câu hỏi A sắp sai
+        là 'A hơn B' tự xuất hiện. Quy định trước: mẫu chốt là 194 cặp bất đồng đầu tiên theo thứ tự GHI dự báo (cặp VOID
+        vẫn giữ chỗ), và mỗi cặp VOID tính theo hướng bất lợi cho kết luận đang xét."""
+        # Thật ra A đúng 100/194 (không khác tung đồng xu). Hủy 30 cặp A sai, rồi ghi thêm 30 cặp A đúng.
+        preds, res = self._fake(194, 100)
+        more_p, more_r = self._fake(30, 30, start=5000)
+        res_sel = self._void(res, range(100, 130))
+        ab = self._score(preds + more_p, res_sel + more_r)["ab"]
+        self.assertEqual(ab["fixed_sample"]["n"], 194)
+        self.assertEqual((ab["fixed_sample"]["resolved"], ab["fixed_sample"]["void"], ab["fixed_sample"]["a_correct"]), (164, 30, 100))
+        self.assertEqual(ab["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")               # cặp đến sau không được bù vào chỗ cặp VOID
+        self.assertEqual((ab["disagreements_resolved"], ab["disagreements_void"], ab["a_correct"]), (194, 30, 130))   # số chạy vẫn báo đủ
+        self.assertIn("void_rule", ab)
+        from engine import ledger
+        self.assertLess(ledger._binom_two_sided(130, 194), 0.05)                 # cách "bỏ VOID, lấy cặp sau" sẽ cho A hơn B
+        # Chiều ngược lại: A thật sự đúng 112/194 (A hơn B). Hủy 40 cặp A đúng không tạo ra được 'B hơn A', chỉ làm mất kết luận.
+        preds, res = self._fake(194, 112)
+        ab = self._score(preds, self._void(res, range(0, 40)))["ab"]
+        self.assertEqual((ab["fixed_sample"]["a_correct"], ab["fixed_sample"]["void"]), (72, 40))
+        self.assertEqual(ab["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
+        self.assertLess(ledger._binom_two_sided(72, 154), 0.5)                   # (bỏ VOID khỏi mẫu thì A chỉ còn đúng 72/154)
+        # Kết quả đủ mạnh vẫn đứng được khi có ít VOID; và p-value của hai phép thử được ghi riêng
+        preds, res = self._fake(194, 130)
+        ab = self._score(preds, self._void(res, range(0, 5)))["ab"]
+        self.assertEqual(ab["verdict"], "A HƠN B CÓ Ý NGHĨA")
+        self.assertEqual((ab["fixed_sample"]["a_correct"], ab["fixed_sample"]["void"]), (125, 5))
+        self.assertAlmostEqual(ab["fixed_sample"]["p_value_void_as_a_wrong"], round(ledger._binom_two_sided(125, 194), 4))
+        self.assertAlmostEqual(ab["fixed_sample"]["p_value_void_as_a_right"], round(ledger._binom_two_sided(130, 194), 4))
+        preds, res = self._fake(194, 60)
+        ab = self._score(preds, self._void(res, range(190, 194)))["ab"]
+        self.assertEqual(ab["verdict"], "B HƠN A CÓ Ý NGHĨA")                    # A đúng 60, VOID 4 (tính là A đúng): 64/194 vẫn kém rõ
+        # chưa ghi đủ 194 cặp thì chưa kiểm định; cặp VOID có được đếm vào số đã đóng
+        preds, res = self._fake(100, 60)
+        out = self._score(preds, self._void(res, range(0, 10)))
+        self.assertTrue(out["ab"]["verdict"].startswith("CHƯA ĐỦ MẪU (100/194"))
+        self.assertEqual(out["ab"]["fixed_sample"]["p_value_void_as_a_wrong"], None)
+        # báo cáo tỷ lệ hủy theo ghế, theo cặp, theo cặp bất đồng
+        self.assertEqual(out["void"]["by_seat"]["A"], {"void": 10, "closed": 100, "rate": 0.1})
+        self.assertEqual(out["void"]["pairs"], {"void": 10, "closed": 100, "rate": 0.1})
+        self.assertEqual(out["void"]["disagreements"], {"void": 10, "closed": 100, "rate": 0.1})
+        self.assertEqual(out["ab"]["pairs"], 100)                                # cặp VOID vẫn là cặp, vẫn tính vào tỷ lệ bất đồng
+        report = (ROOT / "engine" / "run_cycle.py").read_text(encoding="utf-8")
+        self.assertIn("VOID {disagreements_void}", report); self.assertIn('["void"]["by_seat"]', report)   # báo cáo vòng học in các số này
+
+    def test_sample_is_fixed_when_forecasts_are_recorded_not_when_they_are_resolved(self):
+        """Vòng 9 điểm 2 (tự rà): nếu mẫu là "194 cặp được phân định đầu tiên" thì không cần VOID cũng chọn được mẫu — cứ để
+        yên không phân định những câu hỏi A sai, cặp đến sau sẽ bù vào. Mẫu chốt vì thế là 194 cặp bất đồng đầu tiên theo
+        thứ tự GHI dự báo, và chỉ ra phán quyết khi cả 194 cặp đó đã đóng."""
+        from engine import ledger
+        preds, res = self._fake(194, 100)                                         # thật ra A đúng 100/194
+        more_p, more_r = self._fake(30, 30, start=5000)                           # 30 cặp ghi SAU, A đúng cả
+        skipped = {f"F-{1000 + 2 * i + d}" for i in range(100, 130) for d in (0, 1)}   # 30 cặp A sai: bỏ mặc, không phân định
+        ab = self._score(preds + more_p, [r for r in res if r["prediction_id"] not in skipped] + more_r)["ab"]
+        self.assertEqual(ab["disagreements_resolved"], 194)                       # đã có 194 cặp bất đồng được phân định, A đúng 130…
+        self.assertEqual(ab["a_correct"], 130)
+        self.assertLess(ledger._binom_two_sided(130, 194), 0.05)                  # …và "194 cặp phân định đầu tiên" sẽ cho A hơn B
+        self.assertEqual(ab["fixed_sample"], {"n": 194, "resolved": 164, "void": 0, "open": 30, "a_correct": 100,
+                                              "p_value_void_as_a_wrong": None, "p_value_void_as_a_right": None})
+        self.assertTrue(ab["verdict"].startswith("CHƯA ĐỦ MẪU (164/194"), ab["verdict"])   # 30 cặp trong mẫu còn mở: chưa có phán quyết
+        # Thứ tự phân định không đổi được mẫu: phân định các cặp ghi sau TRƯỚC, kết quả vẫn như khi phân định theo thứ tự ghi.
+        full = self._score(preds + more_p, more_r + res)["ab"]
+        self.assertEqual(full["fixed_sample"], self._score(preds + more_p, res + more_r)["ab"]["fixed_sample"])
+        self.assertEqual((full["fixed_sample"]["a_correct"], full["fixed_sample"]["open"]), (100, 0))
+        self.assertEqual(full["verdict"], "CHƯA THẤY KHÁC BIỆT A–B")
 
     def test_pairs_need_same_day_and_both_outcomes(self):
         preds, res = self._fake(3, 3, b_day="2026-11-18T03:00:00Z")              # B ghi hôm sau → không thành cặp
@@ -1123,6 +1294,29 @@ class TrialRegistryTests(unittest.TestCase):
         (repo / "tools" / "registry_push.py").unlink(); tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("xoa tep moc + ghi ket qua")
         (repo / "tools" / "registry_push.py").write_text("# v3.0.2\n"); commit("tra lai tep moc")
         self.assertTrue(any("commit liền trước chưa có" in e for e in f(base)))
+        # vòng 9 điểm 3: xóa tệp mốc ở MỘT COMMIT TRƯỚC, ghi kết quả không đăng ký ở commit sau, rồi trả tệp mốc lại. Phép kiểm
+        # "vắng ở commit và commit cha" coi commit giữa là kho bản cũ. Nay mốc v3.0.2 xác định bằng tổ tiên.
+        git("reset", "-q", "--hard", base)
+        (repo / "tools" / "registry_push.py").unlink(); commit("A: xoa tep moc")
+        tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("B: ghi ket qua khong dang ky")
+        (repo / "tools" / "registry_push.py").write_text("# v3.0.2\n"); commit("C: tra lai tep moc")
+        self.assertTrue(any("commit liền trước chưa có" in e and "T00003" in e for e in f(base)))
+        # …hay ghi kết quả trên một nhánh tách ra từ lịch sử TRƯỚC v3.0.2 rồi gộp vào main sau: commit gốc của lượt kiểm đã
+        # thuộc v3.0.2 thì không commit nào trong khoảng được miễn
+        git("reset", "-q", "--hard", base)
+        git("checkout", "-q", "-b", "nhanh-cu", old_base)
+        tp.write_text(self.LEGACY + res3, encoding="utf-8"); side = commit("ket qua tren nhanh tach tu lich su cu")
+        git("checkout", "-q", "main"); git("merge", "-q", "--no-ff", "-m", "gop nhanh cu", side)
+        self.assertTrue(any("commit liền trước chưa có" in e for e in f(base)))
+        # khoảng kiểm vắt qua lúc gộp v3.0.2 (commit gốc còn ở trước mốc): vòng học bản cũ được miễn, kết quả ghi SAU mốc mà
+        # không đăng ký thì không
+        git("reset", "-q", "--hard", old_base)
+        tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("Vong hoc ban cu")
+        (repo / "tools").mkdir(exist_ok=True); (repo / "tools" / "registry_push.py").write_text("# v3.0.2\n"); commit("gop v3.0.2")
+        self.assertEqual(f(old_base), [])
+        tp.write_text(self.LEGACY + res3 + res3.replace("T00003", "T00004"), encoding="utf-8"); commit("ket qua khong dang ky sau moc")
+        errs = f(old_base)
+        self.assertTrue(len(errs) == 1 and "T00004" in errs[0] and "T00003" not in errs[0], errs)
         git("reset", "-q", "--hard", base)
         rg.write_text(json.dumps({"trial_id": "T00003"}) + "\n", encoding="utf-8"); commit("L-06: dang ky thu T00003")
         tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("Vong hoc")

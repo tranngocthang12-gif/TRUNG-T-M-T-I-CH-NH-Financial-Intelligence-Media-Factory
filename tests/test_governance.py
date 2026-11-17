@@ -37,7 +37,8 @@ class IntakeRuleTests(unittest.TestCase):
         (self.tmp / "contracts").mkdir(); (self.tmp / "governance").mkdir(); (self.tmp / "ledger").mkdir()
         for c in ("forecast_issue.schema.json", "resolution.schema.json"):       # robot nhận tự chạy lại luật của CẢ hai sổ trước khi ghi
             shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
-        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
+        for g in ("CONTROL_B_PROMPT.md", "control_b_prompts.jsonl"):
+            shutil.copy(ROOT / "governance" / g, self.tmp / "governance")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
 
     def tearDown(self):
@@ -367,9 +368,10 @@ class LedgerAuditTests(unittest.TestCase):
         self.assertIn("hash khác cho cùng mã", f(pred[:1], void[:1], issues, {7: [c7], 9: [month, bot("2026-12-20T00:01:00Z", f"✅\n`ledger-attest: resolutions F-7 {h2}`")]})[0])
         # đối chiếu Issue thật không được nới: dự báo đã VOID vẫn phải trỏ tới Issue có thật, đúng giờ tạo
         self.assertTrue(ledger_audit.issue_crosscheck_errors(pred, void, {7: issues[7], 9: issues[9]}, "chu-kho"))
-        # phía ghi: robot phân định ghi VOID trước hạn được, và engine không chấm dự báo VOID (test_ledger_resolution)
+        # phía ghi: VOID cũng phải chờ tới resolve_at (vòng 9: VOID trước hạn là đường chọn mẫu) — test_ledger_resolution
         src = (ROOT / "tools" / "resolution_intake.py").read_text(encoding="utf-8")
-        self.assertIn('early_ok = outcome_key == "VOID" or', src)
+        self.assertIn('early_ok = outcome_key == "YES" and all(', src)
+        self.assertNotIn('outcome_key == "VOID" or', src)
 
     def test_audit_rereads_attestations_while_another_robot_is_between_push_and_comment(self):
         """Vòng 8 điểm 4: robot nhận đẩy commit TRƯỚC rồi mới đăng bình luận ✅. Kiểm toán chạy sau khi robot A xong nhưng đọc
@@ -409,6 +411,29 @@ class LedgerAuditTests(unittest.TestCase):
         # lỗi không do chờ (robot đăng hash khác cho cùng mã) vẫn là lỗi sau khi đọc lại đủ lượt
         calls.clear(); seq[:] = [{7: [c7], 8: [c8, bot("2026-11-17T02:01:50Z", f"✅\n`ledger-attest: predictions F-8 {h1}`")]}]
         self.assertIn("hash khác cho cùng mã", run()[0]); self.assertEqual(len(calls), 6)
+        # vòng 9 điểm 4: dấu nhận của dòng PHÂN ĐỊNH không có hạn 6 giờ, nên kiểm toán phải đọc lại cho nó dù Issue mở từ hôm
+        # trước (job phân định vừa được chạy lại: commit đã đẩy, bình luận chưa đăng). Dự báo thì giữ hạn 6 giờ và trước resolve_at.
+        hr = "c" * 64
+        res = [{"prediction_id": "F-7", "resolution_issue": 9, "resolution_issue_created_at": "2026-12-10T03:00:00Z", "hash": hr, "outcome": 0}]
+        old_issues = {**issues, 9: {"created_at": "2026-12-10T03:00:00Z", "user": "chu-kho", "is_pr": False}}
+        c9 = bot("2026-12-11T05:00:40Z", f"✅ Đã phân định\n`ledger-attest: resolutions F-7 {hr}`")
+        next_day = datetime(2026, 12, 11, 5, 0, 30, tzinfo=timezone.utc)         # 26 giờ sau khi Issue phân định mở
+        calls.clear(); slept.clear(); seq[:] = [{7: [c7], 8: [c8]}, {7: [c7], 8: [c8], 9: [c9]}]
+        self.assertEqual(f(pred, res, old_issues, fetch, tries=6, wait=30, sleep=slept.append, now=next_day), [])
+        self.assertEqual((len(calls), slept), (2, [30]))                         # lượt 1 thiếu, lượt 2 có → không đỏ giả
+        calls.clear(); slept.clear(); seq[:] = [{7: [c7], 8: [c8]}]
+        errs = f(pred, res, old_issues, fetch, tries=6, wait=30, sleep=slept.append, now=next_day)
+        self.assertEqual(len(errs), 1); self.assertIn("phân định F-7", errs[0])  # không bao giờ tới → vẫn là lỗi, sau đúng 6 lượt
+        self.assertEqual((len(calls), slept), (6, [30] * 5))
+        # dự báo: Issue còn trong 6 giờ nhưng đã sang ngày resolve_at → dấu nhận không thể hợp lệ nữa → không chờ
+        eve = [{"id": "F-7", "issue_number": 7, "issue_created_at": "2026-12-09T16:00:00Z", "hash": h1, "resolve_at": "2026-12-10"}]
+        eve_issues = {7: {"created_at": "2026-12-09T16:00:00Z", "user": "chu-kho", "is_pr": False}}
+        calls.clear(); slept.clear(); seq[:] = [{}]
+        self.assertEqual(len(f(eve, [], eve_issues, fetch, tries=6, wait=30, sleep=slept.append, now=datetime(2026, 12, 9, 17, 30, tzinfo=timezone.utc))), 1)
+        self.assertEqual((len(calls), slept), (1, []))
+        calls.clear(); slept.clear()
+        self.assertEqual(len(f(eve, [], eve_issues, fetch, tries=3, wait=30, sleep=slept.append, now=datetime(2026, 12, 9, 16, 30, tzinfo=timezone.utc))), 1)
+        self.assertEqual((len(calls), slept), (3, [30, 30]))                     # 23:30 ngày 9/12: còn kịp → có chờ
         # main() dùng bản có đọc lại; tổng thời gian chờ mặc định hữu hạn và ngắn hơn hạn chạy của job kiểm toán
         src = (ROOT / "tools" / "ledger_audit.py").read_text(encoding="utf-8")
         self.assertIn("errs += attestation_errors_with_retry(pred, res, issues, lambda: fetch_comments(repo, token)", src.split("def main")[1])
@@ -462,7 +487,8 @@ class LedgerReplayTests(unittest.TestCase):
         (self.tmp / "contracts").mkdir(); (self.tmp / "governance").mkdir(); (self.tmp / "ledger").mkdir()
         for c in ("forecast_issue.schema.json", "resolution.schema.json"):
             shutil.copy(ROOT / "contracts" / c, self.tmp / "contracts")
-        shutil.copy(ROOT / "governance" / "CONTROL_B_PROMPT.md", self.tmp / "governance")
+        for g in ("CONTROL_B_PROMPT.md", "control_b_prompts.jsonl"):
+            shutil.copy(ROOT / "governance" / g, self.tmp / "governance")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         self.led = self.tmp / "ledger" / "predictions.jsonl"
         for n, seat in ((1, "A"), (2, "B")):
