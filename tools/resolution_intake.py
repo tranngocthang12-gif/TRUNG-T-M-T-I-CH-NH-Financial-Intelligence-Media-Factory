@@ -9,8 +9,16 @@ Luật — decide() — (mọi "ngày" tính theo giờ Việt Nam, UTC+7). CI c
 có trong sổ (replay(), gọi từ tools/validate.py):
 - Một Issue phân định MỘT CÂU HỎI, và ghi cùng một outcome cho MỌI dự báo Issue của câu hỏi đó (cùng question + resolve_at),
   dù forecast_ids chỉ liệt kê một phần: một câu hỏi chỉ có một sự thật, A và B nhận cùng outcome.
+- THỨ TỰ (ADR-0003 quyết định 10): một Issue phân định chỉ ghi kết quả cho dự báo mở TRƯỚC nó. Nếu trong sổ đang có dự
+  báo của câu hỏi mở cùng lúc hoặc sau Issue phân định này (robot nhận dự báo chạy xong trước robot phân định) thì KHÔNG
+  ghi gì — không ghi kết quả cho dự báo mở sau, cũng không bỏ sót nó: mở Issue Resolution mới. Chiều ngược lại (dự báo mở
+  trước nhưng robot ghi sau khi đã có kết quả) do tools/ledger_intake.py từ chối. Nhờ vậy, ở mọi thứ tự chạy xong của
+  hai robot, sổ luôn thỏa: mọi dự báo của một câu hỏi đã phân định đều mở trước Issue phân định và đều có dòng kết quả.
 - Câu hỏi đã có bất kỳ dự báo nào được phân định thì không phân định lại (kể cả VOID).
-- L-05: không phân định trước resolve_at; ngoại lệ duy nhất: YES khi MỌI dự báo của câu hỏi có luật event_before_date.
+- L-05: không ghi KẾT QUẢ (YES/NO) trước resolve_at; ngoại lệ duy nhất: YES khi MỌI dự báo của câu hỏi có luật
+  event_before_date. VOID không phải kết quả mà là HỦY câu hỏi (không dự báo nào của nó được chấm), nên ghi được bất kỳ
+  lúc nào: hủy trước khi biết kết quả không cho ai lợi thế nào so với hủy lúc đã biết. Đây cũng là đường phục hồi cho
+  một dự báo nằm trong sổ mà không có dấu nhận hợp lệ (xem phần PHỤC HỒI trong tools/ledger_intake.py).
 - L-09: resolver bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung GHẾ với bất kỳ người viết dự báo nào
   của câu hỏi (đọc author_seat từng dòng: nhà cung cấp mô hình hoặc Owner; Anthropic luôn bị chặn). author_seat không nhận
   ra được ghế → không ghi. resolver là người ĐỌC NGUỒN và quyết định, không phải người bấm nút.
@@ -20,6 +28,10 @@ có trong sổ (replay(), gọi từ tools/validate.py):
   được tính; đường dẫn có '@' hoặc '\' bị từ chối. Nguồn đã hứa không công bố → VOID kèm void_reason.
 - L-02: không chứa từ khóa khuyến nghị mua bán.
 - Mỗi dòng khớp contracts/resolution.schema.json và nối hash chuỗi (prev_hash/hash) như predictions.jsonl.
+- Mọi dòng của sổ phải đến từ Issue 'Resolution': dòng không có resolution_issue là lỗi (đường ghi của engine đang đóng).
+- Trước khi ghi, main() tự chạy lại toàn bộ luật kiểm trên trạng thái sổ sau khi ghi (ledger_intake.post_write_errors) —
+  xem phần THỨ TỰ trong tools/ledger_intake.py. Chạy lại job của một Issue đã ghi: không ghi trùng, chỉ trả lại dấu nhận,
+  và chỉ khi các dòng trong sổ đúng là kết quả của luật phân định trên thân Issue lúc mở.
 Giới hạn: máy không mở được nguồn để kiểm quote; quote và resolver là lời khai có ghi tên, kiểm được bởi người đọc sổ.
 """
 import json, os, pathlib, re, sys
@@ -28,7 +40,8 @@ from urllib.parse import urlsplit
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 from tools.laws_checks import line_hash, recommendation_hit, recognised_seat, _seats  # noqa: E402
-from tools.ledger_intake import parse_issue_form, qkey, vn_day, load_rows, dumps, promised_domains, is_engine_row, _URL_RE, ATTEST_MARK  # noqa: E402
+from tools.ledger_intake import (parse_issue_form, qkey, vn_day, ts, load_rows, dumps, strict_loads, promised_domains,  # noqa: E402
+                                 post_write_errors, system_error, _URL_RE, ATTEST_MARK)
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 PRED = ROOT / "ledger" / "predictions.jsonl"
@@ -73,8 +86,10 @@ def reject(msg) -> int:
 
 
 def decide(data, number, created, author, pred_rows, res_rows, schema=None):
-    """Luật phân định. data: các trường của form; pred_rows/res_rows: sổ dự báo và các dòng phân định đã có TRƯỚC Issue
-    này. Trả về (lỗi hoặc None, các dòng sẽ ghi — chưa có prev_hash/hash, ghi chú). Hàm thuần — intake và replay() dùng chung."""
+    """Luật phân định. data: các trường của form; pred_rows: CẢ sổ dự báo (lúc ghi: sổ ngay lúc đó; lúc kiểm lại: sổ đầy
+    đủ — câu hỏi đã phân định không nhận thêm dự báo nên hai thứ trùng nhau với câu hỏi đang xét); res_rows: các dòng phân
+    định đã có TRƯỚC Issue này. Trả về (lỗi hoặc None, các dòng sẽ ghi — chưa có prev_hash/hash, ghi chú). Hàm thuần —
+    intake và replay() gọi với cùng đầu vào, nên kiểm lại không thể ra kết quả khác lúc ghi."""
     import jsonschema
     schema = schema or json.loads(SCHEMA.read_text(encoding="utf-8"))
     created_day = vn_day(created)
@@ -111,6 +126,15 @@ def decide(data, number, created, author, pred_rows, res_rows, schema=None):
     key = keys.pop()
     group = sorted((p for p in preds.values() if qkey(p) == key), key=lambda p: p.get("issue_number", 0))
     group_ids = [p["id"] for p in group]
+    try:
+        opened = ts(created)
+        late = [p["id"] for p in group if ts(p.get("issue_created_at")) >= opened]
+    except (TypeError, ValueError):
+        return f"không đọc được giờ tạo Issue của một dự báo trong câu hỏi ({', '.join(group_ids)}); không ghi", [], ""
+    if late:
+        return (f"L-05: dự báo {', '.join(late)} của câu hỏi này được mở cùng lúc hoặc sau Issue phân định này ({created}). Một "
+                "Issue phân định chỉ ghi kết quả cho dự báo mở TRƯỚC nó và phải ghi cho mọi dự báo của câu hỏi, nên lần này "
+                "không ghi gì. Mở Issue Resolution mới — nó sẽ phân định cả các dự báo đó"), [], ""
     done = {r.get("prediction_id") for r in res_rows}
     already = [i for i in group_ids if i in done]
     if already:
@@ -132,10 +156,10 @@ def decide(data, number, created, author, pred_rows, res_rows, schema=None):
         resolve_at = date.fromisoformat(group[0]["resolve_at"])
     except (KeyError, TypeError, ValueError):
         return f"resolve_at của {group_ids[0]} không đọc được; không ghi", [], ""
-    early_ok = outcome_key == "YES" and all(p.get("resolution_rule") == "event_before_date" for p in group)
+    early_ok = outcome_key == "VOID" or (outcome_key == "YES" and all(p.get("resolution_rule") == "event_before_date" for p in group))
     if created_day < resolve_at and not early_ok:
-        return (f"L-05: chưa tới resolve_at {resolve_at.isoformat()} theo giờ Việt Nam (chỉ YES được phân định sớm, "
-                "và chỉ khi mọi dự báo của câu hỏi có luật event_before_date)"), [], ""
+        return (f"L-05: chưa tới resolve_at {resolve_at.isoformat()} theo giờ Việt Nam (trước hạn chỉ ghi được YES khi mọi dự "
+                "báo của câu hỏi có luật event_before_date, hoặc VOID để hủy câu hỏi)"), [], ""
 
     if outcome_key != "VOID":
         promised = set().union(*[promised_domains(p.get("resolution_source")) for p in group])
@@ -190,31 +214,20 @@ def attest(row) -> str:
 
 
 def replay(pred_rows, res_rows) -> list[str]:
-    """Chạy lại luật phân định trên mọi nhóm dòng phân định Issue đã có trong sổ, theo thứ tự: dựng lại form từ các dòng,
-    cho qua decide(), kết quả phải ra đúng các dòng đang có. Trả về danh sách lỗi."""
+    """Chạy lại luật phân định trên MỌI dòng phân định đã có trong sổ, theo thứ tự: gom các dòng theo Issue phân định,
+    dựng lại form từ các dòng, cho qua decide() với đúng đầu vào lúc ghi, kết quả phải ra đúng các dòng đang có.
+    Trả về danh sách lỗi."""
     errs, prior, seen, i = [], [], set(), 0
     schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
-    engine_preds = {p.get("id"): p for p in pred_rows if is_engine_row(p)}
-    engine_done = set()
     while i < len(res_rows):
         r = res_rows[i]
         n = r.get("resolution_issue")
         if n is None:
-            # Dòng không qua Issue Resolution chỉ được là dòng engine tự chấm một dự báo CỦA ENGINE. Một dòng thiếu
-            # resolution_issue mà trỏ tới dự báo Issue (F-…) sẽ né được chạy lại luật và dấu nhận — phải là lỗi.
-            pid = r.get("prediction_id")
-            p = engine_preds.get(pid)
-            if p is None:
-                errs.append(f"L-05: dòng phân định cho {pid!r} không có resolution_issue và không trỏ tới dự báo nào của engine — "
-                            "dự báo từ Issue chỉ được phân định qua Issue 'Resolution'")
-            else:
-                if pid in engine_done:
-                    errs.append(f"L-05: dự báo engine {pid} có hai dòng phân định")
-                engine_done.add(pid)
-                if isinstance(r.get("outcome"), bool) or r.get("outcome") not in (0, 1, None):
-                    errs.append(f"L-05: dòng phân định engine {pid} có outcome không hợp lệ")
-                if str(r.get("resolved_at") or "") < str(p.get("created_at") or ""):
-                    errs.append(f"L-05: dòng phân định engine {pid} ghi resolved_at trước ngày tạo dự báo")
+            # Không loại dòng nào được miễn (vòng chấm 7 và 8): dòng thiếu resolution_issue né được chạy lại luật, né đối
+            # chiếu Issue và né dấu nhận. Đường ghi của engine đang đóng nên không còn dòng "engine tự chấm" hợp lệ nào.
+            errs.append(f"L-05: dòng phân định cho {r.get('prediction_id')!r} không có resolution_issue — mọi dòng của sổ phải "
+                        "đến từ Issue 'Resolution' (đường ghi của engine đang đóng: config.yaml ledger.engine_forecasts, "
+                        "ADR-0003 quyết định 11)")
             prior.append(r); i += 1; continue
         j = i
         while j < len(res_rows) and res_rows[j].get("resolution_issue") == n:
@@ -234,9 +247,8 @@ def replay(pred_rows, res_rows) -> list[str]:
             if g0.get("observed_value"):
                 data["observed_value"] = g0["observed_value"]
             try:
-                created = g0.get("resolution_issue_created_at")
-                earlier = [p for p in pred_rows if str(p.get("issue_created_at") or "") < str(created)]
-                msg, want, _ = decide(data, n, created, g0.get("resolution_issue_author", ""), earlier, prior, schema)
+                msg, want, _ = decide(data, n, g0.get("resolution_issue_created_at"), g0.get("resolution_issue_author", ""),
+                                      pred_rows, prior, schema)
             except Exception as e:  # noqa: BLE001
                 msg, want = f"không đọc được ({str(e).splitlines()[0]})", []
             have = [{k: v for k, v in x.items() if k not in SYSTEM_FIELDS} for x in group]
@@ -265,16 +277,37 @@ def main() -> int:
     except ImportError:
         print(json.dumps({"ok": False, "message": "Lỗi hệ thống: thiếu thư viện jsonschema"}, ensure_ascii=False))
         return 1
-    res_rows = load_rows(RES)
+    res_rows, pred_rows = load_rows(RES), load_rows(PRED)
     old = [r for r in res_rows if r.get("resolution_issue") == number]
-    if old:                    # chạy lại job: không ghi trùng, trả lại dấu nhận để workflow đăng nếu lần trước chưa đăng được
+    if old:
+        # Chạy lại job: không ghi trùng, và trả lại dấu nhận để workflow đăng nếu lần trước chưa đăng được — nhưng CHỈ khi các
+        # dòng đang có trong sổ đúng là kết quả của luật phân định trên thân Issue lúc mở (job chạy lại nhận đúng thân Issue
+        # của sự kiện gốc). Dòng mang số Issue này mà nội dung khác (ghi tay rồi chạy lại job để xin dấu nhận) không được cấp.
+        first = next(i for i, r in enumerate(res_rows) if r.get("resolution_issue") == number)
+        try:
+            msg, want, _ = decide(data, number, created, author, pred_rows, res_rows[:first])
+        except Exception as e:  # noqa: BLE001
+            msg, want = str(e).splitlines()[0], []
+        if msg or [strict_loads(dumps(w)) for w in want] != [{k: v for k, v in r.items() if k not in SYSTEM_FIELDS} for r in old]:
+            return reject(f"sổ đã có dòng mang số Issue #{number} nhưng nội dung KHÔNG khớp kết quả của luật phân định trên thân "
+                          "Issue lúc mở. Robot chỉ cấp dấu nhận cho dòng do chính nó ghi từ thân Issue")
         print(json.dumps({"ok": True, "duplicate": True, "attest": [attest(r) for r in old],
                           "message": f"Phân định #{number} đã có trong Ledger, bỏ qua"}, ensure_ascii=False))
         return 3
-    msg, rows, note = decide(data, number, created, author, load_rows(PRED), res_rows)
+    try:
+        msg, rows, note = decide(data, number, created, author, pred_rows, res_rows)
+    except (TypeError, ValueError) as e:
+        return reject(f"không đọc được mốc thời gian ({str(e).splitlines()[0]})")
     if msg:
         return reject(msg)
     rows = chain(rows, res_rows[-1]["hash"] if res_rows else "GENESIS")
+    try:                                # tự kiểm: trạng thái sổ sau khi ghi các dòng này phải qua đúng luật mà validate.py chạy
+        broken = post_write_errors(pred_rows, res_rows, pred_rows, res_rows + [strict_loads(dumps(r)) for r in rows])
+    except Exception as e:  # noqa: BLE001
+        broken = [f"không chạy được kiểm lại ({str(e).splitlines()[0]})"]
+    if broken:
+        return system_error(f"ghi phân định #{number} sẽ làm sổ không qua kiểm lại luật — {broken[0]} — nên KHÔNG ghi. Đây là "
+                            "lỗi của máy (luật lúc ghi lệch luật kiểm lại), báo cho người giữ mã; sổ không bị đụng tới")
     RES.parent.mkdir(parents=True, exist_ok=True)
     with RES.open("a", encoding="utf-8") as f:
         for r in rows:

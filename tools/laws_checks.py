@@ -6,9 +6,13 @@ L-03  dữ liệu cá nhân: tệp chữ (md/yaml/json/jsonl/txt) không chứa 
 L-05  Ledger: ledger/predictions.jsonl và ledger/resolutions.jsonl đúng hash chuỗi (prev_hash/hash, dòng đầu "GENESIS").
       Hash chuỗi KHÔNG phải chữ ký: nó bắt sửa nhầm/sửa một phần. Chống viết lại có chủ ý là việc của tools/ledger_audit.py
       (chỉ-ghi-thêm so với commit trước; đối chiếu từng dòng với Issue thật trên GitHub) và ruleset cấm force-push.
+      Mọi dòng của hai sổ phải đến từ Issue: đường ghi dự báo của engine đang ĐÓNG (config.yaml ledger.engine_forecasts),
+      nên dòng không có issue_number / resolution_issue là lỗi, bất kể mang mã gì (check_ledger_rows, check_engine_gate).
 L-06  sổ thử: research/trial_registry.jsonl đúng hash chuỗi; mã thử không trùng; mọi lần thử trong research/trials.csv từ
       mã thử đầu tiên của sổ trở đi có dòng đăng ký cùng trial_id, spec_id, ngưỡng, registry_hash; số dòng đăng ký ≥ số
       lần thử; feature/mô hình đăng ký nằm trong không gian giả thuyết đóng băng (config.yaml research.frozen_space).
+      research/trials.csv đúng KHUÔN: tiêu đề là đúng 13 cột gốc hoặc đúng 17 cột (13 + 4 cột v3.0.2), mỗi dòng đủ số ô,
+      viết đúng dạng chuẩn từng byte (trials_format_errors) — không cột lạ, không đổi thứ tự, không dòng lệch.
 L-07  một kiến trúc: mỗi ARCHITECTURE_v*.md phải có dòng riêng trong architecture/ARCHIVE.md ghi SUPERSEDED.
 L-09  người viết ≠ người chấm: thân PR (bỏ chú thích HTML) có đúng một dòng "authored_by:" và một dòng "reviewed_by:"; cả hai
       bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp); không chung ghế — cùng nhà cung cấp, hoặc cùng là Owner; và
@@ -17,13 +21,16 @@ L-09  người viết ≠ người chấm: thân PR (bỏ chú thích HTML) có 
 L-10  đề thi: tệp trong academy/exams/ khớp exam_item.schema.json và released_at không ở tương lai (đề chỉ vào kho sau khi thi).
 """
 import csv, io, hashlib, json, pathlib, re, unicodedata
-from datetime import date
+from datetime import date, timedelta
 
 RECOMMEND_PATTERNS = [r"mua ngay", r"n[êe]n mua", r"b[áa]n ngay", r"n[êe]n b[áa]n", r"gi[áa] m[ụu]c ti[êe]u",
                       r"target price", r"khuy[ếe]n ngh[ịi] mua", r"khuy[ếe]n ngh[ịi] b[áa]n", r"\bBUY\b", r"\bSELL\b"]
 _RE = re.compile("|".join(RECOMMEND_PATTERNS), re.IGNORECASE)
 SCAN_DIRS = ("reports", "media", "ledger")
 SCAN_EXT = {".md", ".txt", ".jsonl", ".json", ".yaml", ".yml", ".csv"}
+# Dấu nhận của robot phải được đăng trong khoảng này sau giờ tạo Issue. Một định nghĩa cho cả bên ghi (intake không ghi
+# khi đã sát hạn) lẫn bên kiểm (tools/ledger_audit.py).
+ATTEST_WINDOW = timedelta(hours=6)
 
 
 def nfc(text) -> str:
@@ -139,10 +146,12 @@ def check_ledger_chain(root) -> list[str]:
 
 
 def check_ledger_rows(root) -> list[str]:
-    """L-05: chạy LẠI luật nhận dự báo và luật phân định trên MỌI dòng của sổ (tools/ledger_intake.replay,
-    tools/resolution_intake.replay). Dòng không từ Issue chỉ được là dòng của engine (mã P-…); dòng phân định thiếu
-    resolution_issue chỉ được trỏ tới dự báo của engine — không dòng nào né được kiểm lại bằng cách bỏ một trường. Hash chuỗi chỉ cho biết sổ nhất quán; kiểm này cho biết từng dòng đúng luật, kể cả
-    dòng được ghi vòng qua intake. Việc dòng có ĐÚNG LÚC hay không do tools/ledger_audit.py đối chiếu với GitHub."""
+    """L-05: chạy LẠI luật nhận dự báo và luật phân định trên MỌI dòng của sổ (tools/ledger_intake.ledger_errors =
+    ledger_intake.replay + resolution_intake.replay). Không loại dòng nào được miễn: đường ghi dự báo của engine đang đóng
+    nên dòng thiếu issue_number hay thiếu resolution_issue là lỗi, bất kể mang mã "P-…" hay có đủ trường. Hash chuỗi chỉ
+    cho biết sổ nhất quán; kiểm này cho biết từng dòng đúng luật, kể cả dòng được ghi vòng qua intake. Hai robot nhận gọi
+    đúng hàm này trên trạng thái SAU KHI GHI trước khi đẩy (không ghi thứ mà kiểm lại sẽ đánh đỏ). Việc dòng có ĐÚNG LÚC
+    hay không do tools/ledger_audit.py đối chiếu với GitHub."""
     root = pathlib.Path(root)
     pred_p, res_p = root / "ledger" / "predictions.jsonl", root / "ledger" / "resolutions.jsonl"
     def rows(path):
@@ -166,18 +175,48 @@ def check_ledger_rows(root) -> list[str]:
     except ImportError:
         return ["L-05: thiếu thư viện jsonschema nên không kiểm lại được các dòng trong sổ (pip install jsonschema)"]
     try:
-        from tools import ledger_intake, resolution_intake      # nạp muộn: hai mô-đun này nhập lại laws_checks
-        return ledger_intake.replay(pred, res) + resolution_intake.replay(pred, res)
+        from tools import ledger_intake                         # nạp muộn: mô-đun này nhập lại laws_checks
+        return ledger_intake.ledger_errors(pred, res)
     except Exception as e:  # noqa: BLE001
         return [f"L-05: không chạy lại được luật nhận trên sổ ({str(e).splitlines()[0]})"]
 
 
-def _frozen_space(root):
-    """research.frozen_space trong config.yaml: {features: [...], models: [...]}; None nếu chưa khai."""
+def _config(root):
+    """config.yaml của kho → dict; {} nếu không có tệp; None nếu có tệp mà không đọc được."""
+    p = pathlib.Path(root) / "config.yaml"
+    if not p.is_file():
+        return {}
     try:
         import yaml
-        cfg = yaml.safe_load((pathlib.Path(root) / "config.yaml").read_text(encoding="utf-8")) or {}
+        cfg = yaml.safe_load(p.read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
+        return None
+    return cfg if isinstance(cfg, dict) else None
+
+
+ENGINE_GATE_CLOSED = "closed"
+
+
+def check_engine_gate(root) -> list[str]:
+    """L-05 (ADR-0003 quyết định 11): đường ghi dự báo của engine (chuyên gia LLM) ĐÓNG. Dòng engine không có Issue, không
+    có dấu nhận, không có bằng chứng nào ngoài tệp về việc AI ghi và ghi LÚC NÀO — nên khi chưa có cơ chế xuất xứ thì sổ
+    không nhận dòng nào như thế. Bản này chỉ chấp nhận ledger.engine_forecasts = closed (hoặc không khai = đóng). Mở lại
+    phải qua ADR mới kèm cơ chế xuất xứ và sửa chính hàm này — đổi một chữ trong config.yaml không mở được."""
+    cfg = _config(root)
+    if cfg is None:
+        return ["L-05: không đọc được config.yaml nên không xác định được trạng thái đường ghi dự báo của engine"]
+    led = cfg.get("ledger")
+    val = led.get("engine_forecasts") if isinstance(led, dict) else None
+    if val is None or val == ENGINE_GATE_CLOSED:
+        return []
+    return [f"L-05: config.yaml ledger.engine_forecasts = {val!r} — bản này chỉ chấp nhận '{ENGINE_GATE_CLOSED}': dòng dự báo của "
+            "engine chưa có cơ chế bằng chứng xuất xứ (ai ghi, lúc nào); mở lại phải qua ADR mới (ADR-0003 quyết định 11)"]
+
+
+def _frozen_space(root):
+    """research.frozen_space trong config.yaml: {features: [...], models: [...]}; None nếu chưa khai."""
+    cfg = _config(root)
+    if not cfg:
         return None
     fs = (cfg.get("research") or {}).get("frozen_space")
     return {"features": set(fs.get("features") or []), "models": set(fs.get("models") or [])} if fs else None
@@ -185,10 +224,8 @@ def _frozen_space(root):
 
 def _legacy_pin(root):
     """research.legacy_pin trong config.yaml: {results, last_trial_id, sha256}; None nếu chưa khai."""
-    try:
-        import yaml
-        cfg = yaml.safe_load((pathlib.Path(root) / "config.yaml").read_text(encoding="utf-8")) or {}
-    except Exception:  # noqa: BLE001
+    cfg = _config(root)
+    if not cfg:
         return None
     pin = (cfg.get("research") or {}).get("legacy_pin")
     return pin if isinstance(pin, dict) else None
@@ -210,7 +247,40 @@ def _pin_errors(pin, trials) -> list[str]:
 
 TRIAL_LEGACY_COLS = ("trial_id", "cycle_date", "method", "spec_id", "features", "model", "ic_mean", "ic_t", "net_ann",
                      "fold_pos", "threshold", "status", "regimes")
+TRIAL_NEW_COLS = ("sharpe", "sharpe_ann", "dsr", "registry_hash")     # thêm từ v3.0.2, đứng sau 13 cột gốc
+TRIAL_HEADERS = (list(TRIAL_LEGACY_COLS), list(TRIAL_LEGACY_COLS) + list(TRIAL_NEW_COLS))   # hai tiêu đề hợp lệ, không có thứ ba
 LEGACY_ANCHOR = "LEGACY-ANCHOR"
+
+
+def trials_format_errors(text) -> list[str]:
+    """L-06: KHUÔN của research/trials.csv. Tệp này chỉ do vòng học ghi thêm ở mức văn bản (engine/research.
+    append_trial_results); bất kỳ kiểu viết nào khác — dù đọc ra cùng giá trị ô — đều có thể làm lần ghi kế tiếp hỏng
+    hoặc làm lệch nghĩa các cột, nên bị từ chối:
+    - tiêu đề phải là ĐÚNG 13 cột gốc hoặc ĐÚNG 17 cột (13 + sharpe, sharpe_ann, dsr, registry_hash), đúng thứ tự;
+    - mỗi dòng có đúng số ô của tiêu đề; không dòng trống; không ô nào chứa xuống dòng;
+    - từng byte của tệp trùng dạng chuẩn do csv.writer viết ra (xuống dòng LF, chỉ đặt ngoặc kép khi cần, không BOM,
+      không ký tự CR, có xuống dòng cuối tệp)."""
+    if not text:
+        return []
+    try:
+        rows = list(csv.reader(io.StringIO(text, newline="")))
+    except csv.Error as e:
+        return [f"L-06: research/trials.csv không đọc được như CSV ({e})"]
+    if not rows or rows[0] not in TRIAL_HEADERS:
+        return ["L-06: tiêu đề research/trials.csv phải là đúng 13 cột gốc hoặc đúng 17 cột (13 cột gốc + sharpe, sharpe_ann, "
+                "dsr, registry_hash), đúng thứ tự — không thêm, bớt, đổi tên hay đổi chỗ cột"]
+    n = len(rows[0])
+    for i, r in enumerate(rows[1:], 2):
+        if len(r) != n:
+            return [f"L-06: research/trials.csv dòng {i} có {len(r)} ô, tiêu đề có {n} cột — mỗi kết quả phải đủ đúng số ô"]
+        if any("\n" in c or "\r" in c for c in r):
+            return [f"L-06: research/trials.csv dòng {i} có ô chứa ký tự xuống dòng"]
+    buf = io.StringIO()
+    csv.writer(buf, lineterminator="\n").writerows(rows)
+    if buf.getvalue() != text:
+        return ["L-06: research/trials.csv không ở dạng chuẩn từng byte (xuống dòng \\n, không BOM, không \\r, ngoặc kép chỉ khi "
+                "cần, có xuống dòng cuối tệp) — tệp chỉ do vòng học ghi thêm, không sửa tay hay ghi lại bằng công cụ khác"]
+    return []
 
 
 def read_trials(text):
@@ -240,13 +310,25 @@ def check_trial_registry(root) -> list[str]:
     có sổ do tools/ledger_audit.py chặn (so với commit gốc)."""
     root = pathlib.Path(root)
     reg_path, trials_path = root / "research" / "trial_registry.jsonl", root / "research" / "trials.csv"
-    _, trials = read_trials(trials_path.read_text(encoding="utf-8")) if trials_path.is_file() else ([], [])
+    try:
+        trials_text = trials_path.read_bytes().decode("utf-8") if trials_path.is_file() else ""
+    except UnicodeDecodeError:
+        return ["L-06: research/trials.csv không phải UTF-8"]
+    fmt = trials_format_errors(trials_text)
+    if fmt:
+        return fmt                                      # khuôn sai thì tên cột không còn tin được: dừng ở đây, đã là lỗi
+    _, trials = read_trials(trials_text)
     reg_text = reg_path.read_text(encoding="utf-8") if reg_path.is_file() else ""
     pin = _legacy_pin(root)
     pin_errs = _pin_errors(pin, trials)                 # ghim tĩnh trong config.yaml: có hiệu lực cả khi chưa có sổ đăng ký
+    def filled(rows):
+        """Kết quả LỊCH SỬ (có trước sổ đăng ký) không có 4 cột mới: ô nào ở đó khác rỗng là số liệu chèn về sau —
+        cột sharpe của các lần thử cũ đi vào phương sai Sharpe của Deflated Sharpe cho mọi lần thử mới."""
+        bad = [t.get("trial_id") for t in rows if any((t.get(c) or "") != "" for c in TRIAL_NEW_COLS)]
+        return ([f"L-06: {len(bad)} kết quả lịch sử trong trials.csv (từ {bad[0]}) có giá trị ở cột sharpe/sharpe_ann/dsr/"
+                 "registry_hash — kết quả có trước sổ đăng ký phải để trống bốn cột đó"] if bad else [])
     if not reg_text.strip():
-        bad = [t.get("trial_id") for t in trials if (t.get("registry_hash") or "").strip()]
-        return pin_errs + ([f"L-06: trials.csv có {len(bad)} lần thử mang registry_hash nhưng thiếu research/trial_registry.jsonl"] if bad else [])
+        return pin_errs + filled(trials)                # chưa có sổ: mọi kết quả đang có đều là lịch sử
     errs = pin_errs + _chain_errors(reg_path, "L-06 sổ đăng ký")
     if errs:
         return errs
@@ -263,6 +345,7 @@ def check_trial_registry(root) -> list[str]:
         errs.append(f"L-06: trials.csv có {len(trials)} kết quả, ít hơn {n} kết quả lịch sử đã neo — kết quả cũ bị xóa")
     elif trials_digest(trials[:n]) != anchor.get("legacy_sha256"):
         errs.append(f"L-06: {n} kết quả lịch sử trong trials.csv không khớp sha256 đã neo — kết quả cũ bị sửa, xóa hoặc chèn")
+    errs += filled(trials[:n])
     regs = reg[1:]
     for r in regs:
         if r.get("kind") == "legacy_anchor" or r.get("trial_id") == LEGACY_ANCHOR:
@@ -447,4 +530,4 @@ def check_exams(root, today=None) -> list[str]:
 
 def run_all(root) -> list[str]:
     return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root) + check_ledger_rows(root)
-            + check_trial_registry(root) + check_personal_data(root) + check_exams(root))
+            + check_engine_gate(root) + check_trial_registry(root) + check_personal_data(root) + check_exams(root))

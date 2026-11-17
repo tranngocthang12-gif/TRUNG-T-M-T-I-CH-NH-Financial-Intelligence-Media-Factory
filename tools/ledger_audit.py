@@ -4,21 +4,33 @@ thứ nằm NGOÀI tệp:
 
 1. CHỈ GHI THÊM — nội dung ledger/predictions.jsonl, ledger/resolutions.jsonl, research/trial_registry.jsonl và các tệp
    paper/*.csv ở commit gốc (--base) phải là tiền tố nguyên từng byte của bản hiện tại. Sửa, xóa hay chèn dòng cũ → lỗi.
-   research/trials.csv kiểm theo dòng: mọi kết quả đã có ở commit gốc phải còn nguyên từng ô.
+   research/trials.csv kiểm theo dòng: mọi kết quả đã có ở commit gốc phải còn nguyên từng ô; tiêu đề chỉ được giữ
+   nguyên hoặc đi từ 13 cột gốc lên đúng 17 cột (khuôn của tệp do laws_checks.trials_format_errors kiểm).
 1b. KẾT QUẢ THỬ (L-06) — trong một Pull Request không được thêm kết quả vào research/trials.csv hay thêm dòng vào sổ đăng
    ký: hai tệp đó chỉ do vòng học trên main ghi. Trên main, mỗi commit thêm kết quả phải có dòng đăng ký của kết quả đó
    nằm sẵn ở commit liền trước (đăng ký được đẩy lên main trước khi backtest chạy).
 2. ĐỐI CHIẾU ISSUE (--github) — mỗi dòng dự báo/phân định từ Issue phải ứng với một Issue thật của kho: có tồn tại, không
    phải PR, do chủ kho mở, và giờ tạo trùng issue_created_at trong sổ (giờ máy chủ GitHub, không do người ghi tự khai).
-3. DẤU NHẬN (--github) — không có khoảng miễn kiểm: dòng nào thiếu dấu nhận là lỗi, kể cả khi Issue vừa mở. Bằng chứng
-   gốc về NỘI DUNG lúc Issue mở: workflow nhận (chạy khi Issue mở, đọc thân Issue lúc mở)
-   đăng một bình luận dưới tên github-actions[bot] chứa "ledger-attest: <sổ> <mã> <hash dòng>". Mỗi dòng Issue trong sổ
-   phải có một bình luận ✅ như thế trên đúng Issue của nó: do bot đăng, chưa từng bị sửa (updated_at = created_at), đăng
-   trong vòng 6 giờ sau giờ tạo Issue và (với dự báo) trước ngày resolve_at, chứa đúng hash của dòng; bot không được
-   đăng hash nào khác cho cùng mã. Giờ đăng bình luận do máy chủ GitHub ghi, không ai đặt lùi được; hash dòng phủ toàn
-   bộ nội dung và cả chuỗi phía trước. Vì vậy một dòng viết sau khi biết kết quả không thể mượn giờ của một Issue cũ,
-   kể cả khi thân Issue bị sửa cho khớp. Thân Issue về sau có bị sửa cũng không ảnh hưởng. Thân Issue chứa chuỗi
-   "ledger-attest" bị workflow nhận từ chối, và bình luận ❌ không bao giờ mang dấu nhận.
+3. DẤU NHẬN (--github) — bằng chứng gốc về NỘI DUNG lúc Issue mở. Workflow nhận (chạy khi Issue mở, đọc thân Issue lúc
+   mở) đăng một bình luận dưới tên github-actions[bot] chứa "ledger-attest: <sổ> <mã> <hash dòng>". Mỗi dòng của sổ phải
+   có một bình luận ✅ như thế trên đúng Issue của nó: do bot đăng, chưa từng bị sửa (updated_at = created_at), đăng
+   không trước giờ tạo Issue, chứa đúng hash của dòng; bot không được đăng hash nào khác cho cùng mã. Với DỰ BÁO, dấu
+   nhận còn phải đăng trong 6 giờ sau giờ tạo Issue và trước ngày resolve_at. Giờ đăng bình luận do máy chủ GitHub ghi,
+   không ai đặt lùi được; hash dòng phủ toàn bộ nội dung và cả chuỗi phía trước. Vì vậy một dự báo viết sau khi biết
+   kết quả không thể mượn giờ của một Issue cũ, kể cả khi thân Issue bị sửa cho khớp. Thân Issue về sau có bị sửa cũng
+   không ảnh hưởng. Thân Issue chứa chuỗi "ledger-attest" bị workflow nhận từ chối, và bình luận ❌ không bao giờ mang
+   dấu nhận. Chạy lại job nhận chỉ trả lại dấu nhận cho dòng đúng là dòng robot dựng từ thân Issue lúc mở.
+   - Không có khoảng miễn kiểm: dòng nào thiếu dấu nhận là lỗi, kể cả khi Issue vừa mở. Nhưng robot nhận đẩy commit
+     TRƯỚC rồi mới đăng dấu nhận, và hai robot có thể chạy xen kẽ; nên khi thấy một dòng thiếu dấu nhận mà Issue của nó
+     còn trong hạn 6 giờ, kiểm toán ĐỌC LẠI bình luận trong một khoảng chờ hữu hạn (mặc định 6 lượt, cách nhau 30 giây)
+     rồi mới kết luận. Hết lượt vẫn thiếu thì vẫn là lỗi; không dòng nào được coi là đạt khi chưa có dấu nhận.
+   - Dấu nhận của dòng PHÂN ĐỊNH không có hạn 6 giờ. Lùi giờ một phân định không đổi được gì: thứ tự chấm là thứ tự dòng
+     trong sổ, và luật phân định đã buộc Issue phân định mở sau mọi dự báo của câu hỏi, không trước resolve_at. Nhờ vậy
+     job phân định hỏng ở bước đăng dấu nhận luôn chạy lại được.
+   - Phục hồi cho dự báo (ghi thêm, không sửa sổ): một dự báo CÓ dấu nhận của robot nhưng dấu nhận tới quá hạn (job nhận
+     phải chạy lại sau 6 giờ), nếu câu hỏi của nó đã bị hủy bằng một dòng VOID có dấu nhận hợp lệ, thì không còn là lỗi —
+     dự báo VOID không bao giờ được chấm. Việc đó được in ra thành ghi chú. Dự báo không có dấu nhận nào của robot thì
+     VOID cũng không gỡ được.
 4. L-10 (--github) — cảnh báo (không chặn) khi nhánh main chưa có luật bảo vệ nào.
 
 Việc từng dòng có đúng LUẬT NHẬN hay không (hợp đồng, L-05, mỗi ghế một dự báo…) do tools/validate.py chạy lại
@@ -37,17 +49,21 @@ gọi qua workflow_run), và mỗi ngày một lần.
 Dùng trong CI:  python tools/ledger_audit.py --base "$BASE_SHA" --github
 Môi trường: GITHUB_TOKEN, GITHUB_REPOSITORY (owner/repo). Thoát 1 khi có lỗi.
 """
-import argparse, csv, io, json, os, pathlib, re, subprocess, sys, urllib.request
+import argparse, csv, io, json, os, pathlib, re, subprocess, sys, time, urllib.request
 from datetime import datetime, timedelta, timezone
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+from tools.laws_checks import ATTEST_WINDOW, TRIAL_HEADERS  # noqa: E402  một định nghĩa cho bên ghi và bên kiểm
+
 APPEND_ONLY = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "research/trial_registry.jsonl",
                "paper/nav.csv", "paper/decisions.csv", "paper/trades.csv")
 TRIALS, REGISTRY = "research/trials.csv", "research/trial_registry.jsonl"
 V302_MARKER = "tools/registry_push.py"   # có từ v3.0.2 và thuộc danh sách tệp bắt buộc của validate.py
 ZERO_SHA = "0" * 40
 BOT = "github-actions[bot]"
-ATTEST_WINDOW = timedelta(hours=6)       # dấu nhận phải có trong 6 giờ sau khi Issue mở (bình thường: khoảng 1 phút)
+# ATTEST_WINDOW (6 giờ, từ laws_checks): dấu nhận phải có trong khoảng đó sau khi Issue mở (bình thường: khoảng 1 phút).
+ATTEST_TRIES, ATTEST_WAIT = 6, 30.0      # đọc lại bình luận tối đa 6 lần, cách nhau 30 giây (2,5 phút) rồi mới kết luận thiếu dấu nhận
 
 
 def append_only_errors(base: dict, head: dict) -> list[str]:
@@ -99,21 +115,27 @@ _MARK_RE = re.compile(r"ledger-attest:\s*(predictions|resolutions)\s+(\S+)\s+([0
 VN = timezone(timedelta(hours=7))
 
 
-def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict) -> list[str]:
+def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, notes=None) -> list:
     """comments: {số Issue: [{"user": login, "created_at": iso, "updated_at": iso, "body": str}]}.
-    Trả về danh sách lỗi; KHÔNG có khoảng miễn kiểm cho Issue vừa mở. Một dòng đạt khi Issue của nó có bình luận ✅ của github-actions[bot], chưa sửa, đăng trong
-    ATTEST_WINDOW sau giờ tạo Issue (với dự báo: còn phải trước ngày resolve_at, giờ Việt Nam), chứa
-    'ledger-attest: <sổ> <mã> <hash>' đúng hash của dòng — và mọi bình luận của bot trên Issue đó không nêu hash nào
-    KHÁC cho cùng mã (không ai "đặt trước" hai nội dung rồi chọn một)."""
-    errs = []
-    def check(label, number, ledger, rid, rhash, before_day=None):
+    Trả về [(số Issue, lỗi)]; KHÔNG có khoảng miễn kiểm cho Issue vừa mở. Một dòng đạt khi Issue của nó có bình luận ✅
+    của github-actions[bot], chưa sửa, đăng không trước giờ tạo Issue, chứa 'ledger-attest: <sổ> <mã> <hash>' đúng hash
+    của dòng — và mọi bình luận của bot trên Issue đó không nêu hash nào KHÁC cho cùng mã (không ai "đặt trước" hai nội
+    dung rồi chọn một). Riêng DỰ BÁO: dấu nhận còn phải đăng trong ATTEST_WINDOW sau giờ tạo Issue và trước ngày resolve_at
+    (giờ Việt Nam) — đó là thứ chặn một dự báo viết sau mà mượn giờ Issue cũ.
+    Phục hồi (ghi thêm, không sửa sổ): một dự báo CÓ dấu nhận của robot nhưng dấu nhận ấy tới quá hạn (job nhận phải chạy
+    lại muộn), nếu câu hỏi của nó đã bị hủy bằng một dòng VOID có dấu nhận hợp lệ, thì không còn là lỗi — dự báo VOID không
+    bao giờ được chấm, không vào cặp A–B, không vào tiến độ. Việc đó được ghi vào `notes` để in ra. Dự báo không có dấu
+    nhận nào của robot thì VOID cũng không gỡ được."""
+    def find(number, ledger, rid, rhash, before_day=None, window=ATTEST_WINDOW):
+        """→ (True, "") khi có dấu nhận hợp lệ; (False, lý do) khi không; (None, "") khi Issue không có trên GitHub
+        (issue_crosscheck_errors đã báo)."""
         it = issues.get(number)
         if it is None:
-            return                                                # issue_crosscheck_errors đã báo
+            return None, ""
         try:
             opened = _ts(it.get("created_at"))
         except ValueError:
-            errs.append(f"L-05: {label} — không đọc được giờ tạo Issue #{number}"); return
+            return False, f"không đọc được giờ tạo Issue #{number}"
         why, ok, other = "không có bình luận dấu nhận nào chứa hash của dòng", False, set()
         for c in comments.get(number, []):
             marks = {m[2] for m in _MARK_RE.findall(c.get("body") or "") if m[0] == ledger and m[1] == str(rid)}
@@ -131,26 +153,84 @@ def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict) -> lis
                 posted = _ts(c.get("created_at"))
             except ValueError:
                 why = "không đọc được giờ đăng dấu nhận"; continue
-            if posted < opened or posted - opened > ATTEST_WINDOW:
+            if posted < opened:
+                why = f"dấu nhận đăng lúc {c.get('created_at')}, trước cả giờ tạo Issue {it.get('created_at')}"; continue
+            if window is not None and posted - opened > window:
                 why = (f"dấu nhận đăng lúc {c.get('created_at')}, cách giờ tạo Issue {it.get('created_at')} quá "
-                       f"{int(ATTEST_WINDOW.total_seconds() // 3600)} giờ"); continue
+                       f"{int(window.total_seconds() // 3600)} giờ"); continue
             if before_day and posted.astimezone(VN).date().isoformat() >= str(before_day):
                 why = f"dấu nhận đăng lúc {c.get('created_at')}, không trước ngày resolve_at {before_day} (giờ Việt Nam)"; continue
             ok = True
         if ok and other:
             ok, why = False, f"robot còn đăng dấu nhận với hash khác cho cùng mã {rid} — không xác định được nội dung nào có trước"
-        if ok:
-            return
-        errs.append(f"L-05: {label} — Issue #{number}: {why}. Dòng này không có bằng chứng là nội dung đã có từ lúc Issue mở "
-                    "(dòng ghi vòng qua workflow nhận, hoặc dấu nhận bị xóa/sửa; nếu workflow nhận vừa chạy xong thì chạy lại "
-                    "kiểm toán sau ít phút)")
+        return ok, ("" if ok else why)
+
+    def error(label, number, why, how):
+        return (number, f"L-05: {label} — Issue #{number}: {why}. Dòng này không có bằng chứng là nội dung do robot ghi từ thân "
+                        f"Issue (dòng ghi vòng qua workflow nhận, hoặc dấu nhận bị xóa/sửa, hoặc bước đăng dấu nhận bị hỏng — "
+                        f"khi đó {how})")
+
+    res_errs, voided = [], {}
+    for r in res_rows:                      # phân định trước: cần biết câu hỏi nào đã bị hủy bằng dòng VOID có dấu nhận hợp lệ
+        n = r.get("resolution_issue")
+        if n is None:
+            continue
+        ok, why = find(n, "resolutions", r.get("prediction_id"), r.get("hash"), window=None)
+        if ok is False:
+            res_errs.append(error(f"phân định {r.get('prediction_id')}", n, why, "chạy lại job phân định của Issue này (lúc nào cũng được)"))
+        elif ok and "outcome" in r and r["outcome"] is None:
+            voided[r.get("prediction_id")] = n
+    pred_errs = []
     for r in pred_rows:
-        if "issue_number" in r:
-            check(f"dự báo {r.get('id')}", r.get("issue_number"), "predictions", r.get("id"), r.get("hash"), r.get("resolve_at"))
-    for r in res_rows:
-        if r.get("resolution_issue") is not None:
-            check(f"phân định {r.get('prediction_id')}", r.get("resolution_issue"), "resolutions", r.get("prediction_id"), r.get("hash"))
-    return errs
+        if "issue_number" not in r:
+            continue
+        n, rid = r.get("issue_number"), r.get("id")
+        ok, why = find(n, "predictions", rid, r.get("hash"), r.get("resolve_at"))
+        if ok is not False:
+            continue
+        if rid in voided and find(n, "predictions", rid, r.get("hash"), None, None)[0]:
+            if notes is not None:
+                notes.append(f"dự báo {rid} (Issue #{n}): dấu nhận của robot tới quá hạn ({why}), nhưng câu hỏi đã bị hủy bằng VOID ở "
+                             f"phân định Issue #{voided[rid]} có dấu nhận — dự báo này không được chấm, không tính là lỗi")
+            continue
+        pred_errs.append(error(f"dự báo {rid}", n, why,
+                               "chạy lại job nhận của Issue này trong vòng 6 giờ kể từ lúc Issue mở; đã quá hạn thì vẫn chạy lại job "
+                               "để robot đăng dấu nhận muộn, rồi mở Issue Resolution chọn VOID để hủy câu hỏi của dòng này"))
+    return pred_errs + res_errs
+
+
+def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict) -> list[str]:
+    """Danh sách lỗi dấu nhận (xem attestation_failures) với MỘT lượt đọc bình luận."""
+    return [msg for _, msg in attestation_failures(pred_rows, res_rows, issues, comments)]
+
+
+def attestation_errors_with_retry(pred_rows, res_rows, issues: dict, fetch, tries=ATTEST_TRIES, wait=ATTEST_WAIT,
+                                  sleep=time.sleep, now=None) -> list[str]:
+    """Như attestation_errors, nhưng ĐỌC LẠI bình luận khi còn dòng thiếu dấu nhận mà dấu nhận vẫn có thể tới đúng hạn.
+    Lý do: robot nhận đẩy commit trước rồi mới đăng bình luận ✅; kiểm toán chạy sau khi MỘT robot xong nhưng đọc cả main,
+    nên có thể thấy dòng của robot KHÁC vừa đẩy mà chưa kịp đăng dấu nhận. fetch(): hàm trả về {số Issue: [bình luận]}.
+    - Chỉ đọc lại khi có ít nhất một dòng lỗi thuộc Issue mở chưa quá ATTEST_WINDOW (quá hạn đó thì dấu nhận có tới cũng
+      không hợp lệ, chờ là vô ích).
+    - Tối đa `tries` lượt đọc, cách nhau `wait` giây. Hết lượt mà vẫn thiếu → trả về lỗi như thường: đây không phải
+      khoảng miễn kiểm, không dòng nào được coi là đạt khi chưa có dấu nhận."""
+    now = now or datetime.now(timezone.utc)
+    def fresh(number):
+        try:
+            return now - _ts((issues.get(number) or {}).get("created_at")) <= ATTEST_WINDOW
+        except (TypeError, ValueError):
+            return False
+    notes = []
+    fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes)
+    for _ in range(max(1, int(tries)) - 1):
+        if not fails or not any(fresh(n) for n, _ in fails):
+            break
+        print(f"(còn {len(fails)} dòng chưa thấy dấu nhận, Issue vừa mở: chờ {wait:g} giây rồi đọc lại bình luận)")
+        sleep(wait)
+        notes = []
+        fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes)
+    for n in notes:
+        print("::notice::" + n)
+    return [msg for _, msg in fails]
 
 
 def _trials(data):
@@ -173,9 +253,14 @@ def _reg_ids(data) -> set:
 
 
 def trials_rows_errors(base_trials, head_trials) -> list[str]:
-    """Mọi kết quả thử đã có ở commit gốc phải còn nguyên từng ô, đúng thứ tự (so theo tên cột của commit gốc)."""
+    """Mọi kết quả thử đã có ở commit gốc phải còn nguyên từng ô, đúng thứ tự (so theo tên cột của commit gốc), và TIÊU ĐỀ
+    chỉ được giữ nguyên hoặc đi từ 13 cột gốc lên đúng 17 cột (lần ghi đầu của v3.0.2). Thêm cột lạ, đổi tên, đổi chỗ hay
+    bớt cột — dù mọi ô cũ còn nguyên — làm lần ghi kế tiếp của vòng học hỏng, nên là lỗi."""
     bh, br = _trials(base_trials)
-    _, hr = _trials(head_trials)
+    hh, hr = _trials(head_trials)
+    if bh and hh != bh and not (bh == TRIAL_HEADERS[0] and hh == TRIAL_HEADERS[1]):
+        return [f"L-06: tiêu đề {TRIALS} bị đổi so với commit gốc ({len(bh)} cột → {len(hh)} cột) — chỉ được giữ nguyên, hoặc từ "
+                "13 cột gốc lên đúng 17 cột do vòng học ghi"]
     for i, row in enumerate(br):
         if i >= len(hr):
             return [f"L-06: {TRIALS} mất kết quả {row.get('trial_id')} (và các dòng sau) so với commit gốc"]
@@ -221,8 +306,9 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
         parent = git("rev-parse", "--verify", "-q", f"{c}^").stdout.decode().strip()
         if not parent:
             continue
-        if show(c, V302_MARKER) is None:
-            continue          # commit của kho trước v3.0.2 (vòng học bản cũ, chưa có sổ đăng ký): kết quả đó do ghim và dòng neo chốt
+        if show(c, V302_MARKER) is None and show(parent, V302_MARKER) is None:
+            continue          # commit của kho trước v3.0.2 (vòng học bản cũ, chưa có sổ đăng ký): kết quả đó do ghim và dòng neo chốt.
+                              # Phải thiếu tệp mốc ở CẢ commit lẫn commit cha: xóa tệp mốc trong chính commit ghi kết quả không được miễn.
         before, after = _trials(show(parent, TRIALS))[1], _trials(show(c, TRIALS))[1]
         new = [t.get("trial_id") for t in after[len(before):]]
         if not new:
@@ -290,6 +376,8 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--base", default="")
     ap.add_argument("--github", action="store_true")
+    ap.add_argument("--attest-tries", type=int, default=ATTEST_TRIES, help="số lượt đọc bình luận dấu nhận (>=1)")
+    ap.add_argument("--attest-wait", type=float, default=ATTEST_WAIT, help="giây chờ giữa hai lượt đọc")
     a = ap.parse_args()
     errs = []
     base = (a.base or "").strip()
@@ -313,7 +401,8 @@ def main() -> int:
                 if need:
                     issues = fetch_issues(repo, token)
                     errs += issue_crosscheck_errors(pred, res, issues, repo.split("/")[0])
-                    errs += attestation_errors(pred, res, issues, fetch_comments(repo, token))
+                    errs += attestation_errors_with_retry(pred, res, issues, lambda: fetch_comments(repo, token),
+                                                          tries=a.attest_tries, wait=a.attest_wait)
                 br = _api(f"https://api.github.com/repos/{repo}/branches/main", token)
                 rules = _api(f"https://api.github.com/repos/{repo}/rules/branches/main", token)
                 if not br.get("protected") and not rules:

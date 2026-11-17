@@ -23,6 +23,7 @@ REQUIRED = ["BOOT.md", "CHANGELOG.md", "config.yaml", ".github/workflows/daily_c
             ".github/ISSUE_TEMPLATE/forecast.yml", ".github/ISSUE_TEMPLATE/resolution.yml",
             ".github/workflows/ledger_intake.yml", ".github/workflows/resolution_intake.yml", ".github/workflows/tests.yml",
             "tools/ledger_intake.py", "tools/resolution_intake.py", "tools/laws_checks.py",
+            "contracts/forecast_issue.schema.json", "contracts/resolution.schema.json",
             "tools/review_gate.py", "tools/ledger_audit.py", "tools/registry_push.py", ".github/workflows/review_gate.yml",
             ".github/workflows/ledger_audit.yml",
             ".github/pull_request_template.md", "architecture/adr/ADR-0003-phan-dinh-va-van-hanh.md",
@@ -43,19 +44,25 @@ try:
     n_sources = len(json.loads((ROOT / "library/SOURCE_MANIFEST.json").read_text(encoding="utf-8")).get("files") or {})
 except Exception as e:
     n_sources = 0; errors.append(f"library/SOURCE_MANIFEST.json đọc lỗi ({e})")
-def _count_issue_forecasts(rel):
+def _jsonl(rel):
     p = ROOT / rel
-    if not p.is_file(): return 0
-    n = 0
-    for i, l in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
+    out = []
+    for i, l in enumerate(p.read_text(encoding="utf-8").splitlines() if p.is_file() else [], 1):
         if not l.strip(): continue
         try:
-            n += "issue_number" in json.loads(l)
+            r = json.loads(l)
         except ValueError:
-            errors.append(f"{rel}: dòng {i} không phải JSON")      # báo lỗi, không đổ
-    return n
-n_forecasts = _count_issue_forecasts("ledger/predictions.jsonl")          # chỉ dự báo A+B qua Issue (§8 G1), không đếm dòng engine
-progress = f"tiến độ G1: tài liệu gốc ghim {n_sources}/40, dự báo A+B trong Ledger {n_forecasts}/60"
+            errors.append(f"{rel}: dòng {i} không phải JSON"); continue    # báo lỗi, không đổ
+        if isinstance(r, dict): out.append(r)
+    return out
+# Chỉ dự báo A+B qua Issue (§8 G1). Dự báo đã VOID (câu hỏi bị hủy) không tính vào tiến độ: nó không bao giờ được chấm.
+_void = {r.get("prediction_id") for r in _jsonl("ledger/resolutions.jsonl")
+         if r.get("resolution_issue") is not None and "outcome" in r and r["outcome"] is None}
+_issue_rows = [r for r in _jsonl("ledger/predictions.jsonl") if "issue_number" in r]
+n_forecasts = sum(1 for r in _issue_rows if r.get("id") not in _void)
+n_void = len(_issue_rows) - n_forecasts
+progress = (f"tiến độ G1: tài liệu gốc ghim {n_sources}/40, dự báo A+B trong Ledger {n_forecasts}/60"
+            + (f" (không tính {n_void} dự báo đã VOID)" if n_void else ""))
 
 # ---------- 3) Mọi YAML trong repo phải đọc được ----------
 yamls = sorted(p for ext in ("*.yaml", "*.yml") for p in ROOT.rglob(ext) if ".git" not in p.parts)

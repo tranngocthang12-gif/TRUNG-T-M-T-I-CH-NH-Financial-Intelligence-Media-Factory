@@ -6,6 +6,24 @@ Chạy trong workflow ledger_intake.yml. Đầu vào qua biến môi trường:
 đã có trong Ledger (bỏ qua), 1 khi lỗi hệ thống. "attest" là dấu nhận "predictions F-<n> <hash>": workflow đăng nó thành
 bình luận của github-actions[bot] trên Issue; tools/ledger_audit.py đối chiếu từng dòng sổ với dấu nhận đó.
 
+THỨ TỰ (ADR-0003 quyết định 10). Robot nhận dự báo và robot phân định chạy độc lập; thứ tự chúng GHI có thể khác thứ tự
+MỞ Issue. Sổ chỉ ghi thêm nên không được phép ghi một trạng thái mà kiểm lại sẽ đánh đỏ. Ba lớp:
+1. Luật lúc ghi dựa vào TRẠNG THÁI SỔ ngay lúc ghi (mỗi lần ghi là "lấy main mới nhất → quyết định → đẩy; main đã đổi thì
+   làm lại từ đầu", nên quyết định luôn ứng với đúng trạng thái được ghi tiếp lên): câu hỏi đã có kết quả trong sổ thì
+   không nhận thêm dự báo — kể cả khi Issue dự báo mở trước Issue phân định; và một Issue phân định chỉ ghi được khi mọi
+   dự báo của câu hỏi đang có trong sổ đều mở TRƯỚC nó (tools/resolution_intake.decide).
+2. Tự kiểm trước khi ghi: main() dựng trạng thái sổ SAU KHI GHI trong bộ nhớ và chạy lại toàn bộ luật kiểm (ledger_errors —
+   đúng hàm mà tools/validate.py chạy). Có lỗi MỚI thì không ghi, báo lỗi hệ thống. Luật lúc ghi và luật kiểm lại có lệch
+   nhau ở đâu đó thì hậu quả là một Issue bị từ chối, không phải một sổ hỏng vĩnh viễn.
+3. Hạn ghi: dấu nhận của một dự báo phải được đăng trong 6 giờ sau khi Issue mở và trước ngày resolve_at. Robot không ghi
+   khi đã sát các hạn đó (chạy lại một job cũ sau nhiều giờ sẽ tạo dòng không bao giờ có dấu nhận hợp lệ).
+PHỤC HỒI, không sửa sổ: (a) Issue bị từ chối → mở Issue mới. (b) Job hỏng giữa chừng → chạy lại job: đã ghi thì không ghi
+trùng mà chỉ đăng bổ sung dấu nhận, và chỉ cho dòng khớp thân Issue lúc mở. (c) Một dự báo đã nằm trong sổ mà dấu nhận
+không kịp hạn (GitHub không cho đăng bình luận suốt 6 giờ, hoặc bình luận ✅ bị xóa) → chạy lại job để robot đăng dấu nhận
+muộn, rồi mở Issue Resolution chọn VOID cho câu hỏi đó (VOID ghi được cả trước resolve_at): dự báo đã VOID không bao giờ
+được chấm, nên kiểm toán nhận dấu nhận muộn của nó (tools/ledger_audit.py). Dấu nhận của dòng phân định không có hạn 6
+giờ, nên (b) luôn đủ cho phân định.
+
 Luật kiểm lúc nhận — forecast_error() — (mọi "ngày" tính theo giờ Việt Nam, UTC+7). CI chạy LẠI đúng các luật này trên mọi
 dòng đã có trong sổ (replay(), gọi từ tools/validate.py), nên một dòng ghi vòng qua intake vẫn bị bắt:
 - Thân Issue: mỗi trường đúng một tiêu đề "### <trường>"; trùng tiêu đề hoặc trường lạ → từ chối; chứa chuỗi
@@ -22,13 +40,15 @@ dòng đã có trong sổ (replay(), gọi từ tools/validate.py), nên một d
 - Một câu hỏi (question + resolve_at) mỗi ghế chỉ một dự báo; ghế kia nếu đã ghi thì resolution_rule và resolution_source
   phải giống hệt; cùng câu chữ mà khác resolve_at → từ chối. Khác ngày với ghế kia vẫn ghi nhưng không vào cặp A–B (§4.2).
 - Câu hỏi đã được phân định thì không nhận thêm dự báo.
+- Mọi dòng của sổ phải đến từ Issue: đường ghi dự báo của engine đang đóng (config.yaml ledger.engine_forecasts), dòng
+  không có issue_number là lỗi dù mang mã gì.
 Mỗi dòng có id "F-<số Issue>", issue_created_at, issue_author, prev_hash, hash.
 """
 import hashlib, json, math, os, pathlib, re, sys
 from datetime import date, datetime, timedelta, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
-from tools.laws_checks import line_hash, nfc, recommendation_hit, recognised_seat  # noqa: E402
+from tools.laws_checks import ATTEST_WINDOW, line_hash, nfc, recommendation_hit, recognised_seat  # noqa: E402
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "ledger" / "predictions.jsonl"
@@ -43,6 +63,8 @@ SYSTEM_FIELDS = {"id", "issue_number", "issue_created_at", "issue_author", "prev
 _NUMBER_RE = re.compile(r"[0-9]+(?:[.,][0-9]+)?")          # chỉ chữ số ASCII: float() của Python nhận cả 'nan', '1_0', '١٢', '1e309'
 _DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")       # date.fromisoformat nhận cả '20261210', '2026-W50-4'
 _HEX64_RE = re.compile(r"[0-9a-f]{64}")
+WRITE_MARGIN = timedelta(minutes=30)      # job nhận chạy tối đa 15 phút: còn dưới 30 phút tới hạn dấu nhận thì không ghi nữa
+NOW_ENV = "TTC_INTAKE_NOW"                # chỉ để test đặt giờ; workflow không đặt biến này → dùng đồng hồ máy chạy
 # Tên miền trong một chuỗi nguồn. 'tp.hcm', 'q.iv', 'x.pdf' không phải tên miền (đuôi phải thuộc danh sách).
 _TLDS = "vn|com|org|net|gov|edu|int|io|co|uk|us|eu|info|asia"
 _DOMAIN_RE = re.compile(r"(?<![a-z0-9@.-])((?:[a-z0-9-]+\.)+(?:" + _TLDS + r"))(?![a-z0-9.-])")
@@ -85,9 +107,42 @@ def promised_domains(text) -> set:
     return {d[4:] if d.startswith("www.") else d for d in _DOMAIN_RE.findall(t)}
 
 
+def ts(iso) -> datetime:
+    """Mốc thời gian ISO do GitHub cấp → datetime có múi giờ. ValueError nếu không đọc được hoặc thiếu múi giờ
+    (so hai mốc bằng chuỗi sẽ sai khi một bên viết '+00:00', bên kia viết 'Z')."""
+    d = datetime.fromisoformat(str(iso).strip().replace("Z", "+00:00"))
+    if d.tzinfo is None:
+        raise ValueError(f"mốc thời gian '{iso}' thiếu múi giờ")
+    return d
+
+
 def vn_day(iso: str) -> date:
     """Ngày theo giờ Việt Nam của một mốc thời gian ISO do GitHub cấp (UTC)."""
     return datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(VN).date()
+
+
+def now_utc() -> datetime:
+    """Giờ hiện tại. Test đặt TTC_INTAKE_NOW; khi chạy thật là đồng hồ của máy chạy workflow. Đây chỉ là lưới an toàn của
+    bên ghi — bên kiểm (tools/ledger_audit.py) dùng giờ đăng bình luận do máy chủ GitHub ghi, không tin đồng hồ này."""
+    v = os.environ.get(NOW_ENV, "").strip()
+    return ts(v) if v else datetime.now(timezone.utc)
+
+
+def write_deadline_error(created, now, resolve_at=None):
+    """Hạn ghi. Dấu nhận (bình luận của robot, đăng ngay sau khi ghi) chỉ hợp lệ khi đăng trong ATTEST_WINDOW sau giờ tạo
+    Issue và — với dự báo — trước 00:00 ngày resolve_at (giờ Việt Nam). Một job nhận bị chạy lại muộn, hay một Issue mở
+    sát nửa đêm trước ngày resolve_at, nếu vẫn ghi sẽ để lại trong sổ một dòng vĩnh viễn không có dấu nhận hợp lệ. Vì vậy
+    còn dưới WRITE_MARGIN tới một trong hai hạn thì KHÔNG ghi. Trả về lời từ chối hoặc None."""
+    opened = ts(created)
+    if now - opened > ATTEST_WINDOW - WRITE_MARGIN:
+        h, m = divmod(int((ATTEST_WINDOW - WRITE_MARGIN).total_seconds() // 60), 60)
+        return (f"Issue này mở lúc {created}, tới giờ robot chạy ({now.isoformat(timespec='seconds')}) đã quá {h} giờ {m} phút. "
+                f"Dấu nhận của sổ phải được đăng trong {int(ATTEST_WINDOW.total_seconds() // 3600)} giờ sau khi Issue mở, nên robot "
+                "không ghi nữa. Mở Issue mới với cùng nội dung (giờ tính từ Issue mới)")
+    if resolve_at is not None and (now + WRITE_MARGIN).astimezone(VN).date().isoformat() >= str(resolve_at):
+        return (f"(L-05) đã quá sát ngày resolve_at {resolve_at}: dấu nhận của sổ phải được đăng trước 00:00 ngày đó (giờ Việt "
+                f"Nam), robot cần ít nhất {int(WRITE_MARGIN.total_seconds() // 60)} phút. Không ghi")
+    return None
 
 
 def norm_question(q) -> str:
@@ -161,11 +216,16 @@ def _schema():
     return json.loads(SCHEMA.read_text(encoding="utf-8"))
 
 
-def forecast_error(data, created, issue_rows, res_rows=(), schema=None, prompt_hash="current"):
+def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=True):
     """Luật nhận một dự báo. data: các trường của form; created: giờ tạo Issue (ISO); issue_rows: các dòng dự báo Issue đã
     có TRƯỚC nó; res_rows: các dòng phân định. Trả về (lỗi hoặc None, ghi chú). Hàm thuần — intake và replay() dùng chung.
-    prompt_hash="current": seat B phải khớp prompt hiện hành (lúc nhận); None: chỉ kiểm dạng (lúc kiểm lại dòng cũ, vì
-    prompt có thể đã đổi qua ADR sau khi dòng được ghi)."""
+    live=True (lúc nhận): res_rows là sổ phân định NGAY LÚC GHI; live=False (kiểm lại dòng đã có): res_rows là cả sổ. Hai
+    chỗ khác nhau, và chỉ hai chỗ:
+    - seat B: lúc nhận phải khớp prompt hiện hành; lúc kiểm lại chỉ kiểm dạng (prompt có thể đã đổi qua ADR sau đó).
+    - câu hỏi đã có kết quả: lúc nhận, CÓ BẤT KỲ dòng phân định nào của câu hỏi trong sổ là từ chối — kể cả khi Issue dự
+      báo này mở trước Issue phân định (robot ghi theo thứ tự chạy xong, không theo thứ tự mở). Lúc kiểm lại, sổ đầy đủ
+      luôn chứa cả các phân định ghi SAU dòng đang xét, nên chỉ phân định mở KHÔNG SAU dự báo mới là lỗi ở đây; trường hợp
+      còn lại (dự báo mở trước nhưng ghi sau phân định) do resolution_intake.replay bắt: phân định khi ấy không phủ nó."""
     import jsonschema
     try:
         jsonschema.validate(data, schema or _schema())
@@ -201,7 +261,7 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, prompt_h
                 "định máy chỉ nhận đường dẫn thuộc tên miền đã hứa"), ""
     if data["seat"] == "B":
         got = str(data.get("prompt_hash", "")).strip().lower()
-        if prompt_hash == "current":
+        if live:
             want = control_b_hash()
             if want is None:
                 return ": không đọc được khối prompt trong governance/CONTROL_B_PROMPT.md để đối chiếu prompt_hash", ""
@@ -219,9 +279,19 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, prompt_h
                     "cùng câu chữ thì phải cùng resolve_at, hoặc viết câu hỏi mới"), ""
     same_q = [r for r in issue_rows if qkey(r) == key]
     same_ids = {r.get("id") for r in same_q}
-    done = sorted({str(r.get("prediction_id")) for r in res_rows if r.get("prediction_id") in same_ids
-                   and r.get("resolution_issue") is not None and str(r.get("resolution_issue_created_at") or "") <= created})
+    opened = ts(created)
+    def not_after(iso):                                    # Issue phân định mở không sau Issue dự báo này (không đọc được → coi là có)
+        try:
+            return ts(iso) <= opened
+        except (TypeError, ValueError):
+            return True
+    res_q = [r for r in res_rows if r.get("prediction_id") in same_ids and r.get("resolution_issue") is not None]
+    done = sorted({str(r.get("prediction_id")) for r in res_q if live or not_after(r.get("resolution_issue_created_at"))})
     if done:
+        if all(not not_after(r.get("resolution_issue_created_at")) for r in res_q):
+            return (f": câu hỏi này đã được phân định ({', '.join(done)}) trước khi robot ghi được dự báo này. Sổ không nhận "
+                    "thêm dự báo cho câu hỏi đã có kết quả, kể cả khi Issue dự báo mở trước Issue phân định (robot ghi theo "
+                    "thứ tự chạy xong). Chỉ mở Issue phân định sau khi mọi dự báo của câu hỏi đã có ✅"), ""
         return f": câu hỏi này đã được phân định ({', '.join(done)}); không nhận thêm dự báo sau khi đã có kết quả", ""
     for r in same_q:
         if str(r.get("seat")) == data["seat"]:
@@ -242,30 +312,23 @@ def build_row(data, number, created, author, prev):
     return row
 
 
-def is_engine_row(row) -> bool:
-    """Dòng dự báo do engine ghi (engine/ledger.record): không issue_number, mã "P-…", luật chấm là dict có ticker,
-    không mang ghế A/B của thí nghiệm Issue."""
-    rr = row.get("resolution_rule")
-    return ("issue_number" not in row and str(row.get("id", "")).startswith("P-") and isinstance(rr, dict) and "ticker" in rr
-            and str(row.get("seat", "")) not in ("A", "B"))
-
-
 def attest(row) -> str:
     """Dấu nhận của một dòng dự báo: workflow đăng thành bình luận, kiểm toán đối chiếu (tools/ledger_audit.py)."""
     return f"predictions {row.get('id')} {row.get('hash')}"
 
 
 def replay(pred_rows, res_rows=()) -> list[str]:
-    """Chạy lại luật nhận trên mọi dòng dự báo Issue đã có trong sổ, theo thứ tự. Trả về danh sách lỗi."""
+    """Chạy lại luật nhận trên MỌI dòng dự báo đã có trong sổ, theo thứ tự. Trả về danh sách lỗi."""
     errs, prior, seen = [], [], set()
     schema = _schema()
     for row in pred_rows:
         if "issue_number" not in row:
-            # Dòng không từ Issue chỉ được là dòng của engine: mã "P-…", luật chấm bằng giá (dict có ticker). Một dòng "F-…"
-            # hay mang ghế A/B mà thiếu issue_number là dòng tìm cách né kiểm lại và né dấu nhận.
-            if not is_engine_row(row):
-                errs.append(f"L-05: dòng dự báo {row.get('id')!r} không có issue_number và cũng không phải dòng của engine "
-                            "(mã P-…, luật chấm bằng giá) — dòng lạ không được nằm trong sổ")
+            # Không loại dòng nào được miễn. Trước vòng chấm 8, dòng "trông như của engine" (mã P-…, luật chấm có ticker)
+            # được bỏ qua: bốn dấu hiệu ấy ai cũng viết ra được, không chứng minh xuất xứ, và một dòng P- thiếu trường làm
+            # vòng học vỡ. Đường ghi dự báo của engine nay ĐÓNG (laws_checks.check_engine_gate), nên mọi dòng phải từ Issue.
+            errs.append(f"L-05: dòng dự báo {row.get('id')!r} không có issue_number — mọi dòng của sổ phải đến từ Issue "
+                        "'Forecast' (đường ghi dự báo của engine đang đóng: config.yaml ledger.engine_forecasts, ADR-0003 "
+                        "quyết định 11); dòng mang mã P-… hay bất kỳ mã nào khác đều không được nằm trong sổ")
             continue
         n, label = row.get("issue_number"), row.get("id")
         if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
@@ -277,13 +340,32 @@ def replay(pred_rows, res_rows=()) -> list[str]:
         seen.add(n)
         data = {k: v for k, v in row.items() if k not in SYSTEM_FIELDS}
         try:
-            msg, _ = forecast_error(data, row.get("issue_created_at"), prior, res_rows, schema, prompt_hash=None)
+            msg, _ = forecast_error(data, row.get("issue_created_at"), prior, res_rows, schema, live=False)
         except Exception as e:  # noqa: BLE001
             msg = f": không đọc được ({str(e).splitlines()[0]})"
         if msg:
             errs.append(f"L-05: dòng dự báo {label} trong sổ không qua luật nhận{msg}")
         prior.append(row)
     return errs
+
+
+def ledger_errors(pred_rows, res_rows) -> list[str]:
+    """TOÀN BỘ luật kiểm lại trên một trạng thái của hai sổ (dự báo + phân định). tools/validate.py gọi hàm này trên sổ
+    trong kho; hai robot nhận gọi nó trên trạng thái sau khi ghi, trước khi đẩy."""
+    from tools import resolution_intake                    # nạp muộn: resolution_intake nhập lại mô-đun này
+    return replay(pred_rows, res_rows) + resolution_intake.replay(pred_rows, res_rows)
+
+
+def post_write_errors(pred_before, res_before, pred_after, res_after) -> list[str]:
+    """Tự kiểm trước khi ghi: lỗi kiểm lại có ở trạng thái SAU KHI GHI mà trạng thái trước chưa có. Rỗng = ghi được.
+    So với trạng thái trước (chứ không đòi sổ sạch tuyệt đối) để một lỗi cũ đang chờ xử lý không khóa mọi Issue mới."""
+    before = ledger_errors(pred_before, res_before)
+    return [e for e in ledger_errors(pred_after, res_after) if e not in before]
+
+
+def system_error(msg) -> int:
+    print(json.dumps({"ok": False, "message": f"Lỗi hệ thống: {msg}"}, ensure_ascii=False))
+    return 1
 
 
 def reject(msg) -> int:
@@ -308,14 +390,34 @@ def main() -> int:
         return 1
     rows = load_rows(LEDGER)
     old = next((r for r in rows if r.get("issue_number") == number), None)
-    if old is not None:        # chạy lại job: không ghi trùng, nhưng trả lại dấu nhận để workflow đăng nếu lần trước chưa đăng được
+    if old is not None:
+        # Chạy lại job: không ghi trùng, và trả lại dấu nhận để workflow đăng nếu lần trước chưa đăng được — nhưng CHỈ khi dòng
+        # đang có trong sổ đúng là dòng robot dựng từ thân Issue lúc mở (job chạy lại nhận đúng thân Issue của sự kiện gốc).
+        # Một dòng mang số Issue này mà nội dung khác — ai đó ghi tay rồi chạy lại job để xin dấu nhận — không được cấp.
+        if strict_loads(dumps(build_row(data, number, created, author, old.get("prev_hash")))) != old:
+            return reject(f": sổ đã có một dòng mang số Issue #{number} nhưng nội dung dòng đó KHÔNG khớp thân Issue lúc mở. Robot "
+                          "chỉ cấp dấu nhận cho dòng do chính nó ghi từ thân Issue; dòng kia không có bằng chứng thời điểm")
         print(json.dumps({"ok": True, "duplicate": True, "attest": [attest(old)],
                           "message": f"Dự báo #{number} đã có trong Ledger, bỏ qua (không ghi trùng)"}, ensure_ascii=False))
         return 3
-    msg, note = forecast_error(data, created, [r for r in rows if "issue_number" in r], load_rows(RES))
+    res_rows = load_rows(RES)
+    try:
+        msg, note = forecast_error(data, created, [r for r in rows if "issue_number" in r], res_rows)
+        late = None if msg else write_deadline_error(created, now_utc(), data["resolve_at"])
+    except (TypeError, ValueError) as e:
+        return reject(f": không đọc được mốc thời gian ({str(e).splitlines()[0]})")
     if msg:
         return reject(msg)
+    if late:
+        return reject(f": {late}")
     row = build_row(data, number, created, author, rows[-1]["hash"] if rows else "GENESIS")
+    try:                                # tự kiểm: trạng thái sổ sau khi ghi dòng này phải qua đúng luật mà validate.py chạy
+        broken = post_write_errors(rows, res_rows, rows + [strict_loads(dumps(row))], res_rows)
+    except Exception as e:  # noqa: BLE001
+        broken = [f"không chạy được kiểm lại ({str(e).splitlines()[0]})"]
+    if broken:
+        return system_error(f"ghi dự báo #{number} sẽ làm sổ không qua kiểm lại luật — {broken[0]} — nên KHÔNG ghi. Đây là "
+                            "lỗi của máy (luật lúc ghi lệch luật kiểm lại), báo cho người giữ mã; sổ không bị đụng tới")
     LEDGER.parent.mkdir(parents=True, exist_ok=True)
     with LEDGER.open("a", encoding="utf-8") as f:
         f.write(dumps(row) + "\n")
