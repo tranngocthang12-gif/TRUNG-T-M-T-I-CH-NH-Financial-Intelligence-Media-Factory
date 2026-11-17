@@ -200,6 +200,58 @@ class ResolutionRuleTests(_Base):
         rp.write_text(good, encoding="utf-8")
         self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])
 
+    def test_forged_resolution_without_resolution_issue_is_rejected_and_not_scored(self):
+        """Vòng 7: bỏ trường resolution_issue thì dòng phân định được coi là 'dòng engine' — né chạy lại luật, né đối chiếu
+        Issue, né dấu nhận, mà engine vẫn chấm. Nay: dòng thiếu resolution_issue chỉ được trỏ tới dự báo của engine."""
+        rp = self.tmp / "ledger" / "resolutions.jsonl"
+        def write(rows):
+            out, prev = [], "GENESIS"
+            for r in rows:
+                r = {**r, "prev_hash": prev}; r["hash"] = laws_checks.line_hash(r); prev = r["hash"]
+                out.append(json.dumps(r, ensure_ascii=False, sort_keys=True))
+            rp.write_text("\n".join(out) + "\n", encoding="utf-8")
+            self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])       # hash chuỗi hợp lệ
+            return laws_checks.check_ledger_rows(self.tmp)
+        forged = [{"prediction_id": i, "resolved_at": "2026-12-11", "outcome": 1, "resolver": "Owner",
+                   "resolution_issue_created_at": "2026-12-11T03:00:00Z", "resolution_source": "https://www.nso.gov.vn/x", "quote": "số liệu"}
+                  for i in ("F-101", "F-102")]
+        errs = write(forged)
+        self.assertEqual(len([e for e in errs if "không có resolution_issue" in e]), 2, errs)
+        self.assertTrue(any("không qua" in e or "resolution_issue" in e for e in laws_checks.run_all(self.tmp)))   # validate.py đỏ
+        # kiểm toán GitHub: dòng này không mang số Issue nào để đối chiếu — vì thế việc chặn phải nằm ở validate (trên) và
+        # ở engine (dưới): engine không dùng dòng thiếu resolution_issue để chấm dự báo Issue
+        env = {**os.environ, "TTC_HOME": str(self.tmp), "PYTHONPATH": str(ROOT)}
+        code = ("import json;from engine import ledger as L;P=L._load(L.PRED);R=L._load(L.RES);"
+                "print(json.dumps(L.issue_summary(P,R)['by_seat']))")
+        r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
+        self.assertEqual(r.returncode, 0, r.stderr[-1500:])
+        seats = json.loads(r.stdout.strip().splitlines()[-1])
+        self.assertEqual((seats["A"]["resolved"], seats["B"]["resolved"]), (0, 0))   # điểm A–B không đổi vì dòng giả
+        # dòng thiếu resolution_issue trỏ tới dự báo không tồn tại, hay tới dự báo engine hợp lệ
+        self.assertTrue(write([{"prediction_id": "P-khong-co", "resolved_at": "2026-12-11", "outcome": 1}]))
+        pp = self.tmp / "ledger" / "predictions.jsonl"
+        rows = [json.loads(l) for l in pp.read_text(encoding="utf-8").splitlines()]
+        eng = {"id": "P-abc123", "created_at": "2026-11-18", "question": "VCB vượt bình quân universe trong 20 phiên",
+               "resolution_rule": {"type": "excess_return_positive", "ticker": "VCB", "horizon": 20}, "probability": 0.55,
+               "base_rate": 0.5, "prev_hash": rows[-1]["hash"]}
+        eng["hash"] = laws_checks.line_hash(eng)
+        good_pred = pp.read_text(encoding="utf-8")
+        pp.write_text(good_pred + json.dumps(eng, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+        ok_row = {"prediction_id": "P-abc123", "resolved_at": "2026-12-20", "excess_return": 0.01, "outcome": 1}
+        self.assertEqual(write([ok_row]), [])                                    # dòng engine thật: đạt
+        self.assertTrue(any("hai dòng" in e for e in write([ok_row, ok_row])))
+        self.assertTrue(any("trước ngày tạo" in e for e in write([{**ok_row, "resolved_at": "2026-11-01"}])))
+        self.assertTrue(any("outcome" in e for e in write([{**ok_row, "outcome": 2}])))
+        rp.unlink()
+        # phía dự báo: dòng mang mã F-… hoặc ghế A/B mà thiếu issue_number cũng là dòng tìm cách né kiểm
+        for bad in ({"id": "F-999", "seat": "A", "question": "Câu chèn?", "resolve_at": "2026-12-31", "p": 0.9},
+                    {**{k: v for k, v in eng.items() if k not in ("hash", "prev_hash")}, "id": "P-def456", "seat": "A"},
+                    {"id": "P-ghi789", "question": "thiếu luật chấm"}):
+            row = {**bad, "prev_hash": rows[-1]["hash"]}; row["hash"] = laws_checks.line_hash(row)
+            pp.write_text(good_pred + json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
+            self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])
+            self.assertTrue(any("không có issue_number" in e for e in laws_checks.check_ledger_rows(self.tmp)), bad)
+
     def test_resolution_day_is_vietnam_time(self):
         """resolve_at 31/12/2026: 30/12 22:00 UTC là 05:00 ngày 31/12 giờ VN → được; 30/12 16:00 UTC (23:00 VN 30/12) → chưa."""
         c, o = self._res(220, _resolution("F-101", "NO"), "2026-12-30T16:00:00Z")
@@ -271,7 +323,7 @@ class ScoringTests(_Base):
             for seat, p, num, day in (("A", 0.7, start + 2 * i, a_day), ("B", 0.3, start + 2 * i + 1, b_day)):
                 preds.append({"id": f"F-{num}", "issue_number": num, "issue_created_at": day, "seat": seat, "question": q,
                               "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5})
-                res.append({"prediction_id": f"F-{num}", "outcome": 1 if i < a_right else 0})
+                res.append({"prediction_id": f"F-{num}", "outcome": 1 if i < a_right else 0, "resolution_issue": 90000 + start + i})
         return preds, res
 
     def _score(self, preds, res):
@@ -334,11 +386,19 @@ class ScoringTests(_Base):
         self.assertAlmostEqual(ledger._binom_two_sided(2, 4), 1.0)
 
 
+def _config_without_pin(dst):
+    """config.yaml của kho thật nhưng bỏ research.legacy_pin (ghim 210 kết quả của kho thật không áp cho kho giả lập)."""
+    import yaml
+    cfg = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))
+    cfg["research"].pop("legacy_pin", None)
+    pathlib.Path(dst).write_text(yaml.safe_dump(cfg, allow_unicode=True, sort_keys=False), encoding="utf-8")
+
+
 class TrialRegistryTests(unittest.TestCase):
     def setUp(self):
         self.tmp = pathlib.Path(tempfile.mkdtemp())
         (self.tmp / "research").mkdir()
-        shutil.copy(ROOT / "config.yaml", self.tmp / "config.yaml")
+        _config_without_pin(self.tmp / "config.yaml")
 
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
@@ -349,53 +409,172 @@ class TrialRegistryTests(unittest.TestCase):
                            capture_output=True, text=True)
         return r.returncode, r.stdout, r.stderr
 
+    LEGACY = ("trial_id,cycle_date,method,spec_id,features,model,ic_mean,ic_t,net_ann,fold_pos,threshold,status,regimes\n"
+              'T00001,2026-09-28,mutate_best,M-a,lowvol_60;rev_5,ridge,-0.0146496299511184,-0.5685272773787465,-0.1493369139037447,'
+              '0.4210526315789473,3.0,REJECTED,"{""UP"": {""n"": 5, ""t"": -1.2116751096431657}}"\n'
+              'T00002,2026-09-28,random_subset,M-b,mom_60,gbm,0.01,0.3,-0.02,0.5,3.1,REJECTED,{}\n')
+
     def test_register_before_run_and_check(self):
+        """L-06 sau vòng 7: sổ mở đầu bằng dòng neo lịch sử; kết quả cũ không sửa được; mọi kết quả mới phải có đăng ký."""
+        tp = self.tmp / "research" / "trials.csv"
+        tp.write_text(self.LEGACY, encoding="utf-8")
+        self.assertEqual(laws_checks.check_trial_registry(self.tmp), [])        # chưa có sổ: hai kết quả lịch sử
         code, out, err = self._engine("""
             import json
+            import pandas as pd
             from engine import research
+            from engine.run_cycle import load_ledger
             spec = {"features": ["mom_60", "lowvol_20"], "model": "ridge"}
-            n = research.next_trial_number(None)
+            df = load_ledger()
+            n = research.next_trial_number(df)
             h1 = research.register_trial(f"T{n:05d}", "2026-11-20", "random_subset", spec, research.threshold(n))
-            n2 = research.next_trial_number(None)          # T00001 đăng ký nhưng chưa có kết quả → vẫn được đếm
+            n2 = research.next_trial_number(df)            # T00003 đăng ký nhưng chưa có kết quả → vẫn được đếm
+            h2 = research.register_trial(f"T{n2:05d}", "2026-11-20", "random_subset", spec, research.threshold(n2))
             def refused(tid, sp):
                 try:
                     research.register_trial(tid, "2026-11-20", "random_subset", sp, 3.0); return False
                 except RuntimeError:
                     return True
-            print(json.dumps({"n": n, "n2": n2, "h1": h1, "dup": refused(f"T{n:05d}", spec),
+            row = {"trial_id": f"T{n2:05d}", "cycle_date": "2026-11-20", "method": "random_subset", "spec_id": research.spec_id(spec),
+                   "features": "mom_60;lowvol_20", "model": "ridge", "ic_mean": 0.012345678901234567, "ic_t": 1.5, "net_ann": -0.01,
+                   "fold_pos": 0.5, "threshold": research.threshold(n2), "status": "REJECTED", "regimes": json.dumps({"UP": {"n": 3}}),
+                   "sharpe": 0.1, "sharpe_ann": 1.2, "dsr": float("nan"), "registry_hash": h2}
+            research.append_trial_results([row])
+            df2 = load_ledger()
+            print(json.dumps({"n": n, "n2": n2, "dup": refused(f"T{n:05d}", spec),
                               "new_feature": refused("T00009", {"features": ["mom_60", "feature_moi"], "model": "ridge"}),
                               "new_model": refused("T00010", {"features": ["mom_60"], "model": "transformer"}),
-                              "spec_id": research.spec_id(spec), "thr": research.threshold(n)}))
+                              "total": research.total_trials(df2), "next": research.next_trial_number(df2),
+                              "abandoned": research.abandoned_trials(df2), "rows": len(df2), "cols": list(df2.columns)}))
         """)
-        self.assertEqual(code, 0, err[-2000:])
+        self.assertEqual(code, 0, err[-2500:])
         d = json.loads(out.strip().splitlines()[-1])
-        self.assertEqual((d["n"], d["n2"], d["dup"]), (1, 2, True))
+        self.assertEqual((d["n"], d["n2"], d["dup"]), (3, 4, True))              # dòng neo không bị đếm là một lần thử
         self.assertTrue(d["new_feature"] and d["new_model"])                    # ngoài không gian đóng băng → engine từ chối
-        self.assertEqual(laws_checks.check_trial_registry(self.tmp), [])
-        cols = ["trial_id", "cycle_date", "spec_id", "threshold", "registry_hash"]
-        old = {"trial_id": "T00000", "cycle_date": "2026-11-20", "spec_id": "M-old", "threshold": "3.6", "registry_hash": ""}
-        new = {"trial_id": "T00001", "cycle_date": "2026-11-20", "spec_id": d["spec_id"], "threshold": repr(d["thr"]),
-               "registry_hash": d["h1"]}
-        tp = self.tmp / "research" / "trials.csv"
-        with tp.open("w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); w.writerow(old); w.writerow(new)
-        self.assertEqual(laws_checks.check_trial_registry(self.tmp), [])        # lần thử cũ (mã trước sổ, kể cả cùng ngày) không bị đòi
-        with tp.open("a", encoding="utf-8", newline="") as f:
-            csv.DictWriter(f, fieldnames=cols).writerow(new)                    # hai kết quả cho một lần đăng ký
-        self.assertTrue(any("hai kết quả" in e for e in laws_checks.check_trial_registry(self.tmp)))
-        with tp.open("w", encoding="utf-8", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=cols); w.writeheader(); w.writerow(new)
-            w.writerow({"trial_id": "T00002", "cycle_date": "2026-11-20", "spec_id": "M-x", "threshold": "3.7", "registry_hash": ""})
-        self.assertTrue(any("T00002" in e for e in laws_checks.check_trial_registry(self.tmp)))   # chạy không đăng ký
+        # vòng 7 điểm 3: tổng số lần thử gồm cả lần đăng ký rồi bỏ dở (T00003): 2 lịch sử + 1 bỏ dở + 1 có kết quả = 4
+        self.assertEqual((d["total"], d["next"], d["abandoned"], d["rows"]), (4, 5, ["T00003"], 3))
+        self.assertIn("n_total = research.total_trials(ledger_df)", (ROOT / "engine" / "run_cycle.py").read_text(encoding="utf-8"))
+        self.assertEqual(d["cols"][-4:], ["sharpe", "sharpe_ann", "dsr", "registry_hash"])
+        text = tp.read_text(encoding="utf-8")
+        old_lines, new_lines = self.LEGACY.strip().split("\n"), text.strip().split("\n")
+        self.assertEqual(new_lines[0], old_lines[0] + ",sharpe,sharpe_ann,dsr,registry_hash")
+        self.assertEqual(new_lines[1:3], [l + ",,,," for l in old_lines[1:]])    # dòng cũ giữ nguyên từng ký tự, chỉ thêm ô rỗng
         reg = self.tmp / "research" / "trial_registry.jsonl"
-        good = reg.read_text(encoding="utf-8")
-        reg.write_text(good.replace("random_subset", "cross_family"), encoding="utf-8")
-        self.assertTrue(any("hash" in e for e in laws_checks.check_trial_registry(self.tmp)))     # sửa sổ bị bắt
-        # dòng đăng ký ngoài không gian đóng băng, hash hợp lệ (viết tay) → kiểm máy vẫn bắt
-        row = json.loads(good.splitlines()[0])
-        row.update(trial_id="T00003", features="mom_60;feature_moi", prev_hash=row["hash"]); row["hash"] = laws_checks.line_hash(row)
-        reg.write_text(good + json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n", encoding="utf-8")
-        self.assertTrue(any("đóng băng" in e for e in laws_checks.check_trial_registry(self.tmp)))
+        rows = [json.loads(l) for l in reg.read_text(encoding="utf-8").splitlines()]
+        self.assertEqual([r["trial_id"] for r in rows], ["LEGACY-ANCHOR", "T00003", "T00004"])
+        self.assertEqual((rows[0]["kind"], rows[0]["results"], rows[0]["last_trial_id"]), ("legacy_anchor", 2, "T00002"))
+        self.assertEqual(laws_checks.check_trial_registry(self.tmp), [])        # T00003 không có kết quả: hợp lệ, vẫn được đếm
+        good_t, good_r = text, reg.read_text(encoding="utf-8")
+        def trials(t):
+            tp.write_text(t, encoding="utf-8"); e = laws_checks.check_trial_registry(self.tmp); tp.write_text(good_t, encoding="utf-8"); return e
+        # vòng 7 điểm 2: sửa, xóa, chèn kết quả lịch sử → lệch sha256 đã neo
+        self.assertTrue(any("lịch sử" in e for e in trials(good_t.replace("-0.0146496299511184", "0.0946496299511184"))))
+        self.assertTrue(any("lịch sử" in e for e in trials(good_t.replace("T00002,2026-09-28,random_subset,M-b", "T00002,2026-09-28,random_subset,M-z"))))
+        self.assertTrue(any("lịch sử" in e for e in trials("\n".join([new_lines[0], new_lines[2], new_lines[1], new_lines[3]]) + "\n")))
+        self.assertTrue(any("bị xóa" in e or "lịch sử" in e for e in trials("\n".join(new_lines[:2]) + "\n")))
+        # kết quả mới không có đăng ký (registry_hash rỗng không còn là lý do miễn kiểm), hai kết quả một mã, lệch spec/ngưỡng/hash
+        self.assertTrue(any("T00009" in e and "không có dòng đăng ký" in e for e in trials(good_t + "T00009,2026-11-20,x,M-x,mom_60,ridge,0,0,0,0,3.7,REJECTED,{},,,,\n")))
+        self.assertTrue(any("hai kết quả" in e for e in trials(good_t + new_lines[3] + "\n")))
+        self.assertTrue(any("spec_id lệch" in e for e in trials(good_t.replace(new_lines[3], new_lines[3].replace(",M-", ",M-zz", 1)))))
+        self.assertTrue(any("registry_hash" in e for e in trials(good_t.replace(rows[2]["hash"], "0" * 64))))
+        def registry(t):
+            reg.write_text(t, encoding="utf-8"); e = laws_checks.check_trial_registry(self.tmp); reg.write_text(good_r, encoding="utf-8"); return e
+        self.assertTrue(any("hash" in e for e in registry(good_r.replace("random_subset", "cross_family"))))     # sửa sổ bị bắt
+        def chain(objs):
+            out, prev = [], "GENESIS"
+            for o in objs:
+                o = {k: v for k, v in o.items() if k not in ("hash", "prev_hash")}; o["prev_hash"] = prev
+                o["hash"] = laws_checks.line_hash(o); prev = o["hash"]; out.append(json.dumps(o, ensure_ascii=False, sort_keys=True))
+            return "\n".join(out) + "\n"
+        # các sổ viết tay có hash hợp lệ: bỏ dòng neo; neo khai ít kết quả hơn; dòng ngoài không gian đóng băng; mã không tăng dần
+        self.assertTrue(any("dòng neo" in e for e in registry(chain(rows[1:]))))
+        self.assertTrue(registry(chain([{**rows[0], "results": 1, "last_trial_id": "T00001"}] + rows[1:])))
+        self.assertTrue(any("đóng băng" in e for e in registry(chain(rows + [{**rows[2], "trial_id": "T00005", "features": "mom_60;feature_moi"}]))))
+        self.assertTrue(any("tăng dần" in e for e in registry(chain([rows[0], rows[2], rows[1]]))))
+        self.assertTrue(any("hơn một dòng neo" in e for e in registry(chain(rows + [rows[0]]))))
+        reg.unlink()
+        self.assertTrue(any("thiếu research/trial_registry.jsonl" in e for e in laws_checks.check_trial_registry(self.tmp)))
+
+    def test_first_210_results_are_pinned_in_config(self):
+        """Vòng 7 điểm 2: 210 kết quả thử đầu tiên được ghim sha256 ngay trong config.yaml — có hiệu lực cả khi chưa có sổ đăng ký."""
+        import yaml
+        pin = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))["research"]["legacy_pin"]
+        text = (ROOT / "research" / "trials.csv").read_text(encoding="utf-8")
+        _, rows = laws_checks.read_trials(text)
+        self.assertGreaterEqual(len(rows), 210)
+        self.assertEqual((pin["results"], pin["last_trial_id"]), (210, rows[209]["trial_id"]))
+        self.assertEqual(pin["sha256"], laws_checks.trials_digest(rows[:210]))  # kho thật khớp ghim
+        self.assertEqual(laws_checks.check_trial_registry(ROOT), [])
+        shutil.copy(ROOT / "config.yaml", self.tmp / "config.yaml")           # config thật, có ghim
+        tp = self.tmp / "research" / "trials.csv"
+        def check(t):
+            tp.write_text(t, encoding="utf-8"); return laws_checks.check_trial_registry(self.tmp)
+        self.assertEqual(check(text), [])
+        self.assertEqual(check(text + "T99999,2026-11-20,x,M-x,mom_60,ridge,0,0,0,0,3.7,REJECTED,{}\n"), [])   # thêm dòng: việc của kiểm toán PR
+        first = text.split("\n")[1]
+        num = first.split(",")[6]
+        self.assertTrue(any("đã ghim" in e for e in check(text.replace(num, num[:-1] + ("1" if num[-1] != "1" else "2"), 1))))   # sửa một chữ số
+        lines = text.split("\n")
+        self.assertTrue(any("đã ghim" in e for e in check("\n".join(lines[:1] + lines[2:]))))                # xóa dòng đầu
+        self.assertTrue(any("ít hơn 210" in e for e in check("\n".join(lines[:150]) + "\n")))                # cắt bớt
+        self.assertTrue(any("đã ghim" in e for e in check("\n".join(lines[:5] + [lines[5]] + lines[5:]))))    # chèn dòng
+
+    def test_trial_results_only_from_the_cycle_on_main(self):
+        """Vòng 7 điểm 2, phần cần git: PR không được thêm kết quả hay dòng đăng ký; trên main, commit ghi kết quả phải có đăng
+        ký nằm sẵn ở commit liền trước; kết quả cũ không sửa được."""
+        from tools import ledger_audit
+        repo = self.tmp / "repo"; (repo / "research").mkdir(parents=True)
+        def git(*a):
+            r = subprocess.run(["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t", *a], capture_output=True, text=True)
+            self.assertEqual(r.returncode, 0, f"git {a}: {r.stderr}")
+            return r.stdout.strip()
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True, capture_output=True)
+        tp, rg = repo / "research" / "trials.csv", repo / "research" / "trial_registry.jsonl"
+        def commit(msg):
+            git("add", "-A"); git("commit", "-qm", msg); return git("rev-parse", "HEAD")
+        tp.write_text(self.LEGACY, encoding="utf-8"); (repo / "x.txt").write_text("1")
+        old_base = commit("kho truoc v3.0.2")
+        f = lambda b, pr=False: ledger_audit.trials_history_errors(repo, b, pull_request=pr)
+        # kho trước v3.0.2 (chưa có tools/registry_push.py): vòng học bản cũ ghi kết quả không đăng ký — không bị đòi trên main,
+        # nhưng trong PR thì vẫn bị chặn
+        tp.write_text(self.LEGACY + "T00003,2026-11-16,random_subset,M-c,mom_60,ridge,0.02,1.1,0.01,0.6,3.2,REJECTED,{}\n", encoding="utf-8")
+        commit("Vong hoc ban cu")
+        self.assertEqual(f(old_base), [])
+        self.assertTrue(any("Pull Request thêm 1 kết quả" in e for e in f(old_base, pr=True)))
+        git("reset", "-q", "--hard", old_base)
+        (repo / "tools").mkdir(); (repo / "tools" / "registry_push.py").write_text("# v3.0.2\n")
+        base = commit("v3.0.2")
+        self.assertEqual(f(base), [])
+        res3 = "T00003,2026-11-20,random_subset,M-c,mom_60,ridge,0.02,1.1,0.01,0.6,3.2,REJECTED,{}\n"
+        # (a) PR thêm một kết quả, kể cả kèm dòng đăng ký ngay trong PR
+        tp.write_text(self.LEGACY + res3, encoding="utf-8"); c = commit("PR: them ket qua")
+        self.assertTrue(any("Pull Request thêm 1 kết quả" in e for e in f(base, pr=True)))
+        rg.write_text(json.dumps({"trial_id": "T00003"}) + "\n", encoding="utf-8"); commit("PR: them dang ky")
+        errs = f(base, pr=True)
+        self.assertTrue(any("thêm 1 kết quả" in e for e in errs) and any("sổ đăng ký" in e for e in errs), errs)
+        # (b) trên main: kết quả và đăng ký vào cùng lúc, hoặc kết quả vào trước → lỗi
+        self.assertTrue(any("commit liền trước chưa có" in e for e in f(base)))
+        git("reset", "-q", "--hard", base)
+        rg.write_text(json.dumps({"trial_id": "T00003"}) + "\n", encoding="utf-8"); tp.write_text(self.LEGACY + res3, encoding="utf-8")
+        commit("ket qua va dang ky cung mot commit")
+        self.assertTrue(any("commit liền trước chưa có" in e for e in f(base)))
+        # (c) đúng đường: đăng ký lên main trước, rồi commit sau mới ghi kết quả (kể cả một commit khác chen giữa)
+        git("reset", "-q", "--hard", base)
+        rg.write_text(json.dumps({"trial_id": "T00003"}) + "\n", encoding="utf-8"); commit("L-06: dang ky thu T00003")
+        (repo / "x.txt").write_text("2"); commit("ledger: forecast")
+        tp.write_text(self.LEGACY + res3, encoding="utf-8"); commit("Vong hoc")
+        self.assertEqual(f(base), [])
+        # (d) sửa hoặc xóa kết quả cũ
+        tp.write_text((self.LEGACY + res3).replace("-0.0146496299511184", "0.0946496299511184"), encoding="utf-8"); commit("sua ket qua cu")
+        self.assertTrue(any("đã bị sửa" in e for e in f(base)))
+        tp.write_text(self.LEGACY.split("\n", 2)[0] + "\n" + self.LEGACY.split("\n", 2)[1] + "\n", encoding="utf-8"); commit("xoa ket qua cu")
+        self.assertTrue(any("mất kết quả" in e for e in f(base)))
+        # thêm cột mới và ô rỗng vào dòng cũ (đúng như engine làm lần đầu) không bị coi là sửa
+        self.assertEqual(ledger_audit.trials_rows_errors(self.LEGACY.encode(), (self.LEGACY.split("\n")[0] + ",sharpe\n"
+                         + "\n".join(l + "," for l in self.LEGACY.strip().split("\n")[1:]) + "\n").encode()), [])
+        self.assertIn("research/trials.csv", ledger_audit.TRIALS)
+        for name in ("paper/nav.csv", "paper/decisions.csv", "paper/trades.csv", "research/trial_registry.jsonl"):
+            self.assertIn(name, ledger_audit.APPEND_ONLY)
 
     def test_registration_is_on_main_before_the_backtest_and_survives_a_crash(self):
         """Vòng 6: register_trial chỉ ghi vào thư mục làm việc; vòng học hỏng sau đó thì mất, lần sau dùng lại T00001.
@@ -410,7 +589,7 @@ class TrialRegistryTests(unittest.TestCase):
             subprocess.run(["git", "clone", "-q", f"file://{origin}", str(self.tmp / name)], check=True, capture_output=True)
             return self.tmp / name
         seed = clone("seed")
-        shutil.copy(ROOT / "config.yaml", seed / "config.yaml"); (seed / "research").mkdir(); (seed / "data.txt").write_text("v1\n")
+        _config_without_pin(seed / "config.yaml"); (seed / "research").mkdir(); (seed / "data.txt").write_text("v1\n")
         (seed / "research" / "trials.csv").write_text("trial_id\n", encoding="utf-8")
         git(seed, "add", "-A"); git(seed, "commit", "-qm", "seed"); git(seed, "push", "-q", "origin", "HEAD:main")
         script = """
@@ -426,12 +605,14 @@ class TrialRegistryTests(unittest.TestCase):
             e = {**os.environ, "TTC_HOME": str(home), "PYTHONPATH": str(ROOT), "TTC_REGISTRY_PUSH": "1",
                  "TTC_REGISTRY_PUSH_TRIES": "2", "TTC_REGISTRY_PUSH_WAIT": "0", **env}
             return subprocess.run([sys.executable, "-c", textwrap.dedent(script)], cwd=str(ROOT), env=e, capture_output=True, text=True)
-        on_main = lambda: [json.loads(l)["trial_id"] for l in git(origin, "show", "main:research/trial_registry.jsonl").splitlines()]
+        on_main = lambda: [json.loads(l)["trial_id"] for l in git(origin, "show", "main:research/trial_registry.jsonl").splitlines()][1:]
+        first = lambda: json.loads(git(origin, "show", "main:research/trial_registry.jsonl").splitlines()[0])
 
         run1 = clone("run1"); (run1 / "data.txt").write_text("đang chạy dở\n")      # thư mục làm việc bẩn như lúc vòng học chạy
         r = cycle(run1)
         self.assertEqual(r.returncode, 7, r.stderr[-1500:])
         self.assertEqual(on_main(), ["T00001"])                                     # đăng ký đã nằm trên main dù vòng học hỏng
+        self.assertEqual((first()["kind"], first()["results"]), ("legacy_anchor", 0))   # dòng neo lịch sử đi cùng lần đẩy đầu tiên
         self.assertIn("M data.txt", git(run1, "status", "--porcelain"))             # không đụng thư mục làm việc của vòng học
         shutil.rmtree(run1)                                                         # máy chạy bị thu hồi
 

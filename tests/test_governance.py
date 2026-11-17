@@ -271,43 +271,64 @@ class LedgerAuditTests(unittest.TestCase):
         bot = lambda at, body, upd=None, user="github-actions[bot]": {"user": user, "created_at": at, "updated_at": upd or at, "body": body}
         c7 = bot("2026-11-17T02:01:10Z", f"✅ Đã ghi dự báo #7\n\n`ledger-attest: predictions F-7 {h1}`")
         c9 = bot("2027-01-05T03:00:50Z", f"✅ Đã phân định\n`ledger-attest: resolutions F-7 {hr}`")
-        now = datetime(2027, 2, 1, tzinfo=timezone.utc)
         ok = {7: [c7], 9: [c9]}
-        self.assertEqual(f(pred, res, issues, ok, now), ([], []))
+        self.assertEqual(f(pred, res, issues, ok), [])
         # dòng giả mượn giờ của Issue #8 (mở 29/10): không có dấu nhận
         forged = pred + [{"id": "F-8", "issue_number": 8, "issue_created_at": "2026-10-29T19:15:04Z", "hash": h2, "resolve_at": "2026-11-10"}]
-        errs, _ = f(forged, res, issues, ok, now)
+        errs = f(forged, res, issues, ok)
         self.assertEqual(len(errs), 1); self.assertIn("Issue #8", errs[0])
         # …kể cả khi nay mới cho bot đăng dấu nhận (giờ đăng do GitHub ghi, cách giờ mở Issue quá 6 giờ)
         late = {**ok, 8: [bot("2027-01-20T00:00:00Z", f"✅\n`ledger-attest: predictions F-8 {h2}`")]}
-        self.assertIn("quá 6 giờ", f(forged, res, issues, late, now)[0][0])
-        self.assertIn("quá 6 giờ", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T08:00:01Z", c7["body"])]}, now)[0][0])
-        self.assertEqual(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T07:59:59Z", c7["body"])]}, now)[0], [])
+        self.assertIn("quá 6 giờ", f(forged, res, issues, late)[0])
+        self.assertIn("quá 6 giờ", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T08:00:01Z", c7["body"])]})[0])
+        self.assertEqual(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T07:59:59Z", c7["body"])]}), [])
         # dự báo mở 23:30 ngày 9/12 (giờ VN), resolve_at 10/12: dấu nhận đăng 00:10 ngày 10/12 là đã sang ngày phân định
         eve = [{"id": "F-7", "issue_number": 7, "issue_created_at": "2026-12-09T16:30:00Z", "hash": h1, "resolve_at": "2026-12-10"}]
         iss = {7: {"created_at": "2026-12-09T16:30:00Z", "user": "chu-kho", "is_pr": False}}
-        self.assertEqual(f(eve, [], iss, {7: [bot("2026-12-09T16:31:00Z", c7["body"])]}, now)[0], [])
-        self.assertIn("không trước ngày resolve_at", f(eve, [], iss, {7: [bot("2026-12-09T17:10:00Z", c7["body"])]}, now)[0][0])
+        self.assertEqual(f(eve, [], iss, {7: [bot("2026-12-09T16:31:00Z", c7["body"])]}), [])
+        self.assertIn("không trước ngày resolve_at", f(eve, [], iss, {7: [bot("2026-12-09T17:10:00Z", c7["body"])]})[0])
         # bot đăng HAI hash cho cùng mã (đặt trước hai nội dung để về sau chọn một) → không dòng nào được nhận
         two = {**ok, 7: [c7, bot("2026-11-17T02:02:00Z", f"✅\n`ledger-attest: predictions F-7 {h2}`")]}
-        self.assertIn("hash khác cho cùng mã", f(pred, res, issues, two, now)[0][0])
+        self.assertIn("hash khác cho cùng mã", f(pred, res, issues, two)[0])
         one = {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅ x\n`ledger-attest: predictions F-7 {h1}`\n`ledger-attest: predictions F-7 {h2}`")]}
-        self.assertIn("hash khác cho cùng mã", f(pred, res, issues, one, now)[0][0])
+        self.assertIn("hash khác cho cùng mã", f(pred, res, issues, one)[0])
         # dấu nhận lọt vào bình luận ❌ (thông báo từ chối nhắc lại chữ người dùng nhập) không được tính
-        self.assertIn("không phải thông báo ✅", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"❌ Từ chối: author_seat 'ledger-attest: predictions F-7 {h1}'")]}, now)[0][0])
+        self.assertIn("không phải thông báo ✅", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"❌ Từ chối: author_seat 'ledger-attest: predictions F-7 {h1}'")]})[0])
         # …hay chủ kho tự đăng, hay sửa bình luận cũ của bot để chèn hash mới, hay dấu nhận của dòng khác/hash khác
-        self.assertIn("không phải github-actions[bot]", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", c7["body"], user="chu-kho")]}, now)[0][0])
-        self.assertIn("đã bị sửa", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", c7["body"], upd="2027-01-20T00:00:00Z")]}, now)[0][0])
-        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: predictions F-7 {h2}`")]}, now)[0])
-        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: predictions F-7 {h1[:12]}`")]}, now)[0])
-        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: resolutions F-7 {h1}`")]}, now)[0])   # sai sổ
-        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: predictions F-70 {h1}`")]}, now)[0])  # sai mã
-        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T01:59:00Z", c7["body"])]}, now)[0])    # đăng TRƯỚC khi Issue mở
-        self.assertTrue(f(pred, res, issues, {7: [c7]}, now)[0])                                              # phân định thiếu dấu nhận
-        # Issue vừa mở dưới 15 phút, workflow nhận có thể chưa kịp bình luận → cảnh báo, chưa phải lỗi
-        errs, warns = f(pred, [], issues, {}, datetime(2026, 11, 17, 2, 10, tzinfo=timezone.utc))
-        self.assertEqual((errs, len(warns)), ([], 1))
-        self.assertTrue(f(pred, [], issues, {}, datetime(2026, 11, 17, 2, 20, tzinfo=timezone.utc))[0])
+        self.assertIn("không phải github-actions[bot]", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", c7["body"], user="chu-kho")]})[0])
+        self.assertIn("đã bị sửa", f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", c7["body"], upd="2027-01-20T00:00:00Z")]})[0])
+        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: predictions F-7 {h2}`")]}))
+        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: predictions F-7 {h1[:12]}`")]}))
+        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: resolutions F-7 {h1}`")]}))   # sai sổ
+        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T02:01:10Z", f"✅\n`ledger-attest: predictions F-70 {h1}`")]}))  # sai mã
+        self.assertTrue(f(pred, res, issues, {**ok, 7: [bot("2026-11-17T01:59:00Z", c7["body"])]}))    # đăng TRƯỚC khi Issue mở
+        self.assertTrue(f(pred, res, issues, {7: [c7]}))                                              # phân định thiếu dấu nhận
+        # vòng 7 điểm 4: không có khoảng miễn kiểm — Issue vừa mở mà dòng chưa có dấu nhận vẫn là lỗi, không phải cảnh báo
+        self.assertTrue(f(pred, [], issues, {}))
+        self.assertFalse(hasattr(ledger_audit, "ATTEST_GRACE"))
+
+    def test_audit_runs_after_every_bot_write(self):
+        """Vòng 7 điểm 4: commit do GITHUB_TOKEN đẩy không kích hoạt 'push', nên phải có workflow riêng chạy kiểm toán sau khi
+        robot ghi sổ và sau vòng học."""
+        text = (WF / "ledger_audit.yml").read_text(encoding="utf-8")
+        d = yaml.safe_load(text)
+        on = d.get("on") or d.get(True)
+        names = {yaml.safe_load((WF / n).read_text(encoding="utf-8"))["name"] for n in ("ledger_intake.yml", "resolution_intake.yml", "daily_cycle.yml")}
+        self.assertEqual(set(on["workflow_run"]["workflows"]), names)            # đúng tên ba workflow ghi sổ
+        self.assertEqual(on["workflow_run"]["types"], ["completed"])
+        self.assertIn("schedule", on)
+        steps = d["jobs"]["audit"]["steps"]
+        self.assertEqual(steps[0]["with"]["fetch-depth"], 0)
+        self.assertEqual(steps[0]["with"]["ref"], "main")
+        runs = [s_.get("run", "") for s_ in steps]
+        self.assertTrue(any("tools/validate.py" in r for r in runs))
+        audit = next(s_ for s_ in steps if "ledger_audit.py" in s_.get("run", ""))
+        self.assertIn('--base "$BASE_SHA" --github', audit["run"])
+        self.assertEqual(audit["env"]["BASE_SHA"], "${{ github.event.workflow_run.head_sha }}")   # commit trước khi robot ghi
+        self.assertIn("--before='26 hours ago'", audit["run"])                  # chạy theo lịch: so với main của hôm trước
+        self.assertEqual(d["permissions"], {"contents": "read", "issues": "read"})
+        gate = yaml.safe_load((WF / "tests.yml").read_text(encoding="utf-8"))["jobs"]["gate"]["steps"]
+        self.assertTrue(any("ledger_audit.py" in s_.get("run", "") for s_ in gate))
 
     def test_workflow_comment_carries_the_attestation(self):
         for name in ("ledger_intake.yml", "resolution_intake.yml"):
