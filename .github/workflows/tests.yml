@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: read
+  issues: read
 
 jobs:
   gate:
@@ -14,10 +15,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes"
+      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes test_governance"
       SCRIPTS: "test_no_lookahead test_adjustment test_ingest_errors test_ledger_pipeline test_quality_gate test_llm_review_budget"
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # can lich su de kiem so chi-ghi-them so voi commit goc
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -39,6 +42,11 @@ jobs:
           done
       - name: Kiem cau truc bo nao
         run: python tools/validate.py
+      - name: So chi-ghi-them + doi chieu Issue that tren GitHub (L-05)
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: python tools/ledger_audit.py --base "$BASE_SHA" --github
       - name: Test khong duoc sua tep nao cua kho
         run: |
           if [ -n "$(git status --porcelain)" ]; then

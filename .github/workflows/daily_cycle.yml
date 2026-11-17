@@ -40,6 +40,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: python -m engine.run_cycle --source live --trials ${{ github.event.inputs.trials || '6' }}
+      - name: Kiem lai sau khi chay (ket qua trai luat thi khong ghi vao main)
+        run: python tools/validate.py
       - name: Ghi ket qua vao bo nao
         run: |
           git config user.name "ttc-engine"

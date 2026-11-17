@@ -1,9 +1,10 @@
 name: Ledger intake (Forecast issue)
 
-# Chi nhan Issue luc MO (opened), do chinh Owner mo, co nhan "forecast" ngay tu mau.
+# Chi nhan Issue luc MO (opened), do chinh chu kho mo, co nhan "forecast" hoac tieu de "[Forecast]".
 # Khong nhan su kien "labeled": Issue cu duoc gan nhan muon co the da bi sua than sau khi biet ket qua (L-05).
 # Khong dung nhom concurrency chung: GitHub huy run dang cho khi run thu ba toi, mo nhieu Issue lien tiep se mat du bao.
-# Thay vao do moi run tu thu lai: lay main moi nhat, tinh lai hash chuoi, ghi, day len; trung thi lam lai.
+# Moi run tu thu lai: lay main moi nhat, tinh lai hash chuoi, ghi, day len; trung thi lam lai.
+# Than Issue va moi gia tri do nguoi dung nhap chi di qua bien moi truong, khong chen vao lenh.
 on:
   issues:
     types: [opened]
@@ -39,11 +40,14 @@ jobs:
           ISSUE_NUMBER: ${{ github.event.issue.number }}
           ISSUE_CREATED_AT: ${{ github.event.issue.created_at }}
           ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           set +e
           git config user.name "ttc-ledger"
           git config user.email "ttc-ledger@users.noreply.github.com"
-          out='{"ok":false,"message":"Khong day duoc len main sau 8 lan thu"}'
+          fail='{"ok":false,"message":"Loi he thong: khong ghi duoc vao main sau 8 lan thu"}'
+          out="$fail"
           code=1
           for i in 1 2 3 4 5 6 7 8; do
             git fetch -q origin main && git reset -q --hard origin/main
@@ -53,10 +57,11 @@ jobs:
             git add ledger/predictions.jsonl
             git commit -q -m "ledger: forecast #${ISSUE_NUMBER}"
             if git push -q origin HEAD:main; then break; fi
-            out='{"ok":false,"message":"Khong day duoc len main sau 8 lan thu"}'
+            out="$fail"
             code=1
             sleep $(( (RANDOM % 15) + 5 ))
           done
+          if [ -z "$out" ]; then out='{"ok":false,"message":"Loi he thong: script khong in ket qua (xem log)"}'; code=1; fi
           echo "result=$out" >> "$GITHUB_OUTPUT"
           echo "code=$code" >> "$GITHUB_OUTPUT"
           echo "$out"
@@ -68,13 +73,16 @@ jobs:
           RESULT: ${{ steps.intake.outputs.result }}
         with:
           script: |
-            const r = JSON.parse(process.env.RESULT || '{"ok":false,"message":"khong co ket qua"}');
+            let r;
+            try { r = JSON.parse(process.env.RESULT); } catch (e) { r = {ok: false, message: "Loi he thong: ket qua khong doc duoc (xem log)"}; }
             await github.rest.issues.createComment({owner: context.repo.owner, repo: context.repo.repo,
               issue_number: context.issue.number, body: (r.ok ? "✅ " : "❌ ") + r.message});
             await github.rest.issues.addLabels({owner: context.repo.owner, repo: context.repo.repo,
               issue_number: context.issue.number, labels: [r.ok ? "ledgered" : "rejected"]});
       - name: Loi he thong (ma 1) lam job do; tu choi (2) va trung (3) la ket qua hop le
         if: steps.intake.outputs.code == '1'
+        env:
+          RESULT: ${{ steps.intake.outputs.result }}
         run: |
-          echo "Intake loi he thong hoac khong day duoc len main: ${{ steps.intake.outputs.result }}"
+          echo "Intake loi he thong hoac khong day duoc len main: $RESULT"
           exit 1
