@@ -7,6 +7,7 @@ data:
   start: "2016-01-01"
   store: data/store/prices.csv.gz        # kho cũ, ĐÓNG BĂNG từ ADR-0006 — không ghi lại
   store_dir: data/store/prices          # ADR-0006: dòng mới, mỗi tháng giao dịch một tệp CSV, chỉ nối thêm
+universe_basis: CURRENT     # ADR-0008: danh sách dưới là VN30 HIỆN TẠI dùng cho toàn bộ lịch sử → báo cáo gắn nhãn thiên lệch sống sót
 universe: [ACB, BCM, BID, BVH, CTG, FPT, GAS, GVR, HDB, HPG, MBB, MSN, MWG, PLX, POW,
            SAB, SHB, SSB, SSI, STB, TCB, TPB, VCB, VHM, VIB, VIC, VJC, VNM, VPB, VRE]
 horizon_days: 20           # dự báo lợi nhuận vượt trội 20 phiên
