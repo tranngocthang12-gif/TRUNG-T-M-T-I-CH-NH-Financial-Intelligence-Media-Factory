@@ -1,7 +1,8 @@
 """Research & Backtest Engine: walk-forward có embargo, chi phí thật, ngưỡng thống kê tăng theo số lần thử.
-L-06: mọi lần thử được ĐĂNG KÝ vào research/trial_registry.jsonl (hash chuỗi) TRƯỚC khi chạy; báo Sharpe kèm
-Deflated Sharpe (Bailey & López de Prado 2014) tính theo tổng số lần thử."""
-import hashlib, json, math, sys
+L-06: mọi lần thử được ĐĂNG KÝ vào research/trial_registry.jsonl (hash chuỗi) TRƯỚC khi chạy, và trong vòng học trên
+GitHub dòng đăng ký được đẩy lên main trước khi backtest bắt đầu (persist_registration) — lần thử hỏng giữa chừng vẫn
+được đếm; báo Sharpe kèm Deflated Sharpe (Bailey & López de Prado 2014) tính theo tổng số lần thử."""
+import hashlib, json, math, os, subprocess, sys
 from datetime import datetime, timezone
 from statistics import NormalDist
 import numpy as np, pandas as pd
@@ -196,5 +197,28 @@ def register_trial(trial_id, cycle_date, method, spec, thr):
            "prev_hash": old[-1]["hash"] if old else "GENESIS"}
     row["hash"] = line_hash(row)
     with open(path(REGISTRY), "a", encoding="utf-8") as f:
-        f.write(json.dumps(row, ensure_ascii=False, sort_keys=True) + "\n")
+        f.write(json.dumps(row, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n")
+    persist_registration(trial_id)                        # không ghi bền được → báo lỗi, backtest không chạy
     return row["hash"]
+
+def persist_registration(trial_id):
+    """L-06: đăng ký phải nằm trên main TRƯỚC khi backtest chạy, để vòng học hỏng giữa chừng không làm mất lần thử.
+    Bật bằng TTC_REGISTRY_PUSH=1 (workflow daily_cycle.yml). Không bật (test, chạy thử trong thư mục tạm) → chỉ ghi tệp."""
+    if os.environ.get("TTC_REGISTRY_PUSH") != "1":
+        return False
+    script = REPO / "tools" / "registry_push.py"
+    args = [sys.executable, str(script), "--root", str(ROOT), trial_id]
+    for k in ("TTC_REGISTRY_PUSH_TRIES", "TTC_REGISTRY_PUSH_WAIT"):
+        if os.environ.get(k):
+            args += ["--" + k.rsplit("_", 1)[-1].lower(), os.environ[k]]
+    r = subprocess.run(args, capture_output=True, text=True)
+    print(f"[L-06] {(r.stdout or r.stderr).strip()}")
+    if r.returncode != 0:
+        raise RuntimeError(f"L-06: không ghi bền được đăng ký {trial_id} lên main nên không chạy backtest — "
+                           f"{(r.stdout + r.stderr).strip()}")
+    return True
+
+def abandoned_trials(ledger_df):
+    """Mã thử đã đăng ký mà không có kết quả (vòng học dừng giữa chừng). Vẫn tính vào số lần thử."""
+    done = set(ledger_df["trial_id"]) if ledger_df is not None and "trial_id" in ledger_df else set()
+    return [r.get("trial_id") for r in _registry_rows() if r.get("trial_id") not in done]

@@ -27,12 +27,22 @@ def _append_chained(rel, rows):
     prev = old[-1].get("hash", "GENESIS") if old else "GENESIS"
     out = []
     for r in rows:
-        r = {**r, "prev_hash": prev}
+        r = {**_finite(r), "prev_hash": prev}
         r["hash"] = line_hash(r)
         prev = r["hash"]
         out.append(r)
     with open(path(rel), "a", encoding="utf-8") as f:
-        for r in out: f.write(json.dumps(r, ensure_ascii=False, sort_keys=True) + "\n")
+        for r in out: f.write(json.dumps(r, ensure_ascii=False, sort_keys=True, allow_nan=False) + "\n")
+
+def _finite(x):
+    """NaN/±vô cực không phải JSON chuẩn (laws_checks.check_ledger_chain từ chối): đổi thành null trước khi ghi sổ."""
+    if isinstance(x, float):
+        return x if math.isfinite(x) else None
+    if isinstance(x, dict):
+        return {k: _finite(v) for k, v in x.items()}
+    if isinstance(x, (list, tuple)):
+        return [_finite(v) for v in x]
+    return x
 
 def is_issue_row(p):
     """Dòng ghi từ GitHub Issue 'Forecast' (tools/ledger_intake.py). Không chấm bằng giá ở đây."""

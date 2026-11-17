@@ -104,7 +104,9 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
              "- Cặp A–B: {pairs} cặp (lẻ {unpaired}, khác ngày {not_same_day}), bất đồng {disagreements}, đã phân định "
              "{disagreements_resolved}, A đúng {a_correct}, mâu thuẫn {inconsistent_outcomes} — {verdict}".format(**sc["issue_forecasts"]["ab"])
              + ("  ⚠ " + sc["issue_forecasts"]["ab"]["warning_inconsistent"] if "warning_inconsistent" in sc["issue_forecasts"]["ab"] else ""),
-             f"- Ghi chú chuyển OUTDATED (L-08): {', '.join(outdated) if outdated else 'không có'}", ""]
+             f"- Ghi chú chuyển OUTDATED (L-08): {', '.join(outdated) if outdated else 'không có'}",
+             "- Lần thử đã đăng ký nhưng không có kết quả (L-06; vẫn tính vào số lần thử): "
+             + (", ".join(research.abandoned_trials(ledger_df)) or "không có"), ""]
         if sc["procedures"]:
             L += ["| Chuyên gia | n | Brier | Brier baseline mạnh nhất | Skill | Tỷ lệ đúng | Kết luận |", "|---|---|---|---|---|---|---|"]
             L += [f"| {k} | {v['n']} | {v['brier']} | {v['brier_base_rate']} | {v['brier_skill']} | {v['hit_rate']} | {v['verdict']} |"
