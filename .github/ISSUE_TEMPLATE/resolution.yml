@@ -13,7 +13,7 @@ body:
     id: outcome
     attributes:
       label: outcome
-      description: YES = mệnh đề trong câu hỏi đúng; NO = sai; VOID = không phân định được (nguồn không công bố, câu hỏi sai đề)
+      description: YES = mệnh đề trong câu hỏi đúng; NO = sai; VOID = hủy câu hỏi, không chấm (nguồn không công bố, câu hỏi sai đề, dự báo thiếu dấu nhận). YES/NO chỉ ghi được khi tới resolve_at; VOID ghi được bất kỳ lúc nào và phải có void_reason
       options: ["YES", "NO", "VOID"]
     validations: {required: true}
   - type: input
@@ -41,4 +41,4 @@ body:
     id: void_reason
     attributes:
       label: void_reason
-      description: Chỉ với VOID — vì sao không phân định được
+      description: Chỉ với VOID — vì sao hủy câu hỏi (bắt buộc)
