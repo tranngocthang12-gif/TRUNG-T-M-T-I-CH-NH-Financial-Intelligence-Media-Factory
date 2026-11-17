@@ -103,6 +103,7 @@ def metrics(oos, fold_ics, regime):
         net.append(g.loc[list(top), "y"].mean() - turnover * ROUNDTRIP)
         prev = top
     out["net_ann"] = float(np.mean(net) * 252 / h) if net else 0.0
+    out["max_dd"] = max_drawdown(net)                      # ADR-0008: rủi ro, không chỉ lợi nhuận và Sharpe
     out.update(sharpe_stats(net, h))
     reg = {}
     lab = regime.reindex(ic.index)
@@ -125,6 +126,21 @@ def classify(m, thr):
         return "WEAK"
     return "REJECTED"
 
+
+def max_drawdown(returns):
+    """Sụt giảm lớn nhất (số âm, 0 nếu không sụt) của chuỗi lợi nhuận theo kỳ, ghép lãi kép từ mức 1 (ADR-0008)."""
+    x = np.asarray([v for v in returns if v is not None and np.isfinite(v)], dtype=float)
+    if not len(x):
+        return 0.0
+    wealth = np.concatenate([[1.0], np.cumprod(1.0 + x)])
+    return float(np.min(wealth / np.maximum.accumulate(wealth) - 1.0))
+
+def nav_drawdown(nav):
+    """Sụt giảm lớn nhất của một chuỗi NAV (số âm; None nếu chưa có NAV)."""
+    v = np.asarray([x for x in nav if x is not None and np.isfinite(x) and x > 0], dtype=float)
+    if not len(v):
+        return None
+    return float(np.min(v / np.maximum.accumulate(v) - 1.0))
 
 # ---------------- L-06: Sharpe, Deflated Sharpe, sổ đăng ký thử ----------------
 def sharpe_stats(net, h):

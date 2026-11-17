@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.0.5 — 2026-11-18 (dữ liệu và rủi ro sau nghiên cứu GitHub; thứ tự Owner duyệt) — Claude soạn, Owner gộp; ADR-0008
+- **Thiên lệch sống sót:** `config.yaml` `universe_basis: CURRENT`; báo cáo chu kỳ và `state/ENGINE_STATE.json` (`universe_basis`, `universe_bias`) ghi rõ backtest dùng VN30 hiện tại cho toàn bộ lịch sử nên kết quả bị đẩy lên. Danh sách theo từng kỳ: khuôn `data/vn30_history.csv` ở ADR-0008, việc dữ liệu giao ghế thi công hoặc Owner.
+- **BCTC theo ngày công bố:** `kind: FINANCIAL_STATEMENT` trong `SOURCE_MANIFEST.json` bắt buộc `period_end`, `published_on` (`period_end ≤ published_on ≤ accessed_on`); `engine/knowledge_notes.usable_on`; ghi chú trích BCTC có `effective_date` ≥ ngày công bố (`contracts/knowledge_note.schema.json` mô tả, `library/sources/README.md`).
+- **Giấy:** phiên khớp có biến động ≥ 95% biên độ của mã (`adjust.limits`) coi như khóa — không mua ở khóa trần, không bán ở khóa sàn; ghi `UNFILLED_LIMIT_UP`/`UNFILLED_LIMIT_DOWN`, lệnh giữ lại thử phiên sau (`engine/paper.locked`).
+- **Sụt giảm lớn nhất:** `research.max_drawdown`, `nav_drawdown`; báo cáo có cột "Sụt giảm lớn nhất" cho từng lần thử và dòng sụt giảm lớn nhất của NAV giấy; `ENGINE_STATE.json` `paper_max_drawdown`. `research/trials.csv` giữ 17 cột.
+- Test: `tests/test_governance.py` `RiskAndBiasTests`; `tests/test_knowledge_notes.py` `test_financial_statements_are_usable_only_from_publication_date`.
+- Văn bản: ADR-0006, ADR-0007 ghi ACCEPTED (PR #30); `state/PROJECT_STATE.yaml` ghi PR #30 đã gộp.
+
 ## v3.0.4 — 2026-11-17 (giấy tờ sau PR #29; kho giá ghi tăng dần; lệnh Owner) — Claude soạn, Owner gộp; ADR-0006, ADR-0007
 - Danh mục ADR và ba tệp ADR-0002, ADR-0004, ADR-0005: ACCEPTED 17/11/2026 (PR #29, commit gộp `b8158be`; người chấm Gemini, `GỘP ĐƯỢC — commit 6201090`).
 - `governance/LAWS.md` (Owner ra lệnh; hiệu lực khi Owner gộp): cột "Máy kiểm" của L-09 thêm "bản chấm GỘP ĐƯỢC kèm SHA dán thành bình luận PR"; của L-10 thay "Branch protection trên `main`" bằng "ruleset cho `main` cấm force-push và cấm xóa nhánh; CI cảnh báo khi chưa bật" (ADR-0003 mục "Hai chỗ chữ"). Nội dung các luật không đổi.

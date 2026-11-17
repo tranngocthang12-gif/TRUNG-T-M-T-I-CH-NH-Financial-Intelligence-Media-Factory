@@ -7,7 +7,9 @@ Quy ước trên đĩa (library/sources/README.md):
   dòng đầu là tiêu đề, dòng "|---" bỏ qua, dòng dữ liệu đánh số 1, 2, … Bảng không tính là đoạn.
 - library/SOURCE_MANIFEST.json "files"[<doc_id>]: sha256 + bytes của text.md, issuer, issued_on, accessed_on, source_url,
   data_source (tên trong governance/DATA_SOURCES.yaml, không được là nguồn "forbidden"), legal_status, license,
-  kind, effective_from, effective_to, superseded_by.
+  kind, effective_from, effective_to, superseded_by. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
+  sổ của kỳ) và published_on (ngày CÔNG BỐ công khai — ngày đầu tiên thị trường biết số liệu); số liệu chỉ được dùng từ
+  published_on (usable_on), không phải từ period_end.
 - library/notes/<KN-id>.json: KNOWLEDGE_NOTE theo contracts/knowledge_note.schema.json.
 - library/audits/<KN-id>.json: biên bản chấm {note_id, auditor, verdict: PASS|FAIL, date, note_sha256}.
   note_sha256 = note_digest() của ghi chú (mọi trường trừ status) → sửa ghi chú sau khi chấm thì biên bản hết hiệu lực.
@@ -22,7 +24,7 @@ Dùng: python -m engine.knowledge_notes          kiểm toàn thư viện, in l�
       run_cycle gọi mark_outdated() để tự chuyển OUTDATED (L-08).
 """
 import hashlib, json, pathlib, re, sys
-from datetime import date
+from datetime import date, datetime
 
 import yaml
 
@@ -36,6 +38,7 @@ LIB = "library"
 MAX_NOTE_BYTES = 16_000
 MIN_QUOTE_CHARS = 15                      # trích ngắn hơn thế chỉ hợp lệ khi là nguyên cả đoạn/dòng được trỏ tới
 LEGAL_KINDS = {"LAW", "DECREE", "CIRCULAR", "DECISION", "STANDARD", "REGULATION"}
+FINANCIAL_KINDS = {"FINANCIAL_STATEMENT"}     # ADR-0008: số liệu dùng theo ngày công bố
 FREE_STATUS = {"DRAFT", "OUTDATED"}
 AUDIT_VERDICT_FOR = {"CITED": "PASS", "DISPUTED": "FAIL"}     # TESTED/PROVEN: do mã Học viện gán — chưa có → từ chối
 ADDR_RE = re.compile(r"^([a-z0-9_-]+):(p|t)([0-9]+):([0-9]+)$")
@@ -104,6 +107,25 @@ def _date(v):
     except ValueError:
         return None
 
+def usable_from(entry):
+    """Ngày sớm nhất được dùng nội dung tài liệu (ADR-0008): BCTC → published_on; tài liệu khác → issued_on."""
+    if str(entry.get("kind", "")).upper() in FINANCIAL_KINDS:
+        return _date(entry.get("published_on"))
+    return _date(entry.get("issued_on"))
+
+def usable_on(man, doc_id, day):
+    """True nếu tại ngày `day` thị trường đã biết nội dung tài liệu doc_id. Mọi nơi dùng số liệu BCTC cho một ngày phải qua
+    hàm này: dự báo, đề thi, backtest. Thiếu ngày công bố → False (đóng khi không chắc)."""
+    d = usable_from(man.get(doc_id, {}))
+    if d is None:
+        return False
+    # A wrong or missing historical cutoff must never become an unlimited future date.
+    if isinstance(day, datetime):
+        day = day.date()
+    elif not isinstance(day, date):
+        day = _date(day)
+    return day is not None and d <= day
+
 def _expired(entry, today):
     if entry.get("superseded_by"):
         return True
@@ -135,9 +157,17 @@ def check_manifest(root):
             errs.append(f"L-04: manifest {doc_id} lấy từ nguồn bị cấm '{e.get('data_source')}'")
         if str(e.get("kind", "")).upper() in LEGAL_KINDS and not e.get("effective_from"):
             errs.append(f"L-08: văn bản {doc_id} ({e.get('kind')}) thiếu effective_from")
-        for k in ("issued_on", "accessed_on", "effective_from", "effective_to"):
+        for k in ("issued_on", "accessed_on", "effective_from", "effective_to", "period_end", "published_on"):
             if e.get(k) and _date(e[k]) is None:
                 errs.append(f"manifest {doc_id}: {k} không phải ngày YYYY-MM-DD")
+        if str(e.get("kind", "")).upper() in FINANCIAL_KINDS:
+            pe, pub, acc = _date(e.get("period_end")), _date(e.get("published_on")), _date(e.get("accessed_on"))
+            if pe is None or pub is None:
+                errs.append(f"ADR-0008: BCTC {doc_id} phải có period_end và published_on (ngày công bố) dạng YYYY-MM-DD")
+            elif pub < pe:
+                errs.append(f"ADR-0008: BCTC {doc_id} có published_on {pub} trước period_end {pe}")
+            elif acc is not None and pub > acc:
+                errs.append(f"ADR-0008: BCTC {doc_id} có published_on {pub} sau ngày truy cập {acc}")
         t = src_dir / doc_id / "text.md"
         if not t.is_file():
             errs.append(f"L-01: thiếu library/sources/{doc_id}/text.md"); continue
@@ -209,6 +239,16 @@ def check_note(root, path, docs, man, today):
     legal = [d for d in note["doc_ids"] if str(man.get(d, {}).get("kind", "")).upper() in LEGAL_KINDS]
     if note["tier"] == 2 and legal and not note.get("effective_date"):
         errs.append(f"{nid}: ghi chú T2 về văn bản pháp luật/chuẩn mực phải có effective_date (L-08)")
+    fin = [d for d in note["doc_ids"] if str(man.get(d, {}).get("kind", "")).upper() in FINANCIAL_KINDS]
+    if fin:
+        eff = _date(note.get("effective_date")) if note.get("effective_date") else None
+        if eff is None:
+            errs.append(f"{nid}: ghi chú trích BCTC phải có effective_date ≥ ngày công bố của BCTC (ADR-0008)")
+        else:
+            early = [d for d in fin if not usable_on(man, d, eff)]
+            if early:
+                errs.append(f"{nid}: effective_date {eff} trước ngày công bố của {early} — số liệu BCTC chỉ dùng từ ngày "
+                            "công bố (ADR-0008)")
     ids = [p["id"] for p in note["points"]]
     if len(ids) != len(set(ids)):
         errs.append(f"{nid}: id ý bị trùng")
