@@ -1,5 +1,10 @@
 # Changelog
 
+## v3.0.4 — 2026-11-17 (giấy tờ sau PR #29, lệnh Owner) — Claude soạn, Owner gộp
+- Danh mục ADR và ba tệp ADR-0002, ADR-0004, ADR-0005: ACCEPTED 17/11/2026 (PR #29, commit gộp `b8158be`; người chấm Gemini, `GỘP ĐƯỢC — commit 6201090`).
+- `governance/LAWS.md` (Owner ra lệnh; hiệu lực khi Owner gộp): cột "Máy kiểm" của L-09 thêm "bản chấm GỘP ĐƯỢC kèm SHA dán thành bình luận PR"; của L-10 thay "Branch protection trên `main`" bằng "ruleset cho `main` cấm force-push và cấm xóa nhánh; CI cảnh báo khi chưa bật" (ADR-0003 mục "Hai chỗ chữ"). Nội dung các luật không đổi.
+- Đóng 19 PR nháp dòng UMLF và 5 Issue đi kèm theo L-07 (một kiến trúc; hướng song song chưa có ADR). Nhánh giữ nguyên, mở lại được. `state/PROJECT_STATE.yaml` cập nhật.
+
 ## v3.0.3 — 2026-11-17 (hoàn thiện kiến trúc sau PR #28) — Claude soạn, Owner gộp; ADR-0002, ADR-0004, ADR-0005
 - **ADR-0002** (quyết định của Owner 17/11/2026): không thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001; dự báo là việc dài hạn; mốc xét lại mới 31/03/2027. Câu hỏi `event_before_date` không vào phép kiểm định chốt mẫu A–B (ghế A được tìm web, ghế B thì không) — vẫn là cặp, vẫn vào tỷ lệ bất đồng; báo riêng `disagreements_out_of_scope` (`engine/ledger.py`, báo cáo vòng học).
 - **ADR-0004** — đóng bốn việc tồn của bản chấm vòng 10: (1) giữ hành vi kiểm toán đỏ tới `resolve_at` cho dự báo thiếu dấu nhận đúng hạn, kèm lý do; (2) gọi đúng khóa chọn mẫu: "theo số Issue hoàn tất cặp"; (3) Brier theo ghế khi VOID tính là sai (`brier_void_worst`); (4) mốc v3.0.2 cố định `research.v302_boundary` trong `config.yaml` — kiểm toán chỉ miễn commit nằm trong lịch sử của mốc; mốc không đổi được (PR so với đầu `main` lúc gộp, không so với `base.sha` có thể đã cũ); `tools/validate.py` đòi mốc khi đã có `research.legacy_pin` (`tools/laws_checks.check_v302_boundary`).
