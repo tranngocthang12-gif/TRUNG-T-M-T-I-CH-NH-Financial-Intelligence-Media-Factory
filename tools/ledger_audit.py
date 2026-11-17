@@ -338,6 +338,9 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
         errs.append("L-06: research.v302_boundary trong config.yaml khác giá trị ở commit gốc (hoặc bị xóa) — mốc v3.0.2 không "
                     "được đổi (ADR-0004)")
         boundary = base_boundary
+    if boundary is not None:
+        if git("cat-file", "-e", f"{boundary}^{{commit}}").returncode != 0:
+            return errs + [f"L-06: không tìm thấy commit mốc v3.0.2 {boundary[:7]} trong kho (cần lịch sử đầy đủ: fetch-depth 0)"]
     if pull_request:
         nb, nh = len(_trials(show(base, TRIALS))[1]), len(_trials(show("HEAD", TRIALS))[1])
         if nh > nb:
@@ -353,9 +356,6 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
     # - commit gốc của lượt kiểm đã thuộc v3.0.2 (tệp mốc từng có trong lịch sử của nó) → KHÔNG commit nào trong khoảng được
     #   miễn, kể cả commit nằm trên một nhánh tách ra từ lịch sử cũ rồi gộp vào sau;
     # - commit gốc còn ở trước v3.0.2 (khoảng kiểm vắt qua lúc gộp) → chỉ miễn commit mà lịch sử của nó chưa từng có tệp mốc.
-    if boundary is not None:
-        if git("cat-file", "-e", f"{boundary}^{{commit}}").returncode != 0:
-            return errs + [f"L-06: không tìm thấy commit mốc v3.0.2 {boundary[:7]} trong kho (cần lịch sử đầy đủ: fetch-depth 0)"]
     def pre_v302(c):
         if boundary is not None:
             return git("merge-base", "--is-ancestor", c, boundary).returncode == 0
