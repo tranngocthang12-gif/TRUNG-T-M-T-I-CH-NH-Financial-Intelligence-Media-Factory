@@ -101,8 +101,12 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
                                        or "chưa có")
              + (f" | dòng hỏng bị bỏ qua: {sc['issue_forecasts']['malformed']}" if sc["issue_forecasts"].get("malformed") else ""),
              "- Cặp A–B: {pairs} cặp (lẻ {unpaired}, khác ngày {not_same_day}), bất đồng {disagreements}, đã phân định "
-             "{disagreements_resolved}, A đúng {a_correct}, mâu thuẫn {inconsistent_outcomes} — {verdict}".format(**sc["issue_forecasts"]["ab"])
+             "{disagreements_resolved}, VOID {disagreements_void}, A đúng {a_correct}, mâu thuẫn {inconsistent_outcomes} — {verdict}".format(**sc["issue_forecasts"]["ab"])
              + ("  ⚠ " + sc["issue_forecasts"]["ab"]["warning_inconsistent"] if "warning_inconsistent" in sc["issue_forecasts"]["ab"] else ""),
+             "- VOID (câu hỏi bị hủy; trong kiểm định A–B tính theo hướng bất lợi cho kết luận đang xét): "
+             + (", ".join(f"ghế {k}: {v['void']}/{v['closed']} đã đóng" for k, v in sc["issue_forecasts"]["void"]["by_seat"].items()) or "chưa có")
+             + " | cặp: {void}/{closed}".format(**sc["issue_forecasts"]["void"]["pairs"])
+             + " | cặp bất đồng: {void}/{closed}".format(**sc["issue_forecasts"]["void"]["disagreements"]),
              f"- Ghi chú chuyển OUTDATED (L-08): {', '.join(outdated) if outdated else 'không có'}",
              "- Lần thử đã đăng ký nhưng không có kết quả (L-06; vẫn tính vào số lần thử): "
              + (", ".join(research.abandoned_trials(ledger_df)) or "không có"), ""]

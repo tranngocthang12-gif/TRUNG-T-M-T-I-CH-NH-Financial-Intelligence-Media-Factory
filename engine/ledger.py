@@ -239,13 +239,21 @@ def issue_summary(all_rows, R):
     """Chấm dự báo từ Issue theo ARCHITECTURE v3.0 §4.1 bước 5 và ADR-0003.
     Theo ghế: n, đã phân định, VOID, chờ; Brier, Brier của xác suất nền, hiệu chuẩn.
     Cặp A–B: cùng câu hỏi (question + resolve_at), ghi cùng ngày (giờ VN, §4.2). Bất đồng = hai ghế ở hai phía 0,5.
-    Dự báo đã VOID (câu hỏi bị hủy, hoặc nguồn không công bố) không vào cặp, không vào tỷ lệ bất đồng, không vào điểm nào.
-    Chỉ chấm cặp mà cả A và B đã phân định cùng một sự thật.
-    Kiểm định CHỐT MẪU: phán quyết chỉ tính trên đúng 194 bất đồng được phân định ĐẦU TIÊN (theo thứ tự ghi trong sổ),
-    kiểm định nhị thức hai phía với p0 = 0,5 — không xem lại mỗi vòng trên mẫu lớn dần (tránh dừng tùy ý)."""
+    Chỉ chấm ĐÚNG/SAI cặp mà cả A và B đã phân định cùng một sự thật.
+
+    Kiểm định CHỐT MẪU — mẫu được xác định lúc GHI dự báo, không phải lúc phân định (ADR-0003 quyết định 3, vòng chấm 9):
+    - Mẫu chốt = đúng 194 cặp bất đồng ĐẦU TIÊN theo thứ tự ghi dự báo (số Issue của dự báo hoàn tất cặp). Cặp nào vào mẫu
+      đã cố định từ trước khi có bất kỳ kết quả nào: hủy một câu hỏi, để một câu hỏi không phân định, hay phân định câu
+      này trước câu kia đều không đổi được thành phần của mẫu.
+    - Chỉ ra phán quyết khi CẢ 194 cặp đó đã đóng (phân định YES/NO, hoặc VOID). Còn cặp chưa đóng → "CHƯA ĐỦ MẪU".
+    - VOID là một quyền chọn của người phân định (bỏ câu hỏi), nên mỗi cặp VOID trong mẫu được tính theo hướng BẤT LỢI cho
+      kết luận đang xét: xét "A hơn B" thì coi A sai ở mọi cặp VOID; xét "B hơn A" thì coi A đúng ở mọi cặp VOID. Hủy một
+      câu hỏi vì thế không bao giờ làm kết luận nào dễ đạt hơn.
+    - Kiểm định nhị thức hai phía với p0 = 0,5 trên n = 194 (khớp cỡ mẫu §4.2); không xem lại trên mẫu lớn dần.
+    Số và tỷ lệ VOID được báo riêng theo ghế, theo cặp và theo cặp bất đồng (khóa "void"). Brier theo ghế chỉ tính dự báo
+    đã có kết quả YES/NO — đọc kèm tỷ lệ VOID của ghế; phán quyết A–B chỉ dựa vào phép kiểm định chốt mẫu ở trên."""
     R = [r for r in R if r.get("resolution_issue") is not None]   # dự báo Issue chỉ nhận kết quả từ Issue 'Resolution'
-    res_order = {r.get("prediction_id"): i for i, r in enumerate(R)}
-    done = set(res_order)
+    done = {r.get("prediction_id") for r in R}
     outcome = {r.get("prediction_id"): int(r["outcome"]) for r in R if r.get("outcome") in (0, 1)}
     void_ids = {r.get("prediction_id") for r in R if r.get("outcome") is None}
     raw = [p for p in all_rows if is_issue_row(p)]
@@ -273,7 +281,6 @@ def issue_summary(all_rows, R):
                      "calibration": _calibration(ps, os_)}
     by_q = {}
     for p in sorted(issue, key=lambda r: r.get("issue_number", 0)):
-        if p["id"] in void_ids: continue                 # câu hỏi đã hủy (VOID): không vào cặp, không vào tỷ lệ bất đồng
         by_q.setdefault(_qkey(p), {"A": [], "B": []})[str(p["seat"])].append(p)
     pairs, unpaired, not_same_day = [], 0, 0
     for g in by_q.values():
@@ -282,30 +289,52 @@ def issue_summary(all_rows, R):
             else: not_same_day += 1
         unpaired += abs(len(g["A"]) - len(g["B"]))
     dis = [(a, b) for a, b in pairs if (float(a["p"]) - 0.5) * (float(b["p"]) - 0.5) < 0]
+    is_void = lambda ab: ab[0]["id"] in void_ids or ab[1]["id"] in void_ids      # một VOID hủy cả câu hỏi
     both = [(a, b) for a, b in dis if a["id"] in outcome and b["id"] in outcome]
     inconsistent = sum(1 for a, b in both if outcome[a["id"]] != outcome[b["id"]])
-    dis_res = sorted(((a, b) for a, b in both if outcome[a["id"]] == outcome[b["id"]]),
-                     key=lambda ab: (res_order.get(ab[0]["id"], 0), ab[0].get("issue_number", 0)))
+    resolved_ids = {a["id"] for a, b in both if outcome[a["id"]] == outcome[b["id"]]}
+    is_res = lambda ab: ab[0]["id"] in resolved_ids and not is_void(ab)           # cả hai đã phân định cùng một sự thật
     def right(a): return (float(a["p"]) > 0.5) == (outcome[a["id"]] == 1)
+    dis_res, dis_void = [ab for ab in dis if is_res(ab)], [ab for ab in dis if is_void(ab)]
     n_all, a_all = len(dis_res), sum(1 for a, _ in dis_res if right(a))
-    fixed = dis_res[:TARGET_DISAGREEMENTS]
-    n, a_right = len(fixed), sum(1 for a, _ in fixed if right(a))
-    pval = _binom_two_sided(a_right, n) if n == TARGET_DISAGREEMENTS else None
-    ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "void_forecasts": sum(1 for p in issue if p["id"] in void_ids),
-          "disagreements": len(dis),
+    # MẪU CHỐT: 194 cặp bất đồng đầu tiên theo thứ tự GHI dự báo — cố định trước khi có kết quả; phân định sau không đổi được.
+    recorded = lambda ab: max(ab[0].get("issue_number", 0), ab[1].get("issue_number", 0))
+    fixed = sorted(dis, key=recorded)[:TARGET_DISAGREEMENTS]
+    n = len(fixed)
+    v = sum(1 for ab in fixed if is_void(ab))
+    r = sum(1 for ab in fixed if is_res(ab))
+    k = sum(1 for ab in fixed if is_res(ab) and right(ab[0]))
+    full = n == TARGET_DISAGREEMENTS and r + v == n                              # đủ 194 cặp VÀ cả 194 cặp đã đóng
+    p_a = _binom_two_sided(k, n) if full else None                               # xét "A hơn B": mọi cặp VOID coi như A sai
+    p_b = _binom_two_sided(k + v, n) if full else None                           # xét "B hơn A": mọi cặp VOID coi như A đúng
+    verdict = ((f"CHƯA ĐỦ MẪU ({r + v}/{TARGET_DISAGREEMENTS} cặp bất đồng đầu tiên đã phân định hoặc VOID; đã ghi {n} cặp)")
+               if not full else
+               "A HƠN B CÓ Ý NGHĨA" if p_a < 0.05 and k > n / 2 else
+               "B HƠN A CÓ Ý NGHĨA" if p_b < 0.05 and k + v < n / 2 else "CHƯA THẤY KHÁC BIỆT A–B")
+    ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "disagreements": len(dis),
           "disagreement_rate": round(len(dis) / len(pairs), 3) if pairs else None,
-          "disagreements_resolved": n_all, "inconsistent_outcomes": inconsistent, "a_correct": a_all,
-          "a_accuracy": round(a_all / n_all, 3) if n_all else None,
+          "disagreements_resolved": n_all, "disagreements_void": len(dis_void), "inconsistent_outcomes": inconsistent,
+          "a_correct": a_all, "a_accuracy": round(a_all / n_all, 3) if n_all else None,
           "target_disagreements": TARGET_DISAGREEMENTS,
-          "fixed_sample": {"n": n, "a_correct": a_right, "p_value_two_sided_vs_coin": round(pval, 4) if pval is not None else None},
-          "verdict": (f"CHƯA ĐỦ MẪU ({n}/{TARGET_DISAGREEMENTS} bất đồng đã phân định)" if n < TARGET_DISAGREEMENTS else
-                      "A HƠN B CÓ Ý NGHĨA" if pval < 0.05 and a_right > n / 2 else
-                      "B HƠN A CÓ Ý NGHĨA" if pval < 0.05 else "CHƯA THẤY KHÁC BIỆT A–B")}
+          "fixed_sample": {"n": n, "resolved": r, "void": v, "open": n - r - v, "a_correct": k,
+                           "p_value_void_as_a_wrong": round(p_a, 4) if p_a is not None else None,
+                           "p_value_void_as_a_right": round(p_b, 4) if p_b is not None else None},
+          "verdict": verdict}
+    if v:
+        ab["void_rule"] = (f"{v} cặp bất đồng trong mẫu chốt bị VOID: tính A sai khi xét 'A hơn B', tính A đúng khi xét 'B hơn A' "
+                           "(ADR-0003 quyết định 3)")
     if inconsistent:
         ab["warning_inconsistent"] = f"{inconsistent} cặp có hai outcome khác nhau cho cùng câu hỏi — kiểm ledger/resolutions.jsonl"
     if len(pairs) >= MIN_PAIRS_FOR_RATE_WARNING and len(dis) / len(pairs) < 0.10:
         ab["warning"] = "tỷ lệ bất đồng < 10% sau 60 cặp: mở ADR đổi nhóm B sang nhà cung cấp khác (CONTROL_B_PROMPT, ARCHITECTURE §9)"
-    out = {"total": len(raw), "by_seat": by_seat, "scores": scores, "ab": ab}
+    rate = lambda x, y: round(x / y, 3) if y else None
+    pairs_void, pairs_closed = sum(1 for ab_ in pairs if is_void(ab_)), sum(1 for a, b in pairs if a["id"] in done and b["id"] in done)
+    void = {"by_seat": {s: {"void": d["void"], "closed": d["void"] + d["resolved"], "rate": rate(d["void"], d["void"] + d["resolved"])}
+                        for s, d in sorted(by_seat.items())},
+            "pairs": {"void": pairs_void, "closed": pairs_closed, "rate": rate(pairs_void, pairs_closed)},
+            "disagreements": {"void": len(dis_void), "closed": n_all + len(dis_void),
+                              "rate": rate(len(dis_void), n_all + len(dis_void))}}
+    out = {"total": len(raw), "by_seat": by_seat, "scores": scores, "ab": ab, "void": void}
     if len(raw) != len(issue):
         out["malformed"] = len(raw) - len(issue)
     return out
