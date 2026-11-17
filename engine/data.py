@@ -1,20 +1,61 @@
 """Data Engine: kho du lieu append-only, giu ban quan sat dau tien (point-in-time).
-Kho giu GIA GOC lam bang chung. Moi tinh toan (feature, nhan, paper, Ledger) dung GIA DIEU CHINH tu load_market()."""
+Kho giu GIA GOC lam bang chung. Moi tinh toan (feature, nhan, paper, Ledger) dung GIA DIEU CHINH tu load_market().
+
+Ghi TANG DAN (ADR-0006, C2): kho cu `data.store` (prices.csv.gz) DONG BANG — khong ghi lai nua. Dong moi vao
+`data.store_dir`, moi thang giao dich mot tep CSV `YYYY-MM.csv`; chi NOI THEM vao cuoi tep (thu tu = thu tu quan sat),
+khong bao gio viet lai dong cu. tools/ledger_audit.py kiem: kho cu khong doi, moi tep thang cu la tien to cua ban moi."""
 import datetime as dt
+import pathlib
 import numpy as np, pandas as pd
+from . import config
 from .config import CFG, path
 from . import adjust
 
 COLS = ["date", "ticker", "open", "high", "low", "close", "volume", "observed_at", "source"]
 
-def load_store():
-    p = path(CFG["data"]["store"])
-    if not p.exists():
-        return pd.DataFrame(columns=COLS)
-    return pd.read_csv(p, parse_dates=["date", "observed_at"])
+def _root(root):
+    return pathlib.Path(root) if root is not None else config.ROOT
 
-def save_store(df):
-    df.sort_values(["date", "ticker"]).to_csv(path(CFG["data"]["store"]), index=False, compression="gzip")
+def load_store(root=None):
+    """Kho cu (dong bang) + moi tep thang; trung (date, ticker) thi giu ban quan sat DAU TIEN."""
+    r, parts = _root(root), []
+    legacy = r / CFG["data"]["store"]
+    if legacy.exists():
+        parts.append(pd.read_csv(legacy))
+    d = r / CFG["data"]["store_dir"]
+    if d.is_dir():
+        parts += [pd.read_csv(f) for f in sorted(d.glob("*.csv"))]
+    parts = [x for x in parts if len(x)]
+    if not parts:
+        return pd.DataFrame(columns=COLS)
+    s = pd.concat(parts, ignore_index=True)[COLS]
+    for c in ("date", "observed_at"):     # mot tep co the co ca "YYYY-MM-DD" lan "YYYY-MM-DD HH:MM:SS.ffffff"
+        s[c] = pd.to_datetime(s[c], format="ISO8601")
+    s = s.sort_values("observed_at", kind="stable").drop_duplicates(["date", "ticker"], keep="first")
+    return s.sort_values(["date", "ticker"], kind="stable").reset_index(drop=True)
+
+def save_store(df, root=None):
+    """Ghi TANG DAN (ADR-0006): chi them dong (date, ticker) chua co trong kho, noi vao cuoi tep thang cua ngay giao dich.
+    Dong da co thi GIU NGUYEN ban cu (diem-thoi-gian: ban quan sat dau tien) — truyen vao gia da sua cung khong ghi de.
+    Tra ve so dong da them."""
+    if df is None or len(df) == 0:
+        return 0
+    r = _root(root)
+    have = load_store(r)
+    keys = set(zip(have["date"], have["ticker"])) if len(have) else set()
+    df = df[COLS].copy()
+    df["date"], df["observed_at"] = pd.to_datetime(df["date"]), pd.to_datetime(df["observed_at"])
+    new = df[[(d, t) not in keys for d, t in zip(df["date"], df["ticker"])]]
+    new = new.sort_values("observed_at", kind="stable").drop_duplicates(["date", "ticker"], keep="first")
+    if new.empty:
+        return 0
+    d = r / CFG["data"]["store_dir"]
+    d.mkdir(parents=True, exist_ok=True)
+    new = new.sort_values(["observed_at", "date", "ticker"], kind="stable")
+    for month, g in new.groupby(new["date"].dt.strftime("%Y-%m"), sort=True):
+        f = d / f"{month}.csv"
+        g.to_csv(f, mode="a", header=not f.exists(), index=False)
+    return len(new)
 
 def append_rows(store, new):
     """Append-only: neu mot (date, ticker) da co, giu ban quan sat DAU TIEN, khong ghi de qua khu."""
