@@ -32,22 +32,28 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
 1. Ghế A (Claude trong Project) soạn câu hỏi có/không, nguồn phân định, ngày phân định, xác suất.
 2. Ghế B: mở một chat Claude **mới**, không Project, không tệp, tắt tìm web; dán nguyên khối prompt trong `governance/CONTROL_B_PROMPT.md` rồi dán câu hỏi; chép ba dòng trả lời.
 3. Tab **Issues** → **New issue** → mẫu **Forecast**. Mở hai Issue **trong cùng một ngày**: một cho ghế A, một cho ghế B, **cùng một câu chữ** ở ô question, cùng nguồn, cùng luật, cùng ngày phân định.
-   - `p`, `base_rate`: chỉ ghi con số (0.35 hoặc 0,35 đều được).
+   - `p`, `base_rate`: chỉ ghi con số (0.35 hoặc 0,35 đều được); không ghi %, không ghi chữ.
+   - `resolve_at`: đúng dạng `2026-12-10`.
+   - `resolution_source`: phải có **tên miền** của nguồn, ví dụ `nso.gov.vn` hoặc `https://www.sbv.gov.vn`. Lúc phân định máy chỉ nhận đường dẫn thuộc tên miền ghi ở đây.
    - `model_cutoff`: dạng `2026-06`.
    - `author_seat`: bắt đầu bằng tên mô hình ("Claude Project TTC", "Claude trần").
    - `prompt_hash`: ghế B dán mã hash ghi trong `CONTROL_B_PROMPT.md`; ghế A để trống.
-4. Trong 1–2 phút robot `ttc-ledger` bình luận ✅ (đã ghi, kèm mã `F-<số Issue>`) hoặc ❌ kèm lý do. Bị ❌ thì mở Issue mới đã sửa; không sửa Issue cũ (sửa không có tác dụng).
+4. Trong 1–2 phút robot `github-actions` bình luận ✅ (đã ghi, kèm mã `F-<số Issue>` và dòng **dấu nhận** `ledger-attest: …`) hoặc ❌ kèm lý do. Bị ❌ thì mở Issue mới đã sửa; không sửa Issue cũ (sửa không có tác dụng).
+   - **Không sửa, không xóa bình luận ✅ của robot.** Dòng dấu nhận là bằng chứng dự báo đã có từ lúc Issue mở; mất nó thì kiểm toán sổ báo đỏ.
+   - Nếu việc "Ledger intake" đỏ mà dự báo đã vào sổ nhưng chưa có bình luận ✅: vào tab **Actions**, mở lần chạy đó, bấm **Re-run all jobs** trong vòng 6 giờ kể từ lúc mở Issue (và trước ngày `resolve_at`). Robot sẽ đăng bổ sung dấu nhận, không ghi trùng. Quá hạn đó thì báo kiến trúc sư: dòng ấy không còn bằng chứng thời điểm.
 5. Mỗi ghế chỉ một dự báo cho một câu hỏi. Ghi nhầm thì không xóa được: sổ chỉ ghi thêm.
 
 ## 7. Phân định khi tới hạn
 1. Tới ngày `resolve_at` (giờ Việt Nam), **Owner hoặc một ghế AI khác nhà cung cấp với ghế viết** (ví dụ ChatGPT) mở nguồn đã ghi trong dự báo, tìm con số hoặc sự kiện.
-2. **Issues** → **New issue** → mẫu **Resolution**: mã dự báo (`F-101`), YES/NO/VOID, đường dẫn nguồn (phải cùng tên miền đã ghi trong dự báo), đoạn trích nguyên văn, `resolver` = người đã đọc nguồn ("Owner" hoặc "ChatGPT (OpenAI)"; không được là Claude).
+2. **Issues** → **New issue** → mẫu **Resolution**: mã dự báo (`F-101`), YES/NO/VOID, đường dẫn nguồn, đoạn trích nguyên văn, `resolver` = người đã đọc nguồn ("Owner" hoặc "ChatGPT (OpenAI)"; không được là Claude).
+   - Đường dẫn nguồn: dán **đường dẫn đầy đủ bắt đầu bằng `https://`** tới đúng trang đã đọc. Mọi đường dẫn ghi trong ô này phải thuộc tên miền đã ghi trong dự báo (tên miền con như `data.nso.gov.vn` được nhận); không dán kèm đường dẫn của trang khác.
+   - Robot bình luận ✅ kèm dấu nhận như ở mục 6; cũng không sửa, không xóa bình luận đó.
 3. Một Issue phân định một câu hỏi; ghế A và ghế B của câu hỏi nhận cùng kết quả. Đã phân định thì không sửa được. Nguồn đã hứa không công bố → chọn VOID và ghi lý do.
 4. Điểm số cập nhật ở vòng học kế tiếp: `reports/scorecard.json` mục `issue_forecasts`, và cuối tệp `reports/cycle_<ngày>.md`.
 
 ## 8. Chấm và gộp một PR (L-09, L-10)
 1. PR phải có hai dòng trong mô tả: `authored_by: <ghế viết>` và `reviewed_by:` (để trống lúc mở).
-2. Đưa PR cho một ghế **khác nhà cung cấp** với ghế viết để chấm, ghi rõ commit cần chấm (7 ký tự đầu SHA). Yêu cầu ghế chấm mở đầu câu trả lời bằng `GỘP ĐƯỢC — commit <7 ký tự>` hoặc `SỬA TRƯỚC — commit <7 ký tự>`.
+2. Đưa PR cho một ghế **khác nhà cung cấp** với ghế viết để chấm, ghi rõ commit cần chấm (7 ký tự đầu SHA). Yêu cầu ghế chấm viết **dòng đầu tiên** của câu trả lời là đúng `GỘP ĐƯỢC — commit <7 ký tự>` hoặc `SỬA TRƯỚC — commit <7 ký tự>`, không thêm chữ nào khác trên dòng đó. Máy chỉ nhận dòng đầu đúng dạng này: "GỘP ĐƯỢC nếu sửa…" không được tính.
 3. Kết luận GỘP ĐƯỢC: (a) dán nguyên bản chấm thành một **bình luận** của PR; (b) rồi sửa mô tả PR, điền `reviewed_by: <ghế chấm>`. Việc "L-09 nguoi cham" chuyển xanh.
 4. Có commit mới sau khi chấm → việc đó đỏ lại → chấm lại bản mới.
 5. Owner bấm **Merge pull request**. Không ghế AI nào bấm thay.
@@ -59,3 +65,6 @@ Settings → Rules → Rulesets → New branch ruleset → áp cho `main` → b�
 - "Test bat buoc (chan merge)" đỏ: không gộp; đọc dòng `LỖI:` trong log và giao ghế viết sửa.
 - "L-09 nguoi cham" đỏ: thiếu người chấm hoặc thiếu bình luận bản chấm đúng commit — xem mục 8.
 - Vòng học đỏ ở bước "Kiem lai sau khi chay": kết quả vòng đó trái luật nên không được ghi; chụp log gửi kiến trúc sư.
+- Vòng học đỏ với dòng `LỖI L-06` (không đẩy được đăng ký thử lên `main`): backtest chưa chạy, không mất gì; bấm **Re-run all jobs**. Lần thử đã đăng ký mà không có kết quả vẫn nằm trong sổ và vẫn được đếm — đó là chủ ý.
+- Log có `L-05: … không có bình luận dấu nhận`: một dòng trong sổ không có dấu nhận của robot (dòng ghi sai đường, hoặc bình luận ✅ bị xóa/sửa). Không tự sửa sổ; chụp log gửi kiến trúc sư.
+- Log có `L-05: dòng … trong sổ không qua luật nhận`: một dòng trong sổ trái luật nhận (ghi không qua robot). Xử lý như trên.
