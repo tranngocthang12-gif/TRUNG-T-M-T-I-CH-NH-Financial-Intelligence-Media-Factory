@@ -18,11 +18,12 @@ MỞ Issue. Sổ chỉ ghi thêm nên không được phép ghi một trạng th
 3. Hạn ghi: dấu nhận của một dự báo phải được đăng trong 6 giờ sau khi Issue mở và trước ngày resolve_at. Robot không ghi
    khi đã sát các hạn đó (chạy lại một job cũ sau nhiều giờ sẽ tạo dòng không bao giờ có dấu nhận hợp lệ).
 PHỤC HỒI, không sửa sổ: (a) Issue bị từ chối → mở Issue mới. (b) Job hỏng giữa chừng → chạy lại job: đã ghi thì không ghi
-trùng mà chỉ đăng bổ sung dấu nhận, và chỉ cho dòng khớp thân Issue lúc mở. (c) Một dự báo đã nằm trong sổ mà dấu nhận
-không kịp hạn (GitHub không cho đăng bình luận suốt 6 giờ, hoặc bình luận ✅ bị xóa) → chạy lại job để robot đăng dấu nhận
-muộn, rồi mở Issue Resolution chọn VOID cho câu hỏi đó (VOID ghi được cả trước resolve_at): dự báo đã VOID không bao giờ
-được chấm, nên kiểm toán nhận dấu nhận muộn của nó (tools/ledger_audit.py). Dấu nhận của dòng phân định không có hạn 6
-giờ, nên (b) luôn đủ cho phân định.
+trùng mà chỉ đăng bổ sung dấu nhận — và CHỈ khi dòng trong sổ khớp thân Issue lúc mở VÀ việc có dòng đó trong sổ qua được
+đúng phép tự kiểm của đường ghi (một Issue đã bị robot từ chối thì chạy lại bao nhiêu lần cũng không xin được dấu nhận cho
+một dòng ghi tay). (c) Một dự báo đã nằm trong sổ mà dấu nhận không kịp hạn (GitHub không cho đăng bình luận suốt 6 giờ,
+hoặc bình luận ✅ bị xóa) → chạy lại job để robot đăng dấu nhận muộn; kiểm toán vẫn đỏ ở dòng đó cho tới khi câu hỏi
+được hủy bằng VOID lúc tới resolve_at (VOID không ghi được trước hạn — xem tools/resolution_intake.py). Dấu nhận của dòng
+phân định không có hạn 6 giờ, nên (b) luôn đủ cho phân định.
 
 Luật kiểm lúc nhận — forecast_error() — (mọi "ngày" tính theo giờ Việt Nam, UTC+7). CI chạy LẠI đúng các luật này trên mọi
 dòng đã có trong sổ (replay(), gọi từ tools/validate.py), nên một dòng ghi vòng qua intake vẫn bị bắt:
@@ -35,8 +36,11 @@ dòng đã có trong sổ (replay(), gọi từ tools/validate.py), nên một d
 - L-09: author_seat bắt đầu bằng tên ghế (mô hình/nhà cung cấp hoặc Owner) — để về sau xác định người phân định độc lập.
 - L-02: không chứa từ khóa khuyến nghị mua bán (Ledger chỉ ghi thêm; một dòng sai sẽ làm validate đỏ mãi).
 - resolution_source phải nêu ít nhất một tên miền (vd nso.gov.vn): lời hứa về nguồn phải máy kiểm được lúc phân định.
-- Nhóm đối chứng: seat B bắt buộc prompt_hash = sha256 khối prompt hiện hành trong governance/CONTROL_B_PROMPT.md;
-  seat A không được có prompt_hash.
+- Nhóm đối chứng: seat B bắt buộc prompt_hash = sha256 của PHIÊN BẢN prompt chuẩn có hiệu lực vào ngày Issue mở, theo
+  governance/control_b_prompts.jsonl (mỗi dòng một phiên bản: sha256 + ngày bắt đầu hiệu lực; chỉ ghi thêm). Luật này
+  giống hệt nhau lúc nhận và lúc kiểm lại, nên một dòng B mang prompt_hash sai không qua được validate dù có dấu nhận
+  hay không. Lúc nhận còn đòi khối prompt trong governance/CONTROL_B_PROMPT.md trùng phiên bản mới nhất (đổi prompt mà
+  quên thêm dòng phiên bản thì robot ngừng nhận ghế B). Seat A không được có prompt_hash.
 - Một câu hỏi (question + resolve_at) mỗi ghế chỉ một dự báo; ghế kia nếu đã ghi thì resolution_rule và resolution_source
   phải giống hệt; cùng câu chữ mà khác resolve_at → từ chối. Khác ngày với ghế kia vẫn ghi nhưng không vào cặp A–B (§4.2).
 - Câu hỏi đã được phân định thì không nhận thêm dự báo.
@@ -54,6 +58,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "ledger" / "predictions.jsonl"
 SCHEMA = ROOT / "contracts" / "forecast_issue.schema.json"
 CONTROL_B = ROOT / "governance" / "CONTROL_B_PROMPT.md"
+CONTROL_B_VERSIONS = ROOT / "governance" / "control_b_prompts.jsonl"
 RES = ROOT / "ledger" / "resolutions.jsonl"
 NUMERIC = {"p", "base_rate"}
 VN = timezone(timedelta(hours=7))
@@ -208,6 +213,44 @@ def control_b_hash(path=None):
     return hashlib.sha256(m.group(1).rstrip("\n").encode("utf-8")).hexdigest() if m else None
 
 
+def control_b_versions(path=None) -> list:
+    """Các phiên bản prompt chuẩn của ghế B: [(ngày bắt đầu hiệu lực, sha256)] theo thứ tự trong tệp
+    governance/control_b_prompts.jsonl. Tệp không có → []. ValueError nếu tệp hỏng: mỗi dòng phải là
+    {"sha256": <64 hex>, "valid_from": "YYYY-MM-DD"}, ngày tăng dần, không trùng hash."""
+    path = path or CONTROL_B_VERSIONS
+    if not path.is_file():
+        return []
+    out = []
+    for n, raw in enumerate(path.read_text(encoding="utf-8").splitlines(), 1):
+        if not raw.strip():
+            continue
+        try:
+            row = strict_loads(raw)
+            sha, start = row["sha256"], row["valid_from"]
+            if set(row) != {"sha256", "valid_from"} or not isinstance(sha, str) or not _HEX64_RE.fullmatch(sha) \
+                    or not isinstance(start, str) or not _DATE_RE.fullmatch(start):
+                raise ValueError("sai dạng")
+            day = date.fromisoformat(start)
+        except (ValueError, KeyError, TypeError):
+            raise ValueError(f"dòng {n} không đúng dạng {{\"sha256\": <64 hex>, \"valid_from\": \"YYYY-MM-DD\"}}") from None
+        if out and day <= out[-1][0]:
+            raise ValueError(f"dòng {n}: valid_from phải sau phiên bản trước")
+        if any(sha == h for _, h in out):
+            raise ValueError(f"dòng {n}: sha256 trùng một phiên bản trước")
+        out.append((day, sha))
+    return out
+
+
+def control_b_hash_on(day, versions):
+    """sha256 của phiên bản prompt chuẩn có hiệu lực vào ngày `day` (giờ Việt Nam): phiên bản mới nhất có valid_from ≤ day.
+    None nếu chưa phiên bản nào có hiệu lực vào ngày đó."""
+    hit = None
+    for start, sha in versions:
+        if start <= day:
+            hit = sha
+    return hit
+
+
 def load_rows(path):
     return [strict_loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()] if path.is_file() else []
 
@@ -216,12 +259,13 @@ def _schema():
     return json.loads(SCHEMA.read_text(encoding="utf-8"))
 
 
-def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=True):
+def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=True, versions=None):
     """Luật nhận một dự báo. data: các trường của form; created: giờ tạo Issue (ISO); issue_rows: các dòng dự báo Issue đã
     có TRƯỚC nó; res_rows: các dòng phân định. Trả về (lỗi hoặc None, ghi chú). Hàm thuần — intake và replay() dùng chung.
     live=True (lúc nhận): res_rows là sổ phân định NGAY LÚC GHI; live=False (kiểm lại dòng đã có): res_rows là cả sổ. Hai
     chỗ khác nhau, và chỉ hai chỗ:
-    - seat B: lúc nhận phải khớp prompt hiện hành; lúc kiểm lại chỉ kiểm dạng (prompt có thể đã đổi qua ADR sau đó).
+    - seat B: luật prompt_hash giống nhau ở cả hai chế độ (phiên bản có hiệu lực ngày Issue mở); lúc nhận thêm một điều
+      kiện về trạng thái kho: khối prompt hiện hành phải trùng phiên bản mới nhất.
     - câu hỏi đã có kết quả: lúc nhận, CÓ BẤT KỲ dòng phân định nào của câu hỏi trong sổ là từ chối — kể cả khi Issue dự
       báo này mở trước Issue phân định (robot ghi theo thứ tự chạy xong, không theo thứ tự mở). Lúc kiểm lại, sổ đầy đủ
       luôn chứa cả các phân định ghi SAU dòng đang xét, nên chỉ phân định mở KHÔNG SAU dự báo mới là lỗi ở đây; trường hợp
@@ -260,15 +304,24 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=Tru
         return (": resolution_source phải nêu ít nhất một tên miền của nguồn (ví dụ nso.gov.vn, sbv.gov.vn) — lúc phân "
                 "định máy chỉ nhận đường dẫn thuộc tên miền đã hứa"), ""
     if data["seat"] == "B":
+        # Cùng một luật lúc nhận và lúc kiểm lại: prompt_hash phải là phiên bản có hiệu lực vào NGÀY ISSUE MỞ. (Trước vòng
+        # chấm 9, kiểm lại chỉ đòi 64 ký tự hex: một dòng B ghi tay với prompt_hash sai qua được validate.)
         got = str(data.get("prompt_hash", "")).strip().lower()
-        if live:
-            want = control_b_hash()
-            if want is None:
-                return ": không đọc được khối prompt trong governance/CONTROL_B_PROMPT.md để đối chiếu prompt_hash", ""
-            if got != want:
-                return f": seat B phải có prompt_hash = {want} (sha256 khối prompt chuẩn hiện hành; đổi prompt phải qua ADR)", ""
-        elif not _HEX64_RE.fullmatch(got):
-            return ": seat B phải có prompt_hash là sha256 (64 ký tự hex) của prompt chuẩn", ""
+        try:
+            versions = control_b_versions() if versions is None else versions
+        except (OSError, ValueError) as e:
+            return f": không đọc được governance/control_b_prompts.jsonl ({str(e).splitlines()[0]})", ""
+        want = control_b_hash_on(created_day, versions)
+        if want is None:
+            return (f": chưa có phiên bản prompt chuẩn nào của ghế B có hiệu lực vào ngày {created_day.isoformat()} "
+                    "(governance/control_b_prompts.jsonl)"), ""
+        if live and control_b_hash() != versions[-1][1]:
+            return (": khối prompt trong governance/CONTROL_B_PROMPT.md không trùng phiên bản mới nhất ghi trong "
+                    "governance/control_b_prompts.jsonl — đổi prompt phải qua ADR và thêm một dòng phiên bản; robot ngừng nhận "
+                    "dự báo ghế B cho tới khi hai tệp khớp nhau"), ""
+        if got != want:
+            return (f": seat B phải có prompt_hash = {want} (sha256 của prompt chuẩn có hiệu lực ngày {created_day.isoformat()}, "
+                    "theo governance/control_b_prompts.jsonl; đổi prompt phải qua ADR)"), ""
     elif "prompt_hash" in data:
         return ": seat A không dùng prompt chuẩn của nhóm B — để trống prompt_hash", ""
 
@@ -317,8 +370,9 @@ def attest(row) -> str:
     return f"predictions {row.get('id')} {row.get('hash')}"
 
 
-def replay(pred_rows, res_rows=()) -> list[str]:
-    """Chạy lại luật nhận trên MỌI dòng dự báo đã có trong sổ, theo thứ tự. Trả về danh sách lỗi."""
+def replay(pred_rows, res_rows=(), versions=None) -> list[str]:
+    """Chạy lại luật nhận trên MỌI dòng dự báo đã có trong sổ, theo thứ tự. Trả về danh sách lỗi.
+    versions: các phiên bản prompt ghế B (control_b_versions) của kho đang kiểm; None = kho chứa mô-đun này."""
     errs, prior, seen = [], [], set()
     schema = _schema()
     for row in pred_rows:
@@ -340,7 +394,7 @@ def replay(pred_rows, res_rows=()) -> list[str]:
         seen.add(n)
         data = {k: v for k, v in row.items() if k not in SYSTEM_FIELDS}
         try:
-            msg, _ = forecast_error(data, row.get("issue_created_at"), prior, res_rows, schema, live=False)
+            msg, _ = forecast_error(data, row.get("issue_created_at"), prior, res_rows, schema, live=False, versions=versions)
         except Exception as e:  # noqa: BLE001
             msg = f": không đọc được ({str(e).splitlines()[0]})"
         if msg:
@@ -349,11 +403,11 @@ def replay(pred_rows, res_rows=()) -> list[str]:
     return errs
 
 
-def ledger_errors(pred_rows, res_rows) -> list[str]:
+def ledger_errors(pred_rows, res_rows, versions=None) -> list[str]:
     """TOÀN BỘ luật kiểm lại trên một trạng thái của hai sổ (dự báo + phân định). tools/validate.py gọi hàm này trên sổ
     trong kho; hai robot nhận gọi nó trên trạng thái sau khi ghi, trước khi đẩy."""
     from tools import resolution_intake                    # nạp muộn: resolution_intake nhập lại mô-đun này
-    return replay(pred_rows, res_rows) + resolution_intake.replay(pred_rows, res_rows)
+    return replay(pred_rows, res_rows, versions) + resolution_intake.replay(pred_rows, res_rows)
 
 
 def post_write_errors(pred_before, res_before, pred_after, res_after) -> list[str]:
@@ -397,6 +451,17 @@ def main() -> int:
         if strict_loads(dumps(build_row(data, number, created, author, old.get("prev_hash")))) != old:
             return reject(f": sổ đã có một dòng mang số Issue #{number} nhưng nội dung dòng đó KHÔNG khớp thân Issue lúc mở. Robot "
                           "chỉ cấp dấu nhận cho dòng do chính nó ghi từ thân Issue; dòng kia không có bằng chứng thời điểm")
+        # Khớp nội dung chưa đủ: thân Issue có thể chính là thứ robot đã TỪ CHỐI (ví dụ ghế B sai prompt_hash), rồi ai đó ghi
+        # tay đúng nội dung ấy vào sổ. Dấu nhận chỉ được cấp khi việc có dòng này trong sổ qua được đúng phép tự kiểm của
+        # đường ghi: so sổ không có dòng này với sổ đang có, không được sinh lỗi kiểm lại nào.
+        res_rows = load_rows(RES)
+        try:
+            broken = post_write_errors([r for r in rows if r is not old], res_rows, rows, res_rows)
+        except Exception as e:  # noqa: BLE001
+            broken = [f"không chạy được kiểm lại ({str(e).splitlines()[0]})"]
+        if broken:
+            return reject(f": sổ đã có một dòng mang số Issue #{number}, nhưng dòng đó không qua luật nhận — {broken[0]} — nên "
+                          "robot không cấp dấu nhận cho nó")
         print(json.dumps({"ok": True, "duplicate": True, "attest": [attest(old)],
                           "message": f"Dự báo #{number} đã có trong Ledger, bỏ qua (không ghi trùng)"}, ensure_ascii=False))
         return 3

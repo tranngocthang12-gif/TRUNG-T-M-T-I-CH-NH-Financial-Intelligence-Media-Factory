@@ -29,8 +29,10 @@ thứ nằm NGOÀI tệp:
      job phân định hỏng ở bước đăng dấu nhận luôn chạy lại được.
    - Phục hồi cho dự báo (ghi thêm, không sửa sổ): một dự báo CÓ dấu nhận của robot nhưng dấu nhận tới quá hạn (job nhận
      phải chạy lại sau 6 giờ), nếu câu hỏi của nó đã bị hủy bằng một dòng VOID có dấu nhận hợp lệ, thì không còn là lỗi —
-     dự báo VOID không bao giờ được chấm. Việc đó được in ra thành ghi chú. Dự báo không có dấu nhận nào của robot thì
-     VOID cũng không gỡ được.
+     dự báo VOID không bao giờ có điểm. Việc đó được in ra thành ghi chú. Dự báo không có dấu nhận nào của robot thì VOID
+     cũng không gỡ được. VOID chỉ ghi được từ resolve_at, nên cho tới lúc đó kiểm toán vẫn đỏ ở dòng ấy.
+   - Kiểm toán đọc lại bình luận cho dòng PHÂN ĐỊNH thiếu dấu nhận bất kể Issue mở từ bao giờ (job phân định có thể vừa
+     được chạy lại); cho dòng DỰ BÁO thì chỉ khi Issue còn trong hạn 6 giờ.
 4. L-10 (--github) — cảnh báo (không chặn) khi nhánh main chưa có luật bảo vệ nào.
 
 Việc từng dòng có đúng LUẬT NHẬN hay không (hợp đồng, L-05, mỗi ghế một dự báo…) do tools/validate.py chạy lại
@@ -57,7 +59,8 @@ sys.path.insert(0, str(ROOT))
 from tools.laws_checks import ATTEST_WINDOW, TRIAL_HEADERS  # noqa: E402  một định nghĩa cho bên ghi và bên kiểm
 
 APPEND_ONLY = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "research/trial_registry.jsonl",
-               "paper/nav.csv", "paper/decisions.csv", "paper/trades.csv")
+               "paper/nav.csv", "paper/decisions.csv", "paper/trades.csv",
+               "governance/control_b_prompts.jsonl")   # phiên bản prompt ghế B đã có hiệu lực: không sửa, không xóa
 TRIALS, REGISTRY = "research/trials.csv", "research/trial_registry.jsonl"
 V302_MARKER = "tools/registry_push.py"   # có từ v3.0.2 và thuộc danh sách tệp bắt buộc của validate.py
 ZERO_SHA = "0" * 40
@@ -117,15 +120,16 @@ VN = timezone(timedelta(hours=7))
 
 def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, notes=None) -> list:
     """comments: {số Issue: [{"user": login, "created_at": iso, "updated_at": iso, "body": str}]}.
-    Trả về [(số Issue, lỗi)]; KHÔNG có khoảng miễn kiểm cho Issue vừa mở. Một dòng đạt khi Issue của nó có bình luận ✅
+    Trả về [(số Issue, lỗi, "predictions" | "resolutions")]; KHÔNG có khoảng miễn kiểm cho Issue vừa mở. Một dòng đạt khi Issue của nó có bình luận ✅
     của github-actions[bot], chưa sửa, đăng không trước giờ tạo Issue, chứa 'ledger-attest: <sổ> <mã> <hash>' đúng hash
     của dòng — và mọi bình luận của bot trên Issue đó không nêu hash nào KHÁC cho cùng mã (không ai "đặt trước" hai nội
     dung rồi chọn một). Riêng DỰ BÁO: dấu nhận còn phải đăng trong ATTEST_WINDOW sau giờ tạo Issue và trước ngày resolve_at
     (giờ Việt Nam) — đó là thứ chặn một dự báo viết sau mà mượn giờ Issue cũ.
     Phục hồi (ghi thêm, không sửa sổ): một dự báo CÓ dấu nhận của robot nhưng dấu nhận ấy tới quá hạn (job nhận phải chạy
     lại muộn), nếu câu hỏi của nó đã bị hủy bằng một dòng VOID có dấu nhận hợp lệ, thì không còn là lỗi — dự báo VOID không
-    bao giờ được chấm, không vào cặp A–B, không vào tiến độ. Việc đó được ghi vào `notes` để in ra. Dự báo không có dấu
-    nhận nào của robot thì VOID cũng không gỡ được."""
+    bao giờ có điểm, và trong phép kiểm định A–B nó bị tính theo hướng bất lợi cho kết luận đang xét. Việc đó được ghi vào
+    `notes` để in ra. Dự báo không có dấu nhận nào của robot thì VOID cũng không gỡ được. (VOID chỉ ghi được từ resolve_at,
+    nên cho tới lúc đó dòng ấy vẫn là lỗi.)"""
     def find(number, ledger, rid, rhash, before_day=None, window=ATTEST_WINDOW):
         """→ (True, "") khi có dấu nhận hợp lệ; (False, lý do) khi không; (None, "") khi Issue không có trên GitHub
         (issue_crosscheck_errors đã báo)."""
@@ -177,7 +181,8 @@ def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, note
             continue
         ok, why = find(n, "resolutions", r.get("prediction_id"), r.get("hash"), window=None)
         if ok is False:
-            res_errs.append(error(f"phân định {r.get('prediction_id')}", n, why, "chạy lại job phân định của Issue này (lúc nào cũng được)"))
+            res_errs.append(error(f"phân định {r.get('prediction_id')}", n, why, "chạy lại job phân định của Issue này (lúc nào cũng được)")
+                            + ("resolutions",))
         elif ok and "outcome" in r and r["outcome"] is None:
             voided[r.get("prediction_id")] = n
     pred_errs = []
@@ -195,13 +200,14 @@ def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, note
             continue
         pred_errs.append(error(f"dự báo {rid}", n, why,
                                "chạy lại job nhận của Issue này trong vòng 6 giờ kể từ lúc Issue mở; đã quá hạn thì vẫn chạy lại job "
-                               "để robot đăng dấu nhận muộn, rồi mở Issue Resolution chọn VOID để hủy câu hỏi của dòng này"))
+                               "để robot đăng dấu nhận muộn, và khi tới resolve_at thì hủy câu hỏi của dòng này bằng Issue Resolution "
+                               "chọn VOID") + ("predictions",))
     return pred_errs + res_errs
 
 
 def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict) -> list[str]:
     """Danh sách lỗi dấu nhận (xem attestation_failures) với MỘT lượt đọc bình luận."""
-    return [msg for _, msg in attestation_failures(pred_rows, res_rows, issues, comments)]
+    return [f[1] for f in attestation_failures(pred_rows, res_rows, issues, comments)]
 
 
 def attestation_errors_with_retry(pred_rows, res_rows, issues: dict, fetch, tries=ATTEST_TRIES, wait=ATTEST_WAIT,
@@ -209,28 +215,34 @@ def attestation_errors_with_retry(pred_rows, res_rows, issues: dict, fetch, trie
     """Như attestation_errors, nhưng ĐỌC LẠI bình luận khi còn dòng thiếu dấu nhận mà dấu nhận vẫn có thể tới đúng hạn.
     Lý do: robot nhận đẩy commit trước rồi mới đăng bình luận ✅; kiểm toán chạy sau khi MỘT robot xong nhưng đọc cả main,
     nên có thể thấy dòng của robot KHÁC vừa đẩy mà chưa kịp đăng dấu nhận. fetch(): hàm trả về {số Issue: [bình luận]}.
-    - Chỉ đọc lại khi có ít nhất một dòng lỗi thuộc Issue mở chưa quá ATTEST_WINDOW (quá hạn đó thì dấu nhận có tới cũng
-      không hợp lệ, chờ là vô ích).
+    - Chỉ đọc lại khi còn ít nhất một dòng lỗi mà dấu nhận VẪN CÓ THỂ tới hợp lệ: dòng phân định thì lúc nào cũng có thể
+      (dấu nhận phân định không có hạn 6 giờ — job phân định của một Issue mở từ hôm trước có thể vừa được chạy lại); dòng
+      dự báo thì chỉ khi Issue mở chưa quá ATTEST_WINDOW (quá hạn đó dấu nhận có tới cũng không hợp lệ, chờ là vô ích).
     - Tối đa `tries` lượt đọc, cách nhau `wait` giây. Hết lượt mà vẫn thiếu → trả về lỗi như thường: đây không phải
       khoảng miễn kiểm, không dòng nào được coi là đạt khi chưa có dấu nhận."""
     now = now or datetime.now(timezone.utc)
+    due = {r.get("issue_number"): str(r.get("resolve_at") or "") for r in pred_rows if "issue_number" in r}
     def fresh(number):
+        """Dự báo: dấu nhận còn có thể tới đúng hạn — Issue mở chưa quá ATTEST_WINDOW và chưa sang ngày resolve_at."""
         try:
-            return now - _ts((issues.get(number) or {}).get("created_at")) <= ATTEST_WINDOW
+            in_window = now - _ts((issues.get(number) or {}).get("created_at")) <= ATTEST_WINDOW
         except (TypeError, ValueError):
             return False
+        return in_window and (not due.get(number) or now.astimezone(VN).date().isoformat() < due[number])
+    def may_still_arrive(f):
+        return f[2] == "resolutions" or fresh(f[0])
     notes = []
     fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes)
     for _ in range(max(1, int(tries)) - 1):
-        if not fails or not any(fresh(n) for n, _ in fails):
+        if not any(may_still_arrive(f) for f in fails):
             break
-        print(f"(còn {len(fails)} dòng chưa thấy dấu nhận, Issue vừa mở: chờ {wait:g} giây rồi đọc lại bình luận)")
+        print(f"(còn {len(fails)} dòng chưa thấy dấu nhận mà dấu nhận vẫn có thể tới: chờ {wait:g} giây rồi đọc lại bình luận)")
         sleep(wait)
         notes = []
         fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes)
     for n in notes:
         print("::notice::" + n)
-    return [msg for _, msg in fails]
+    return [f[1] for f in fails]
 
 
 def _trials(data):
@@ -273,14 +285,18 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
     """L-06, cần git. base: commit gốc. Trả về lỗi về việc THÊM kết quả thử:
     - Pull Request: không được thêm kết quả, không được thêm dòng đăng ký (hai tệp chỉ do vòng học trên main ghi).
     - Trên main: với mỗi commit trong (base, HEAD] có thêm kết quả, dòng đăng ký của từng kết quả mới phải có sẵn trong sổ
-      ở commit liền trước nó. Chỉ bỏ qua commit của kho TRƯỚC v3.0.2 (nhận biết bằng việc chưa có tools/registry_push.py —
-      tệp bắt buộc từ v3.0.2, thiếu nó thì validate đỏ): đó là vòng học bản cũ, kết quả của nó do ghim trong config.yaml
-      và dòng neo lịch sử chốt. Từ v3.0.2 trở đi không commit nào được miễn."""
+      ở commit liền trước nó. Chỉ bỏ qua commit của kho TRƯỚC v3.0.2 — vòng học bản cũ, kết quả của nó do ghim trong
+      config.yaml và dòng neo lịch sử chốt. "Trước v3.0.2" xác định bằng tổ tiên: tools/registry_push.py (tệp bắt buộc từ
+      v3.0.2) chưa từng xuất hiện trong lịch sử của commit đó, VÀ commit gốc của lượt kiểm cũng còn ở trước v3.0.2. Từ
+      v3.0.2 trở đi không commit nào được miễn, kể cả khi tệp mốc tạm thời bị xóa."""
     def git(*a):
         return subprocess.run(["git", "-C", str(root), *a], capture_output=True)
     def show(rev, path):
         r = git("show", f"{rev}:{path}")
         return r.stdout if r.returncode == 0 else None
+    def ever_had_marker(rev):
+        """Tệp mốc v3.0.2 đã TỪNG có trong lịch sử của commit này (kể cả khi về sau bị xóa)."""
+        return bool(git("log", "--full-history", "-1", "--format=%H", rev, "--", V302_MARKER).stdout.strip())
     errs = trials_rows_errors(show(base, TRIALS), show("HEAD", TRIALS))
     if pull_request:
         # Cái PR tự thêm = commit gộp so với ĐẦU NHÁNH ĐÍCH lúc gộp (cha thứ nhất của commit gộp mà GitHub dựng cho PR).
@@ -301,14 +317,19 @@ def trials_history_errors(root, base, pull_request=False) -> list[str]:
             errs.append(f"L-06: Pull Request thêm dòng vào sổ đăng ký thử ({', '.join(sorted(map(str, extra)))}) — sổ chỉ do vòng "
                         "học trên main ghi, trước khi chạy backtest")
         return errs
+    # Mốc v3.0.2 xác định bằng TỔ TIÊN, không bằng việc tệp mốc đang có mặt hay không (vòng chấm 9: xóa tệp mốc ở một commit
+    # rồi ghi kết quả ở commit sau, rồi trả tệp lại, là qua được phép kiểm "vắng ở commit và commit cha"):
+    # - commit gốc của lượt kiểm đã thuộc v3.0.2 (tệp mốc từng có trong lịch sử của nó) → KHÔNG commit nào trong khoảng được
+    #   miễn, kể cả commit nằm trên một nhánh tách ra từ lịch sử cũ rồi gộp vào sau;
+    # - commit gốc còn ở trước v3.0.2 (khoảng kiểm vắt qua lúc gộp) → chỉ miễn commit mà lịch sử của nó chưa từng có tệp mốc.
+    base_is_v302 = ever_had_marker(base)
     commits = git("rev-list", "--reverse", f"{base}..HEAD", "--", TRIALS).stdout.decode().split()
     for c in commits:
         parent = git("rev-parse", "--verify", "-q", f"{c}^").stdout.decode().strip()
         if not parent:
             continue
-        if show(c, V302_MARKER) is None and show(parent, V302_MARKER) is None:
-            continue          # commit của kho trước v3.0.2 (vòng học bản cũ, chưa có sổ đăng ký): kết quả đó do ghim và dòng neo chốt.
-                              # Phải thiếu tệp mốc ở CẢ commit lẫn commit cha: xóa tệp mốc trong chính commit ghi kết quả không được miễn.
+        if not base_is_v302 and not ever_had_marker(c):
+            continue          # vòng học bản cũ (trước v3.0.2, chưa có sổ đăng ký): kết quả đó do ghim và dòng neo chốt
         before, after = _trials(show(parent, TRIALS))[1], _trials(show(c, TRIALS))[1]
         new = [t.get("trial_id") for t in after[len(before):]]
         if not new:

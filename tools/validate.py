@@ -19,7 +19,7 @@ REQUIRED = ["BOOT.md", "CHANGELOG.md", "config.yaml", ".github/workflows/daily_c
             "engine/run_cycle.py", "engine/ledger.py", "engine/experts.py", "engine/budget.py", "engine/adjust.py",
             "data/corporate_actions.csv",
             # v3.0 (G0 + v3.0.1/v3.0.2): đường ghi và phân định dự báo, luật, thư viện/học viện khởi động
-            "architecture/adr/ADR-0001-hop-nhat-v3.md", "governance/CONTROL_B_PROMPT.md",
+            "architecture/adr/ADR-0001-hop-nhat-v3.md", "governance/CONTROL_B_PROMPT.md", "governance/control_b_prompts.jsonl",
             ".github/ISSUE_TEMPLATE/forecast.yml", ".github/ISSUE_TEMPLATE/resolution.yml",
             ".github/workflows/ledger_intake.yml", ".github/workflows/resolution_intake.yml", ".github/workflows/tests.yml",
             "tools/ledger_intake.py", "tools/resolution_intake.py", "tools/laws_checks.py",

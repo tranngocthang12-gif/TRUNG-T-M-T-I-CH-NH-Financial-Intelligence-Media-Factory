@@ -176,7 +176,11 @@ def check_ledger_rows(root) -> list[str]:
         return ["L-05: thiếu thư viện jsonschema nên không kiểm lại được các dòng trong sổ (pip install jsonschema)"]
     try:
         from tools import ledger_intake                         # nạp muộn: mô-đun này nhập lại laws_checks
-        return ledger_intake.ledger_errors(pred, res)
+        try:                                                    # phiên bản prompt ghế B của CHÍNH kho đang kiểm
+            versions = ledger_intake.control_b_versions(root / "governance" / "control_b_prompts.jsonl")
+        except (OSError, ValueError):
+            versions = []                                       # tệp ghim hỏng: check_control_b_prompts báo; mọi dòng B sẽ đỏ
+        return ledger_intake.ledger_errors(pred, res, versions)
     except Exception as e:  # noqa: BLE001
         return [f"L-05: không chạy lại được luật nhận trên sổ ({str(e).splitlines()[0]})"]
 
@@ -211,6 +215,31 @@ def check_engine_gate(root) -> list[str]:
         return []
     return [f"L-05: config.yaml ledger.engine_forecasts = {val!r} — bản này chỉ chấp nhận '{ENGINE_GATE_CLOSED}': dòng dự báo của "
             "engine chưa có cơ chế bằng chứng xuất xứ (ai ghi, lúc nào); mở lại phải qua ADR mới (ADR-0003 quyết định 11)"]
+
+
+def check_control_b_prompts(root) -> list[str]:
+    """L-05 (ADR-0003 quyết định 12): phiên bản prompt chuẩn của ghế B được GHIM theo ngày trong
+    governance/control_b_prompts.jsonl. Luật nhận đòi prompt_hash của một dự báo B là phiên bản có hiệu lực vào ngày Issue
+    mở — lúc nhận cũng như lúc kiểm lại. Ở đây kiểm chính tệp ghim: đọc được, ngày tăng dần, và phiên bản mới nhất trùng
+    khối prompt đang nằm trong governance/CONTROL_B_PROMPT.md (đổi prompt mà không thêm dòng phiên bản → lỗi). Tệp chỉ
+    được ghi thêm (tools/ledger_audit.py), nên không ai đổi được phiên bản đã có hiệu lực trong quá khứ."""
+    root = pathlib.Path(root)
+    prompt, pins = root / "governance" / "CONTROL_B_PROMPT.md", root / "governance" / "control_b_prompts.jsonl"
+    if not prompt.is_file() and not pins.is_file():
+        return []
+    from tools import ledger_intake                             # nạp muộn: mô-đun này nhập lại laws_checks
+    try:
+        versions = ledger_intake.control_b_versions(pins)
+    except (OSError, ValueError) as e:
+        return [f"L-05: governance/control_b_prompts.jsonl không đọc được ({str(e).splitlines()[0]})"]
+    if not versions:
+        return ["L-05: thiếu governance/control_b_prompts.jsonl (hoặc tệp rỗng) — không biết phiên bản prompt chuẩn nào của "
+                "ghế B có hiệu lực vào ngày nào"]
+    current = ledger_intake.control_b_hash(prompt)
+    if current != versions[-1][1]:
+        return ["L-05: khối prompt trong governance/CONTROL_B_PROMPT.md không trùng phiên bản mới nhất trong "
+                "governance/control_b_prompts.jsonl — đổi prompt phải qua ADR và thêm một dòng phiên bản (sha256 + ngày hiệu lực)"]
+    return []
 
 
 def _frozen_space(root):
@@ -530,4 +559,5 @@ def check_exams(root, today=None) -> list[str]:
 
 def run_all(root) -> list[str]:
     return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root) + check_ledger_rows(root)
-            + check_engine_gate(root) + check_trial_registry(root) + check_personal_data(root) + check_exams(root))
+            + check_engine_gate(root) + check_control_b_prompts(root) + check_trial_registry(root) + check_personal_data(root)
+            + check_exams(root))

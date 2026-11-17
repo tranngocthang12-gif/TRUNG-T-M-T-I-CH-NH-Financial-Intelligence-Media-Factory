@@ -15,10 +15,10 @@ có trong sổ (replay(), gọi từ tools/validate.py):
   trước nhưng robot ghi sau khi đã có kết quả) do tools/ledger_intake.py từ chối. Nhờ vậy, ở mọi thứ tự chạy xong của
   hai robot, sổ luôn thỏa: mọi dự báo của một câu hỏi đã phân định đều mở trước Issue phân định và đều có dòng kết quả.
 - Câu hỏi đã có bất kỳ dự báo nào được phân định thì không phân định lại (kể cả VOID).
-- L-05: không ghi KẾT QUẢ (YES/NO) trước resolve_at; ngoại lệ duy nhất: YES khi MỌI dự báo của câu hỏi có luật
-  event_before_date. VOID không phải kết quả mà là HỦY câu hỏi (không dự báo nào của nó được chấm), nên ghi được bất kỳ
-  lúc nào: hủy trước khi biết kết quả không cho ai lợi thế nào so với hủy lúc đã biết. Đây cũng là đường phục hồi cho
-  một dự báo nằm trong sổ mà không có dấu nhận hợp lệ (xem phần PHỤC HỒI trong tools/ledger_intake.py).
+- L-05: không phân định trước resolve_at — kể cả VOID; ngoại lệ duy nhất: YES khi MỌI dự báo của câu hỏi có luật
+  event_before_date. (Vòng chấm 9: cho VOID trước hạn là mở đường chọn mẫu — hủy câu hỏi khi triển vọng của một ghế xấu
+  đi. VOID lúc tới hạn cũng là một quyền chọn, nên phép kiểm định A–B tính mọi cặp bất đồng bị VOID theo hướng BẤT LỢI cho
+  kết luận đang xét: engine/ledger.issue_summary.)
 - L-09: resolver bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp) và không chung GHẾ với bất kỳ người viết dự báo nào
   của câu hỏi (đọc author_seat từng dòng: nhà cung cấp mô hình hoặc Owner; Anthropic luôn bị chặn). author_seat không nhận
   ra được ghế → không ghi. resolver là người ĐỌC NGUỒN và quyết định, không phải người bấm nút.
@@ -28,6 +28,7 @@ có trong sổ (replay(), gọi từ tools/validate.py):
   được tính; đường dẫn có '@' hoặc '\' bị từ chối. Nguồn đã hứa không công bố → VOID kèm void_reason.
 - L-02: không chứa từ khóa khuyến nghị mua bán.
 - Mỗi dòng khớp contracts/resolution.schema.json và nối hash chuỗi (prev_hash/hash) như predictions.jsonl.
+- Mọi đường dẫn nguồn phải dùng https:// (http:// bị từ chối).
 - Mọi dòng của sổ phải đến từ Issue 'Resolution': dòng không có resolution_issue là lỗi (đường ghi của engine đang đóng).
 - Trước khi ghi, main() tự chạy lại toàn bộ luật kiểm trên trạng thái sổ sau khi ghi (ledger_intake.post_write_errors) —
   xem phần THỨ TỰ trong tools/ledger_intake.py. Chạy lại job của một Issue đã ghi: không ghi trùng, chỉ trả lại dấu nhận,
@@ -56,9 +57,10 @@ SYSTEM_FIELDS = {"prev_hash", "hash"}
 
 
 def url_hosts(text) -> set:
-    """Tên máy chủ (bỏ 'www.') của MỌI đường dẫn http(s) trong chuỗi nguồn, tách bằng urllib chứ không dò chuỗi.
-    ValueError nếu có đường dẫn không tách được chắc chắn: có phần đăng nhập ('@'), dấu '\\' (trình duyệt coi là '/'),
-    hoặc tên máy chủ có ký tự ngoài a-z, 0-9, '-', '.'."""
+    """Tên máy chủ (bỏ 'www.') của MỌI đường dẫn trong chuỗi nguồn, tách bằng urllib chứ không dò chuỗi.
+    ValueError nếu có đường dẫn không dùng https:// (ADR-0003 quyết định 2 đòi https; http:// bị từ chối), hoặc không tách
+    được chắc chắn: có phần đăng nhập ('@'), dấu '\\' (trình duyệt coi là '/'), hoặc tên máy chủ có ký tự ngoài a-z, 0-9,
+    '-', '.'."""
     hosts = set()
     for u in _URL_RE.findall(str(text or "")):
         try:
@@ -67,6 +69,8 @@ def url_hosts(text) -> set:
             parts.port                                   # cổng không phải số → ValueError
         except ValueError:
             raise ValueError(f"đường dẫn '{u}' không đọc được") from None
+        if parts.scheme.lower() != "https":
+            raise ValueError(f"đường dẫn '{u}' không dùng https:// — nguồn phân định phải là đường dẫn https:// đầy đủ")
         if "@" in parts.netloc or "\\" in u:
             raise ValueError(f"đường dẫn '{u}' có '@' hoặc '\\' trong phần máy chủ — ghi đường dẫn thẳng tới trang nguồn")
         if not _HOST_RE.fullmatch(host):
@@ -156,10 +160,10 @@ def decide(data, number, created, author, pred_rows, res_rows, schema=None):
         resolve_at = date.fromisoformat(group[0]["resolve_at"])
     except (KeyError, TypeError, ValueError):
         return f"resolve_at của {group_ids[0]} không đọc được; không ghi", [], ""
-    early_ok = outcome_key == "VOID" or (outcome_key == "YES" and all(p.get("resolution_rule") == "event_before_date" for p in group))
+    early_ok = outcome_key == "YES" and all(p.get("resolution_rule") == "event_before_date" for p in group)
     if created_day < resolve_at and not early_ok:
-        return (f"L-05: chưa tới resolve_at {resolve_at.isoformat()} theo giờ Việt Nam (trước hạn chỉ ghi được YES khi mọi dự "
-                "báo của câu hỏi có luật event_before_date, hoặc VOID để hủy câu hỏi)"), [], ""
+        return (f"L-05: chưa tới resolve_at {resolve_at.isoformat()} theo giờ Việt Nam (trước hạn chỉ ghi được YES, và chỉ khi "
+                "mọi dự báo của câu hỏi có luật event_before_date; VOID cũng phải chờ tới hạn)"), [], ""
 
     if outcome_key != "VOID":
         promised = set().union(*[promised_domains(p.get("resolution_source")) for p in group])
@@ -291,6 +295,13 @@ def main() -> int:
         if msg or [strict_loads(dumps(w)) for w in want] != [{k: v for k, v in r.items() if k not in SYSTEM_FIELDS} for r in old]:
             return reject(f"sổ đã có dòng mang số Issue #{number} nhưng nội dung KHÔNG khớp kết quả của luật phân định trên thân "
                           "Issue lúc mở. Robot chỉ cấp dấu nhận cho dòng do chính nó ghi từ thân Issue")
+        try:                            # và việc có các dòng đó trong sổ phải qua đúng phép tự kiểm của đường ghi
+            broken = post_write_errors(pred_rows, [r for r in res_rows if r.get("resolution_issue") != number], pred_rows, res_rows)
+        except Exception as e:  # noqa: BLE001
+            broken = [f"không chạy được kiểm lại ({str(e).splitlines()[0]})"]
+        if broken:
+            return reject(f"sổ đã có dòng mang số Issue #{number}, nhưng các dòng đó không qua luật phân định — {broken[0]} — nên "
+                          "robot không cấp dấu nhận")
         print(json.dumps({"ok": True, "duplicate": True, "attest": [attest(r) for r in old],
                           "message": f"Phân định #{number} đã có trong Ledger, bỏ qua"}, ensure_ascii=False))
         return 3
