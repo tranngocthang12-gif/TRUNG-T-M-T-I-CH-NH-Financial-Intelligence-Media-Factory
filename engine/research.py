@@ -12,11 +12,11 @@ from .config import CFG, ROOT, REPO, ROUNDTRIP, path
 
 if str(REPO) not in sys.path:
     sys.path.insert(0, str(REPO))
-from tools.laws_checks import LEGACY_ANCHOR, TRIAL_LEGACY_COLS, line_hash, read_trials, trials_digest  # noqa: E402
+from tools.laws_checks import (LEGACY_ANCHOR, TRIAL_HEADERS, TRIAL_LEGACY_COLS, TRIAL_NEW_COLS, line_hash, read_trials,  # noqa: E402
+                               trials_digest)
 
 REGISTRY = "research/trial_registry.jsonl"
 TRIALS = "research/trials.csv"
-TRIAL_NEW_COLS = ("sharpe", "sharpe_ann", "dsr", "registry_hash")     # thêm từ v3.0.2, đứng sau 13 cột gốc
 EULER_GAMMA = 0.5772156649015329
 
 MODELS = ["ridge", "gbm", "signed_sum"]
@@ -211,14 +211,11 @@ def append_trial_results(new_rows):
         lines.pop()
     if lines:
         head = next(csv.reader([lines[0]]))
-        if head[:len(TRIAL_LEGACY_COLS)] != list(TRIAL_LEGACY_COLS):
-            raise RuntimeError("L-06: tiêu đề research/trials.csv không đúng 13 cột gốc — không ghi thêm")
-        missing = [c for c in cols if c not in head]
-        if missing:
-            if head != cols[:len(head)]:
-                raise RuntimeError("L-06: thứ tự cột research/trials.csv lạ — không ghi thêm")
-            pad = "," * len(missing)
-            lines = [lines[0] + "," + ",".join(missing)] + [ln + pad for ln in lines[1:]]
+        if head not in TRIAL_HEADERS:                      # cùng luật với laws_checks.trials_format_errors (validate chạy trước vòng học)
+            raise RuntimeError("L-06: tiêu đề research/trials.csv không phải đúng 13 cột gốc hay đúng 17 cột — không ghi thêm")
+        if head != cols:                                   # lần ghi đầu của v3.0.2: 13 cột → 17 cột, dòng cũ thêm bốn ô rỗng
+            pad = "," * len(TRIAL_NEW_COLS)
+            lines = [lines[0] + "," + ",".join(TRIAL_NEW_COLS)] + [ln + pad for ln in lines[1:]]
     else:
         lines = [",".join(cols)]
     buf = io.StringIO()

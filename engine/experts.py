@@ -62,8 +62,9 @@ def _context(close, t):
 
 def run(as_of, close):
     st = budget.status(as_of)
-    if not st["allowed"]:
-        return {"ran": False, "reasons": st["reasons"]}
+    reasons = ([] if ledger.forecasts_open() else [ledger.GATE_REASON]) + st["reasons"]
+    if reasons:                                           # cổng đóng thì không gọi API, không ghi dòng nào vào sổ
+        return {"ran": False, "reasons": reasons}
     universe = list(close.columns)
     cands = facts.candidates(as_of, universe)
     if not cands:

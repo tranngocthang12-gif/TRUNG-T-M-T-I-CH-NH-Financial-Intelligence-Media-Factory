@@ -1,7 +1,13 @@
 """PREDICTION LEDGER — trái tim của v1.0.
 Dự báo ghi TRƯỚC khi biết kết quả (append-only, commit vào git). Kết quả ghi ở file riêng.
-Auditor, Resolution, Scorecard đều là code tất định — không LLM nào tự chấm mình."""
-import hashlib, json, math, sys
+Auditor, Resolution, Scorecard đều là code tất định — không LLM nào tự chấm mình.
+
+ĐƯỜNG GHI CỦA ENGINE ĐANG ĐÓNG (ADR-0003 quyết định 11; config.yaml ledger.engine_forecasts: closed). Từ v3.0 sổ dự báo là sổ
+của các Issue 'Forecast'/'Resolution': mỗi dòng có Issue thật và dấu nhận của robot. Dòng do engine tự ghi (chuyên gia LLM
+dự báo giá, engine tự chấm bằng giá) không có bằng chứng nào ngoài tệp về việc ai ghi và ghi lúc nào, nên tools/validate.py
+không nhận dòng nào như thế. Khi đóng: record() không ghi, resolve() không chấm, scorecard() không tính dòng engine.
+Mã của đường này được giữ (và test bằng thư mục tạm có cổng mở) để mở lại bằng ADR khi có cơ chế xuất xứ."""
+import hashlib, json, math, re, sys
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, REPO, path, save_json
 
@@ -48,10 +54,75 @@ def is_issue_row(p):
     """Dòng ghi từ GitHub Issue 'Forecast' (tools/ledger_intake.py). Không chấm bằng giá ở đây."""
     return "issue_number" in p
 
+GATE_REASON = "config.yaml: ledger.engine_forecasts = closed — đường ghi dự báo của engine đang đóng (ADR-0003 quyết định 11)"
+ENGINE_KEYS = {"id", "created_at", "procedure", "claim", "question", "resolution_rule", "probability", "base_rate",
+               "evidence_refs", "links", "note"}
+ENGINE_RULE = {"type": "excess_return_positive", "benchmark": "universe_equal_weight", "entry": "close_t+1"}
+_DATE_RE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+
+def forecasts_open():
+    """Đường ghi dự báo của engine chỉ mở khi config.yaml ghi ĐÚNG ledger.engine_forecasts: open. Không khai = đóng.
+    (tools/validate.py của bản này chỉ chấp nhận 'closed' trong kho thật; 'open' chỉ dùng trong thư mục tạm của test.)"""
+    return (CFG.get("ledger") or {}).get("engine_forecasts") == "open"
+
+def _num(x):
+    return not isinstance(x, bool) and isinstance(x, (int, float)) and math.isfinite(x)
+
+def _engine_id(row):
+    body = {k: v for k, v in row.items() if k not in ("prev_hash", "hash")}
+    body["id"] = None
+    return "P-" + hashlib.sha1(json.dumps(body, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
+
+def engine_row_error(p):
+    """Hợp đồng ĐẦY ĐỦ của một dòng dự báo do engine ghi (đúng những gì _engine_row() tạo ra). Trả về lỗi hoặc None.
+    resolve() và scorecard() chỉ đụng tới dòng qua được hàm này — một dòng thiếu horizon, created_at hay probability bị bỏ
+    qua chứ không làm vòng học vỡ (KeyError)."""
+    if not isinstance(p, dict) or is_issue_row(p) or "seat" in p:
+        return "không phải dòng của engine"
+    if set(p) - {"prev_hash", "hash"} != ENGINE_KEYS:
+        return "tập trường không đúng hợp đồng dòng engine"
+    rr = p["resolution_rule"]
+    if not isinstance(rr, dict) or set(rr) != set(ENGINE_RULE) | {"ticker", "horizon"} or any(rr[k] != v for k, v in ENGINE_RULE.items()):
+        return "resolution_rule không đúng hợp đồng"
+    if not isinstance(rr["ticker"], str) or not re.fullmatch(r"[A-Za-z0-9._-]{1,15}", rr["ticker"]):
+        return "ticker không hợp lệ"
+    if isinstance(rr["horizon"], bool) or not isinstance(rr["horizon"], int) or rr["horizon"] not in CFG["ledger"]["horizons"]:
+        return "horizon không thuộc config.yaml ledger.horizons"
+    if not isinstance(p["created_at"], str) or not _DATE_RE.fullmatch(p["created_at"]):
+        return "created_at không phải ngày YYYY-MM-DD"
+    try:
+        pd.Timestamp(p["created_at"])
+    except ValueError:
+        return "created_at không phải ngày YYYY-MM-DD"
+    L = CFG["ledger"]
+    if not _num(p["probability"]) or not (L["min_p"] <= p["probability"] <= L["max_p"]):
+        return "probability không phải số trong khoảng cho phép"
+    if not _num(p["base_rate"]) or not (0.0 <= p["base_rate"] <= 1.0):
+        return "base_rate không phải số trong [0, 1]"
+    if not all(isinstance(p[k], str) and p[k].strip() for k in ("procedure", "claim", "question")) or not isinstance(p["note"], str):
+        return "procedure/claim/question/note không phải chuỗi hợp lệ"
+    if not isinstance(p["evidence_refs"], list) or not isinstance(p["links"], dict):
+        return "evidence_refs/links sai kiểu"
+    if p["id"] != _engine_id(p):
+        return "id không khớp nội dung dòng"
+    return None
+
 def is_engine_row(p):
-    """Dòng do engine/experts ghi: có id và luật chấm dạng dict có ticker → chấm tự động bằng giá."""
-    rr = p.get("resolution_rule")
-    return not is_issue_row(p) and "id" in p and isinstance(rr, dict) and "ticker" in rr
+    """Dòng do engine/experts ghi, đúng hợp đồng đầy đủ → chấm tự động bằng giá. Khi đường ghi của engine đóng thì không
+    dòng nào được coi là dòng engine: không chấm, không tính điểm (sổ hợp lệ khi đó cũng không có dòng nào như thế)."""
+    return forecasts_open() and engine_row_error(p) is None
+
+def _engine_row(p, as_of, base):
+    """Dựng một dòng dự báo của engine từ dự báo đã qua audit(). Mã = sha1 của nội dung dòng."""
+    h = int(p["horizon"])
+    row = {"id": None, "created_at": as_of, "procedure": p["procedure"], "claim": p["claim"],
+           "question": f"{p['ticker']} vượt bình quân universe trong {h} phiên, vào lệnh tại close phiên kế tiếp sau {as_of}",
+           "resolution_rule": {"type": "excess_return_positive", "ticker": p["ticker"], "horizon": h,
+                               "benchmark": "universe_equal_weight", "entry": "close_t+1"},
+           "probability": round(float(p["probability"]), 3), "base_rate": round(float(base), 3),
+           "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
+    row["id"] = _engine_id(row)
+    return row
 
 def base_rate(close, ticker, h):
     """Tỷ lệ lịch sử mã này vượt bình quân universe trong h phiên (do code tính)."""
@@ -77,20 +148,18 @@ def audit(p, universe, fact_ids, as_of):
     return errs
 
 def record(preds, as_of, universe, fact_ids, close):
-    """Kiểm toán rồi ghi. Trả về (đã ghi, bị loại)."""
+    """Kiểm toán rồi ghi. Trả về (đã ghi, bị loại). Đường ghi đóng → không ghi gì vào sổ, mọi dự báo bị loại."""
+    if not forecasts_open():
+        return [], [{**p, "audit_errors": [GATE_REASON]} for p in preds]
     ok, rejected = [], []
     for p in preds:
         errs = audit(p, universe, fact_ids, as_of)
         if errs:
             rejected.append({**p, "audit_errors": errs}); continue
-        h = int(p["horizon"])
-        row = {"id": None, "created_at": as_of, "procedure": p["procedure"], "claim": p["claim"],
-               "question": f"{p['ticker']} vượt bình quân universe trong {h} phiên, vào lệnh tại close phiên kế tiếp sau {as_of}",
-               "resolution_rule": {"type": "excess_return_positive", "ticker": p["ticker"], "horizon": h,
-                                   "benchmark": "universe_equal_weight", "entry": "close_t+1"},
-               "probability": round(float(p["probability"]), 3), "base_rate": round(base_rate(close, p["ticker"], h), 3),
-               "evidence_refs": p.get("evidence_refs", []), "links": p.get("links", {}), "note": p.get("note", "")}
-        row["id"] = "P-" + hashlib.sha1(json.dumps(row, sort_keys=True, ensure_ascii=False).encode()).hexdigest()[:12]
+        row = _finite(_engine_row(p, as_of, base_rate(close, p["ticker"], int(p["horizon"]))))
+        bad = engine_row_error(row)                      # engine không ghi dòng mà chính nó sẽ không đọc lại được
+        if bad:
+            rejected.append({**p, "audit_errors": [f"dòng không đúng hợp đồng: {bad}"]}); continue
         ok.append(row)
     _append_chained(PRED, ok)
     if rejected:
@@ -100,12 +169,14 @@ def record(preds, as_of, universe, fact_ids, close):
 # ---------------- RESOLUTION (code) ----------------
 def resolve(close, as_of, bad=None):
     """Chấm bằng GIÁ ĐIỀU CHỈNH. Mã có ô lỗi dữ liệu trong cửa sổ chấm → VOID (không tính điểm);
-    mã khác có lỗi trong cửa sổ bị loại khỏi bình quân universe."""
-    done = {r["prediction_id"] for r in _load(RES)}
+    mã khác có lỗi trong cửa sổ bị loại khỏi bình quân universe. Đường ghi của engine đóng → không chấm, không ghi gì."""
+    if not forecasts_open():
+        return []
+    done = {r.get("prediction_id") for r in _load(RES)}
     idx = close.index
     new = []
     for p in _load(PRED):
-        if not is_engine_row(p): continue                # dự báo từ Issue: phân định theo resolution_source, không bằng giá
+        if not is_engine_row(p): continue                # dự báo từ Issue (phân định theo nguồn, không bằng giá) và dòng sai hợp đồng
         if p["id"] in done: continue
         rr = p["resolution_rule"]; h = rr["horizon"]
         c = pd.Timestamp(p["created_at"])
@@ -168,6 +239,7 @@ def issue_summary(all_rows, R):
     """Chấm dự báo từ Issue theo ARCHITECTURE v3.0 §4.1 bước 5 và ADR-0003.
     Theo ghế: n, đã phân định, VOID, chờ; Brier, Brier của xác suất nền, hiệu chuẩn.
     Cặp A–B: cùng câu hỏi (question + resolve_at), ghi cùng ngày (giờ VN, §4.2). Bất đồng = hai ghế ở hai phía 0,5.
+    Dự báo đã VOID (câu hỏi bị hủy, hoặc nguồn không công bố) không vào cặp, không vào tỷ lệ bất đồng, không vào điểm nào.
     Chỉ chấm cặp mà cả A và B đã phân định cùng một sự thật.
     Kiểm định CHỐT MẪU: phán quyết chỉ tính trên đúng 194 bất đồng được phân định ĐẦU TIÊN (theo thứ tự ghi trong sổ),
     kiểm định nhị thức hai phía với p0 = 0,5 — không xem lại mỗi vòng trên mẫu lớn dần (tránh dừng tùy ý)."""
@@ -201,6 +273,7 @@ def issue_summary(all_rows, R):
                      "calibration": _calibration(ps, os_)}
     by_q = {}
     for p in sorted(issue, key=lambda r: r.get("issue_number", 0)):
+        if p["id"] in void_ids: continue                 # câu hỏi đã hủy (VOID): không vào cặp, không vào tỷ lệ bất đồng
         by_q.setdefault(_qkey(p), {"A": [], "B": []})[str(p["seat"])].append(p)
     pairs, unpaired, not_same_day = [], 0, 0
     for g in by_q.values():
@@ -218,7 +291,8 @@ def issue_summary(all_rows, R):
     fixed = dis_res[:TARGET_DISAGREEMENTS]
     n, a_right = len(fixed), sum(1 for a, _ in fixed if right(a))
     pval = _binom_two_sided(a_right, n) if n == TARGET_DISAGREEMENTS else None
-    ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "disagreements": len(dis),
+    ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "void_forecasts": sum(1 for p in issue if p["id"] in void_ids),
+          "disagreements": len(dis),
           "disagreement_rate": round(len(dis) / len(pairs), 3) if pairs else None,
           "disagreements_resolved": n_all, "inconsistent_outcomes": inconsistent, "a_correct": a_all,
           "a_accuracy": round(a_all / n_all, 3) if n_all else None,
