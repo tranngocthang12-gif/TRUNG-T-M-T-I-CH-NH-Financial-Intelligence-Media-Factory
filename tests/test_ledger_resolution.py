@@ -1314,6 +1314,12 @@ class TrialRegistryTests(unittest.TestCase):
         self.assertTrue(any("khác giá trị ở commit gốc" in e for e in errs), errs)
         self.assertTrue(any("T00004" in e and "commit liền trước chưa có" in e for e in errs), errs)   # …và không miễn được gì: vẫn dùng mốc cũ
         self.assertTrue(any("khác giá trị ở commit gốc" in e for e in ledger_audit.trials_history_errors(repo, merged, pull_request=True)))   # PR cũng bị bắt
+        # PR mở từ trước khi main có mốc (base của sự kiện đã cũ): so với cha thứ nhất của commit gộp → vẫn bị bắt
+        git("reset", "-q", "--hard", merged); git("checkout", "-q", "-b", "pr-doi-moc")
+        cfg(first); commit("PR doi moc")
+        git("checkout", "-q", "main"); git("merge", "-q", "--no-ff", "-m", "commit gop cua PR", "pr-doi-moc")
+        errs = ledger_audit.trials_history_errors(repo, old_main, pull_request=True)
+        self.assertTrue(any("khác giá trị ở commit gốc" in e for e in errs), errs)
         git("reset", "-q", "--hard", merged); (repo / "config.yaml").unlink(); commit("xoa moc")
         self.assertTrue(any("khác giá trị ở commit gốc" in e for e in f(merged)))   # xóa mốc cũng là đổi mốc
         tp.write_text(self.LEGACY + res3 + res4, encoding="utf-8"); commit("ket qua khong dang ky sau khi xoa moc")
