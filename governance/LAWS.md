@@ -1,6 +1,6 @@
 # TRUNG TÂM TÀI CHÍNH — LAWS.md (luật vận hành, v1.0, 22/10/2026)
 
-Hiệu lực khi Owner gộp. Chỉ Owner sửa. Mỗi luật có mã, nội dung, cách máy kiểm (nếu có), căn cứ. Luật nào không máy kiểm được thì ghế chấm kiểm bằng chữ ở mỗi PR.
+Hiệu lực khi Owner gộp. Chỉ Owner sửa. Sửa chữ cột "Máy kiểm" của L-09 và L-10 (17/11/2026): Owner ra lệnh trong chat vận hành, Claude soạn chữ theo ADR-0003 mục "Hai chỗ chữ"; nội dung các luật không đổi. Mỗi luật có mã, nội dung, cách máy kiểm (nếu có), căn cứ. Luật nào không máy kiểm được thì ghế chấm kiểm bằng chữ ở mỗi PR.
 
 | Mã | Luật | Máy kiểm | Căn cứ |
 |---|---|---|---|
@@ -12,8 +12,8 @@ Hiệu lực khi Owner gộp. Chỉ Owner sửa. Mỗi luật có mã, nội dun
 | **L-06 Sổ thử** | Mọi lần thử chiến lược/giả thuyết được đăng ký trước vào `research/trial_registry.jsonl` (giả thuyết, dữ liệu, ngưỡng). Ngưỡng ý nghĩa tính theo tổng số lần thử từ đầu; báo Deflated Sharpe cùng Sharpe. | `engine/research.py` từ chối thử chưa đăng ký; CI kiểm số dòng registry ≥ số thử | Harvey–Liu–Zhu 2016; Bailey–López de Prado 2014 |
 | **L-07 Một kiến trúc** | Chỉ `architecture/ARCHITECTURE.md` có hiệu lực. Mọi thay đổi qua ADR trong `architecture/adr/` có "điều kiện hoàn tác". Không viết bản kiến trúc mới khi bản hiện hành chưa vận hành ≥ 30 ngày. | `validate.py` từ chối tệp `ARCHITECTURE_v*.md` không được liệt kê SUPERSEDED trong `architecture/ARCHIVE.md` | 6 bản trong một ngày rồi đóng băng 24 ngày |
 | **L-08 Hiệu lực văn bản** | Văn bản pháp lý trong thư viện phải có `effective_from`, `effective_to`/`superseded_by`. Ghi chú dựa trên văn bản hết hiệu lực tự chuyển OUTDATED. Kiểm lại mỗi quý. | `engine/knowledge_notes.py` so ngày; CI cảnh báo khi quá hạn kiểm | TT 99/2025 thay TT 200; NĐ 245/2025 sửa NĐ 155 |
-| **L-09 Người viết ≠ người chấm** | Ghi chú, mệnh đề, mã, dự báo do ghế nào viết thì ghế khác nhà cung cấp chấm; không ghế nào tự gán CITED/TESTED/PROVEN hay tự nâng competency_map; Owner gộp. | PR template bắt buộc trường `reviewed_by` khác `authored_by`; CI kiểm | Kế thừa MINH TRÍ; v1.0 IV.3 |
-| **L-10 Ba tay người** | Ba việc không tự động hóa: Owner gộp `main`; Owner đổi luật/phạm vi; thầy ra và giữ đề thi ngoài kho tới khi thi. Mọi việc khác tự động hóa cao nhất. | Branch protection trên `main`; đề thi không có trong kho trước ngày thi | Quyết định Owner 21/10 |
+| **L-09 Người viết ≠ người chấm** | Ghi chú, mệnh đề, mã, dự báo do ghế nào viết thì ghế khác nhà cung cấp chấm; không ghế nào tự gán CITED/TESTED/PROVEN hay tự nâng competency_map; Owner gộp. | PR template bắt buộc trường `reviewed_by` khác `authored_by`; CI kiểm; bản chấm GỘP ĐƯỢC kèm SHA dán thành bình luận PR (`tools/review_gate.py`) | Kế thừa MINH TRÍ; v1.0 IV.3 |
+| **L-10 Ba tay người** | Ba việc không tự động hóa: Owner gộp `main`; Owner đổi luật/phạm vi; thầy ra và giữ đề thi ngoài kho tới khi thi. Mọi việc khác tự động hóa cao nhất. | Ruleset cho `main` cấm force-push và cấm xóa nhánh; CI cảnh báo khi chưa bật; đề thi không có trong kho trước ngày thi | Quyết định Owner 21/10 |
 
 ## Thước đo của chính bộ luật
 Mỗi quý, ghế chấm đếm: số lần CI đỏ theo từng luật; số PR bị trả vì L-01/L-09; số dự báo bị loại vì L-05. Luật không bắt được vi phạm nào sau hai quý thì xem lại cách máy kiểm, không xem lại luật.
