@@ -73,4 +73,4 @@ body:
     id: prompt_hash
     attributes:
       label: prompt_hash
-      description: BẮT BUỘC với seat B — sha256 khối prompt trong governance/CONTROL_B_PROMPT.md; seat A để trống
+      description: BẮT BUỘC với seat B — sha256 của prompt chuẩn đang có hiệu lực (dòng cuối của governance/control_b_prompts.jsonl); seat A để trống

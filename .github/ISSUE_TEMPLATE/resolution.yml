@@ -13,7 +13,7 @@ body:
     id: outcome
     attributes:
       label: outcome
-      description: YES = mệnh đề trong câu hỏi đúng; NO = sai; VOID = hủy câu hỏi, không chấm (nguồn không công bố, câu hỏi sai đề, dự báo thiếu dấu nhận). YES/NO chỉ ghi được khi tới resolve_at; VOID ghi được bất kỳ lúc nào và phải có void_reason
+      description: YES = mệnh đề trong câu hỏi đúng; NO = sai; VOID = hủy câu hỏi, không chấm (nguồn không công bố, câu hỏi sai đề, dự báo thiếu dấu nhận) — phải có void_reason. Cả ba chỉ ghi được khi tới resolve_at (riêng YES được sớm nếu câu hỏi có luật event_before_date). Trong kiểm định A–B, cặp bị VOID tính theo hướng bất lợi cho kết luận đang xét
       options: ["YES", "NO", "VOID"]
     validations: {required: true}
   - type: input
@@ -25,7 +25,7 @@ body:
     id: resolution_source
     attributes:
       label: resolution_source
-      description: Đường dẫn ĐẦY ĐỦ bắt đầu bằng https:// tới trang đã đọc. Mọi đường dẫn ghi ở đây phải thuộc tên miền đã ghi trong dự báo (tên miền con được nhận). Nguồn đó không công bố thì chọn VOID
+      description: Đường dẫn ĐẦY ĐỦ bắt đầu bằng https:// tới trang đã đọc (http:// bị từ chối). Mọi đường dẫn ghi ở đây phải thuộc tên miền đã ghi trong dự báo (tên miền con được nhận). Nguồn đó không công bố thì chọn VOID
   - type: textarea
     id: quote
     attributes:
