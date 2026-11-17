@@ -4,6 +4,7 @@
 - Người đề xuất: Claude (kiến trúc sư trưởng)
 - Người chấm: Gemini (Google) — `GỘP ĐƯỢC — commit 6201090` (bình luận PR #29)
 - Owner duyệt: gộp PR #29 ngày 17/11/2026
+- Sửa đổi: điều kiện mở lại thay bởi ADR-0007 (mở lại khi phép thử A–B đã có phán quyết, không theo số dự báo).
 
 ## Quyết định
 Ý tưởng của Owner (17/11/2026): một "engine cờ kinh tế" như phần mềm cờ tướng — đóng khung trạng thái kinh tế tại ngày phân tích làm bàn cờ, hôm sau có thông tin mới thì lấy đó làm khung mới, lấy hiệu quả đầu tư làm luật. Bản thiết kế đã soạn qua hai vòng góp ý của hội đồng AI (ngoài kho). Quyết định: **tạm gác**, không đưa vào kiến trúc v3.0, không viết mã.
