@@ -44,6 +44,7 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
    - Quá 6 giờ mà dự báo đã nằm trong sổ nhưng chưa có dấu nhận: vẫn bấm **Re-run all jobs** để robot đăng dấu nhận muộn. Việc "Kiem toan so" sẽ còn đỏ ở dòng đó; tới ngày `resolve_at` thì **hủy câu hỏi đó** — mở Issue mẫu **Resolution**, chọn `VOID`, ghi lý do ở `void_reason` (ví dụ "F-123 không có dấu nhận đúng hạn do sự cố ngày …") — kiểm toán xanh lại. VOID không ghi được trước `resolve_at`. Vì vậy **khi thấy "Ledger intake" đỏ, bấm chạy lại ngay trong ngày**.
    - Mở Issue dự báo **ít nhất 30 phút trước nửa đêm** của ngày liền trước `resolve_at`; sát hơn thì robot từ chối (dấu nhận sẽ rơi sang ngày phân định).
 5. Mỗi ghế chỉ một dự báo cho một câu hỏi. Ghi nhầm thì không xóa được: sổ chỉ ghi thêm. Câu hỏi viết sai thì tới `resolve_at` chọn `VOID` trong Issue **Resolution** (cả hai ghế của câu hỏi cùng bị hủy). VOID không làm đẹp được kết quả: phép kiểm định A–B dùng đúng 194 cặp bất đồng đầu tiên theo số Issue hoàn tất cặp; một cặp bị VOID vẫn giữ chỗ của nó và bị tính theo hướng bất lợi cho kết luận đang xét; một cặp bị bỏ mặc không phân định thì phép kiểm định chưa ra kết luận.
+6. Phép thử này đo cả bộ TTC so với Claude trần, không đo riêng Thư viện. Khi báo cáo, tách câu trả lời của ghế B khỏi phần biểu mẫu do người khác điền. Không sửa dòng đã ghi. F-38, F-40, F-42 đã ghi trong sổ rằng phần hoàn thiện biểu mẫu là theo lệnh G0 của Owner, không phải lời nguyên văn của ghế B.
 
 ## 7. Phân định khi tới hạn
 1. Tới ngày `resolve_at` (giờ Việt Nam), **Owner hoặc một ghế AI khác nhà cung cấp với ghế viết** (ví dụ ChatGPT) mở nguồn đã ghi trong dự báo, tìm con số hoặc sự kiện.
@@ -62,8 +63,14 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
 4. Có commit mới sau khi chấm → việc đó đỏ lại → chấm lại bản mới.
 5. Owner bấm **Merge pull request**. Không ghế AI nào bấm thay.
 
-## 9. Bảo vệ nhánh main (làm một lần — L-10)
-Settings → Rules → Rulesets → New branch ruleset → áp cho `main` → bật **Restrict deletions** và **Block force pushes** → Create. Hai luật này không cản vòng học và robot ghi dự báo. **Không** bật "Require a pull request before merging": bật là robot không ghi được vào sổ.
+## 9. Bảo vệ nhánh main (L-10) — trạng thái đã đo 18/11/2026
+Ruleset `Protect main history` (id 27474018) đã active trên nhánh mặc định. Bypass rỗng. Chỉ có hai rule: cấm xóa nhánh và cấm force-push. API branch protection cổ điển của `main` trả 404. Hai rule này không cản vòng học và robot ghi dự báo.
+
+GitHub **chưa** bắt check phải xanh trước khi merge. L-09 đỏ không tự chặn nút Merge. PR #43 không phải một vụ vi phạm L-09: trước lúc gộp, lượt L-09 sau đã success trên cả `pull_request` và `pull_request_target`.
+
+Không bật required status checks trong hướng dẫn này. `ledger_intake.yml` và `resolution_intake.yml` đều `contents: write` và `git push origin HEAD:main` thẳng vào `main`, không qua PR. `daily_cycle.yml` cũng đẩy `main`. Chưa chứng minh robot vẫn đẩy được nếu bật rule đó. Việc này chờ quyết định hoặc thiết kế riêng. Không yêu cầu Owner bật ngay. Không bật “Require a pull request before merging”.
+
+“Sau sáu tháng” ở G4 và Media là mốc xem xét, không phải hạn phải có 194 bất đồng. Không tự sửa `governance/SAFETY_STATE.yaml`.
 
 ## 10. Khi CI đỏ
 - "Test bat buoc (chan merge)" đỏ: không gộp; đọc dòng `LỖI:` trong log và giao ghế viết sửa.
