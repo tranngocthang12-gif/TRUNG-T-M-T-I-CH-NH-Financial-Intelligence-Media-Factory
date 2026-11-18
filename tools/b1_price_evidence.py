@@ -8,6 +8,10 @@ Usage: python tools/b1_price_evidence.py
 from __future__ import annotations
 
 import json
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
 import pandas as pd
 
