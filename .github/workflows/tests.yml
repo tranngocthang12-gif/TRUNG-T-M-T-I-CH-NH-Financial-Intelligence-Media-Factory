@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes test_governance"
+      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes test_governance test_source_original"
       SCRIPTS: "test_no_lookahead test_adjustment test_ingest_errors test_ledger_pipeline test_quality_gate test_llm_review_budget"
     steps:
       - uses: actions/checkout@v4

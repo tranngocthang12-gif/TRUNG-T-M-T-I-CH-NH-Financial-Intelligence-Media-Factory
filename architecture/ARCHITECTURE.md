@@ -73,7 +73,7 @@ ADR-0009: bản giá dẫn xuất có phiên bản, nguồn gốc và cách hoà
 ## 5. Nửa HỌC (Thư viện + Học viện) — ghế thi công, không phải MINH TRÍ
 
 Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
-- Nguồn: chỉ tài liệu gốc công khai, ghim sha256 + ngày phát hành + ngày truy cập + trạng thái pháp lý + **trạng thái hiệu lực** (`effective_from`, `superseded_by`) (L-01, L-08); BCTC thêm `period_end` và `published_on` — số liệu chỉ dùng từ ngày công bố (ADR-0008, `knowledge_notes.usable_on`). Thứ cấp chỉ là CROSS_TEXT_SYNTHESIS.
+- Nguồn: chỉ tài liệu gốc công khai, ghim sha256 + ngày phát hành + ngày truy cập + trạng thái pháp lý + **trạng thái hiệu lực** (`effective_from`, `superseded_by`) (L-01, L-08). Mọi dòng manifest phải ghim riêng `original_sha256`, `original_bytes`, `original_path` của tệp gốc và `text_sha256`, `text_bytes` của `text.md`; bỏ các trường đó không còn là đường vòng. `SOURCED` và ghi chú `CITED` cần hash cả trang (gồm bảng) cộng `pdf_check` của một ghế đã đối chiếu PDF; hash tự sinh từ `text.md` không đủ (ADR-0012). Luật Kế toán 88/2015 vẫn `QUEUED` cho tới khi bản gốc và bản chép đạt kiểm tra. BCTC thêm `period_end` và `published_on` — số liệu chỉ dùng từ ngày công bố (ADR-0008, `knowledge_notes.usable_on`). Thứ cấp chỉ là CROSS_TEXT_SYNTHESIS.
 - Địa chỉ: `<doc_id>:p<trang>:<đoạn>` / `<doc_id>:t<bảng>:<dòng>`; trích nguyên văn máy kiểm.
 - Đơn vị: KNOWLEDGE_NOTE (`contracts/knowledge_note.schema.json`) với `not_said ≥ 2`, `testable_implications`, `self_check`; DRAFT không dùng cho mệnh đề hay quyết định.
 - Mệnh đề = `knowledge_item` + `hypothesis.invalidation_conditions`; mỗi mệnh đề có `chain`, `supports ≥ 3`, hạn hiệu lực; trần 60 đang dùng; thay thế bằng `supersedes`.
