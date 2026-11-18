@@ -1,1 +1,24 @@
-{"schema": "ttc-source-manifest/v1", "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day: sha256, bytes, issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08)", "files": {}}
+{
+  "schema": "ttc-source-manifest/v1",
+  "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day: sha256, bytes, issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08)",
+  "files": {
+    "luat_ke_toan_88_2015": {
+      "sha256": "bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3",
+      "bytes": 101331,
+      "issuer": "Quốc hội",
+      "issued_on": "2015-11-20",
+      "accessed_on": "2026-11-18",
+      "source_url": "https://datafiles.chinhphu.vn/cpp/files/vbpq/2016/01/88.signed.pdf",
+      "data_source": "Công báo / Cổng TTĐT Chính phủ",
+      "legal_status": "Văn bản quy phạm gốc: Luật số 88/2015/QH13, Quốc hội thông qua ngày 20/11/2015, hiệu lực 01/01/2017 (Điều 72). Không bị thay thế toàn bộ. Điều 72 khoản 2 chỉ làm Luật kế toán số 03/2003/QH11 hết hiệu lực. Luật 88/2015 đã bị sửa đổi, bổ sung một phần (không phải thay thế) bởi Luật Quản lý thuế số 38/2019/QH14 (hiệu lực 01/07/2020) và Luật số 56/2024/QH15 (thông qua 29/11/2024, hiệu lực phần lớn 01/01/2025). Văn bản hợp nhất 25/VBHN-VPQH ngày 26/02/2025 của Văn phòng Quốc hội chỉ để tra cứu; nguồn thứ cấp còn nêu 41/VBHN-VPQH ngày 31/03/2026. Hợp nhất không thay thế bản gốc và không được dùng làm text.md. text.md chép PDF ký số 88.signed.pdf trên Cổng TTĐT Chính phủ, đối chiếu Công báo qua Wikisource; không phải văn bản hợp nhất.",
+      "license": "public-domain-vn-law",
+      "kind": "LAW",
+      "effective_from": "2017-01-01",
+      "effective_to": null,
+      "superseded_by": null,
+      "pdf_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50",
+      "pdf_bytes": 2566253,
+      "pdf_pages": 35
+    }
+  }
+}
