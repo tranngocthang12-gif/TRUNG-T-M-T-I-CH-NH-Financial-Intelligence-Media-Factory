@@ -1,6 +1,11 @@
 # Changelog
 
-## v3.0.7 — 2026-11-18 (PR-A, L-05 hạn khóa công bố) — Grok (xAI) soạn; ADR-0011 PROPOSED; chưa gộp
+## 2026-11-19 — Đồng bộ hồ sơ chấp nhận ADR-0011–0013 — ChatGPT (OpenAI) soạn
+- Đối chiếu main `cb931b44274eec4f2cbc104230c9fcae17b526a4`, metadata merge PR #45/#46/#47, bản chấm L-09 và check-runs trên từng HEAD đã chấm. Cập nhật ba header ADR, ba dòng danh mục và trạng thái các mục v3.0.7/v3.0.7b/v3.0.7c theo bằng chứng bên dưới. Thân quyết định ADR giữ nguyên từng byte.
+- Đây là đồng bộ hồ sơ sau merge; các bản chấm cũ chỉ áp dụng cho HEAD của PR cũ. PR tài liệu mới do ChatGPT (OpenAI) viết cần L-09 độc lập trên HEAD mới; chưa có bản chấm cho lần đồng bộ này.
+
+## v3.0.7 — 2026-11-18 (PR-A, L-05 hạn khóa công bố) — Grok (xAI) soạn; Claude (Anthropic) sửa; ChatGPT (OpenAI) hợp nhất main; ADR-0011 ACCEPTED qua PR #45
+- **Owner đã gộp:** 19/11/2026 00:43:15 giờ Việt Nam (UTC+07:00; GitHub `merged_at`: `2026-11-18T17:43:15Z`), [PR #45](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/45), merge `cb931b44274eec4f2cbc104230c9fcae17b526a4`. [Bản chấm L-09](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/45#issuecomment-6986598442) trên HEAD `7078dc50b2c3988b08338c6c31ae8d31271642a3`; `reviewed_by: Gemini (Google)`; hai lượt L-09 cuối SUCCESS. Ngày 2026-11-18 ở tiêu đề là ngày soạn; thời điểm merge được ghi riêng ở dòng này.
 - Dự báo mới bắt buộc `info_lock_at` (ngày thông tin có thể công bố), với ngày tạo < hạn khóa ≤ `resolve_at`. Không đặt lại sau khi ghi. Dấu nhận phải trước cả hạn khóa lẫn `resolve_at`.
 - Issue `[Publication]` ghi `ledger/publication_evidence.jsonl` khi kết quả công bố sớm. Có dòng đó thì ngừng nhận dự báo của câu hỏi. `published_at` phải có múi giờ; chỉ có ngày thì từ chối. Không ghi đè.
 - `capability_test_eligible` được `issue_summary` dùng để chặn phán quyết. Mẫu 194 không đổi thành phần. Thiếu bằng chứng thời điểm thì `CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN`, không rút cặp sau vào thay.
@@ -12,12 +17,14 @@
   - Lỗi 3: `issue_summary` tính Brier, `hit_rate`, hiệu chuẩn, `a_correct`, `a_accuracy`, `disagreements_resolved`, `brier_void_worst` chỉ trên dự báo hợp lệ; số toàn sổ ở `raw_audit` với nhãn "KHÔNG PHẢI BẰNG CHỨNG NĂNG LỰC"; `counts` tách số ghi / hợp lệ / đã phân định / đã phân định và hợp lệ. Mẫu 194, thứ tự khóa mẫu, luật VOID và ngưỡng kiểm định không đổi.
   - Bằng chứng công bố phát hiện sau: được ghi thêm dòng chỉ khi mốc `published_at` sớm hơn mọi mốc đã ghi; dòng dự báo bất biến, bị loại khỏi kết luận năng lực nếu công bố không sau giờ mở Issue.
   - Test đối kháng: `tests/test_timing_lock.py` (thiếu/sai lịch, lịch ghi lùi, lịch xác nhận sau Issue, sửa/xóa/ghi đè lịch, nộp sau công bố trước hạn tự khai, bằng chứng ghi muộn, Brier không bị làm đẹp, mẫu 194 không bị thay, F-37–F-42 giữ hash, luồng robot hợp lệ). Test cũ ghim lịch qua đúng robot bằng `tests/_calendar_fixture.py`.
-## v3.0.7b — 2026-11-18 (PR-B, L-01 ghim tệp gốc) — Grok (xAI) soạn; ADR-0012 PROPOSED; chưa gộp
+## v3.0.7b — 2026-11-18 (PR-B, L-01 ghim tệp gốc) — Grok (xAI) soạn; ADR-0012 ACCEPTED qua PR #46
+- **Owner đã gộp:** 19/11/2026 00:03:17 giờ Việt Nam (UTC+07:00; GitHub `merged_at`: `2026-11-18T17:03:17Z`), [PR #46](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/46), merge `8f0174cd5c08257277579d44437a4f43e0ce9f8b`. [Bản chấm L-09](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/46#issuecomment-6985573601) trên HEAD `cedbbc784586402c92d0b4adb26974648872dba0`; `reviewed_by: ChatGPT (OpenAI)`; hai lượt L-09 cuối SUCCESS. Ngày 2026-11-18 ở tiêu đề là ngày soạn; thời điểm merge được ghi riêng ở dòng này.
 - `sha256`/`bytes` giữ nghĩa hash của `text.md`. Mọi dòng manifest phải có `original_sha256`, `original_bytes`, `original_path`, `text_sha256`, `text_bytes`. Bỏ các trường đó không qua cổng nguồn. Manifest trên `main` đang rỗng, không giữ đường vòng cho dòng cũ.
 - Hash từng trang tính cả bảng, không chỉ đoạn văn. `page_crosscheck()` không phải biên bản đối chiếu PDF. `SOURCED` và ghi chú `CITED`/`TESTED`/`PROVEN` cần thêm `pdf_check` gắn đúng hash `text.md` và hash PDF, do ghế khác người đọc ghi chú. Máy không đọc ảnh trang.
 - Luật Kế toán 88/2015: nếu khai tệp gốc thì chỉ nhận SHA-256 `1fd9336a…cca50`, 2566253 byte, 35 trang. Kho này chưa ghim PDF và hàng đợi vẫn `QUEUED`.
 
-## v3.0.7c — 2026-11-18 (PR-C, giấy tờ) — Grok (xAI) soạn; ADR-0013 PROPOSED; chưa gộp
+## v3.0.7c — 2026-11-18 (PR-C, giấy tờ) — Grok (xAI) soạn; ADR-0013 ACCEPTED qua PR #47
+- **Owner đã gộp:** 18/11/2026 23:21:08 giờ Việt Nam (UTC+07:00; GitHub `merged_at`: `2026-11-18T16:21:08Z`), [PR #47](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/47), merge `fc8077cf2f892dc1093b5bb26312db90886d339e`. [Bản chấm L-09](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/47#issuecomment-6984297276) trên HEAD `563f689e23b99c471d188c89df7194a14b34e599`; `reviewed_by: ChatGPT (OpenAI)`; hai lượt L-09 cuối SUCCESS. Ngày 2026-11-18 ở tiêu đề là ngày soạn; thời điểm merge được ghi riêng ở dòng này.
 - §8 khớp sáu dự báo F-37–F-42 và pha `V3_G0_DAT_DIEU_KIEN_KY_THUAT`. Không hủy cột dừng/đảo 3 tuần và không dời mốc ADR-0002.
 - Header ADR-0010 và dòng danh mục chuyển ACCEPTED theo PR #35 đã gộp (merge `400de577`). Quyết định 1–7 không viết lại.
 - Ghi phạm vi phép thử: cả bộ TTC so với Claude trần, không đo riêng Thư viện. Báo cáo tương lai tách câu trả lời ghế B khỏi phần biểu mẫu. “Sau sáu tháng” là mốc xem xét. Không sửa `SAFETY_STATE.yaml`, không sửa Ledger, không sửa mẫu 194.

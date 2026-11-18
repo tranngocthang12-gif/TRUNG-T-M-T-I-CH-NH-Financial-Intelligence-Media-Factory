@@ -1,9 +1,9 @@
 # ADR-0012: Ghim tệp gốc riêng khỏi text.md
 - Ngày: 2026-11-18
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này, sau bản chấm L-09 của ghế khác nhà cung cấp)
+- Trạng thái: ACCEPTED (Owner đã gộp [PR #46](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/46), merge `8f0174cd5c08257277579d44437a4f43e0ce9f8b`; quyết định giữ nguyên)
 - Người đề xuất: Grok (xAI), ghế thi công, theo lệnh thi công cùng ngày
-- Người chấm: để trống đến khi ghế khác nhà cung cấp chấm
-- Owner duyệt: hiệu lực khi Owner gộp
+- Người chấm: ChatGPT (OpenAI) (theo `reviewed_by` của PR); [bản chấm L-09](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/46#issuecomment-6985573601) trên HEAD `cedbbc784586402c92d0b4adb26974648872dba0`. Hai lượt L-09 cuối trên HEAD này đều SUCCESS: [pull_request_target](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44354265409/job/134977992785); [pull_request](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44354264565/job/134977983879).
+- Owner duyệt: 19/11/2026 00:03:17 giờ Việt Nam (UTC+07:00; GitHub `merged_at`: `2026-11-18T17:03:17Z`), [PR #46](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/46); merge `8f0174cd5c08257277579d44437a4f43e0ce9f8b`.
 
 ## Quyết định
 1. `sha256` và `bytes` trong `library/SOURCE_MANIFEST.json` luôn là của `library/sources/<doc_id>/text.md`. Chúng không phải hash PDF.
