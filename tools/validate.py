@@ -110,6 +110,20 @@ todo = [c for c in V2_CONTRACTS if c not in have]
 expected = len(V1_CONTRACTS) + len(V2_CONTRACTS)
 n_ok = len([c for c in V1_CONTRACTS + V2_CONTRACTS if c in have])
 if todo: errors.append(f"Contract theo kiến trúc v3.0: có {n_ok}/{expected}; thiếu {todo}")
+new_path, old_path = ROOT / "contracts" / "forecast_issue_new.schema.json", ROOT / "contracts" / "forecast_issue.schema.json"
+try:
+    new_schema, old_schema = json.loads(new_path.read_text(encoding="utf-8")), json.loads(old_path.read_text(encoding="utf-8"))
+    if set(new_schema.get("properties") or {}) != set(old_schema.get("properties") or {}):
+        errors.append("forecast_issue_new.schema.json phải giữ đúng các properties của forecast_issue.schema.json")
+    for key in ("info_lock_at", "calendar_id"):
+        if key not in (new_schema.get("required") or []):
+            errors.append(f"forecast_issue_new.schema.json phải bắt buộc {key} — robot nhận dự báo mới đòi trường này")
+        if key in (old_schema.get("required") or []):
+            errors.append(f"forecast_issue.schema.json không được bắt buộc {key} — F-37–F-42 kiểm lại bằng contract cũ, không viết lại sổ")
+except OSError as e:
+    errors.append(f"thiếu contract dự báo mới hoặc contract cũ ({e})")
+except Exception as e:
+    errors.append(f"contract dự báo mới/cũ không đọc được ({e})")
 
 # ---------- 5b) Luật vận hành máy kiểm (governance/LAWS.md: L-02, L-03, L-05 hash chuỗi + chạy lại luật nhận trên từng dòng sổ,
 #              L-06, L-07, L-10 đề thi) ----------

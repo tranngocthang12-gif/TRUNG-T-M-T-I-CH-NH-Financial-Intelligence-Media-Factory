@@ -1,5 +1,11 @@
 # Changelog
 
+## v3.0.7d — 2026-11-19 (chỉ số hướng và contract dự báo mới) — Grok (xAI) soạn; chưa gộp
+- `hit_rate` = mean(outcome) không còn được in là “Tỷ lệ đúng”. Báo cáo tách `observed_yes_rate` và `directional_accuracy`. p = 0,5 không phải một hướng: không tính đúng, không tính sai. Brier, skill, mẫu 194 và kiểm định A/B không đổi công thức.
+- `HƠN BASELINE` vẫn chỉ so với `base_rate` do dòng tự khai hoặc với đồng xu 0,5. Chưa ghim baseline độc lập; câu đó không phải kết luận hiệu năng.
+- `contracts/forecast_issue_new.schema.json` bắt buộc `info_lock_at` và `calendar_id` cho dự báo mới. `forecast_issue.schema.json` giữ nguyên danh sách bắt buộc để kiểm lại F-37–F-42, không viết lại sáu dòng.
+- `scorecard()` ghi `freshness` (giờ sinh, commit nguồn, số dòng sổ). Tệp `reports/scorecard.json` đã commit chỉ đổi khi vòng học chạy.
+
 ## 2026-11-19 — Đồng bộ hồ sơ chấp nhận ADR-0011–0013 — ChatGPT (OpenAI) soạn
 - Đối chiếu main `cb931b44274eec4f2cbc104230c9fcae17b526a4`, metadata merge PR #45/#46/#47, bản chấm L-09 và check-runs trên từng HEAD đã chấm. Cập nhật ba header ADR, ba dòng danh mục và trạng thái các mục v3.0.7/v3.0.7b/v3.0.7c theo bằng chứng bên dưới. Thân quyết định ADR giữ nguyên từng byte.
 - Đây là đồng bộ hồ sơ sau merge; các bản chấm cũ chỉ áp dụng cho HEAD của PR cũ. PR tài liệu mới do ChatGPT (OpenAI) viết cần L-09 độc lập trên HEAD mới; chưa có bản chấm cho lần đồng bộ này.
