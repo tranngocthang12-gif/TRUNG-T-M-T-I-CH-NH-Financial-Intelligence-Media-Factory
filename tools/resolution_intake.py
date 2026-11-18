@@ -310,6 +310,57 @@ def publication_main(data, number, created, author, pred_rows) -> int:
     return 0
 
 
+def calendar_main(data, number, created, author) -> int:
+    """Ghim một dòng lịch công bố vào governance/release_calendar.jsonl (chỉ ghi thêm, chuỗi hash, dấu nhận của bot).
+    Mốc thời gian là số Issue và giờ tạo Issue do GitHub cấp; không có trường thời gian tự khai."""
+    from tools.ledger_intake import (CALENDAR, calendar_attest, calendar_prepare, load_calendar, post_write_errors,
+                                     write_deadline_error, now_utc)
+    cal_rows = load_calendar()
+    old = [r for r in cal_rows if r.get("issue_number") == number]
+    if old:
+        try:
+            msg, want = calendar_prepare(data, number, created, author, [r for r in cal_rows if r.get("issue_number") != number])
+        except Exception as e:  # noqa: BLE001
+            msg, want = str(e).splitlines()[0], None
+        have = [{k: v for k, v in r.items() if k not in SYSTEM_FIELDS} for r in old]
+        if msg or want is None or [want] != have:
+            return reject("lịch công bố đã có dòng mang số Issue này nhưng nội dung không khớp thân Issue lúc mở")
+        print(json.dumps({"ok": True, "duplicate": True, "kind": "calendar", "attest": [calendar_attest(old[0])],
+                          "message": "Lịch %s đã ghim, bỏ qua" % old[0].get("calendar_id")}, ensure_ascii=False))
+        return 3
+    try:
+        msg, row = calendar_prepare(data, number, created, author, cal_rows)
+    except (TypeError, ValueError) as e:
+        return reject(f"không đọc được mốc thời gian ({str(e).splitlines()[0]})")
+    if msg:
+        return reject(msg)
+    late = write_deadline_error(created, now_utc())      # dấu nhận phải đăng trong 6 giờ sau khi Issue lịch mở
+    if late:
+        return reject(late)
+    rows = chain([row], cal_rows[-1]["hash"] if cal_rows else "GENESIS")
+    pred_rows, res_rows = load_rows(PRED), load_rows(RES)
+    after = cal_rows + [strict_loads(dumps(r)) for r in rows]
+    try:
+        broken = post_write_errors(pred_rows, res_rows, pred_rows, res_rows, cal_before=cal_rows, cal_after=after)
+    except Exception as e:  # noqa: BLE001
+        broken = [f"không chạy được kiểm lại ({str(e).splitlines()[0]})"]
+    if broken:
+        return system_error_cal("ghim lịch sẽ làm sổ không qua kiểm lại — " + broken[0] + " — nên KHÔNG ghi")
+    CALENDAR.parent.mkdir(parents=True, exist_ok=True)
+    with CALENDAR.open("a", encoding="utf-8") as f:
+        for r in rows:
+            f.write(dumps(r) + "\n")
+    print(json.dumps({"ok": True, "kind": "calendar", "attest": [calendar_attest(rows[0])],
+                      "message": "Đã ghim lịch %s: info_lock_at %s (%s)" % (row["calendar_id"], row["info_lock_at"],
+                                                                         ", ".join(row["domains"]))}, ensure_ascii=False))
+    return 0
+
+
+def system_error_cal(msg) -> int:
+    print(json.dumps({"ok": False, "message": f"Lỗi hệ thống: {msg}"}, ensure_ascii=False))
+    return 1
+
+
 def main() -> int:
     number = int(os.environ["ISSUE_NUMBER"])
     created = os.environ["ISSUE_CREATED_AT"]
@@ -328,6 +379,8 @@ def main() -> int:
     res_rows, pred_rows = load_rows(RES), load_rows(PRED)
     if str(data.get("notice", "")).strip().upper() == "PUBLICATION":
         return publication_main(data, number, created, author, pred_rows)
+    if str(data.get("notice", "")).strip().upper() == "CALENDAR":
+        return calendar_main(data, number, created, author)
     old = [r for r in res_rows if r.get("resolution_issue") == number]
     if old:
         # Chạy lại job: không ghi trùng, và trả lại dấu nhận để workflow đăng nếu lần trước chưa đăng được — nhưng CHỈ khi các

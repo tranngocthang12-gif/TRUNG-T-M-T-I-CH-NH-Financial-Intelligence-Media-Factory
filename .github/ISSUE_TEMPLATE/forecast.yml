@@ -38,14 +38,14 @@ body:
     id: info_lock_at
     attributes:
       label: info_lock_at
-      description: "Ngày người gửi khai thông tin có thể công khai, YYYY-MM-DD. Đây chưa phải bằng chứng. Muốn vào phép kiểm định thì phải khớp một dòng lịch công bố độc lập (calendar_id)."
+      description: "Ngày đầu tiên thông tin phân định có thể công khai, YYYY-MM-DD. Phải trùng đúng info_lock_at của dòng lịch calendar_id; ngày tự khai khác lịch bị từ chối."
     validations: {required: true}
   - type: input
     id: calendar_id
     attributes:
       label: calendar_id
-      description: "Id một dòng đã có trong governance/release_calendar.jsonl, do ghế khác ghi trước Issue. Để trống thì dự báo vẫn có thể ghi nhưng không vào phép kiểm định."
-    validations: {required: false}
+      description: "BẮT BUỘC. Id (CAL-…) một dòng governance/release_calendar.jsonl do robot ghim từ Issue [Calendar] mở TRƯỚC Issue này, do ghế khác người viết ghi. Thiếu hoặc sai thì robot không nhận dự báo."
+    validations: {required: true}
   - type: input
     id: p
     attributes:

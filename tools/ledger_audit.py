@@ -65,7 +65,8 @@ from tools.laws_checks import ATTEST_WINDOW, TRIAL_HEADERS  # noqa: E402  một 
 APPEND_ONLY = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "ledger/publication_evidence.jsonl",
                "research/trial_registry.jsonl",
                "paper/nav.csv", "paper/decisions.csv", "paper/trades.csv",
-               "governance/control_b_prompts.jsonl")   # phiên bản prompt ghế B đã có hiệu lực: không sửa, không xóa
+               "governance/control_b_prompts.jsonl",
+               "governance/release_calendar.jsonl")   # lịch công bố đã ghim (ADR-0011): không sửa, không xóa, không chèn giữa   # phiên bản prompt ghế B đã có hiệu lực: không sửa, không xóa
 TRIALS, REGISTRY = "research/trials.csv", "research/trial_registry.jsonl"
 V302_MARKER = "tools/registry_push.py"   # có từ v3.0.2 và thuộc danh sách tệp bắt buộc của validate.py
 ZERO_SHA = "0" * 40
@@ -175,7 +176,7 @@ def _ts(iso):
     return datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
 
 
-_MARK_RE = re.compile(r"ledger-attest:\s*(predictions|resolutions|publications)\s+(\S+)\s+([0-9a-f]{64})(?![0-9a-f])")
+_MARK_RE = re.compile(r"ledger-attest:\s*(predictions|resolutions|publications|calendars)\s+(\S+)\s+([0-9a-f]{64})(?![0-9a-f])")
 VN = timezone(timedelta(hours=7))
 
 
@@ -281,6 +282,122 @@ def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, note
             pub_errs.append(error(f"bằng chứng công bố PBN-{n}", n, why,
                                   "chạy lại job của Issue bằng chứng trong vòng 6 giờ kể từ lúc Issue mở") + ("publications",))
     return pred_errs + res_errs + pub_errs
+
+
+def bot_attest_time(issues: dict, comments: dict, number, ledger, rid, rhash):
+    """Giờ (máy chủ GitHub) github-actions[bot] đăng dấu nhận 'ledger-attest: <ledger> <rid> <rhash>' trên Issue #number.
+    → (datetime, "") khi có đúng dấu nhận hợp lệ: bình luận ✅ của bot, chưa sửa, đăng không trước giờ mở Issue, trong
+    ATTEST_WINDOW, và bot không nêu hash nào khác cho cùng mã. → (None, lý do) khi không."""
+    it = issues.get(number)
+    if it is None:
+        return None, f"Issue #{number} không tồn tại trên GitHub"
+    try:
+        opened = _ts(it.get("created_at"))
+    except (TypeError, ValueError):
+        return None, f"không đọc được giờ tạo Issue #{number}"
+    best, other, why = None, set(), "không có bình luận dấu nhận của bot chứa hash của dòng"
+    for c in comments.get(number, []):
+        if (c.get("user") or "") != BOT:
+            continue
+        marks = {m[2] for m in _MARK_RE.findall(c.get("body") or "") if m[0] == ledger and m[1] == str(rid)}
+        other |= marks - {rhash}
+        if rhash not in marks:
+            continue
+        if c.get("created_at") != c.get("updated_at"):
+            why = "bình luận dấu nhận đã bị sửa sau khi đăng"; continue
+        if not (c.get("body") or "").lstrip().startswith("✅"):
+            why = "dấu nhận không nằm trong thông báo ✅ của workflow"; continue
+        try:
+            posted = _ts(c.get("created_at"))
+        except (TypeError, ValueError):
+            why = "không đọc được giờ đăng dấu nhận"; continue
+        if posted < opened or posted - opened > ATTEST_WINDOW:
+            why = f"dấu nhận đăng lúc {c.get('created_at')}, ngoài {int(ATTEST_WINDOW.total_seconds() // 3600)} giờ sau khi Issue mở"
+            continue
+        best = posted if best is None or posted < best else best
+    if best is not None and other:
+        return None, f"bot còn đăng dấu nhận với hash khác cho cùng mã {rid}"
+    return (best, "") if best is not None else (None, why)
+
+
+def provenance_verified_ids(pred_rows, cal_rows, pub_rows, issues: dict, comments: dict, owner: str):
+    """Xác nhận xuất xứ thời điểm bằng dữ liệu GitHub (không tin trường tự khai, không tin ngày commit).
+    - Mỗi dòng lịch: Issue tồn tại, không phải PR, do chủ kho mở, giờ tạo khớp dòng; có dấu nhận 'calendars' của bot.
+    - Dự báo mới (có calendar_id): lịch được xác nhận, số Issue lịch < số Issue dự báo, và DẤU NHẬN CỦA LỊCH đăng TRƯỚC giờ
+      mở Issue dự báo (cả hai mốc đều do máy chủ GitHub ghi).
+    - F-37–F-42: mọi bằng chứng công bố của câu hỏi có dấu nhận 'publications' hợp lệ.
+    → (tập mã dự báo đã xác nhận, danh sách lỗi). Lỗi = dòng trong sổ không chứng minh được xuất xứ — CI đỏ."""
+    from tools import ledger_intake as LI
+    errs, cal_ok = [], {}
+    def issue_ok(label, number, created):
+        it = issues.get(number)
+        if it is None:
+            errs.append(f"L-05: {label} trỏ tới Issue #{number} không tồn tại trên GitHub"); return False
+        bad = []
+        if it.get("is_pr"):
+            bad.append(f"#{number} là Pull Request")
+        if (it.get("user") or "").lower() != (owner or "").lower():
+            bad.append(f"Issue #{number} do '{it.get('user')}' mở, không phải chủ kho")
+        if it.get("created_at") != created:
+            bad.append(f"giờ tạo ghi {created} khác GitHub {it.get('created_at')}")
+        for b in bad:
+            errs.append(f"L-05: {label}: {b}")
+        return not bad
+    for c in cal_rows or ():
+        cid, n = c.get("calendar_id"), c.get("issue_number")
+        label = f"lịch công bố {cid}"
+        if not issue_ok(label, n, c.get("issue_created_at")):
+            continue
+        when, why = bot_attest_time(issues, comments, n, "calendars", cid, c.get("hash"))
+        if when is None:
+            errs.append(f"L-05: {label}: {why}"); continue
+        cal_ok[cid] = (n, when)
+    pub_ok = set()
+    for r in pub_rows or ():
+        n = r.get("issue_number")
+        when, _ = bot_attest_time(issues, comments, n, "publications", f"PBN-{n}", r.get("hash"))
+        if when is not None:
+            pub_ok.add(n)
+    verified = set()
+    for p in pred_rows:
+        if "issue_number" not in p:
+            continue
+        rid = p.get("id")
+        if LI.is_legacy_timing_row(p):
+            pubs = [x for x in pub_rows or () if LI.publication_question_key(x) == LI.qkey(p)]
+            if pubs and all(x.get("issue_number") in pub_ok for x in pubs):
+                verified.add(rid)
+            continue
+        cid = str(p.get("calendar_id") or "")
+        if not cid:
+            errs.append(f"L-05: dự báo {rid} không trích lịch công bố — không chứng minh được hạn khóa"); continue
+        if cid not in cal_ok:
+            errs.append(f"L-05: dự báo {rid} trích lịch {cid} chưa xác nhận được xuất xứ trên GitHub"); continue
+        cn, when = cal_ok[cid]
+        try:
+            opened = _ts(p.get("issue_created_at"))
+        except (TypeError, ValueError):
+            errs.append(f"L-05: dự báo {rid}: không đọc được giờ mở Issue"); continue
+        if not (isinstance(p.get("issue_number"), int) and cn < p["issue_number"]) or not when < opened:
+            errs.append(f"L-05: dự báo {rid}: lịch {cid} (Issue #{cn}, dấu nhận {when.isoformat()}) không có trước Issue dự báo "
+                        f"#{p.get('issue_number')} ({p.get('issue_created_at')}) theo giờ GitHub"); continue
+        verified.add(rid)
+    return verified, errs
+
+
+def github_verified_ids(pred, cal, pub, repo=None, token=None):
+    """Dùng cho engine (scorecard): đọc API GitHub và trả về (tập mã dự báo đã xác nhận xuất xứ, nguồn).
+    Không gọi được API hoặc thiếu GITHUB_REPOSITORY → tập rỗng (fail closed)."""
+    repo = repo or os.environ.get("GITHUB_REPOSITORY", "")
+    token = token if token is not None else os.environ.get("GITHUB_TOKEN", "")
+    if not repo:
+        return set(), "none: không có GITHUB_REPOSITORY"
+    try:
+        verified, _ = provenance_verified_ids(pred, cal, pub, fetch_issues(repo, token), fetch_comments(repo, token),
+                                              repo.split("/")[0])
+        return verified, "github_api"
+    except Exception as e:  # noqa: BLE001
+        return set(), f"none: không gọi được GitHub API ({str(e).splitlines()[0]})"
 
 
 def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict, pub_rows=()) -> list[str]:
@@ -527,7 +644,9 @@ def main() -> int:
         repo, token = os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GITHUB_TOKEN", "")
         pred, res = _rows("ledger/predictions.jsonl"), _rows("ledger/resolutions.jsonl")
         pub = _rows("ledger/publication_evidence.jsonl")
-        need = any("issue_number" in r for r in pred) or any(r.get("resolution_issue") is not None for r in res) or bool(pub)
+        cal = _rows("governance/release_calendar.jsonl")
+        need = (any("issue_number" in r for r in pred) or any(r.get("resolution_issue") is not None for r in res) or bool(pub)
+                or bool(cal))
         if not repo:
             print("(bỏ qua đối chiếu Issue: không có GITHUB_REPOSITORY)")
         else:
@@ -537,6 +656,8 @@ def main() -> int:
                     errs += issue_crosscheck_errors(pred, res, issues, repo.split("/")[0], pub)
                     errs += attestation_errors_with_retry(pred, res, issues, lambda: fetch_comments(repo, token),
                                                           tries=a.attest_tries, wait=a.attest_wait, pub_rows=pub)
+                    _, perrs = provenance_verified_ids(pred, cal, pub, issues, fetch_comments(repo, token), repo.split("/")[0])
+                    errs += perrs
                 br = _api(f"https://api.github.com/repos/{repo}/branches/main", token)
                 rules = _api(f"https://api.github.com/repos/{repo}/rules/branches/main", token)
                 if not br.get("protected") and not rules:

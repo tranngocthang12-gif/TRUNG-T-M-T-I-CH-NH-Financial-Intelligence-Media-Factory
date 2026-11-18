@@ -31,10 +31,12 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
 ## 6. Ghi một cặp dự báo A/B (Owner làm tay — ARCHITECTURE §4.1–4.2)
 1. Ghế A (Claude trong Project) soạn câu hỏi có/không, nguồn phân định, ngày phân định, xác suất.
 2. Ghế B: mở một chat Claude **mới**, không Project, không tệp, tắt tìm web; dán nguyên khối prompt trong `governance/CONTROL_B_PROMPT.md` rồi dán câu hỏi; chép ba dòng trả lời.
+0. **Trước** khi mở Issue dự báo, ghim lịch công bố: Tab **Issues** → **New issue** → mẫu **Calendar**. Điền `calendar_id` mới (ví dụ `CAL-NSO-CPI-2026-12`), tên miền nguồn (`nso.gov.vn`), `info_lock_at` = ngày lịch chính thức nói số liệu ra, đường dẫn trang lịch, câu trích nguyên văn, và `recorder` = **Owner** hoặc một nhà cung cấp khác người viết dự báo. Chờ robot bình luận ✅ (kèm dòng `ledger-attest: calendars …`) **rồi mới** mở Issue dự báo — dự báo mở trước dấu nhận của lịch sẽ không bao giờ được tính là năng lực. Không sửa, không xóa bình luận ✅ đó. Lịch sai ngày thì ghim mã mới, không sửa mã cũ.
 3. Tab **Issues** → **New issue** → mẫu **Forecast**. Mở hai Issue **trong cùng một ngày**: một cho ghế A, một cho ghế B, **cùng một câu chữ** ở ô question, cùng nguồn, cùng luật, cùng ngày phân định.
    - `p`, `base_rate`: chỉ ghi con số (0.35 hoặc 0,35 đều được); không ghi %, không ghi chữ.
    - `resolve_at`: đúng dạng `2026-12-10`. Đây là ngày phân định, không phải ngày số liệu ra.
-   - `info_lock_at`: ngày đầu tiên thông tin **có thể** được công bố, dạng `2026-12-06`, sau hôm nay và không sau `resolve_at`. Hai ghế cùng một ngày. Không sửa được sau khi ghi. Bỏ trống thì robot từ chối.
+   - `info_lock_at`: ngày đầu tiên thông tin **có thể** được công bố, dạng `2026-12-06`, sau hôm nay và không sau `resolve_at`. Phải **trùng đúng** ngày của lịch ở `calendar_id`. Hai ghế cùng một ngày. Không sửa được sau khi ghi. Bỏ trống thì robot từ chối.
+   - `calendar_id`: **bắt buộc** — mã lịch đã ghim ở bước 0. Thiếu, sai mã, lịch khác tên miền với `resolution_source`, lịch do cùng nhà cung cấp với ghế viết ghi, hoặc lịch ghim sau Issue này: robot từ chối.
    - `resolution_source`: phải có **tên miền** của nguồn, ví dụ `nso.gov.vn` hoặc `https://www.sbv.gov.vn`. Lúc phân định máy chỉ nhận đường dẫn thuộc tên miền ghi ở đây.
    - `model_cutoff`: dạng `2026-06`.
    - `author_seat`: bắt đầu bằng tên mô hình ("Claude Project TTC", "Claude trần").

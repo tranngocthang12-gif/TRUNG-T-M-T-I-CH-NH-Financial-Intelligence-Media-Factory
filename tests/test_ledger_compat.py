@@ -11,6 +11,7 @@ import json, os, pathlib, shutil, subprocess, sys, tempfile, textwrap, unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.ledger_intake import control_b_hash  # noqa: E402
+from tests._calendar_fixture import with_calendar, verified_ids  # noqa: E402,F401
 B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
 
 
@@ -42,6 +43,7 @@ class LedgerCompatTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _intake(self, number, body, created="2026-11-17T02:00:00Z"):
+        body = with_calendar(self.tmp, body)
         env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
                "TTC_INTAKE_NOW": created.replace(":00:00Z", ":01:00Z")}        # robot chạy một phút sau khi Issue mở
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")],

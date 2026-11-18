@@ -143,6 +143,9 @@ def check_ledger_chain(root) -> list[str]:
         path = pathlib.Path(root) / "ledger" / name
         if path.is_file():
             errs += _chain_errors(path, label)
+    cal = pathlib.Path(root) / "governance" / "release_calendar.jsonl"     # lịch công bố: chuỗi hash, chỉ ghi thêm (L-05)
+    if cal.is_file():
+        errs += _chain_errors(cal, "Lịch công bố")
     return errs
 
 
@@ -169,7 +172,8 @@ def check_ledger_rows(root) -> list[str]:
     pred, res = rows(pred_p), rows(res_p)
     if pred is None or res is None:
         return []
-    if not pred and not res:
+    cal_p = root / "governance" / "release_calendar.jsonl"
+    if not pred and not res and not (cal_p.is_file() and cal_p.read_text(encoding="utf-8").strip()):
         return []
     try:
         import jsonschema  # noqa: F401

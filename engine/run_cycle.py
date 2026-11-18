@@ -101,6 +101,10 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
                                                  for k, v in sorted(sc["issue_forecasts"]["by_seat"].items()))
                                        or "chưa có")
              + (f" | dòng hỏng bị bỏ qua: {sc['issue_forecasts']['malformed']}" if sc["issue_forecasts"].get("malformed") else ""),
+             "- Thời điểm (L-05, ADR-0011): ghi {recorded}, có bằng chứng hợp lệ {timing_valid}, đã phân định {resolved}, đã phân định "
+             "và hợp lệ {resolved_timing_valid}".format(**sc["issue_forecasts"]["counts"])
+             + f" — nguồn xác nhận: {sc['issue_forecasts']['timing_verification_source']}. Số năng lực dưới đây chỉ tính dự báo hợp lệ; "
+             "số toàn sổ nằm ở raw_audit trong reports/scorecard.json (không phải bằng chứng năng lực).",
              "- Cặp A–B: {pairs} cặp (lẻ {unpaired}, khác ngày {not_same_day}), bất đồng trong phạm vi phép thử {disagreements} "
              "(ngoài phạm vi — event_before_date, ADR-0002: {disagreements_out_of_scope}), đã phân định "
              "{disagreements_resolved}, VOID {disagreements_void}, A đúng {a_correct}, mâu thuẫn {inconsistent_outcomes} — {verdict}".format(**sc["issue_forecasts"]["ab"])

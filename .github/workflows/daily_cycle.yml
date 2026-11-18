@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  issues: read          # scorecard doi chieu Issue lich/bang chung va dau nhan cua bot (ADR-0011, fail closed khi loi)
 
 concurrency:
   group: daily-cycle
@@ -42,6 +43,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TTC_REGISTRY_PUSH: "1"
+          TTC_PROVENANCE_ONLINE: "1"
+          GITHUB_TOKEN: ${{ github.token }}
           TRIALS: ${{ github.event.inputs.trials || '6' }}
         run: |
           case "$TRIALS" in ''|*[!0-9]*) echo "trials phai la so nguyen khong am: '$TRIALS'"; exit 1;; esac

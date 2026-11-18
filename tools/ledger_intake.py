@@ -200,23 +200,140 @@ def info_lock_error(data, created_day, resolve_at, legacy=False):
 
 
 def load_calendar(root=None):
-    """Lịch công bố đã ghim. Không có tệp thì không có bằng chứng — ngày tự khai không thành hạn đã chứng minh."""
+    """Lịch công bố đã ghim (governance/release_calendar.jsonl). Không có tệp thì không có bằng chứng."""
     p = pathlib.Path(root) / "governance" / "release_calendar.jsonl" if root else CALENDAR
     if not p.is_file():
         return []
     return [strict_loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()]
 
 
-def calendar_lock_error(data, created, calendar):
-    """None nếu không trích calendar_id, hoặc trích đúng một lịch độc lập khớp ngày và đứng trước Issue.
-    Không trích lịch không phải lỗi nhận sổ: ngày tự khai vẫn chưa được coi là hợp lệ ở phép kiểm định."""
+# ---------------- LỊCH CÔNG BỐ (ADR-0011 quyết định 7, sửa đổi vòng Claude) ----------------
+# Lịch chỉ vào sổ qua robot: Owner mở Issue "[Calendar]", workflow resolution_intake.yml ghi một dòng vào
+# governance/release_calendar.jsonl và github-actions[bot] đăng dấu nhận "ledger-attest: calendars <calendar_id> <hash>".
+# Mốc thời gian của lịch là issue_created_at + số Issue (máy chủ GitHub cấp) và giờ đăng dấu nhận của bot — KHÔNG có trường
+# thời gian nào do người ghi tự khai (không recorded_at, không ngày commit). tools/ledger_audit.py --github đối chiếu Issue,
+# người mở và dấu nhận với API; engine chỉ coi dự báo là đã chứng minh thời điểm khi kiểm toán đó xác nhận (fail closed).
+CALENDAR_ID_RE = re.compile(r"CAL-[A-Za-z0-9][A-Za-z0-9._-]{2,63}")
+_CAL_DOMAIN_RE = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+")
+CALENDAR_FIELDS = ("notice", "calendar_id", "domains", "info_lock_at", "evidence_url", "quote", "recorder")
+
+
+def calendar_attest(row) -> str:
+    return f"calendars {row.get('calendar_id')} {row.get('hash')}"
+
+
+def parse_domains(text) -> list:
+    """'nso.gov.vn, gso.gov.vn' → ['gso.gov.vn', 'nso.gov.vn']. Một mục sai dạng → ValueError."""
+    items = [x.strip().lower().rstrip(".") for x in re.split(r"[,\s;]+", str(text or "")) if x.strip()]
+    bad = [x for x in items if not _CAL_DOMAIN_RE.fullmatch(x)]
+    if bad:
+        raise ValueError(f"tên miền không hợp lệ: {bad[0]}")
+    return sorted(set(items))
+
+
+def calendar_prepare(data, number, created, author, prior_cals):
+    """Luật ghi một dòng lịch công bố từ Issue [Calendar]. Trả về (lỗi hoặc None, dòng chưa có prev_hash/hash)."""
+    if str(data.get("notice", "")).strip().upper() != "CALENDAR":
+        return "notice phải là CALENDAR", None
+    extra = sorted(set(data) - set(CALENDAR_FIELDS))
+    if extra:
+        return f"trường lạ trong Issue lịch: {extra}", None
+    if any(ATTEST_MARK in str(v).lower() for v in data.values()):
+        return f"nội dung chứa chuỗi dành riêng '{ATTEST_MARK}'", None
+    cid = str(data.get("calendar_id", "")).strip()
+    if not CALENDAR_ID_RE.fullmatch(cid):
+        return "calendar_id phải có dạng CAL-<chữ/số . _ -> (3–64 ký tự sau CAL-)", None
+    if any(str(c.get("calendar_id")) == cid for c in prior_cals or ()):
+        return f"calendar_id {cid} đã có trong lịch; lịch đã ghim không sửa, không ghi đè — dùng calendar_id mới", None
+    try:
+        domains = parse_domains(data.get("domains"))
+    except ValueError as e:
+        return f"domains: {e}", None
+    if not domains:
+        return "domains phải nêu ít nhất một tên miền nguồn chính thức (vd nso.gov.vn)", None
+    lock = str(data.get("info_lock_at", "")).strip()
+    if not _DATE_RE.fullmatch(lock):
+        return "info_lock_at phải có dạng YYYY-MM-DD", None
+    try:
+        lock_day = date.fromisoformat(lock)
+        created_day = vn_day(created)
+    except (TypeError, ValueError):
+        return "info_lock_at hoặc giờ tạo Issue không đọc được", None
+    if lock_day <= created_day:
+        return "(L-05): info_lock_at của lịch phải sau ngày mở Issue lịch — không ghim lịch cho ngày công bố đã qua", None
+    url, quote = str(data.get("evidence_url", "")).strip(), str(data.get("quote", "")).strip()
+    if not url.startswith("https://"):
+        return "evidence_url phải là đường dẫn https:// tới trang lịch công bố chính thức", None
+    try:
+        from tools.resolution_intake import url_hosts, source_allowed
+        hosts = url_hosts(url)
+    except ValueError as e:
+        return f"evidence_url: {e}", None
+    if not source_allowed(set(domains), hosts):
+        return "evidence_url không thuộc các tên miền khai trong domains", None
+    if len(quote) < 15:
+        return "quote phải trích nguyên văn câu lịch công bố (≥ 15 ký tự) để người chấm kiểm", None
+    recorder = str(data.get("recorder", "")).strip()
+    if not recognised_seat(recorder):
+        return "recorder phải bắt đầu bằng tên ghế (Owner hoặc mô hình/nhà cung cấp)", None
+    row = {"calendar_id": cid, "domains": domains, "info_lock_at": lock, "evidence_url": url, "quote": quote,
+           "recorder": recorder, "issue_number": number, "issue_created_at": created}
+    if author:
+        row["issue_author"] = author
+    return None, row
+
+
+def calendar_replay(cal_rows) -> list[str]:
+    """Chạy lại luật lịch trên mọi dòng đã ghim. Dòng không do robot dựng (thiếu số Issue, sai luật, lệch nội dung) là lỗi."""
+    errs, prior, seen = [], [], set()
+    for row in cal_rows or ():
+        n = row.get("issue_number")
+        label = f"lịch công bố {row.get('calendar_id')}"
+        if isinstance(n, bool) or not isinstance(n, int) or n <= 0:
+            errs.append(f"L-05: {label}: issue_number không phải số Issue — lịch chỉ vào sổ qua Issue [Calendar]")
+            prior.append(row); continue
+        if n in seen:
+            errs.append(f"L-05: {label}: Issue #{n} xuất hiện hai lần")
+        seen.add(n)
+        data = {"notice": "CALENDAR", "calendar_id": row.get("calendar_id", ""), "domains": ", ".join(row.get("domains") or []),
+                "info_lock_at": row.get("info_lock_at", ""), "evidence_url": row.get("evidence_url", ""),
+                "quote": row.get("quote", ""), "recorder": row.get("recorder", "")}
+        try:
+            msg, want = calendar_prepare(data, n, row.get("issue_created_at"), row.get("issue_author", ""), prior)
+        except Exception as e:  # noqa: BLE001
+            msg, want = str(e).splitlines()[0], None
+        have = {k: v for k, v in row.items() if k not in {"prev_hash", "hash"}}
+        if msg:
+            errs.append(f"L-05: {label} không qua luật lịch công bố: {msg}")
+        elif want != have:
+            errs.append(f"L-05: {label}: dòng trong lịch không khớp kết quả chạy lại luật (có trường tự khai hoặc bị sửa)")
+        prior.append(row)
+    return errs
+
+
+def _calendar_row_ok(c) -> bool:
+    """Dòng lịch có dạng do robot ghi: số Issue, giờ tạo Issue, hash chuỗi."""
+    n = c.get("issue_number")
+    return (not isinstance(n, bool) and isinstance(n, int) and n > 0 and bool(c.get("issue_created_at"))
+            and isinstance(c.get("hash"), str) and len(c.get("hash")) == 64)
+
+
+def calendar_lock_error(data, created, calendar, number=None):
+    """None khi dự báo trích đúng một dòng lịch do robot ghim, khớp info_lock_at và tên miền, do ghế khác người viết ghi,
+    và Issue lịch mở TRƯỚC Issue dự báo theo giờ tạo Issue ghi trong dòng (giờ máy chủ GitHub do robot chép).
+    Không trích lịch → lỗi (dự báo mới bắt buộc calendar_id). Phần chỉ API GitHub chứng minh được — Issue lịch có thật, do
+    chủ kho mở, số Issue nhỏ hơn và dấu nhận của bot đăng TRƯỚC Issue dự báo — do tools/ledger_audit.provenance_verified_ids
+    kiểm (fail closed). number: giữ cho tương thích lời gọi, không dùng offline."""
     cid = str(data.get("calendar_id") or "").strip()
     if not cid:
-        return None
+        return (" (L-05): thiếu calendar_id — dự báo mới phải trích một dòng governance/release_calendar.jsonl đã ghim qua "
+                "Issue [Calendar] trước khi mở Issue dự báo; ngày khóa tự khai không được nhận")
     matches = [c for c in calendar or [] if str(c.get("calendar_id") or "") == cid]
     if len(matches) != 1:
-        return " (L-05): calendar_id không trỏ tới đúng một dòng lịch công bố độc lập"
+        return f" (L-05): calendar_id '{cid}' không trỏ tới đúng một dòng lịch công bố đã ghim"
     c = matches[0]
+    if not _calendar_row_ok(c):
+        return " (L-05): dòng lịch không do robot ghi (thiếu số Issue, giờ tạo Issue hoặc hash) — không phải bằng chứng"
     if str(c.get("info_lock_at") or "") != str(data.get("info_lock_at") or ""):
         return " (L-05): info_lock_at không khớp lịch công bố đã ghim — không nhận ngày tự khai khác lịch"
     domains = {str(d).lower().strip() for d in (c.get("domains") or []) if str(d).strip()}
@@ -231,18 +348,11 @@ def calendar_lock_error(data, created, calendar):
     if not recognised_seat(recorder) or same_provider(recorder, data.get("author_seat")):
         return " (L-05): lịch công bố phải do ghế khác người viết dự báo ghi — nguồn không độc lập"
     try:
-        if ts(c.get("recorded_at")) >= ts(created):
-            return " (L-05): lịch công bố không đứng trước Issue dự báo — không dùng lịch ghi sau khi đã biết câu hỏi"
+        if ts(c.get("issue_created_at")) >= ts(created):
+            return " (L-05): Issue lịch công bố không mở trước Issue dự báo — không dùng lịch ghi sau khi đã biết câu hỏi"
     except (TypeError, ValueError):
-        return " (L-05): recorded_at của lịch công bố không phải mốc có múi giờ"
+        return " (L-05): issue_created_at của lịch công bố không đọc được"
     return None
-
-
-def lock_corroborated(row, calendar) -> bool:
-    """True chỉ khi info_lock_at khớp lịch độc lập đã có trước Issue. Ngày người gửi tự khai một mình thì False."""
-    if not str(row.get("calendar_id") or "").strip():
-        return False
-    return calendar_lock_error(row, row.get("issue_created_at"), calendar) is None
 
 
 def publication_question_key(row):
@@ -275,11 +385,26 @@ def publication_blocks(data, created, pub_rows, live):
     return None
 
 
-def timing_verification_status(row, pub_rows=(), calendar=None) -> str:
-    """Dự báo có được đưa vào phép kiểm định hợp lệ hay không.
-    eligible | legacy_proven_by_evidence | legacy_unproven | after_publication | after_lock | unproven |
-    unclear_publication | self_declared_lock.
-    self_declared_lock: có info_lock_at nhưng không có lịch công bố độc lập khớp ngày. Ngày tự khai không phải bằng chứng.
+def is_legacy_timing_row(row) -> bool:
+    """F-37–F-42 đúng như đã ghim: mã đúng, không có info_lock_at, hash khớp. Dòng khác mượn mã cũ không được miễn."""
+    rid = row.get("id")
+    return rid in LEGACY_TIMING_IDS and "info_lock_at" not in row and row.get("hash") == LEGACY_TIMING_HASHES.get(rid)
+
+
+VALID_TIMING = frozenset({"eligible", "legacy_proven_by_evidence"})
+
+
+def timing_verification_status(row, pub_rows=(), calendar=None, verified=None) -> str:
+    """Dự báo có được đưa vào phép kiểm định năng lực hay không.
+    eligible | legacy_proven_by_evidence                      → hợp lệ (chỉ hai trạng thái này)
+    legacy_unproven | after_publication | after_lock | unproven | unclear_publication |
+    self_declared_lock | calendar_invalid | provenance_unverified → không hợp lệ.
+    - self_declared_lock: không trích lịch (ngày khóa tự khai). calendar_invalid: trích lịch nhưng lịch không qua luật.
+    - provenance_unverified: mọi điều kiện trong sổ đã đạt, nhưng chưa có xác nhận của API GitHub rằng Issue lịch/bằng chứng
+      do chủ kho mở và dấu nhận của bot đăng trước Issue dự báo. verified = tập mã dự báo đã được
+      tools/ledger_audit.provenance_verified_ids xác nhận; None hoặc thiếu mã → chưa xác nhận (fail closed).
+    - Bằng chứng công bố ghi muộn (Issue mở sau dự báo) mà published_at trước giờ mở Issue dự báo → after_publication; dòng
+      dự báo giữ nguyên, chỉ bị loại khỏi kết luận năng lực.
     Mẫu 194 cặp không bị thay vì một trạng thái ở đây."""
     try:
         created_dt = ts(row.get("issue_created_at"))
@@ -298,7 +423,7 @@ def timing_verification_status(row, pub_rows=(), calendar=None) -> str:
             earliest = t
     if unclear and earliest is None:
         return "unclear_publication"
-    legacy = row.get("id") in LEGACY_TIMING_IDS and "info_lock_at" not in row
+    legacy = is_legacy_timing_row(row)
     raw = row.get("info_lock_at")
     if raw not in (None, ""):
         try:
@@ -315,16 +440,21 @@ def timing_verification_status(row, pub_rows=(), calendar=None) -> str:
         return "unclear_publication"
     if legacy and earliest is None:
         return "legacy_unproven"
-    if legacy:
-        return "legacy_proven_by_evidence"
-    if not lock_corroborated(row, [] if calendar is None else calendar):
-        return "self_declared_lock"
-    return "eligible"
+    if not legacy:
+        if not str(row.get("calendar_id") or "").strip():
+            return "self_declared_lock"
+        n = row.get("issue_number")
+        if calendar_lock_error(row, row.get("issue_created_at"), calendar or [],
+                               n if isinstance(n, int) and not isinstance(n, bool) else None):
+            return "calendar_invalid"
+    if verified is None or row.get("id") not in verified:
+        return "provenance_unverified"
+    return "legacy_proven_by_evidence" if legacy else "eligible"
 
 
-def capability_test_eligible(row, pub_rows=(), calendar=None) -> bool:
-    """True chỉ khi chứng minh được thời điểm. engine.ledger.issue_summary dùng hàm này để chặn phán quyết, không để bỏ qua."""
-    return timing_verification_status(row, pub_rows, calendar) in {"eligible", "legacy_proven_by_evidence"}
+def capability_test_eligible(row, pub_rows=(), calendar=None, verified=None) -> bool:
+    """True chỉ khi chứng minh được thời điểm VÀ xuất xứ đã được kiểm toán GitHub xác nhận (verified)."""
+    return timing_verification_status(row, pub_rows, calendar, verified) in VALID_TIMING
 
 
 def publication_prepare(data, number, created, author, pred_rows, prior_pubs):
@@ -363,8 +493,16 @@ def publication_prepare(data, number, created, author, pred_rows, prior_pubs):
     key = keys.pop()
     group = sorted((p for p in preds.values() if qkey(p) == key), key=lambda p: p.get("issue_number", 0))
     group_ids = [p["id"] for p in group]
-    if any(publication_question_key(p) == key for p in prior_pubs):
-        return "câu hỏi này đã có bằng chứng công bố; không đặt lại thời điểm sau khi đã ghi", None
+    same = [p for p in prior_pubs if publication_question_key(p) == key]
+    if same:
+        # Bằng chứng phát hiện sau chỉ được làm mốc công bố SỚM HƠN (siết lại), không bao giờ dời mốc về sau (nới ra).
+        try:
+            earliest = min(ts(p.get("published_at")) for p in same)
+        except (TypeError, ValueError):
+            earliest = None
+        if earliest is None or pub_ts >= earliest:
+            return ("câu hỏi này đã có bằng chứng công bố; chỉ ghi thêm bằng chứng cho thấy kết quả công khai SỚM HƠN mốc đã "
+                    "ghi — không đặt lại thời điểm về sau"), None
     authors = set()
     for p in group:
         if not recognised_seat(p.get("author_seat")):
@@ -520,7 +658,8 @@ def _schema():
     return json.loads(SCHEMA.read_text(encoding="utf-8"))
 
 
-def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=True, versions=None, pub_rows=(), legacy_timing=False, calendar=None):
+def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=True, versions=None, pub_rows=(), legacy_timing=False,
+                   calendar=None, number=None):
     """Luật nhận một dự báo. data: các trường của form; created: giờ tạo Issue (ISO); issue_rows: các dòng dự báo Issue đã
     có TRƯỚC nó; res_rows: các dòng phân định. Trả về (lỗi hoặc None, ghi chú). Hàm thuần — intake và replay() dùng chung.
     live=True (lúc nhận): res_rows là sổ phân định NGAY LÚC GHI; live=False (kiểm lại dòng đã có): res_rows là cả sổ. Hai
@@ -557,9 +696,6 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=Tru
     lock_msg = info_lock_error(data, created_day, resolve_at, legacy=legacy_timing)
     if lock_msg:
         return lock_msg, ""
-    cal_msg = calendar_lock_error(data, created, load_calendar() if calendar is None else calendar)
-    if cal_msg:
-        return cal_msg, ""
     if not recognised_seat(data["author_seat"]):
         return (f" (L-09): author_seat '{data['author_seat']}' phải BẮT ĐẦU bằng tên ghế viết — tên mô hình/nhà cung cấp "
                 "(ví dụ 'Claude Project TTC', 'Claude trần', 'ChatGPT trần') hoặc 'Owner'; không nhận ra ghế viết thì "
@@ -627,6 +763,12 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=Tru
                     "khóa công bố, không được đặt lại sau khi đã ghi"), ""
         if vn_day(r["issue_created_at"]) != created_day:
             note = f" ⚠ Khác ngày với {r.get('id')} — vẫn ghi, nhưng không tính vào cặp A–B (§4.2 đòi cùng ngày)."
+    if not legacy_timing:      # dự báo mới: ngày khóa phải khớp lịch đã ghim qua robot, mở trước Issue dự báo (L-05)
+        cal_msg = calendar_lock_error(data, created, load_calendar() if calendar is None else calendar, number)
+        if cal_msg:
+            return cal_msg, ""
+    elif "calendar_id" in data:
+        return " (L-05): dòng chuyển tiếp F-37–F-42 không được gắn calendar_id sau khi đã ghi", ""
     return None, note
 
 
@@ -666,10 +808,10 @@ def replay(pred_rows, res_rows=(), versions=None, pub_rows=(), calendar=None) ->
             errs.append(f"L-05: Issue #{n} có hai dòng dự báo trong sổ")
         seen.add(n)
         data = {k: v for k, v in row.items() if k not in SYSTEM_FIELDS}
-        legacy = row.get("id") in LEGACY_TIMING_IDS and "info_lock_at" not in row
+        legacy = is_legacy_timing_row(row)
         try:
             msg, _ = forecast_error(data, row.get("issue_created_at"), prior, res_rows, schema, live=False, versions=versions,
-                                    pub_rows=pub_rows, legacy_timing=legacy, calendar=calendar)
+                                    pub_rows=pub_rows, legacy_timing=legacy, calendar=calendar, number=n)
         except Exception as e:  # noqa: BLE001
             msg = f": không đọc được ({str(e).splitlines()[0]})"
         if msg:
@@ -679,22 +821,27 @@ def replay(pred_rows, res_rows=(), versions=None, pub_rows=(), calendar=None) ->
 
 
 def ledger_errors(pred_rows, res_rows, versions=None, pub_rows=None, calendar=None) -> list[str]:
-    """TOÀN BỘ luật kiểm lại trên một trạng thái của sổ dự báo, phân định và (nếu truyền) bằng chứng công bố.
+    """TOÀN BỘ luật kiểm lại trên một trạng thái của sổ dự báo, phân định, lịch công bố và (nếu truyền) bằng chứng công bố.
     pub_rows=None: không xét tệp bằng chứng (lời gọi cũ). pub_rows=[]: tệp không có dòng, vẫn chạy luật.
     calendar=None: đọc lịch của chính cây mã này. Kho khác (thư mục tạm) phải truyền lịch của kho đó."""
     from tools import resolution_intake                    # nạp muộn: resolution_intake nhập lại mô-đun này
     pubs = () if pub_rows is None else pub_rows
-    errs = replay(pred_rows, res_rows, versions, pubs, calendar=calendar) + resolution_intake.replay(pred_rows, res_rows)
+    cal = load_calendar() if calendar is None else calendar
+    errs = replay(pred_rows, res_rows, versions, pubs, calendar=cal) + resolution_intake.replay(pred_rows, res_rows)
+    errs += calendar_replay(cal)
     if pub_rows is not None:
         errs += publication_replay(pred_rows, pub_rows)
     return errs
 
 
-def post_write_errors(pred_before, res_before, pred_after, res_after, pub_before=None, pub_after=None) -> list[str]:
+def post_write_errors(pred_before, res_before, pred_after, res_after, pub_before=None, pub_after=None,
+                      cal_before=None, cal_after=None) -> list[str]:
     """Tự kiểm trước khi ghi: lỗi kiểm lại có ở trạng thái SAU KHI GHI mà trạng thái trước chưa có."""
-    before = ledger_errors(pred_before, res_before, pub_rows=pub_before)
+    cb = load_calendar() if cal_before is None else cal_before
+    ca = cb if cal_after is None else cal_after
+    before = ledger_errors(pred_before, res_before, pub_rows=pub_before, calendar=cb)
     after_pubs = pub_before if pub_after is None else pub_after
-    return [e for e in ledger_errors(pred_after, res_after, pub_rows=after_pubs) if e not in before]
+    return [e for e in ledger_errors(pred_after, res_after, pub_rows=after_pubs, calendar=ca) if e not in before]
 
 
 def system_error(msg) -> int:
@@ -748,7 +895,8 @@ def main() -> int:
         return 3
     res_rows = load_rows(RES)
     try:
-        msg, note = forecast_error(data, created, [r for r in rows if "issue_number" in r], res_rows, pub_rows=pub_rows)
+        msg, note = forecast_error(data, created, [r for r in rows if "issue_number" in r], res_rows, pub_rows=pub_rows,
+                                   number=number)
         late = None if msg else write_deadline_error(created, now_utc(), data.get("resolve_at"), data.get("info_lock_at"))
     except (TypeError, ValueError) as e:
         return reject(f": không đọc được mốc thời gian ({str(e).splitlines()[0]})")
