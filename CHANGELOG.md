@@ -1,7 +1,8 @@
 # Changelog
 
 ## v3.0.6 — 2026-11-18 (ghế thi công; sửa giấy tờ) — nội dung do Grok (xAI) soạn theo lệnh Owner; ADR-0010; Owner gộp sau L-09
-- **Ai soạn:** `authored_by: Grok (xAI)` là lời khai ghế soạn. Commit `02e5d7e` có author và committer `Grok (xAI)`, login `grok-xai`, không phải tài khoản chủ kho. Người mở PR #35 là `tranngocthang12-gif`. Tên git và login mở PR không tự chứng minh ai soạn câu chữ.
+- **Ai soạn:** `authored_by: Grok (xAI)` là lời khai attribution, không phải kết luận của lịch sử Git. Commit `7ff741b5833179d597c8751d838e23aa5eecf427` (tạo ADR-0010, `requirements.txt`, `state/PROJECT_STATE.yaml`, `architecture/ARCHIVE.md`, `BOOT.md`, sửa handoff): Git author và Git committer đều `tranngocthang12-gif <tranngocthang12@gmail.com>`, login `tranngocthang12-gif`. Commit `02e5d7e` và `4641fcf`: author và committer `Grok (xAI)`, login `grok-xai`. Metadata chỉ chứng minh ai ghi commit lên Git. Không sửa tác giả commit đã đẩy.
+- **Ba điểm trên `4641fcf`:** (A) metadata `7ff741b` như dòng trên. (B) ARCHITECTURE §4.3 thêm một câu trỏ ADR-0009; không sửa quyết định 1–7 của ADR đó. (C) header ADR-0009: Owner duyệt là 18/11/2026 giờ Việt Nam (17/11 18:32:23 UTC).
 - **Ghế thi công:** Grok (xAI). Không phải MINH TRÍ. Không được gộp, sửa luật, mở API, chạm engine ngoài lệnh. Quyết định 9 của ADR-0003 giữ nguyên chữ đã chấm; không thêm câu vào tệp đó.
 - **Pha:** `state/PROJECT_STATE.yaml` ghi `V3_G0_CHUA_THOAT`. Không có biên bản Owner bác riêng nhánh "chỉ giữ Ledger" ngày 17/11. Kết luận đang lưu là ADR-0002: không thu hẹp v3.0; mốc 31/03/2027. Hai đồng hồ không phải một luật.
 - **ADR-0008:** header lật ACCEPTED chỉ vì Owner gộp PR #31 (merge `8c4fd4305b8154adda2ea0e1abf4e43cd7b647ab`). Không viện `docs/RESEARCH_POINT_IN_TIME_LIMITATIONS.md`.

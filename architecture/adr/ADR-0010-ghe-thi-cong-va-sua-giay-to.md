@@ -4,7 +4,7 @@
 - Người đề xuất: Grok (xAI), theo lệnh Owner cùng ngày: sửa các vấn đề đã nêu và giao ghế thi công cho ghế này
 - Người chấm: ghế khác nhà cung cấp (L-09), ghi ở PR. Ghế này không tự chấm.
 - Owner duyệt: lệnh trong chat vận hành 18/11/2026; hiệu lực khi Owner gộp
-- Ai soạn: nội dung do ghế Grok (xAI) soạn. `authored_by: Grok (xAI)` trong thân PR là lời khai đó. Commit `02e5d7e` có author và committer cùng tên `Grok (xAI)`, login `grok-xai`, không phải tài khoản chủ kho. Người mở PR #35 là login `tranngocthang12-gif`. Tên git author là chuỗi ghi trong commit; login mở PR là người bấm mở. Không cái nào trong hai cái đó tự chứng minh ai đã soạn câu chữ. Chủ kho giữ nút Merge.
+- Ai soạn: `authored_by: Grok (xAI)` là lời khai attribution — nội dung do ghế này soạn theo lệnh Owner. Lịch sử Git không xác nhận lời khai đó. Metadata commit chỉ chứng minh ai ghi commit lên Git. Commit `7ff741b5833179d597c8751d838e23aa5eecf427` (tạo ADR-0010, `requirements.txt`, `state/PROJECT_STATE.yaml`, `architecture/ARCHIVE.md`, `BOOT.md`, và sửa handoff): Git author và Git committer đều là `tranngocthang12-gif <tranngocthang12@gmail.com>`, GitHub map về login `tranngocthang12-gif`. Commit `02e5d7e` và `4641fcf`: author và committer tên `Grok (xAI)`, login `grok-xai`. Người mở PR #35 là login `tranngocthang12-gif`. Không cái nào trong các tên đó tự chứng minh ai soạn câu chữ. Không sửa tác giả các commit đã đẩy. Chủ kho giữ nút Merge.
 
 ## Quyết định
 1. **Ghế thi công là Grok (xAI).** Không phải MINH TRÍ. Owner lập ghế ngày 18/11/2026. Ghế được: chép nguồn, viết ghi chú, mệnh đề, mã công cụ theo đặc tả, mở PR. Ghế không được: gộp `main`, sửa `governance/LAWS.md`, mở API, chạm `engine/` ngoài một lệnh riêng, tự chấm PR của mình, điền `OWNER_MISSION` hay `GOVERNOR_POLICY`. Quyết định 9 của ADR-0003 giữ nguyên chữ đã chấm ("ghế thi công chưa lập"). ADR này không thêm câu vào tệp đó. Từ khi ADR này có hiệu lực, chỗ "chưa lập" được đọc cùng quyết định 1. Văn bản đang hiệu lực (ARCHITECTURE, thiết kế v0.2, bàn giao) sửa cho khớp quyết định 1.
@@ -31,4 +31,4 @@ Bản rà soát 18/11/2026 đo đúng sổ trống và một phần giấy tờ 
 - Ghim `requirements.txt`: nếu CI Python 3.12 không cài được đúng số đã ghim, nới bằng PR riêng có ghế khác chấm. Không trả về ràng buộc mở kiểu `pandas>=2.1`. Đổi số pin, kể cả nâng lại pandas 3, cũng là PR riêng — PR này không làm.
 
 ## Ảnh hưởng tới ARCHITECTURE.md
-Dòng trạng thái; §2; §3 (kênh); §5 (tiêu đề và đường dẫn); §7 (một ô chi phí); §8 (một đoạn về hai đồng hồ, không biến ADR-0002 thành biên bản cột 3 tuần); §10.
+Dòng trạng thái; §2; §3 (kênh); §4.3 (một câu trỏ ADR-0009: giá dẫn xuất có phiên bản, nguồn gốc và cách hoàn tác, không sửa raw của ADR-0006; điều 7 chưa cho đổi `engine/adjust.py`, `data.sources`, chưa bật SSI/DNSE); §5 (tiêu đề và đường dẫn); §7 (một ô chi phí); §8 (một đoạn về hai đồng hồ, không biến ADR-0002 thành biên bản cột 3 tuần); §10.

@@ -62,6 +62,7 @@ Cùng ngày, cùng câu hỏi; phiên Claude mới không dự án, không tệp
 ### 4.3 Engine định lượng = đối chứng âm
 Giữ nguyên mã; chạy hằng tuần thay vì hằng ngày (thứ Sáu, từ v3.0.2); đóng băng không gian giả thuyết (13 feature × 3 mô hình × VN30); thêm Deflated Sharpe và sổ đăng ký thử `research/trial_registry.jsonl` (đã làm v3.0.2: mỗi lần thử đăng ký có hash chuỗi và được đẩy lên `main` trước khi chạy, lần thử bỏ dở vẫn được đếm, kết quả chỉ-ghi-thêm có neo lịch sử, CI đối chiếu); giả thuyết mới chỉ chạy khi đã đăng ký trước. Kho dữ liệu đổi sang ghi tăng dần (append) để git không phình (C2 — đã làm, ADR-0006: kho cũ đóng băng, dòng mới nối vào tệp tháng, kiểm toán bắt mọi lần viết lại). Benchmark ghi rõ là "bình quân đều VN30 hiện tại", không gọi là VN-Index (C6).
 ADR-0008: báo cáo gắn nhãn thiên lệch sống sót khi danh sách là VN30 hiện tại; giấy không khớp ở phiên khóa trần/sàn; báo cáo có sụt giảm lớn nhất (backtest và NAV giấy).
+ADR-0009: bản giá dẫn xuất có phiên bản, nguồn gốc và cách hoàn tác; không sửa kho giá gốc của ADR-0006. Điều 7 chưa cho đổi `engine/adjust.py`, `data.sources`, và chưa bật SSI/DNSE.
 
 ## 5. Nửa HỌC (Thư viện + Học viện) — ghế thi công, không phải MINH TRÍ
 
