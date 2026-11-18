@@ -5,6 +5,12 @@
 - Hash từng trang tính cả bảng, không chỉ đoạn văn. `page_crosscheck()` không phải biên bản đối chiếu PDF. `SOURCED` và ghi chú `CITED`/`TESTED`/`PROVEN` cần thêm `pdf_check` gắn đúng hash `text.md` và hash PDF, do ghế khác người đọc ghi chú. Máy không đọc ảnh trang.
 - Luật Kế toán 88/2015: nếu khai tệp gốc thì chỉ nhận SHA-256 `1fd9336a…cca50`, 2566253 byte, 35 trang. Kho này chưa ghim PDF và hàng đợi vẫn `QUEUED`.
 
+## v3.0.7c — 2026-11-18 (PR-C, giấy tờ) — Grok (xAI) soạn; ADR-0013 PROPOSED; chưa gộp
+- §8 khớp sáu dự báo F-37–F-42 và pha `V3_G0_DAT_DIEU_KIEN_KY_THUAT`. Không hủy cột dừng/đảo 3 tuần và không dời mốc ADR-0002.
+- Header ADR-0010 và dòng danh mục chuyển ACCEPTED theo PR #35 đã gộp (merge `400de577`). Quyết định 1–7 không viết lại.
+- Ghi phạm vi phép thử: cả bộ TTC so với Claude trần, không đo riêng Thư viện. Báo cáo tương lai tách câu trả lời ghế B khỏi phần biểu mẫu. “Sau sáu tháng” là mốc xem xét. Không sửa `SAFETY_STATE.yaml`, không sửa Ledger, không sửa mẫu 194.
+- Ruleset `Protect main history` chỉ có cấm xóa nhánh và cấm force-push. Không gọi PR #43 là vi phạm L-09. Không yêu cầu Owner bật required status checks: `ledger_intake.yml` và `resolution_intake.yml` đẩy thẳng `main`, chưa chứng minh rule đó vẫn cho đẩy. Việc này chờ quyết định riêng.
+
 
 ## v3.0.6 — 2026-11-18 (ghế thi công; sửa giấy tờ) — nội dung do Grok (xAI) soạn theo lệnh Owner; ADR-0010; Owner gộp sau L-09
 - **Ai soạn:** `authored_by: Grok (xAI)` là lời khai attribution, không phải kết luận của lịch sử Git. Commit `7ff741b5833179d597c8751d838e23aa5eecf427` (tạo ADR-0010, `requirements.txt`, `state/PROJECT_STATE.yaml`, `architecture/ARCHIVE.md`, `BOOT.md`, sửa handoff): Git author và Git committer đều `tranngocthang12-gif <tranngocthang12@gmail.com>`, login `tranngocthang12-gif`. Commit `02e5d7e` và `4641fcf`: author và committer `Grok (xAI)`, login `grok-xai`. Metadata chỉ chứng minh ai ghi commit lên Git. Không sửa tác giả commit đã đẩy.

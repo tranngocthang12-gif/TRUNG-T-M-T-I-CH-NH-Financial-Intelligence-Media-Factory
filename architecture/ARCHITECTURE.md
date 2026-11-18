@@ -47,6 +47,8 @@ Thêm (từ nghiên cứu 2025–2026): (4) **thời điểm**: mọi kiểm đ�
 
 Kênh, ba lớp đã có, không đặt lớp mới (ADR-0010 quyết định 6): lệnh vẫn là Gmail `[TTC] #N — …` (kết `Dừng.`) → `BAO CAO [TTC] #N` như `governance/ARCHITECT_HANDOFF_20261022.md` mục 2, Owner chưa thu hồi. Đưa tệp lên `main` là PR + L-09 + Owner bấm Merge (ADR-0003 quyết định 6). Tên nhánh `hoc-hieu` trong thiết kế v0.2 mục 9 là mặc định Claude chọn, chưa phải lệnh Owner. Tệp cho Claude: kho công khai đọc thẳng, hoặc ZIP nhánh.
 
+ChatGPT (OpenAI) có thể soạn chữ một PR khi được giao. Đó là người viết, không phải ghế thi công và không có quyền trên Owner. Ghế thi công là Grok (xAI) theo ADR-0010 quyết định 1. Phản biện độc lập phải là nhà cung cấp khác người viết (L-09). Không lập ghế nào đứng trên Owner (ADR-0013).
+
 ## 4. Nửa CHỨNG MINH
 
 ### 4.1 Prediction Ledger không cần API
@@ -54,10 +56,14 @@ Kênh, ba lớp đã có, không đặt lớp mới (ADR-0010 quyết định 6)
 2. Owner dán vào GitHub Issue mẫu **Forecast**; trường `seat` = `A` hoặc `B`. Chỉ Issue do Owner mở, nhận lúc mở; mỗi ghế một dự báo cho một câu hỏi; ghế B kèm `prompt_hash` của prompt chuẩn (ADR-0003).
 3. GitHub Actions kiểm schema, chép vào `ledger/predictions.jsonl` kèm `issue_created_at` (giờ máy chủ GitHub), `sha256` của nội dung và hash chuỗi (mỗi dòng chứa hash dòng trước). Dự báo thiếu nguồn giải quyết hoặc ghi sau `resolve_at` bị loại tự động; câu hỏi đã có kết quả trong sổ thì không nhận thêm dự báo. Workflow đăng hash của dòng vừa ghi thành bình luận của `github-actions[bot]` trên Issue (dấu nhận); CI đối chiếu từng dòng sổ với dấu nhận đó và chạy lại luật nhận trên mọi dòng (ADR-0003 mục 7).
 4. Phân định (ADR-0003): tới `resolve_at`, Owner hoặc ghế khác nhà cung cấp đọc nguồn và mở Issue mẫu **Resolution** (mã dự báo, YES/NO/VOID, nguồn, trích nguyên văn, người phân định); `resolution_intake.yml` kiểm (đúng hạn, một câu hỏi một sự thật, không phân định lại, người phân định khác ghế với mọi người viết, mọi đường dẫn nguồn có máy chủ thuộc tên miền đã hứa) và ghi `ledger/resolutions.jsonl`; một Issue phân định chỉ ghi kết quả cho dự báo mở trước nó; VOID (hủy câu hỏi) cũng chỉ ghi được khi tới hạn. Sổ chỉ nhận dòng từ Issue: đường để engine tự ghi và tự chấm dự báo giá (`excess_return_positive`, mã `P-…`) đóng cho tới khi có ADR kèm cơ chế bằng chứng xuất xứ (ADR-0003 quyết định 11).
-5. Scorecard theo ghế: Brier, hiệu chuẩn theo nhóm, n; **tập bất đồng A–B** và độ đúng của A trên tập đó; tỷ lệ bất đồng (dưới 10% nghĩa là thư viện chưa đổi gì).
+5. Scorecard theo ghế: Brier, hiệu chuẩn theo nhóm, n; **tập bất đồng A–B** và độ đúng của A trên tập đó; tỷ lệ bất đồng (dưới 10% nghĩa là bộ máy TTC chưa khác Claude trần; không đo riêng Thư viện — ADR-0002, ADR-0013).
 
 ### 4.2 Nhóm đối chứng B
 Cùng ngày, cùng câu hỏi; phiên Claude mới không dự án, không tệp; prompt chuẩn trong `governance/CONTROL_B_PROMPT.md` (có hash, đổi phải qua ADR; các phiên bản đã có hiệu lực ghim theo ngày trong `governance/control_b_prompts.jsonl`). Mục tiêu cỡ mẫu: ~194 bất đồng đã chấm để phát hiện A đúng 60% so với 50% (độ mạnh 80%, α 0,05 hai phía; phán quyết chốt trên đúng 194 cặp bất đồng đầu tiên theo số Issue hoàn tất cặp, chỉ ra khi cả 194 cặp đã phân định hoặc VOID, không xem lại trên mẫu lớn dần; cặp VOID tính theo hướng bất lợi cho kết luận đang xét — ADR-0003 quyết định 3, ADR-0004; câu hỏi `event_before_date` không vào phép thử vì ghế A được tìm web — ADR-0002); với tỷ lệ bất đồng ~25% cần ~800 câu, nên câu hỏi phải nhỏ, giải nhanh (tháng/quý), lấy từ BCTC và dữ liệu NHNN.
+
+Phép thử đang chạy đo cả bộ TTC so với Claude trần, không đo riêng Thư viện: ghế A là Claude trong Project (quy trình, tìm web, và thư viện khi có); ghế B là Claude trần (ADR-0002, ADR-0013). Báo cáo sau này được phép đếm thêm một lớp theo `library_refs` của dòng ghế A (có dẫn thư viện hay không). Không có trường đó thì ghi "không khai mức dùng thư viện"; không được suy mức dùng thư viện từ tên ghế. Lớp đếm này không đổi mẫu 194 cặp trong `engine/ledger.py`.
+
+Báo cáo tương lai tách hai lớp ghế B: câu trả lời của ghế B, và phần biểu mẫu do người khác hoàn thiện khi dán Issue. Không viết lại Ledger. F-38, F-40 và F-42 đã có câu trong `invalidation_conditions`: phần hoàn thiện biểu mẫu theo lệnh G0 của Owner, không phải lời trả lời nguyên văn của ghế B. Báo cáo dẫn câu đó.
 
 ### 4.3 Engine định lượng = đối chứng âm
 Giữ nguyên mã; chạy hằng tuần thay vì hằng ngày (thứ Sáu, từ v3.0.2); đóng băng không gian giả thuyết (13 feature × 3 mô hình × VN30); thêm Deflated Sharpe và sổ đăng ký thử `research/trial_registry.jsonl` (đã làm v3.0.2: mỗi lần thử đăng ký có hash chuỗi và được đẩy lên `main` trước khi chạy, lần thử bỏ dở vẫn được đếm, kết quả chỉ-ghi-thêm có neo lịch sử, CI đối chiếu); giả thuyết mới chỉ chạy khi đã đăng ký trước. Kho dữ liệu đổi sang ghi tăng dần (append) để git không phình (C2 — đã làm, ADR-0006: kho cũ đóng băng, dòng mới nối vào tệp tháng, kiểm toán bắt mọi lần viết lại). Benchmark ghi rõ là "bình quân đều VN30 hiện tại", không gọi là VN-Index (C6).
@@ -78,7 +84,7 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 
 - `governance/LAWS.md` (L-01…L-10) là luật vận hành; `GATES.md`, `SAFETY_STATE.yaml`, thang vốn 0–6 giữ nguyên; mọi công tắc tiền/API vẫn `false`.
 - Kho công khai: không commit vốn thật, mức lỗ chịu được, nhu cầu rút tiền, vị thế thật, định danh (L-03). OWNER_MISSION chỉ ghi phạm vi, khung thời gian, nguyên tắc.
-- Không khuyến nghị mua/bán mã cụ thể; chỉ dự báo xác suất về sự kiện và chỉ tiêu (L-02). Media OS hoãn ≥ 6 tháng, chỉ mở sau ý kiến luật sư và khi Ledger có ≥ 194 bất đồng đã chấm.
+- Không khuyến nghị mua/bán mã cụ thể; chỉ dự báo xác suất về sự kiện và chỉ tiêu (L-02). Media OS: “sau sáu tháng” là mốc xem xét, không phải cam kết đạt 194 bất đồng. Chỉ cân nhắc mở sau ý kiến luật sư và khi Ledger có ≥ 194 bất đồng đã chấm. PR này không sửa `governance/SAFETY_STATE.yaml`.
 - Firewall Media/Investment giữ như v1.0, và `tools/validate.py` phải kiểm thật (B6).
 
 ## 7. Runtime và chi phí
@@ -89,7 +95,7 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 | Ghi chú, mệnh đề, mã công cụ | Ghế thi công: lệnh theo handoff mục 2 (Gmail), lên `main` bằng PR | gói thuê bao |
 | Thiết kế, chấm, ra đề | Claude trong Project (gói Max) | gói thuê bao |
 | Nhóm B | Phiên Claude trần | gói thuê bao |
-| API trả phí | **không mở** trong 6 tháng | 0 |
+| API trả phí | **không mở** cho tới mốc xem xét sau 6 tháng | 0 |
 
 ## 8. Lộ trình có điều kiện thoát
 
@@ -99,9 +105,9 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 | G1 (tháng 1–2) | ≥ 40 tài liệu gốc có hash; ≥ 60 dự báo A+B | tỷ lệ bất đồng đo được; 100% dự báo có nguồn giải quyết | < 20 dự báo/tháng → hạ độ khó câu hỏi |
 | G2 (tháng 2–4) | mệnh đề kế toán ngân hàng; đề kín ≥ 150 câu; sổ điểm | A ≥ 80% đề kín với trích dẫn kiểm được; ≥ 30 dự báo chỉ tiêu BCTC quý | trích dẫn sai > 5% → sửa retrieval theo từng tài liệu |
 | G3 (tháng 4–6) | thống kê, vĩ mô truyền dẫn, luật thị trường; DSR vào engine | ≥ 150 dự báo đã chấm; báo cáo hiệu chuẩn đầu tiên | Brier A tệ hơn B có ý nghĩa → kiểm lại thư viện |
-| G4 (sau 6 tháng) | báo cáo đánh giá | chỉ cân nhắc API/Media khi ≥ 194 bất đồng đã chấm | — |
+| G4 (mốc xem xét sau 6 tháng, không phải hạn phải đủ 194) | báo cáo đánh giá | chỉ cân nhắc API/Media khi đã tới mốc xem xét và Ledger có ≥ 194 bất đồng đã chấm; 194 là điều kiện cân nhắc, không phải sản lượng cam kết | chưa đủ 194 tại mốc không tự động là thất bại của mốc |
 
-G0 chưa thoát. Cột thoát ("Action xanh trên 3 dự báo thử") chưa đạt: sổ chưa có dự báo thử. Cột dừng/đảo ("quá 3 tuần → chỉ giữ Ledger") đã quá hạn nếu tính từ 22/10/2026 hoặc từ ngày gộp 24/10/2026. Không có biên bản Owner bác riêng nhánh đó vào ngày 17/11/2026. Việc đang lưu là ADR-0002 (PR #29, cùng ngày): không thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001; mốc xét lại 31/03/2027. Đó là kết luận từ quyết định đã lưu, không phải bằng chứng trực tiếp về cột 3 tuần. Hai đồng hồ không phải một luật. `state/PROJECT_STATE.yaml` ghi pha `V3_G0_CHUA_THOAT` cho tới khi có 3 dự báo thử đi qua Action xanh. Dời mốc 31/03/2027 thêm lần nữa phải bằng ADR mới nêu bằng chứng đã đổi, không bằng sửa ngày trong ADR-0002 (ADR-0010).
+G0 đã đạt điều kiện kỹ thuật ngày 18/11/2026, chưa phải G1. Sổ có sáu dự báo F-37–F-42, ba cặp A/B (CPI, IIP, bán lẻ), mỗi cặp cùng câu hỏi và cùng ngày theo giờ Việt Nam; cả sáu có dấu nhận robot khớp hash. `state/PROJECT_STATE.yaml` ghi `V3_G0_DAT_DIEU_KIEN_KY_THUAT`. Thư viện vẫn 0/40. Việc này không hủy cột dừng/đảo (“quá 3 tuần → chỉ giữ Ledger”): cột đó đã quá hạn nếu tính từ 22/10/2026 hoặc từ ngày gộp 24/10/2026. Không có biên bản Owner bác riêng nhánh đó vào ngày 17/11/2026. Việc đang lưu vẫn là ADR-0002 (PR #29): không thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001; mốc xét lại 31/03/2027. Đó không phải bằng chứng trực tiếp về cột 3 tuần. Hai đồng hồ không phải một luật. Ghi nhận điều kiện kỹ thuật của G0 không dừng đồng hồ 3 tuần và không dời mốc 31/03/2027. Quyết định 2 của ADR-0010 giữ nguyên chữ đã chấm, kể cả câu pha cũ trong quyết định đó; pha hiện tại đọc ở `PROJECT_STATE.yaml` và ở đoạn này (ADR-0013). Dời mốc 31/03/2027 phải bằng ADR mới, không bằng sửa ngày trong ADR-0002.
 
 Không có trong lộ trình: tiền thật; cấp vốn 4+ chỉ xét khi G3 cho alpha có ý nghĩa và Owner quyết.
 
