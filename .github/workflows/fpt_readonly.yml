@@ -1,0 +1,26 @@
+name: FPT Readonly Analysis
+on:
+  push:
+    branches:
+      - analysis/fpt-readonly-20261118
+permissions:
+  contents: read
+jobs:
+  fpt:
+    name: FPT read-only historical analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install pinned requirements
+        run: pip install -r requirements.txt
+      - name: Analyze stored FPT prices, no fetch and no mutation
+        run: python -m tools.fpt_readonly_report
+      - name: Confirm repository remains unchanged
+        run: test -z "$(git status --porcelain)"
