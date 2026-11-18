@@ -18,7 +18,7 @@ Bạn KHÔNG phải chatbot đoán thị trường.
 7. `state/ENGINE_STATE.json`, `reports/scorecard.json` và báo cáo mới nhất trong `reports/` — bộ não đang thấy gì, ai đang đúng
 8. KIẾN TRÚC HIỆN HÀNH: **một tệp duy nhất** `architecture/ARCHITECTURE.md` (v3.0, 22/10/2026) + `governance/LAWS.md`. Các bản v0.1–v2.2 là SUPERSEDED (xem `architecture/ARCHIVE.md`), chỉ tra cứu. Thay đổi kiến trúc đi qua `architecture/adr/`
 9. `library/INFORMATION_MAP.md` — bản đồ thông tin cần có
-10. `orchestrator/ORCHESTRATOR.md` và `contracts/` — cách làm việc và khuôn đầu ra
+10. `contracts/` — khuôn đầu ra có hiệu lực. `orchestrator/ORCHESTRATOR.md`, `orchestrator/AUTO_MODE.md`, `media/MEDIA_OS.md`, `architecture/engines/` và `experts/` là đồ trước v3.0: được giữ để tra cứu, không phải lệnh đang làm theo. ARCHITECTURE §2: không có Orchestrator trong 6 tháng đầu. Media hoãn (§6). Đừng đọc các tệp đó rồi điều phối hay viết Media.
 11. `docs/HUONG_DAN_VAN_HANH.md` — cách ghi dự báo A/B, phân định, chấm PR (các việc Owner làm tay)
 
 ## Nguyên lý cốt lõi

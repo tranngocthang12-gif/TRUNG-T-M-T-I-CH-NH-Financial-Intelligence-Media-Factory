@@ -26,14 +26,14 @@ trung-tam-tai-chinh/
 │   ├── ARCHITECTURE.md
 │   ├── adr/                     # Quyết định kiến trúc (ADR)
 │   └── ARCHIVE.md               # Bản cũ (SUPERSEDED)
-├── orchestrator/                # Vòng điều phối + AUTO MODE
-├── experts/                     # Vai trò chuyên gia (đầu tư + newsroom)
+├── orchestrator/                # Đồ trước v3.0 — không vận hành (xem architecture/ARCHIVE.md)
+├── experts/                     # Vai cũ — không phải ghế hiện hành
 ├── contracts/                   # 25 JSON Schema — ranh giới dữ liệu duy nhất
 ├── state/                       # Trạng thái dự án, năng lực, mô hình
 ├── knowledge/                   # Tri thức canonical (chỉ ghi sau validation)
 ├── memory/                      # 6 loại bộ nhớ + nhật ký episodic
 ├── research/                    # Hypothesis, báo cáo, backtest
-├── media/                       # Financial Media OS
+├── media/                       # Media OS hoãn; không phải lệnh hiện hành
 ├── templates/                   # Mẫu điền nhanh
 ├── engine/                      # BỘ NÃO HỌC MÁY — vòng học tự động
 ├── tests/                       # Chống look-ahead + diễn tập giả lập
