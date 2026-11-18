@@ -5,9 +5,11 @@ Quy ước trên đĩa (library/sources/README.md):
 - library/sources/<doc_id>/text.md: văn bản thuần. Dòng "[p<N>]" mở trang N. Trong trang, đoạn cách nhau bởi dòng trống,
   đánh số 1, 2, … theo thứ tự. Dòng "[t<N>]" mở bảng N: các dòng bắt đầu bằng "|" ngay sau đó là bảng markdown;
   dòng đầu là tiêu đề, dòng "|---" bỏ qua, dòng dữ liệu đánh số 1, 2, … Bảng không tính là đoạn.
-- library/SOURCE_MANIFEST.json "files"[<doc_id>]: sha256 + bytes của text.md, issuer, issued_on, accessed_on, source_url,
+- library/SOURCE_MANIFEST.json "files"[<doc_id>]: sha256 + bytes của text.md (không phải của PDF), issuer, issued_on, accessed_on, source_url,
   data_source (tên trong governance/DATA_SOURCES.yaml, không được là nguồn "forbidden"), legal_status, license,
-  kind, effective_from, effective_to, superseded_by. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
+  kind, effective_from, effective_to, superseded_by. Khi khai tệp gốc thì thêm original_sha256, original_bytes,
+  original_path, text_sha256, text_bytes — text_* phải trùng sha256/bytes, original_* phải khác và trỏ tới tệp
+  trong cùng thư mục, không phải text.md (ADR-0012). BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
   sổ của kỳ) và published_on (ngày CÔNG BỐ công khai — ngày đầu tiên thị trường biết số liệu); số liệu chỉ được dùng từ
   published_on (usable_on), không phải từ period_end.
 - library/notes/<KN-id>.json: KNOWLEDGE_NOTE theo contracts/knowledge_note.schema.json.
@@ -44,6 +46,15 @@ AUDIT_VERDICT_FOR = {"CITED": "PASS", "DISPUTED": "FAIL"}     # TESTED/PROVEN: d
 ADDR_RE = re.compile(r"^([a-z0-9_-]+):(p|t)([0-9]+):([0-9]+)$")
 MANIFEST_KEYS = ["sha256", "bytes", "issuer", "issued_on", "accessed_on", "source_url", "data_source", "legal_status",
                  "license", "kind", "effective_from", "effective_to", "superseded_by"]
+# sha256/bytes luôn là text.md. ORIGINAL_KEYS chỉ bắt buộc khi dòng khai một trường gốc hoặc crosscheck (ADR-0012).
+ORIGINAL_KEYS = ("original_sha256", "original_bytes", "original_path", "text_sha256", "text_bytes")
+KNOWN_ORIGINALS = {
+    "luat_ke_toan_88_2015": {
+        "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50",
+        "original_bytes": 2_566_253,
+        "pages": 35,
+    },
+}
 
 
 def _norm(s):
@@ -133,6 +144,139 @@ def _expired(entry, today):
     return bool(to) and to < today
 
 
+def claims_original(entry) -> bool:
+    """True khi dòng manifest khai bất kỳ trường tệp gốc hoặc biên bản đối chiếu trang."""
+    if not isinstance(entry, dict):
+        return False
+    return any(k in entry for k in ORIGINAL_KEYS) or "crosscheck" in entry
+
+
+def _sha256_hex(v) -> bool:
+    return isinstance(v, str) and re.fullmatch(r"[0-9a-f]{64}", v) is not None
+
+
+def _pos_int(v) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and v > 0
+
+
+def original_file(root, doc_id, rel):
+    """→ (Path|None, lỗi|None). Đường dẫn tương đối, trong library/sources/<doc_id>/, không phải text.md."""
+    rel = str(rel or "").strip().replace("\\", "/")
+    if not rel or rel.startswith("/") or rel.startswith("~"):
+        return None, "đường dẫn tệp gốc không được tuyệt đối"
+    if ".." in pathlib.PurePosixPath(rel).parts:
+        return None, "đường dẫn tệp gốc không được chứa .."
+    prefix = f"library/sources/{doc_id}/"
+    if not rel.startswith(prefix) or rel == prefix + "text.md" or rel.endswith("/text.md"):
+        return None, "đường dẫn tệp gốc phải nằm trong library/sources/<doc_id>/ và không được là text.md"
+    root = pathlib.Path(root).resolve()
+    path = (root / rel).resolve()
+    try:
+        path.relative_to((root / LIB / "sources" / doc_id).resolve())
+    except ValueError:
+        return None, "đường dẫn tệp gốc thoát khỏi thư mục tài liệu"
+    return path, None
+
+
+def _page_set_ok(pages, total) -> bool:
+    return isinstance(pages, dict) and _pos_int(total) and set(pages) == set(range(1, total + 1))
+
+
+def crosscheck_complete(entry, pages) -> bool:
+    """Đối chiếu từng trang đủ mới đúng. Khớp hash một mình không bao giờ đủ."""
+    cc = entry.get("crosscheck") if isinstance(entry, dict) else None
+    if not isinstance(cc, dict) or cc.get("method") != "page-by-page":
+        return False
+    checked, total = cc.get("pages_checked"), cc.get("pages_total")
+    return _pos_int(checked) and checked == total and _page_set_ok(pages, total)
+
+
+def may_mark_sourced(entry, pages, doc_id=None) -> bool:
+    """True chỉ khi tệp gốc được ghim riêng và mọi trang đã phân tích đã được đối chiếu.
+    Không đọc đĩa. Hash khớp không phải bằng chứng chép đúng, nên thiếu crosscheck thì False."""
+    if not isinstance(entry, dict) or not claims_original(entry):
+        return False
+    if not (_sha256_hex(entry.get("original_sha256")) and _sha256_hex(entry.get("text_sha256"))
+            and _sha256_hex(entry.get("sha256"))):
+        return False
+    if entry.get("original_sha256") in (entry.get("sha256"), entry.get("text_sha256")):
+        return False
+    if entry.get("text_sha256") != entry.get("sha256") or entry.get("text_bytes") != entry.get("bytes"):
+        return False
+    if not (_pos_int(entry.get("original_bytes")) and _pos_int(entry.get("text_bytes"))):
+        return False
+    known = KNOWN_ORIGINALS.get(doc_id or "")
+    if known:
+        if entry.get("original_sha256") != known["original_sha256"] or entry.get("original_bytes") != known["original_bytes"]:
+            return False
+        if (entry.get("crosscheck") or {}).get("pages_total") != known["pages"]:
+            return False
+        if (entry.get("crosscheck") or {}).get("pages_checked") != known["pages"]:
+            return False
+    return crosscheck_complete(entry, pages)
+
+
+def origin_binding_errors(root, doc_id, entry, text_bytes) -> list[str]:
+    """Rỗng nếu dòng không khai tệp gốc, hoặc khai đủ và byte khớp. Không suy ra SOURCED."""
+    if not claims_original(entry):
+        return []
+    errs, prefix = [], f"L-01: {doc_id}"
+    missing = [k for k in ORIGINAL_KEYS if entry.get(k) in (None, "")]
+    if missing:
+        return [f"{prefix}: khai nguồn gốc thì phải có đủ original_sha256, original_bytes, original_path, "
+                f"text_sha256, text_bytes; đang thiếu {missing}"]
+    if not _sha256_hex(entry.get("text_sha256")) or not _pos_int(entry.get("text_bytes")):
+        errs.append(f"{prefix}: text_sha256 phải là 64 hex thường và text_bytes là số nguyên dương — hash của text.md, không phải PDF")
+    elif entry.get("text_sha256") != entry.get("sha256") or entry.get("text_bytes") != entry.get("bytes"):
+        errs.append(f"{prefix}: text_sha256/text_bytes phải trùng sha256/bytes của text.md")
+    text_hash = hashlib.sha256(text_bytes).hexdigest()
+    if entry.get("text_sha256") != text_hash or entry.get("text_bytes") != len(text_bytes):
+        errs.append(f"{prefix}: text.md lệch text_sha256/text_bytes (không dùng hash này cho tệp gốc)")
+    if not _sha256_hex(entry.get("original_sha256")) or not _pos_int(entry.get("original_bytes")):
+        errs.append(f"{prefix}: original_sha256 phải là 64 hex thường và original_bytes là số nguyên dương")
+    if entry.get("original_sha256") in (entry.get("sha256"), entry.get("text_sha256"), text_hash):
+        errs.append(f"{prefix}: hash text.md không được dùng làm hash tệp gốc")
+    known = KNOWN_ORIGINALS.get(doc_id)
+    if known and (entry.get("original_sha256") != known["original_sha256"] or entry.get("original_bytes") != known["original_bytes"]):
+        errs.append(f"{prefix}: không khớp bản gốc đã công bố (SHA-256 {known['original_sha256']}, "
+                    f"{known['original_bytes']} byte, {known['pages']} trang)")
+    path, why = original_file(root, doc_id, entry.get("original_path"))
+    if why:
+        errs.append(f"{prefix}: {why}")
+    elif not path.is_file():
+        errs.append(f"{prefix}: thiếu tệp gốc {entry.get('original_path')}")
+    else:
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != entry.get("original_sha256") or len(raw) != entry.get("original_bytes"):
+            errs.append(f"{prefix}: tệp gốc lệch original_sha256/original_bytes (đã đổi nội dung hoặc sửa metadata)")
+        if raw == text_bytes:
+            errs.append(f"{prefix}: tệp gốc trùng byte text.md — không phải hai ghim riêng")
+    cc = entry.get("crosscheck", None)
+    if "crosscheck" in entry:
+        if not isinstance(cc, dict):
+            errs.append(f"{prefix}: crosscheck phải là đối tượng method, pages_checked, pages_total")
+        else:
+            checked, total = cc.get("pages_checked"), cc.get("pages_total")
+            if cc.get("method") not in (None, "page-by-page"):
+                errs.append(f"{prefix}: crosscheck.method chỉ được là page-by-page")
+            if checked is not None and not _pos_int(checked):
+                errs.append(f"{prefix}: crosscheck.pages_checked phải là số nguyên dương")
+            if total is not None and not _pos_int(total):
+                errs.append(f"{prefix}: crosscheck.pages_total phải là số nguyên dương")
+            if _pos_int(checked) and _pos_int(total) and checked != total:
+                errs.append(f"{prefix}: pages_checked {checked} khác pages_total {total} — chưa đối chiếu đủ trang")
+            if known and total not in (None, known["pages"]):
+                errs.append(f"{prefix}: pages_total phải là {known['pages']} — chưa đối chiếu đủ {known['pages']} trang thì không ghi nhận")
+            if _pos_int(total):
+                try:
+                    pages, _tables = parse_text(text_bytes.decode("utf-8"))
+                except UnicodeError:
+                    pages = {}
+                if not _page_set_ok(pages, total):
+                    errs.append(f"{prefix}: text.md không có đủ trang 1..{total} để đối chiếu")
+    return errs
+
+
 def check_manifest(root):
     """L-01/L-04/L-08: mọi tài liệu trong library/sources đều được ghim, đúng sha256/bytes, đủ trường, nguồn được phép."""
     root = pathlib.Path(root)
@@ -175,7 +319,11 @@ def check_manifest(root):
         if hashlib.sha256(b).hexdigest() != e.get("sha256") or len(b) != e.get("bytes"):
             errs.append(f"L-01: library/sources/{doc_id}/text.md lệch sha256/bytes đã ghim (tài liệu gốc không được sửa)")
             continue
-        docs[doc_id] = parse_text(b.decode("utf-8"))
+        errs.extend(origin_binding_errors(root, doc_id, e, b))
+        try:
+            docs[doc_id] = parse_text(b.decode("utf-8"))
+        except UnicodeError:
+            errs.append(f"L-01: library/sources/{doc_id}/text.md không phải UTF-8")
     return errs, docs, man
 
 
@@ -337,6 +485,13 @@ def check_library(root=REPO, today=None):
                 warns.append(f"reading_queue: {d} ghi {st} nhưng chưa có trong SOURCE_MANIFEST.json")
             if st == "NOTE_WRITTEN" and d not in noted:
                 warns.append(f"reading_queue: {d} ghi NOTE_WRITTEN nhưng chưa có ghi chú nào dẫn tài liệu này")
+            if st == "SOURCED":
+                pages = (docs.get(d) or ({}, {}))[0]
+                if not may_mark_sourced(man.get(d) or {}, pages, d):
+                    errs.append(f"L-01: reading_queue {d} ghi SOURCED khi chưa đối chiếu đủ từng trang với tệp gốc "
+                                "(hash khớp không phải bằng chứng chép đúng)")
+                elif origin_binding_errors(root, d, man[d], (root / LIB / "sources" / d / "text.md").read_bytes()):
+                    errs.append(f"L-01: reading_queue {d} ghi SOURCED nhưng tệp gốc hoặc metadata không khớp ghim")
     index = (root / LIB / "INDEX.md").read_text(encoding="utf-8") if (root / LIB / "INDEX.md").is_file() else ""
     for p in notes:
         if p.stem not in index:
