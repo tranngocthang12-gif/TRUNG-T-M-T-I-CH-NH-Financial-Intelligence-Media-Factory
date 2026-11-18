@@ -11,6 +11,7 @@ import json, os, pathlib, shutil, subprocess, sys, tempfile, textwrap, unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.ledger_intake import control_b_hash  # noqa: E402
+from tests._calendar_fixture import with_calendar, verified_ids  # noqa: E402,F401
 B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
 
 
@@ -21,7 +22,8 @@ def _form(seat, question, resolve_at="2099-02-15", p="0.25"):
               "invalidation_conditions": "Ngân hàng đổi cách phân loại nợ",
               "author_seat": "Claude Project TTC" if seat == "A" else "Claude trần",
               "model_cutoff": "2026-06", "library_refs": "_No response_" if seat == "B" else "KN-T2-vas-01",
-              "prompt_hash": B_HASH if seat == "B" else "_No response_"}
+              "prompt_hash": B_HASH if seat == "B" else "_No response_",
+              "info_lock_at": resolve_at}
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in fields.items())
 
 
@@ -41,6 +43,7 @@ class LedgerCompatTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _intake(self, number, body, created="2026-11-17T02:00:00Z"):
+        body = with_calendar(self.tmp, body)
         env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
                "TTC_INTAKE_NOW": created.replace(":00:00Z", ":01:00Z")}        # robot chạy một phút sau khi Issue mở
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")],

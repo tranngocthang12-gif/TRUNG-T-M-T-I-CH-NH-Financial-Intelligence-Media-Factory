@@ -7,7 +7,7 @@ của các Issue 'Forecast'/'Resolution': mỗi dòng có Issue thật và dấu
 dự báo giá, engine tự chấm bằng giá) không có bằng chứng nào ngoài tệp về việc ai ghi và ghi lúc nào, nên tools/validate.py
 không nhận dòng nào như thế. Khi đóng: record() không ghi, resolve() không chấm, scorecard() không tính dòng engine.
 Mã của đường này được giữ (và test bằng thư mục tạm có cổng mở) để mở lại bằng ADR khi có cơ chế xuất xứ."""
-import hashlib, json, math, re, sys
+import hashlib, json, math, os, re, sys
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, REPO, path, save_json
 
@@ -235,7 +235,25 @@ def _same_day(a, b):
     except (KeyError, TypeError, ValueError):
         return False
 
-def issue_summary(all_rows, R):
+def _seat_scores(rows, outcome):
+    """Brier, Brier xác suất nền, Brier đồng xu, mean_p, hit_rate, hiệu chuẩn cho các dòng ĐÃ có kết quả YES/NO."""
+    ps = [float(p["p"]) for p in rows]; os_ = [outcome[p["id"]] for p in rows]
+    bs = []
+    for p in rows:
+        try: bs.append(min(1.0, max(0.0, float(p.get("base_rate", 0.5)))))
+        except (TypeError, ValueError): bs.append(0.5)
+    return {"n": len(rows), "brier": round(float(np.mean([(a - b) ** 2 for a, b in zip(ps, os_)])), 4),
+            "brier_base_rate": round(float(np.mean([(a - b) ** 2 for a, b in zip(bs, os_)])), 4),
+            "brier_coin": round(float(np.mean([(0.5 - b) ** 2 for b in os_])), 4),
+            "mean_p": round(float(np.mean(ps)), 3), "hit_rate": round(float(np.mean(os_)), 3),
+            "calibration": _calibration(ps, os_)}
+
+RAW_AUDIT_LABEL = ("SỐ LIỆU THÔ ĐỂ KIỂM TOÁN — KHÔNG PHẢI BẰNG CHỨNG NĂNG LỰC: gồm cả dự báo chưa chứng minh thời điểm "
+                   "(L-05, ADR-0011). Không trích các số này như điểm năng lực.")
+CAPABILITY_BASIS = ("Điểm năng lực (scores, a_correct, a_accuracy, disagreements_resolved, brier_void_worst) chỉ tính trên dự báo "
+                    "qua kiểm L-05: thời điểm đã chứng minh và xuất xứ lịch/bằng chứng đã được kiểm toán GitHub xác nhận.")
+
+def issue_summary(all_rows, R, pub_rows=None, calendar=None, verified=None, verification_source=None):
     """Chấm dự báo từ Issue theo ARCHITECTURE v3.0 §4.1 bước 5 và ADR-0003.
     Theo ghế: n, đã phân định, VOID, chờ; Brier, Brier của xác suất nền, hiệu chuẩn.
     Cặp A–B: cùng câu hỏi (question + resolve_at), ghi cùng ngày (giờ VN, §4.2). Bất đồng = hai ghế ở hai phía 0,5.
@@ -249,7 +267,9 @@ def issue_summary(all_rows, R):
     - Phạm vi phép thử (ADR-0002): câu hỏi có luật event_before_date KHÔNG vào phép thử A–B — ghế A được tìm web, ghế B
       thì không, nên với loại câu hỏi mà sự kiện có thể đã xảy ra trước khi hỏi, bất đồng không đo thư viện mà đo việc
       tìm web. Các cặp đó vẫn là cặp, vẫn vào tỷ lệ bất đồng và Brier theo ghế; số của chúng báo riêng.
-    - Chỉ ra phán quyết khi CẢ 194 cặp đó đã đóng (phân định YES/NO, hoặc VOID). Còn cặp chưa đóng → "CHƯA ĐỦ MẪU".
+    - Chỉ ra phán quyết khi CẢ 194 cặp đó đã đóng (phân định YES/NO, hoặc VOID) VÀ từng cặp trong mẫu đã chứng minh thời điểm.
+      Cặp after_publication, legacy_unproven, self_declared_lock hoặc không đủ bằng chứng thì không tạo phán quyết năng lực.
+      Mẫu không được thay bằng cặp sau cho đủ chỗ. Chưa đủ bằng chứng → "CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN".
     - VOID là một quyền chọn của người phân định (bỏ câu hỏi), nên mỗi cặp VOID trong mẫu được tính theo hướng BẤT LỢI cho
       kết luận đang xét: xét "A hơn B" thì coi A sai ở mọi cặp VOID; xét "B hơn A" thì coi A đúng ở mọi cặp VOID. Hủy một
       câu hỏi vì thế không bao giờ làm kết luận nào dễ đạt hơn.
@@ -257,7 +277,13 @@ def issue_summary(all_rows, R):
     Số và tỷ lệ VOID được báo riêng theo ghế, theo cặp và theo cặp bất đồng (khóa "void"). Brier theo ghế chỉ tính dự báo
     đã có kết quả YES/NO; vì hủy có chọn lọc làm đẹp được con số đó, khóa "void" in thêm cho mỗi ghế brier_void_worst:
     Brier trên mọi dự báo đã đóng, trong đó mỗi dự báo VOID tính như thể kết quả ngược với phía nó đứng (ADR-0004).
-    Phán quyết A–B chỉ dựa vào phép kiểm định chốt mẫu ở trên."""
+    Phán quyết A–B chỉ dựa vào phép kiểm định chốt mẫu ở trên.
+
+    Tách số liệu (lệnh sửa PR #45, lỗi 3): counts = số dự báo được ghi / có bằng chứng thời điểm hợp lệ / đã phân định /
+    đã phân định và hợp lệ. scores, a_correct, a_accuracy, disagreements_resolved và brier_void_worst chỉ tính trên dự báo
+    hợp lệ (tools.ledger_intake.capability_test_eligible với verified = tập mã đã được kiểm toán GitHub xác nhận; None →
+    không mã nào hợp lệ). Số tính trên toàn sổ nằm trong raw_audit, gắn nhãn RAW_AUDIT_LABEL. Mẫu 194, thứ tự khóa mẫu, luật
+    VOID và ngưỡng kiểm định không đổi."""
     R = [r for r in R if r.get("resolution_issue") is not None]   # dự báo Issue chỉ nhận kết quả từ Issue 'Resolution'
     done = {r.get("prediction_id") for r in R}
     outcome = {r.get("prediction_id"): int(r["outcome"]) for r in R if r.get("outcome") in (0, 1)}
@@ -271,20 +297,21 @@ def issue_summary(all_rows, R):
         if p["id"] in outcome: d["resolved"] += 1
         elif p["id"] in void_ids: d["void"] += 1
         elif p["id"] not in done: d["pending"] += 1
+    from tools.ledger_intake import VALID_TIMING, timing_verification_status
+    pubs, cals = pub_rows or [], calendar or []
+    status = {p["id"]: timing_verification_status(p, pubs, cals, verified) for p in issue}
+    valid = {i for i, st in status.items() if st in VALID_TIMING}
+    by_status = {}
+    for st in status.values():
+        by_status[st] = by_status.get(st, 0) + 1
+    scores, raw_scores = {}, {}
     for s in sorted(by_seat):
         rows = [p for p in issue if str(p["seat"]) == s and p["id"] in outcome]
-        if not rows:
-            continue
-        ps = [float(p["p"]) for p in rows]; os_ = [outcome[p["id"]] for p in rows]
-        bs = []
-        for p in rows:
-            try: bs.append(min(1.0, max(0.0, float(p.get("base_rate", 0.5)))))
-            except (TypeError, ValueError): bs.append(0.5)
-        scores[s] = {"n": len(rows), "brier": round(float(np.mean([(a - b) ** 2 for a, b in zip(ps, os_)])), 4),
-                     "brier_base_rate": round(float(np.mean([(a - b) ** 2 for a, b in zip(bs, os_)])), 4),
-                     "brier_coin": round(float(np.mean([(0.5 - b) ** 2 for b in os_])), 4),
-                     "mean_p": round(float(np.mean(ps)), 3), "hit_rate": round(float(np.mean(os_)), 3),
-                     "calibration": _calibration(ps, os_)}
+        if rows:
+            raw_scores[s] = _seat_scores(rows, outcome)
+        rows_ok = [p for p in rows if p["id"] in valid]
+        if rows_ok:
+            scores[s] = _seat_scores(rows_ok, outcome)
     by_q = {}
     for p in sorted(issue, key=lambda r: r.get("issue_number", 0)):
         by_q.setdefault(_qkey(p), {"A": [], "B": []})[str(p["seat"])].append(p)
@@ -304,7 +331,10 @@ def issue_summary(all_rows, R):
     is_res = lambda ab: ab[0]["id"] in resolved_ids and not is_void(ab)           # cả hai đã phân định cùng một sự thật
     def right(a): return (float(a["p"]) > 0.5) == (outcome[a["id"]] == 1)
     dis_res, dis_void = [ab for ab in dis if is_res(ab)], [ab for ab in dis if is_void(ab)]
-    n_all, a_all = len(dis_res), sum(1 for a, _ in dis_res if right(a))
+    raw_n_all, raw_a_all = len(dis_res), sum(1 for a, _ in dis_res if right(a))      # thô: chỉ để kiểm toán
+    pair_ok = lambda ab: ab[0]["id"] in valid and ab[1]["id"] in valid
+    dis_res_ok = [ab for ab in dis_res if pair_ok(ab)]
+    n_all, a_all = len(dis_res_ok), sum(1 for a, _ in dis_res_ok if right(a))
     # MẪU CHỐT: 194 cặp bất đồng đầu tiên theo số Issue hoàn tất cặp — cố định trước khi có kết quả; phân định sau không đổi được.
     recorded = lambda ab: max(ab[0].get("issue_number", 0), ab[1].get("issue_number", 0))
     fixed = sorted(dis, key=recorded)[:TARGET_DISAGREEMENTS]
@@ -313,12 +343,23 @@ def issue_summary(all_rows, R):
     r = sum(1 for ab in fixed if is_res(ab))
     k = sum(1 for ab in fixed if is_res(ab) and right(ab[0]))
     full = n == TARGET_DISAGREEMENTS and r + v == n                              # đủ 194 cặp VÀ cả 194 cặp đã đóng
-    p_a = _binom_two_sided(k, n) if full else None                               # xét "A hơn B": mọi cặp VOID coi như A sai
-    p_b = _binom_two_sided(k + v, n) if full else None                           # xét "B hơn A": mọi cặp VOID coi như A đúng
-    verdict = ((f"CHƯA ĐỦ MẪU ({r + v}/{TARGET_DISAGREEMENTS} cặp bất đồng đầu tiên đã phân định hoặc VOID; đã ghi {n} cặp)")
-               if not full else
-               "A HƠN B CÓ Ý NGHĨA" if p_a < 0.05 and k > n / 2 else
-               "B HƠN A CÓ Ý NGHĨA" if p_b < 0.05 and k + v < n / 2 else "CHƯA THẤY KHÁC BIỆT A–B")
+    blocked, reasons = [], {}
+    for ab_ in fixed:
+        bad = next((status[side["id"]] for side in ab_ if status[side["id"]] not in VALID_TIMING), None)
+        if bad:
+            blocked.append(ab_)
+            reasons[bad] = reasons.get(bad, 0) + 1
+    timing_ready = not blocked
+    p_a = _binom_two_sided(k, n) if full and timing_ready else None             # xét "A hơn B": mọi cặp VOID coi như A sai
+    p_b = _binom_two_sided(k + v, n) if full and timing_ready else None         # xét "B hơn A": mọi cặp VOID coi như A đúng
+    if not full:
+        verdict = (f"CHƯA ĐỦ MẪU ({r + v}/{TARGET_DISAGREEMENTS} cặp bất đồng đầu tiên đã phân định hoặc VOID; đã ghi {n} cặp)")
+    elif not timing_ready:
+        verdict = (f"CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN (mẫu {n} cặp bất đồng đầu tiên giữ nguyên, không thay cặp; "
+                   f"{len(blocked)} cặp chưa chứng minh thời điểm)")
+    else:
+        verdict = ("A HƠN B CÓ Ý NGHĨA" if p_a < 0.05 and k > n / 2 else
+                   "B HƠN A CÓ Ý NGHĨA" if p_b < 0.05 and k + v < n / 2 else "CHƯA THẤY KHÁC BIỆT A–B")
     ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "disagreements": len(dis),
           "disagreements_out_of_scope": len(dis_all) - len(dis),
           "disagreements_all": len(dis_all),          # ADR-0007: mẫu số của disagreement_rate (gồm cả event_before_date)
@@ -329,7 +370,9 @@ def issue_summary(all_rows, R):
           "fixed_sample": {"n": n, "resolved": r, "void": v, "open": n - r - v, "a_correct": k,
                            "p_value_void_as_a_wrong": round(p_a, 4) if p_a is not None else None,
                            "p_value_void_as_a_right": round(p_b, 4) if p_b is not None else None},
-          "verdict": verdict}
+          "verdict": verdict,
+          "timing": {"blocked_pairs": len(blocked), "reasons": reasons, "sample_replaced": False,
+                     "fixed_sample_counts_are_capability": bool(full and timing_ready)}}
     if v:
         ab["void_rule"] = (f"{v} cặp bất đồng trong mẫu chốt bị VOID: tính A sai khi xét 'A hơn B', tính A đúng khi xét 'B hơn A' "
                            "(ADR-0003 quyết định 3)")
@@ -339,10 +382,12 @@ def issue_summary(all_rows, R):
         ab["warning"] = "tỷ lệ bất đồng < 10% sau 60 cặp: mở ADR đổi nhóm B sang nhà cung cấp khác (CONTROL_B_PROMPT, ARCHITECTURE §9)"
     rate = lambda x, y: round(x / y, 3) if y else None
     pairs_void, pairs_closed = sum(1 for ab_ in pairs if is_void(ab_)), sum(1 for a, b in pairs if a["id"] in done and b["id"] in done)
-    def worst(s):
-        """Brier của ghế trên mọi dự báo đã đóng; dự báo VOID tính như kết quả ngược phía nó đứng (p = 0,5 → 0,25)."""
+    def worst(s, only_valid=True):
+        """Brier của ghế trên mọi dự báo đã đóng; dự báo VOID tính như kết quả ngược phía nó đứng (p = 0,5 → 0,25).
+        only_valid=True: chỉ dự báo qua kiểm L-05 (điểm năng lực); False: toàn sổ (thô, để kiểm toán)."""
         e = [(float(p["p"]) - outcome[p["id"]]) ** 2 if p["id"] in outcome else max(float(p["p"]), 1 - float(p["p"])) ** 2
-             for p in issue if str(p["seat"]) == s and (p["id"] in outcome or p["id"] in void_ids)]
+             for p in issue if str(p["seat"]) == s and (p["id"] in outcome or p["id"] in void_ids)
+             and (not only_valid or p["id"] in valid)]
         return round(float(np.mean(e)), 4) if e else None
     void = {"by_seat": {s: {"void": d["void"], "closed": d["void"] + d["resolved"], "rate": rate(d["void"], d["void"] + d["resolved"]),
                             "brier_void_worst": worst(s)}
@@ -350,19 +395,40 @@ def issue_summary(all_rows, R):
             "pairs": {"void": pairs_void, "closed": pairs_closed, "rate": rate(pairs_void, pairs_closed)},
             "disagreements": {"void": len(dis_void), "closed": n_all + len(dis_void),
                               "rate": rate(len(dis_void), n_all + len(dis_void))}}
-    out = {"total": len(raw), "by_seat": by_seat, "scores": scores, "ab": ab, "void": void}
+    resolved_ids_all = {p["id"] for p in issue if p["id"] in outcome}
+    counts = {"recorded": len(raw), "timing_valid": len(valid), "resolved": len(resolved_ids_all),
+              "resolved_timing_valid": len(resolved_ids_all & valid), "by_timing_status": dict(sorted(by_status.items()))}
+    raw_audit = {"label": RAW_AUDIT_LABEL, "scores": raw_scores,
+                 "ab_running": {"disagreements_resolved": raw_n_all, "a_correct": raw_a_all,
+                                "a_accuracy": round(raw_a_all / raw_n_all, 3) if raw_n_all else None},
+                 "brier_void_worst": {s: worst(s, only_valid=False) for s in sorted(by_seat)}}
+    out = {"total": len(raw), "counts": counts, "capability_basis": CAPABILITY_BASIS,
+           "timing_verification_source": verification_source or ("injected" if verified is not None else "none"),
+           "by_seat": by_seat, "scores": scores, "ab": ab, "void": void, "raw_audit": raw_audit}
     if len(raw) != len(issue):
         out["malformed"] = len(raw) - len(issue)
     return out
 
-def scorecard(as_of):
+def scorecard(as_of, verified=None):
     all_rows = _load(PRED)
     P = {p["id"]: p for p in all_rows if is_engine_row(p)}
     R = _load(RES)
     rows = [{**P[r["prediction_id"]], **r} for r in R if r.get("prediction_id") in P and r.get("outcome") is not None]
     void = sum(1 for r in R if r.get("prediction_id") in P and r.get("outcome") is None)
+    pubs = _load("ledger/publication_evidence.jsonl")
+    cals = _load("governance/release_calendar.jsonl")
+    if verified is None:
+        # Xuất xứ chỉ được xác nhận bằng API GitHub (vòng học trên Actions bật TTC_PROVENANCE_ONLINE=1). Ngoài đó: tập rỗng —
+        # không dự báo nào được tính là năng lực (fail closed), số thô vẫn có trong raw_audit.
+        if os.environ.get("TTC_PROVENANCE_ONLINE") == "1":
+            from tools.ledger_audit import github_verified_ids
+            verified, source = github_verified_ids(all_rows, cals, pubs)
+        else:
+            verified, source = set(), "none: chưa đối chiếu GitHub (TTC_PROVENANCE_ONLINE khác 1)"
+    else:
+        source = "injected"
     out = {"as_of": as_of, "total_predictions": len(all_rows), "resolved": len(rows), "void_data_error": void,
-           "issue_forecasts": issue_summary(all_rows, R), "procedures": {}}
+           "issue_forecasts": issue_summary(all_rows, R, pubs, cals, verified, source), "procedures": {}}
     if rows:
         df = pd.DataFrame(rows)
         for proc, g in df.groupby("procedure"):

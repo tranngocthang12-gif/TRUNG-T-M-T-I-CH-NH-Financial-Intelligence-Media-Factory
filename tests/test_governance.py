@@ -9,6 +9,7 @@ import yaml
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import laws_checks, ledger_audit, review_gate  # noqa: E402
+from tests._calendar_fixture import with_calendar, verified_ids  # noqa: E402,F401
 from tools.ledger_intake import control_b_hash, dumps, parse_cutoff, parse_issue_form, parse_number, promised_domains, vn_day  # noqa: E402
 
 B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
@@ -28,6 +29,8 @@ def _forecast(seat="A", question="CPI tháng 11/2026 so với cùng kỳ từ 5,
     if seat == "B":
         f["prompt_hash"] = B_HASH
     f.update(kw)
+    if "info_lock_at" not in f:
+        f["info_lock_at"] = f["resolve_at"]
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items() if v is not None)
 
 
@@ -45,6 +48,7 @@ class IntakeRuleTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _fc(self, number, body, created="2026-11-17T02:00:00Z", **env):
+        body = with_calendar(self.tmp, body)
         e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
              "TTC_INTAKE_NOW": _just_after(created), **env}
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=e, capture_output=True, text=True)
@@ -520,7 +524,8 @@ class LedgerReplayTests(unittest.TestCase):
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         self.led = self.tmp / "ledger" / "predictions.jsonl"
         for n, seat in ((1, "A"), (2, "B")):
-            e = {**os.environ, "ISSUE_NUMBER": str(n), "ISSUE_CREATED_AT": "2026-11-17T02:00:00Z", "ISSUE_BODY": _forecast(seat),
+            e = {**os.environ, "ISSUE_NUMBER": str(n), "ISSUE_CREATED_AT": "2026-11-17T02:00:00Z",
+                 "ISSUE_BODY": with_calendar(self.tmp, _forecast(seat)),
                  "TTC_INTAKE_NOW": _just_after("2026-11-17T02:00:00Z")}
             r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=e, capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout)
