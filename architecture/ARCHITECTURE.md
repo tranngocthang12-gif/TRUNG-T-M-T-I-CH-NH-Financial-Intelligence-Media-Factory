@@ -1,6 +1,6 @@
 # TRUNG TÂM TÀI CHÍNH — ARCHITECTURE v3.0 (bản hợp nhất, duy nhất có hiệu lực)
 
-Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0002, ADR-0003 và ADR-0004 (ACCEPTED 17/11/2026), ADR-0005, ADR-0006 và ADR-0007 (ACCEPTED 17/11/2026), ADR-0008 (ACCEPTED 18/11/2026, PR #31). ADR-0009 vẫn PROPOSED. Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010, hiệu lực khi Owner gộp). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập cho bản gốc — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
+Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0002, ADR-0003 và ADR-0004 (ACCEPTED 17/11/2026), ADR-0005, ADR-0006 và ADR-0007 (ACCEPTED 17/11/2026), ADR-0008 (ACCEPTED 18/11/2026, căn cứ Owner gộp PR #31), ADR-0009 (ACCEPTED 18/11/2026, PR #32 đã L-09; điều 7 chưa đổi engine). Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010, hiệu lực khi Owner gộp). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập cho bản gốc — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
 Bản này **thay thế** v0.1, v0.2, v1.0, v2.0, v2.1, v2.2. Các bản cũ giữ nguyên chỗ nhưng được liệt kê là SUPERSEDED trong `architecture/ARCHIVE.md`, không xóa (luật INVALIDATED không xóa); `tools/validate.py` từ chối bất kỳ `ARCHITECTURE_v*.md` nào không có trong danh sách đó. Từ đây chỉ một tệp kiến trúc có hiệu lực; thay đổi đi qua ADR (`architecture/adr/`), mỗi ADR có điều kiện hoàn tác (L-07).
 
 > KHÔNG XÂY AI ĐOÁN THỊ TRƯỜNG. XÂY MỘT HỆ THỐNG biết thu thập bằng chứng, biết nghi ngờ chính nó, biết đo lường độ không chắc chắn, biết quản trị rủi ro, biết học từ kết quả, và biết cải thiện cách nó học.
@@ -45,7 +45,7 @@ Thêm (từ nghiên cứu 2025–2026): (4) **thời điểm**: mọi kiểm đ�
 | Nhóm B | Claude trần, phiên mới không dự án không tệp, prompt cố định có hash | thấy thư viện hay câu trả lời của A |
 | CI | kiểm schema, địa chỉ, trích nguyên văn, dấu thời gian Ledger, test | — |
 
-Kênh lệnh: Gmail `[TTC] #N — …` (kết `Dừng.`) → `BAO CAO #N`. Tệp cho Claude: kho công khai đọc thẳng, hoặc ZIP nhánh.
+Kênh, ba lớp đã có, không đặt lớp mới (ADR-0010 quyết định 6): lệnh vẫn là Gmail `[TTC] #N — …` (kết `Dừng.`) → `BAO CAO [TTC] #N` như `governance/ARCHITECT_HANDOFF_20261022.md` mục 2, Owner chưa thu hồi. Đưa tệp lên `main` là PR + L-09 + Owner bấm Merge (ADR-0003 quyết định 6). Tên nhánh `hoc-hieu` trong thiết kế v0.2 mục 9 là mặc định Claude chọn, chưa phải lệnh Owner. Tệp cho Claude: kho công khai đọc thẳng, hoặc ZIP nhánh.
 
 ## 4. Nửa CHỨNG MINH
 
@@ -85,7 +85,7 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 | Việc | Chạy ở đâu | Chi phí |
 |---|---|---|
 | Engine, Ledger, Actions kiểm Issue, validate | GitHub Actions (kho công khai: miễn phí) | 0 |
-| Ghi chú, mệnh đề, mã công cụ | Ghế thi công theo lịch Gmail + PR | gói thuê bao |
+| Ghi chú, mệnh đề, mã công cụ | Ghế thi công: lệnh theo handoff mục 2 (Gmail), lên `main` bằng PR | gói thuê bao |
 | Thiết kế, chấm, ra đề | Claude trong Project (gói Max) | gói thuê bao |
 | Nhóm B | Phiên Claude trần | gói thuê bao |
 | API trả phí | **không mở** trong 6 tháng | 0 |
@@ -100,7 +100,7 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 | G3 (tháng 4–6) | thống kê, vĩ mô truyền dẫn, luật thị trường; DSR vào engine | ≥ 150 dự báo đã chấm; báo cáo hiệu chuẩn đầu tiên | Brier A tệ hơn B có ý nghĩa → kiểm lại thư viện |
 | G4 (sau 6 tháng) | báo cáo đánh giá | chỉ cân nhắc API/Media khi ≥ 194 bất đồng đã chấm | — |
 
-G0 chưa thoát. Cột thoát ("Action xanh trên 3 dự báo thử") chưa đạt: sổ chưa có dự báo thử. Cột dừng/đảo ("quá 3 tuần → chỉ giữ Ledger") đã quá hạn nếu tính từ 22/10/2026 hoặc từ ngày gộp 24/10/2026. Ngày 17/11/2026 Owner không thi hành nhánh đó. ADR-0002 xét điều kiện hoàn tác của ADR-0001 (30 ngày sau ngày gộp, tức 23/11/2026, dưới 20 dự báo hợp lệ thì *xét* thu hẹp) và quyết định không thu hẹp; mốc xét lại là 31/03/2027. Hai đồng hồ không phải một luật. `state/PROJECT_STATE.yaml` ghi pha `V3_G0_CHUA_THOAT` cho tới khi có 3 dự báo thử đi qua Action xanh. Dời mốc 31/03/2027 thêm lần nữa phải bằng ADR mới nêu bằng chứng đã đổi, không bằng sửa ngày trong ADR-0002 (ADR-0010).
+G0 chưa thoát. Cột thoát ("Action xanh trên 3 dự báo thử") chưa đạt: sổ chưa có dự báo thử. Cột dừng/đảo ("quá 3 tuần → chỉ giữ Ledger") đã quá hạn nếu tính từ 22/10/2026 hoặc từ ngày gộp 24/10/2026. Không có biên bản Owner bác riêng nhánh đó vào ngày 17/11/2026. Việc đang lưu là ADR-0002 (PR #29, cùng ngày): không thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001; mốc xét lại 31/03/2027. Đó là kết luận từ quyết định đã lưu, không phải bằng chứng trực tiếp về cột 3 tuần. Hai đồng hồ không phải một luật. `state/PROJECT_STATE.yaml` ghi pha `V3_G0_CHUA_THOAT` cho tới khi có 3 dự báo thử đi qua Action xanh. Dời mốc 31/03/2027 thêm lần nữa phải bằng ADR mới nêu bằng chứng đã đổi, không bằng sửa ngày trong ADR-0002 (ADR-0010).
 
 Không có trong lộ trình: tiền thật; cấp vốn 4+ chỉ xét khi G3 cho alpha có ý nghĩa và Owner quyết.
 

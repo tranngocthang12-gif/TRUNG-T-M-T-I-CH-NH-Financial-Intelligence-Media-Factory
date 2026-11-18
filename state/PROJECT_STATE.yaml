@@ -1,6 +1,6 @@
 version: 0.5
 phase: V3_G0_CHUA_THOAT
-current_focus: "G0 chưa thoát (ADR-0010, 18/11/2026). Cột thoát §8 chưa đạt: 0 dự báo thử qua Action xanh. Ngày 17/11/2026 Owner không thi hành nhánh 'quá 3 tuần → chỉ giữ Ledger'. ADR-0002 giữ v3.0; mốc xét thu hẹp vẫn là 31/03/2027, cần ≥ 20 dự báo hợp lệ, và chỉ dời bằng ADR mới. Đường dự báo → phân định → chấm A–B → kiểm toán đã có mã (PR #28). Ghế thi công là Grok (xAI). Điều kiện thoát G1 (§8) chưa phải việc của pha này: ≥ 40 tài liệu gốc có hash, ≥ 60 dự báo A+B."
+current_focus: "G0 chưa thoát (ADR-0010, 18/11/2026). Cột thoát §8 chưa đạt: 0 dự báo thử qua Action xanh. Không có biên bản Owner bác riêng nhánh 'chỉ giữ Ledger' ngày 17/11; kết luận đang lưu là ADR-0002 (PR #29): không thu hẹp v3.0, mốc xét lại 31/03/2027. Hai đồng hồ không phải một luật. Đường dự báo → phân định → chấm A–B → kiểm toán đã có mã (PR #28). Ghế thi công là Grok (xAI). Điều kiện thoát G1 (§8) chưa phải việc của pha này: ≥ 40 tài liệu gốc có hash, ≥ 60 dự báo A+B."
 deployment_level: 0
 open_blockers:
   - "Ledger chưa có dự báo nào (0/60); Owner ghi cặp A/B theo docs/HUONG_DAN_VAN_HANH.md mục 6. Chưa có tệp ledger/predictions.jsonl"
@@ -10,15 +10,19 @@ open_blockers:
   - "OWNER GATE: chưa có nguồn giá chính thức — vnstock bị PyPI cách ly, Yahoo là nguồn tạm có lỗi; SSI FastConnect / DNSE cần tài khoản Owner"
   - "Sự kiện quyền TCB 11/06/2024 và VCB 03/03/2025 trong data/corporate_actions.csv ở trạng thái CAN_DOI_CHIEU — cần đường dẫn CBTT chính thức"
   - "Backtest dùng VN30 HIỆN TẠI cho toàn bộ lịch sử (thiên lệch sống sót, đã gắn nhãn — ADR-0008, ACCEPTED qua PR #31); cần data/vn30_history.csv từ công bố xét duyệt định kỳ của HOSE (ghế thi công hoặc Owner)"
-  - "ADR-0009 vẫn PROPOSED. PR #32 chỉ gộp bản disclosure point-in-time, không chấp nhận ADR này"
+  - "ADR-0009 ACCEPTED qua PR #32 (merge 432f456, L-09 trên c4d8a03). Điều 7 của ADR đó chưa cho đổi engine/adjust.py hay data.sources"
 last_session:
   date: 2026-11-18
   type: "SỬA GIẤY TỜ ĐÃ XÁC NHẬN + LẬP GHẾ THI CÔNG (ADR-0010)"
   done:
     - "Owner giao ghế thi công cho Grok (xAI). ADR-0010. Không gộp main, không sửa LAWS.md, không mở API, không chạm engine"
-    - "PROJECT_STATE chuyển V3_G0_CHUA_THOAT. §8 ghi hai đồng hồ: 3 tuần không bị thi hành ngày 17/11; mốc ADR-0002 vẫn 31/03/2027"
-    - "ADR-0008 lật ACCEPTED theo PR #31. ADR-0009 giữ PROPOSED"
+    - "PROJECT_STATE chuyển V3_G0_CHUA_THOAT. §8 không biến ADR-0002 thành biên bản cột 3 tuần"
+    - "ADR-0008 lật ACCEPTED chỉ vì Owner gộp PR #31 (merge 8c4fd43), không viện disclosure PR #32"
+    - "ADR-0009 ghi ACCEPTED: PR #32 đưa chính tệp lên main và có L-09 GỘP ĐƯỢC trên c4d8a03. Sửa câu sai 'chỉ gộp disclosure'"
     - "Sửa tiêu đề §5, đường dẫn docs/TTC_TANG_HOC_HIEU_v0.2.md, chỗ gọi MINH TRÍ là ghế, BOOT bước 10, ARCHIVE các tệp trước v3.0"
-    - "requirements.txt ghim pandas==2.3.3 numpy==2.2.6 scikit-learn==1.7.2 pyyaml==6.0.3 joblib==1.6.0 yfinance==1.8.0 jsonschema==4.26.0"
+    - "requirements.txt ghim pandas==2.3.3 (hạ major so với pandas 3.0.5 của máy rà soát) và các số trên máy ghế thi công. Không có log CI chứng minh đây là bộ CI đã phân giải. Không đổi số pin"
+    - "TTC-2 ghi làm một phần: không có engine/knowledge_items.py; CI là tests.yml không phải daily_cycle.yml"
+    - "Kênh: không đặt mới. Gmail handoff mục 2 còn; lên main là PR (ADR-0003); hoc-hieu là mặc định Claude chưa được Owner chọn"
+    - "Trả quyết định 9 của ADR-0003 về chữ đã chấm. authored_by Grok (xAI) là lời khai ghế soạn. Commit 02e5d7e author grok-xai, không phải login chủ kho. Người mở PR là tranngocthang12-gif"
   tests: "tools/validate.py trên bản làm việc; CI của PR chạy lại toàn bộ. Cổng L-09 đỏ cho tới khi ghế khác nhà cung cấp chấm — đúng luật"
 next_gap: "(1) Owner gộp PR của ADR-0010 chỉ sau bản chấm L-09 của ghế khác nhà cung cấp. (2) Vòng học hằng tuần 16:30 thứ Sáu 20/11/2026. (3) Issue Forecast đầu tiên do Owner dán — ghế thi công không mở Issue hộ và không tự ghi sổ. (4) data/vn30_history.csv khi có công bố HOSE. (5) TTC-3 (chép tài liệu gốc) chỉ bắt đầu khi Owner chỉ nguồn và tệp gốc tải được để ghim sha256."

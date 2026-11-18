@@ -3,7 +3,7 @@
 Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Nền: bản hiểu 21/10 (commit `3c9f69d`) · Thay bản v0.1 (ĐTT) ở phần miền và tên gọi.
 Trạng thái: THIẾT KẾ, chưa có mã. Các mặc định ở mục 9 do Claude chọn vì Owner chưa quyết; Owner đổi được bằng một câu.
 
-> Đính chính 18/11/2026 (ADR-0003 quyết định 9, ADR-0010): MINH TRÍ không phải ghế của kho này và không phải ghế A. Ghế thi công là Grok (xAI), Owner lập 18/11/2026. Bảng mục 2 giữ tên MINH TRÍ vì đó là nguồn khuôn ở một dự án khác, không phải người làm.
+> Đính chính 18/11/2026: câu "không phải MINH TRÍ" là ADR-0003 quyết định 9, chữ quyết định đó không bị sửa. Ghế thi công là Grok (xAI) là ADR-0010, hiệu lực khi Owner gộp. Bảng mục 2 giữ tên MINH TRÍ vì đó là nguồn khuôn ở một dự án khác, không phải người làm.
 
 ---
 
@@ -17,7 +17,7 @@ Lắp tầng học hiểu — khuôn lấy từ cỗ máy MINH TRÍ, ghế làm 
 |---|---|---|
 | Owner | gộp `main`, ký OWNER_MISSION, đổi luật/phạm vi, giữ đề thi | chat, GitHub |
 | Claude | thiết kế, soạn lệnh, chấm, ra đề thi, giữ đề | Gmail gửi lệnh `[TTC] #N — …`, kết `Dừng.` |
-| Ghế thi công — Grok (xAI), Owner lập 18/11/2026 (ADR-0010; không phải MINH TRÍ) | chép nguồn, viết ghi chú, viết mã công cụ theo đặc tả, mở PR nháp | đọc lệnh Owner, trả lời bằng PR; không merge |
+| Ghế thi công — Grok (xAI), Owner lập 18/11/2026 (ADR-0010; không phải MINH TRÍ) | chép nguồn, viết ghi chú, viết mã công cụ theo đặc tả, mở PR nháp | Lệnh: handoff mục 2 (Gmail `[TTC] #N`), Owner chưa thu hồi. Lên `main`: PR theo ADR-0003. Hàng này không bỏ Gmail |
 | CI (`tools/validate.py` + test) | kiểm máy, fail-closed | GitHub Actions |
 | Nhóm đối chứng B | Claude trần, không thư viện, trả lời cùng đề | chat riêng, kết quả ghi `academy/results/` |
 
@@ -64,7 +64,7 @@ Mệnh đề cốt lõi ghi theo `knowledge_item` hiện có, thêm hai trườn
 | PR | Nội dung | Ai | Thoát khi |
 |---|---|---|---|
 | **TTC-1** Khởi động | `governance/ARCHITECT_HANDOFF_20261022.md`; 3 hợp đồng `knowledge_note`, `exam_item`, `dossier`; `library/INDEX.md`, `library/SOURCE_MANIFEST.json` (rỗng đúng dạng), `library/reading_queue.yaml` (danh mục mục 9), `academy/curriculum.md` v0.1; cập nhật `contracts/README.md` (24) | Đã làm trong G0 bởi Claude, trước khi có ghế — không phải MINH TRÍ | CI xanh; `validate.py` bớt 3 cảnh báo tương ứng |
-| **TTC-2** Công cụ | `engine/knowledge_notes.py`, `engine/knowledge_items.py` chuyển từ khuôn cũ (địa chỉ trang/đoạn thay mã đoạn), test; `validate.py` gọi chúng; `daily_cycle.yml` chạy **đủ 7 test** (bản hiểu C5) | Đã làm trong G0 bởi Claude, trước khi có ghế — không phải MINH TRÍ | Test xanh; ghi chú mẫu bị từ chối đúng 12 ca lỗi |
+| **TTC-2** Công cụ | Phần đã có: `engine/knowledge_notes.py`, `tests/test_knowledge_notes.py`, `tools/validate.py` gọi module đó. Phần chưa có: không có tệp `engine/knowledge_items.py`. Test chạy trong `.github/workflows/tests.yml`. `daily_cycle.yml` chỉ gọi `tests.test_no_lookahead`, không chạy đủ 7 test | Làm một phần trong G0 bởi Claude, trước khi có ghế — không phải MINH TRÍ. Không ghi "Đã làm" | Còn thiếu `knowledge_items.py` và test của nó. Điều kiện "12 ca lỗi" của hàng này chưa được giấy này xác nhận |
 | **TTC-3** Đọc rộng | Chép 30–50 tài liệu gốc miền hẹp; ghi chú DRAFT cho từng tài liệu; Auditor nâng CITED | Grok (xAI) đọc, Claude chấm mẫu ở mốc 10 và 20 | 20 ghi chú CITED; ≤2/20 sai nghĩa |
 | **TTC-4** Thi lần một | 5 đề giữ kín; A và B cùng làm; sổ điểm; 3–5 mệnh đề OPEN đầu tiên có `invalidation_conditions` | Claude ra đề và chấm | Có số "độ đúng khi bất đồng với B" đầu tiên |
 
@@ -77,6 +77,6 @@ Kho **giữ công khai** (để Claude đọc thẳng và để kiểm chứng c
 ## 9. Mặc định Claude đã chọn (Owner đổi bằng một câu)
 
 1. **Miền hẹp đầu tiên:** `doc_bctc` + `ngan_hang` + `chinh_sach_phap_luat` nền: Luật Kế toán 2015; Thông tư 200/2014 (chế độ kế toán DN) và các VAS liên quan BCTC (VAS 1, 21, 24); Luật Chứng khoán 2019; Nghị định 155/2020; Thông tư 96/2020 (công bố thông tin); Thông tư 41/2016 (tỷ lệ an toàn vốn ngân hàng); BCTC hợp nhất kiểm toán năm 2025 của 10 ngân hàng VN30. Khoảng 30–40 tài liệu, xếp ngắn → dài theo số trang.
-2. **Ghế thi công:** Grok (xAI), Owner lập 18/11/2026 (ADR-0010). **Không phải MINH TRÍ** (dự án kinh Phật, không tham gia tài chính). Trong G0 Claude soạn một mình theo lệnh Owner 22/10; ghế này làm từ 18/11/2026, mở PR nháp, không tự gộp.
-3. **Nhánh làm việc:** `hoc-hieu`; Owner gộp khi Claude báo GỘP ĐƯỢC.
+2. **Ghế thi công:** Grok (xAI), Owner lập 18/11/2026 (ADR-0010). **Không phải MINH TRÍ** (dự án kinh Phật, không tham gia tài chính). Trong G0 Claude soạn một mình theo lệnh Owner 22/10; ghế này làm từ 18/11/2026. Không tự gộp.
+3. **Nhánh:** `hoc-hieu` là mặc định Claude chọn ở dòng này, không phải lệnh Owner ("Owner đổi bằng một câu" — chưa đổi). Không khóa tên nhánh. ADR-0010 đang ở nhánh `ghe-thi-cong/adr-0010-sua-giay-to-20261118` vì lệnh 18/11 nằm trong chat, không phải email `[TTC]`. Gộp chỉ khi ghế khác nhà chấm L-09 và Owner bấm Merge (ADR-0003), không phải khi Claude tự báo GỘP ĐƯỢC. Việc này không thu hồi kênh Gmail ở mục 1.
 4. **Kho giữ công khai** theo mục 8.
