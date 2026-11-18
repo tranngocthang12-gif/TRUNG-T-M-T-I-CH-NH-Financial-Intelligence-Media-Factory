@@ -12,6 +12,10 @@
   - Lỗi 3: `issue_summary` tính Brier, `hit_rate`, hiệu chuẩn, `a_correct`, `a_accuracy`, `disagreements_resolved`, `brier_void_worst` chỉ trên dự báo hợp lệ; số toàn sổ ở `raw_audit` với nhãn "KHÔNG PHẢI BẰNG CHỨNG NĂNG LỰC"; `counts` tách số ghi / hợp lệ / đã phân định / đã phân định và hợp lệ. Mẫu 194, thứ tự khóa mẫu, luật VOID và ngưỡng kiểm định không đổi.
   - Bằng chứng công bố phát hiện sau: được ghi thêm dòng chỉ khi mốc `published_at` sớm hơn mọi mốc đã ghi; dòng dự báo bất biến, bị loại khỏi kết luận năng lực nếu công bố không sau giờ mở Issue.
   - Test đối kháng: `tests/test_timing_lock.py` (thiếu/sai lịch, lịch ghi lùi, lịch xác nhận sau Issue, sửa/xóa/ghi đè lịch, nộp sau công bố trước hạn tự khai, bằng chứng ghi muộn, Brier không bị làm đẹp, mẫu 194 không bị thay, F-37–F-42 giữ hash, luồng robot hợp lệ). Test cũ ghim lịch qua đúng robot bằng `tests/_calendar_fixture.py`.
+## v3.0.7b — 2026-11-18 (PR-B, L-01 ghim tệp gốc) — Grok (xAI) soạn; ADR-0012 PROPOSED; chưa gộp
+- `sha256`/`bytes` giữ nghĩa hash của `text.md`. Mọi dòng manifest phải có `original_sha256`, `original_bytes`, `original_path`, `text_sha256`, `text_bytes`. Bỏ các trường đó không qua cổng nguồn. Manifest trên `main` đang rỗng, không giữ đường vòng cho dòng cũ.
+- Hash từng trang tính cả bảng, không chỉ đoạn văn. `page_crosscheck()` không phải biên bản đối chiếu PDF. `SOURCED` và ghi chú `CITED`/`TESTED`/`PROVEN` cần thêm `pdf_check` gắn đúng hash `text.md` và hash PDF, do ghế khác người đọc ghi chú. Máy không đọc ảnh trang.
+- Luật Kế toán 88/2015: nếu khai tệp gốc thì chỉ nhận SHA-256 `1fd9336a…cca50`, 2566253 byte, 35 trang. Kho này chưa ghim PDF và hàng đợi vẫn `QUEUED`.
 
 ## v3.0.7c — 2026-11-18 (PR-C, giấy tờ) — Grok (xAI) soạn; ADR-0013 PROPOSED; chưa gộp
 - §8 khớp sáu dự báo F-37–F-42 và pha `V3_G0_DAT_DIEU_KIEN_KY_THUAT`. Không hủy cột dừng/đảo 3 tuần và không dời mốc ADR-0002.
