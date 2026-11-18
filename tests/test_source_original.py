@@ -37,7 +37,7 @@ class OriginalBindingTests(unittest.TestCase):
     def tearDown(self):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
-    def _pin(self, doc, text_b, pdf, name, pages, cross=True):
+    def _pin(self, doc, text_b, pdf, name, pages=None, cross=True):
         e = {"sha256": hashlib.sha256(text_b).hexdigest(), "bytes": len(text_b), "issuer": "Quốc hội",
              "issued_on": "2015-11-20", "accessed_on": "2026-11-18", "source_url": "https://vbpl.vn/x",
              "data_source": "Công báo / Cổng TTĐT Chính phủ", "legal_status": "văn bản quy phạm, không bảo hộ",
@@ -61,13 +61,28 @@ class OriginalBindingTests(unittest.TestCase):
     def _errs(self):
         return kn.check_library(self.tmp)[0]
 
+    def _witness(self, entry, text, checker="Owner"):
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        cc = json.loads(json.dumps(entry["crosscheck"]))
+        cc["pdf_check"] = {"checker": checker, "result": "MATCH",
+                           "pages_checked": [p["page"] for p in cc["pages"]],
+                           "evidence": "Đối chiếu từng trang text.md với PDF gốc, gồm các ô bảng.",
+                           "text_sha256": digest, "original_sha256": entry["original_sha256"]}
+        return dict(entry, sha256=digest, bytes=len(text.encode("utf-8")), text_sha256=digest,
+                    text_bytes=len(text.encode("utf-8")), crosscheck=cc)
+
     def test_separate_pins_allow_sourced_only_after_every_page(self):
         pages, _ = kn.parse_text(TEXT)
-        self.assertTrue(kn.may_mark_sourced(self.entry, pages, self.doc))
-        self.assertFalse(kn.may_mark_sourced(dict(self.entry, crosscheck={"method": "hash-only", "pages_checked": 2, "pages_total": 2}), pages, self.doc))
+        self.assertNotIn("pdf_check", self.entry["crosscheck"])
+        self.assertFalse(kn.may_mark_sourced(self.entry, pages, self.doc, TEXT))   # hash tự sinh không phải đối chiếu PDF
+        witnessed = self._witness(self.entry, TEXT)
+        self.assertTrue(kn.may_mark_sourced(witnessed, pages, self.doc, TEXT))
+        self.assertFalse(kn.may_mark_sourced(dict(self.entry, crosscheck={"method": "hash-only", "pages_checked": 2, "pages_total": 2}), pages, self.doc, TEXT))
         bare = {k: v for k, v in self.entry.items() if k not in kn.ORIGINAL_KEYS and k != "crosscheck"}
-        self.assertFalse(kn.may_mark_sourced(bare, pages, self.doc))          # hash text.md một mình không đủ
+        self.assertFalse(kn.may_mark_sourced(bare, pages, self.doc, TEXT))          # hash text.md một mình không đủ
         self._queue("SOURCED")
+        self.assertTrue(any("SOURCED" in e and "hash khớp không" in e for e in self._errs()), self._errs())
+        self._manifest({self.doc: witnessed})
         self.assertEqual(self._errs(), [])
 
     def test_rejects_swapped_pdf_swapped_text_missing_original_and_bad_metadata(self):
@@ -149,7 +164,13 @@ class OriginalBindingTests(unittest.TestCase):
         self.assertTrue(any("pages_checked" in e for e in self._errs()), self._errs())
         full = self._pin(self.doc, self.text_b, PDF, "goc.pdf", pages=2, cross=True)
         self._manifest({self.doc: full})
-        self.assertFalse(any("KN-T2-mau" in e and "L-01" in e for e in self._errs()), self._errs())
+        self.assertTrue(any("PDF" in e for e in self._errs()), self._errs())
+        witnessed = self._witness(full, TEXT, checker="Owner")
+        self._manifest({self.doc: witnessed})
+        self.assertFalse(any("KN-T2-mau" in e and ("L-01" in e or "L-09" in e) for e in self._errs()), self._errs())
+        same = self._witness(full, TEXT, checker="ChatGPT (OpenAI)")
+        self._manifest({self.doc: same})
+        self.assertTrue(any("trùng ghế" in e for e in self._errs()), self._errs())
 
     def test_known_accounting_law_rejects_wrong_pdf_and_cannot_be_sourced_early(self):
         self.assertEqual(KNOWN["original_sha256"], "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50")
@@ -184,6 +205,143 @@ class OriginalBindingTests(unittest.TestCase):
         self.assertTrue(all(i.get("status") != "SOURCED" for i in items))
         errs, _ = kn.check_library(ROOT)
         self.assertFalse(any("SOURCED" in e for e in errs), errs)
+
+
+TABLE = textwrap.dedent("""\
+    [p1]
+    Điều 1. Phạm vi điều chỉnh
+
+    Không được đổi dấu của số liệu.
+
+    [t1]
+    | Chỉ tiêu | Số |
+    |---|---|
+    | Nợ nhóm 3 | 1.200 |
+    | Nợ nhóm 5 | -4.100 |
+
+    [p2]
+    Điều 4. Nhiệm vụ kế toán
+
+    Thu thập, xử lý thông tin, số liệu kế toán.
+    """)
+
+
+class TableAndPdfWitnessTests(unittest.TestCase):
+    """Số trong bảng phải đổi hash trang. Hash tự sinh từ text.md không phải biên bản đối chiếu PDF."""
+
+    def setUp(self):
+        self.host = OriginalBindingTests()
+        self.host.setUp()
+        self.doc = self.host.doc
+        self.dir = self.host.dir
+        (self.dir / "text.md").write_text(TABLE, encoding="utf-8")
+        self.text_b = (self.dir / "text.md").read_bytes()
+        self.entry = self.host._pin(self.doc, self.text_b, PDF, "goc.pdf", pages=2)
+        self.host._manifest({self.doc: self.entry})
+
+    def tearDown(self):
+        self.host.tearDown()
+
+    def _errs(self):
+        return self.host._errs()
+
+    def _manifest(self, files):
+        self.host._manifest(files)
+
+    def _queue(self, status, doc=None):
+        self.host._queue(status, doc or self.doc)
+
+    def _pin(self, *args, **kwargs):
+        return self.host._pin(*args, **kwargs)
+
+    def _witness(self, entry, text, checker="Owner"):
+        return self.host._witness(entry, text, checker)
+
+    def _fp(self, text, page=1):
+        return kn.page_fingerprint(kn.page_surface(text)[page])[1]
+
+    def _para(self, text, page=1):
+        pages, _tables = kn.parse_text(text)
+        return hashlib.sha256("\n".join(pages[page]).encode("utf-8")).hexdigest()
+
+    def test_table_edits_change_the_page_fingerprint(self):
+        body = kn.page_fingerprint(kn.page_surface(TABLE)[1])[0]
+        self.assertIn("1.200", body)
+        self.assertIn("-4.100", body)
+        self.assertIn("Không", body)
+        self.assertNotIn("pdf_check", kn.page_crosscheck(TABLE))
+        edited = TABLE.replace("1.200", "1.900")
+        self.assertEqual(self._para(TABLE), self._para(edited))          # lỗ cũ: đoạn văn không đổi
+        self.assertNotEqual(self._fp(TABLE), self._fp(edited))            # ô bảng phải đổi hash cả trang
+        self.assertNotEqual(self._fp(TABLE), self._fp(TABLE.replace("-4.100", "4.100")))
+        self.assertNotEqual(self._fp(TABLE), self._fp(TABLE.replace("Không được", "Được")))
+        self.assertNotEqual(self._fp(TABLE), self._fp(TABLE.replace("| Nợ nhóm 5 | -4.100 |\n", "")))
+        added = TABLE.replace("| Nợ nhóm 5 | -4.100 |", "| Nợ nhóm 5 | -4.100 |\n| Nợ nhóm 2 | 50 |")
+        self.assertNotEqual(self._fp(TABLE), self._fp(added))
+        moved = textwrap.dedent("""\
+            [p1]
+            Điều 1. Phạm vi điều chỉnh
+
+            Không được đổi dấu của số liệu.
+
+            [p2]
+            Điều 4. Nhiệm vụ kế toán
+
+            Thu thập, xử lý thông tin, số liệu kế toán.
+
+            [t1]
+            | Chỉ tiêu | Số |
+            |---|---|
+            | Nợ nhóm 3 | 1.200 |
+            | Nợ nhóm 5 | -4.100 |
+            """)
+        self.assertNotEqual(self._fp(TABLE, 1), self._fp(moved, 1))
+        self.assertNotEqual(self._fp(TABLE, 2), self._fp(moved, 2))
+
+    def test_stale_qc_regenerated_hash_and_bad_pages_are_blocked(self):
+        changed = TABLE.replace("1.200", "1.900")
+        (self.dir / "text.md").write_text(changed, encoding="utf-8")
+        b = (self.dir / "text.md").read_bytes()
+        stale = dict(self.entry, sha256=hashlib.sha256(b).hexdigest(), bytes=len(b),
+                     text_sha256=hashlib.sha256(b).hexdigest(), text_bytes=len(b))
+        self._manifest({self.doc: stale})
+        self.assertTrue(any("không khớp" in e for e in self._errs()), self._errs())
+        fresh = self._pin(self.doc, b, PDF, "goc.pdf")
+        self.assertNotIn("pdf_check", fresh["crosscheck"])
+        pages, _ = kn.parse_text(changed)
+        self.assertFalse(kn.may_mark_sourced(fresh, pages, self.doc, changed))
+        self._manifest({self.doc: fresh})
+        self._queue("SOURCED")
+        self.assertTrue(any("SOURCED" in e and "hash khớp không" in e for e in self._errs()), self._errs())
+        gap = TABLE.replace("[p2]", "[p3]")
+        gap_b = gap.encode("utf-8")
+        (self.dir / "text.md").write_bytes(gap_b)
+        gapped = self._pin(self.doc, gap_b, PDF, "goc.pdf")
+        self._manifest({self.doc: gapped})
+        self.assertTrue(any("thiếu trang" in e or "đánh số" in e for e in self._errs()), self._errs())
+        short = "\n".join(TABLE.split("[p2]")[0])
+        self._manifest({self.doc: self.entry})
+        (self.dir / "text.md").write_text(TABLE, encoding="utf-8")
+        (self.dir / "text.md").write_text(short, encoding="utf-8")
+        short_b = (self.dir / "text.md").read_bytes()
+        kept = dict(self.entry, sha256=hashlib.sha256(short_b).hexdigest(), bytes=len(short_b),
+                    text_sha256=hashlib.sha256(short_b).hexdigest(), text_bytes=len(short_b))
+        self._manifest({self.doc: kept})
+        self.assertTrue(self._errs(), self._errs())
+        (self.dir / "text.md").write_text(TABLE, encoding="utf-8")
+        (self.dir / "goc.pdf").write_bytes(PDF + b"TAMPER")
+        self._manifest({self.doc: self.entry})
+        self.assertTrue(any("tệp gốc lệch" in e for e in self._errs()), self._errs())
+
+    def test_valid_pdf_witness_passes_sourced(self):
+        (self.dir / "goc.pdf").write_bytes(PDF)
+        (self.dir / "text.md").write_text(TABLE, encoding="utf-8")
+        witnessed = self._witness(self.entry, TABLE)
+        pages, _ = kn.parse_text(TABLE)
+        self.assertTrue(kn.may_mark_sourced(witnessed, pages, self.doc, TABLE))
+        self._manifest({self.doc: witnessed})
+        self._queue("SOURCED")
+        self.assertEqual(self._errs(), [])
 
 
 if __name__ == "__main__":

@@ -9,8 +9,9 @@ Quy ước trên đĩa (library/sources/README.md):
   data_source (tên trong governance/DATA_SOURCES.yaml, không được là nguồn "forbidden"), legal_status, license,
   kind, effective_from, effective_to, superseded_by. Mọi dòng phải ghim original_sha256, original_bytes,
   original_path, text_sha256, text_bytes — text_* phải trùng sha256/bytes, original_* phải khác và trỏ tới tệp
-  trong cùng thư mục, không phải text.md. Bỏ các trường đó không qua cổng nguồn (ADR-0012). SOURCED và ghi chú
-  CITED/TESTED/PROVEN cần crosscheck.pages (sha256, đầu, cuối từng trang); số pages_checked không đủ. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
+  trong cùng thư mục, không phải text.md. Bỏ các trường đó không qua cổng nguồn (ADR-0012). Hash từng trang tính
+  trên cả trang, gồm bảng. Hash đó không phải biên bản đã đối chiếu PDF: SOURCED và ghi chú CITED/TESTED/PROVEN
+  cần thêm pdf_check của một ghế. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
   sổ của kỳ) và published_on (ngày CÔNG BỐ công khai — ngày đầu tiên thị trường biết số liệu); số liệu chỉ được dùng từ
   published_on (usable_on), không phải từ period_end.
 - library/notes/<KN-id>.json: KNOWLEDGE_NOTE theo contracts/knowledge_note.schema.json.
@@ -181,9 +182,30 @@ def original_file(root, doc_id, rel):
     return path, None
 
 
-def page_fingerprint(paragraphs):
-    """Văn bản một trang sau khi gộp khoảng trắng, cùng sha256 và 8 từ đầu/cuối để reviewer đối chiếu mắt."""
-    body = _norm(" ".join(paragraphs or []))
+def page_surface(text: str) -> dict:
+    """Mọi dòng nội dung của từng trang, theo thứ tự, kể cả tiêu đề và từng dòng bảng.
+    Dòng [pN]/[tN] chỉ là mốc. Không bỏ ô bảng. Không đổi số, dấu âm hay chữ phủ định."""
+    pages = {}
+    page = None
+    for raw in str(text or "").splitlines():
+        line = nfc(raw).strip()
+        m = re.fullmatch(r"\[p([0-9]+)\]", line)
+        if m:
+            page = int(m.group(1))
+            pages.setdefault(page, [])
+            continue
+        if re.fullmatch(r"\[t[0-9]+\]", line):
+            continue
+        if page is None or line == "":
+            continue
+        pages[page].append(line)
+    return pages
+
+
+def page_fingerprint(lines):
+    """sha256 của cả trang. `lines` phải là page_surface, không phải danh sách đoạn sau khi tách bảng.
+    NFC từng dòng. Không gộp chữ, không bỏ dấu trừ, không bỏ từ phủ định."""
+    body = "\n".join(nfc(str(x)).strip() for x in (lines or []) if str(x).strip())
     words = body.split()
     head = " ".join(words[:8])
     tail = " ".join(words[-8:]) if words else ""
@@ -192,53 +214,99 @@ def page_fingerprint(paragraphs):
 
 
 def page_crosscheck(text: str) -> dict:
-    """Biên bản đối chiếu sinh từ text.md. Máy chỉ nhận biên bản khớp lại đúng các giá trị này."""
-    pages, _tables = parse_text(text)
+    """Tầng máy: hash từng trang của chính text.md, gồm đoạn, tiêu đề và bảng.
+    Không điền pdf_check. Hàm này không chứng nhận bản chép đã khớp PDF."""
+    surface = page_surface(text)
     rows = []
-    for n in sorted(pages):
-        _body, digest, head, tail = page_fingerprint(pages[n])
+    for n in sorted(surface):
+        _body, digest, head, tail = page_fingerprint(surface[n])
         rows.append({"page": n, "sha256": digest, "head": head, "tail": tail})
     return {"method": "page-by-page", "pages": rows}
 
 
-def transcription_errors(entry, pages, doc_id=None) -> list[str]:
-    """Lỗi nếu chưa chứng minh chép đúng từng trang. Số pages_checked một mình không đủ."""
-    if not isinstance(entry, dict) or not claims_original(entry):
-        return ["thiếu ghim tệp gốc"]
-    if entry.get("original_sha256") in (entry.get("sha256"), entry.get("text_sha256")):
-        return ["hash text.md không được dùng làm hash tệp gốc"]
-    cc = entry.get("crosscheck")
+def _page_hash_errors(entry, text, doc_id=None) -> list[str]:
+    """Tầng 1: hash cả trang khớp text.md, đủ trang 1..N. Không xét người đã nhìn PDF."""
+    if not isinstance(text, str):
+        return ["không có text.md để tính hash cả trang, gồm bảng"]
+    surface = page_surface(text)
+    if not _page_set_ok(surface, len(surface)):
+        return ["thiếu trang hoặc đánh số trang không liền từ 1"]
+    cc = entry.get("crosscheck") if isinstance(entry, dict) else None
     if not isinstance(cc, dict) or cc.get("method") != "page-by-page" or not isinstance(cc.get("pages"), list):
         return ["chưa có biên bản đối chiếu từng trang; không được chỉ khai pages_checked"]
     ev = cc["pages"]
-    if not ev or {e.get("page") for e in ev if isinstance(e, dict)} != set(pages) or len(ev) != len(pages):
-        return ["biên bản không khớp đủ từng trang đã tách trong text.md"]
+    order = [e.get("page") for e in ev if isinstance(e, dict)]
+    if order != list(range(1, len(surface) + 1)) or len(ev) != len(surface):
+        return ["biên bản không khớp đủ từng trang theo thứ tự 1..N — thiếu trang hoặc đánh số sai"]
     errs = []
     for e in ev:
         if not isinstance(e, dict):
             errs.append("một dòng biên bản trang không phải đối tượng")
             continue
-        _body, digest, head, tail = page_fingerprint(pages.get(e.get("page")) or [])
+        _body, digest, head, tail = page_fingerprint(surface.get(e.get("page")) or [])
         if e.get("sha256") != digest or e.get("head") != head or e.get("tail") != tail:
-            errs.append(f"trang {e.get('page')} không khớp sha256/head/tail — reviewer không kiểm được")
+            errs.append(f"trang {e.get('page')} không khớp sha256/head/tail của cả trang (gồm bảng) — reviewer không kiểm được")
     known = KNOWN_ORIGINALS.get(doc_id or "")
-    if known and (len(pages) != known["pages"] or not _page_set_ok(pages, known["pages"])):
+    if known and len(surface) != known["pages"]:
         errs.append(f"chưa đối chiếu đủ {known['pages']} trang của bản gốc đã công bố")
     return errs
 
 
-def transcription_verified(entry, pages, doc_id=None) -> bool:
-    return transcription_errors(entry, pages, doc_id) == []
+def pdf_witness_errors(entry, text) -> list[str]:
+    """Tầng 2: một ghế khai đã đối chiếu text.md với PDF. Máy không đọc ảnh trang.
+    Thiếu biên bản này thì hash tự sinh không được dùng làm chứng nhận."""
+    cc = entry.get("crosscheck") if isinstance(entry, dict) else None
+    w = cc.get("pdf_check") if isinstance(cc, dict) else None
+    if not isinstance(w, dict):
+        return ["hash từng trang tự tính từ text.md không phải bằng chứng đã đối chiếu PDF; thiếu pdf_check"]
+    if w.get("result") != "MATCH":
+        return ["pdf_check.result phải là MATCH sau khi đối chiếu text.md với PDF"]
+    if not recognised_seat(str(w.get("checker") or "")):
+        return ["pdf_check.checker phải bắt đầu bằng tên ghế đã đối chiếu PDF"]
+    if len(str(w.get("evidence") or "").strip()) < 15:
+        return ["pdf_check.evidence thiếu mô tả đối chiếu để reviewer kiểm"]
+    if not isinstance(text, str):
+        return ["pdf_check không gắn được vì thiếu text.md"]
+    text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
+    if w.get("text_sha256") != text_hash or w.get("text_sha256") != entry.get("text_sha256"):
+        return ["pdf_check không gắn với đúng bản text.md hiện tại — biên bản cũ không còn hiệu lực khi bản chép đổi"]
+    if w.get("original_sha256") != entry.get("original_sha256"):
+        return ["pdf_check không gắn với đúng tệp PDF đã ghim"]
+    n = len(page_surface(text))
+    if w.get("pages_checked") != list(range(1, n + 1)):
+        return ["pdf_check.pages_checked phải là danh sách đủ trang 1..N đã đối chiếu, không phải một số đếm"]
+    return []
+
+
+def transcription_errors(entry, pages, doc_id=None, text=None, require_witness=True) -> list[str]:
+    """Lỗi nếu chưa chứng minh chép đúng từng trang. Số pages_checked một mình không đủ.
+    require_witness=False: chỉ tầng hash máy (cổng ghim). True: thêm pdf_check (SOURCED và ghi chú dùng được)."""
+    if not isinstance(entry, dict) or not claims_original(entry):
+        return ["thiếu ghim tệp gốc"]
+    if entry.get("original_sha256") in (entry.get("sha256"), entry.get("text_sha256")):
+        return ["hash text.md không được dùng làm hash tệp gốc"]
+    errs = _page_hash_errors(entry, text, doc_id)
+    if pages is not None and isinstance(text, str) and set(pages) != set(page_surface(text)) and not errs:
+        errs.append("tập trang đã tách không khớp các trang dùng để tính hash")
+    if require_witness:
+        for msg in pdf_witness_errors(entry, text):
+            if msg not in errs:
+                errs.append(msg)
+    return errs
+
+
+def transcription_verified(entry, pages, doc_id=None, text=None) -> bool:
+    return transcription_errors(entry, pages, doc_id, text, require_witness=True) == []
 
 
 def _page_set_ok(pages, total) -> bool:
     return isinstance(pages, dict) and _pos_int(total) and set(pages) == set(range(1, total + 1))
 
 
-def may_mark_sourced(entry, pages, doc_id=None) -> bool:
-    """True chỉ khi tệp gốc được ghim riêng và biên bản từng trang khớp text.md.
-    Số pages_checked không đủ. Hàm không đọc đĩa."""
-    if not transcription_verified(entry, pages, doc_id):
+def may_mark_sourced(entry, pages, doc_id=None, text=None) -> bool:
+    """True chỉ khi tệp gốc được ghim riêng, hash cả trang (gồm bảng) khớp, và có pdf_check gắn đúng hai hash.
+    page_crosscheck() tự sinh không đủ. Hàm không đọc đĩa."""
+    if not isinstance(text, str) or not transcription_verified(entry, pages, doc_id, text):
         return False
     known = KNOWN_ORIGINALS.get(doc_id or "")
     if known and (entry.get("original_sha256") != known["original_sha256"] or entry.get("original_bytes") != known["original_bytes"]):
@@ -301,17 +369,19 @@ def origin_binding_errors(root, doc_id, entry, text_bytes) -> list[str]:
                 errs.append(f"{prefix}: pages_total phải là {known['pages']} — chưa đối chiếu đủ {known['pages']} trang thì không ghi nhận")
             if _pos_int(total):
                 try:
-                    pages, _tables = parse_text(text_bytes.decode("utf-8"))
+                    decoded = text_bytes.decode("utf-8")
+                    pages, _tables = parse_text(decoded)
                 except UnicodeError:
-                    pages = {}
+                    decoded, pages = None, {}
                 if not _page_set_ok(pages, total):
                     errs.append(f"{prefix}: text.md không có đủ trang 1..{total} để đối chiếu")
             else:
                 try:
-                    pages, _tables = parse_text(text_bytes.decode("utf-8"))
+                    decoded = text_bytes.decode("utf-8")
+                    pages, _tables = parse_text(decoded)
                 except UnicodeError:
-                    pages = {}
-            for msg in transcription_errors(entry, pages, doc_id):
+                    decoded, pages = None, {}
+            for msg in transcription_errors(entry, pages, doc_id, decoded, require_witness=False):
                 if msg == "thiếu ghim tệp gốc":
                     continue
                 line = f"{prefix}: {msg}"
@@ -487,10 +557,20 @@ def check_note(root, path, docs, man, today):
             errs.append(f"{nid}: {why} (L-09)")
     if note.get("status") in USABLE_NOTE_STATUS:
         for d in note.get("doc_ids") or []:
+            src = pathlib.Path(root) / LIB / "sources" / d / "text.md"
+            try:
+                text = src.read_text(encoding="utf-8") if src.is_file() else None
+            except UnicodeError:
+                text = None
             pages = (docs.get(d) or ({}, {}))[0] if d in docs else None
-            if pages is None or not transcription_verified(man.get(d) or {}, pages, d):
+            entry = man.get(d) or {}
+            if pages is None or not transcription_verified(entry, pages, d, text):
                 errs.append(f"{nid}: status {note['status']} không dùng được khi {d} chưa có tệp gốc đã kiểm "
-                            "và biên bản đối chiếu từng trang (L-01)")
+                            "và biên bản đối chiếu PDF từng trang, gồm bảng (L-01)")
+            else:
+                checker = str(((entry.get("crosscheck") or {}).get("pdf_check") or {}).get("checker") or "")
+                if same_provider(checker, note.get("read_by")):
+                    errs.append(f"{nid}: ghế đối chiếu PDF trùng ghế đọc ghi chú — không phải cổng độc lập (L-09)")
     expired = [d for d in note["doc_ids"] if d in man and _expired(man[d], today)]
     if expired and note["status"] != "OUTDATED":
         warns.append(f"{nid}: dựa trên văn bản hết hiệu lực {expired} — vòng học sẽ chuyển OUTDATED (L-08)")
@@ -535,8 +615,13 @@ def check_library(root=REPO, today=None):
             if st == "NOTE_WRITTEN" and d not in noted:
                 warns.append(f"reading_queue: {d} ghi NOTE_WRITTEN nhưng chưa có ghi chú nào dẫn tài liệu này")
             if st == "SOURCED":
+                src = root / LIB / "sources" / d / "text.md"
+                try:
+                    text = src.read_text(encoding="utf-8") if src.is_file() else None
+                except UnicodeError:
+                    text = None
                 pages = (docs.get(d) or ({}, {}))[0]
-                if not may_mark_sourced(man.get(d) or {}, pages, d):
+                if not may_mark_sourced(man.get(d) or {}, pages, d, text):
                     errs.append(f"L-01: reading_queue {d} ghi SOURCED khi chưa đối chiếu đủ từng trang với tệp gốc "
                                 "(hash khớp không phải bằng chứng chép đúng)")
                 elif origin_binding_errors(root, d, man[d], (root / LIB / "sources" / d / "text.md").read_bytes()):

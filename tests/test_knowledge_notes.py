@@ -61,6 +61,12 @@ class LibraryTests(unittest.TestCase):
                       "original_sha256": hashlib.sha256(self.pdf).hexdigest(), "original_bytes": len(self.pdf),
                       "original_path": "library/sources/van_ban_mau/goc.pdf",
                       "crosscheck": kn.page_crosscheck(TEXT)}
+        cc = self.entry["crosscheck"]
+        cc["pdf_check"] = {"checker": "Owner", "result": "MATCH",
+                           "pages_checked": [p["page"] for p in cc["pages"]],
+                           "evidence": "Đối chiếu từng trang text.md với PDF gốc, gồm các ô bảng.",
+                           "text_sha256": self.entry["text_sha256"],
+                           "original_sha256": self.entry["original_sha256"]}
         self._manifest({"van_ban_mau": self.entry})
         (self.tmp / "library" / "notes").mkdir()
         (self.tmp / "library" / "INDEX.md").write_text("| KN-T2-luat-ke-toan-pham-vi |", encoding="utf-8")

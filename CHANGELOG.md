@@ -2,7 +2,7 @@
 
 ## v3.0.7b — 2026-11-18 (PR-B, L-01 ghim tệp gốc) — Grok (xAI) soạn; ADR-0012 PROPOSED; chưa gộp
 - `sha256`/`bytes` giữ nghĩa hash của `text.md`. Mọi dòng manifest phải có `original_sha256`, `original_bytes`, `original_path`, `text_sha256`, `text_bytes`. Bỏ các trường đó không qua cổng nguồn. Manifest trên `main` đang rỗng, không giữ đường vòng cho dòng cũ.
-- `SOURCED` và ghi chú `CITED`/`TESTED`/`PROVEN` chỉ khi `crosscheck.pages` có sha256 và đầu/cuối từng trang. Số `pages_checked` không phải biên bản. Hash khớp không phải bằng chứng chép đúng.
+- Hash từng trang tính cả bảng, không chỉ đoạn văn. `page_crosscheck()` không phải biên bản đối chiếu PDF. `SOURCED` và ghi chú `CITED`/`TESTED`/`PROVEN` cần thêm `pdf_check` gắn đúng hash `text.md` và hash PDF, do ghế khác người đọc ghi chú. Máy không đọc ảnh trang.
 - Luật Kế toán 88/2015: nếu khai tệp gốc thì chỉ nhận SHA-256 `1fd9336a…cca50`, 2566253 byte, 35 trang. Kho này chưa ghim PDF và hàng đợi vẫn `QUEUED`.
 
 
