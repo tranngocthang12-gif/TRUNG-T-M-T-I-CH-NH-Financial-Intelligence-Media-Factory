@@ -1,9 +1,9 @@
 # ADR-0011: Khóa nhận dự báo theo lúc thông tin có thể được công bố
 - Ngày: 2026-11-18
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này, sau bản chấm L-09 của ghế khác nhà cung cấp)
+- Trạng thái: ACCEPTED (Owner đã gộp [PR #45](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/45), merge `cb931b44274eec4f2cbc104230c9fcae17b526a4`; quyết định giữ nguyên)
 - Người đề xuất: Grok (xAI), ghế thi công, theo lệnh thi công cùng ngày; sửa mã và quyết định 5, 7, 8, 9–11 bởi Claude (Anthropic) theo lệnh Owner "[TTC] Sửa dứt điểm PR #45 / L-05" ngày 18/11/2026
-- Người chấm: để trống đến khi ghế khác nhà cung cấp chấm
-- Owner duyệt: hiệu lực khi Owner gộp
+- Người chấm: Gemini (Google) (theo `reviewed_by` của PR); [bản chấm L-09](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/45#issuecomment-6986598442) trên HEAD `7078dc50b2c3988b08338c6c31ae8d31271642a3`. Hai lượt L-09 cuối trên HEAD này đều SUCCESS: [pull_request_target](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44361713913/job/135004600960); [pull_request](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44361712935/job/135004591302).
+- Owner duyệt: 19/11/2026 00:43:15 giờ Việt Nam (UTC+07:00; GitHub `merged_at`: `2026-11-18T17:43:15Z`), [PR #45](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/45); merge `cb931b44274eec4f2cbc104230c9fcae17b526a4`.
 
 ## Quyết định
 1. Dự báo mới phải khai `info_lock_at` (YYYY-MM-DD, giờ Việt Nam): ngày đầu tiên thông tin dùng để phân định **có thể** được công bố. Điều kiện nhận: ngày tạo Issue < `info_lock_at` ≤ `resolve_at`. Hạn này độc lập với hạn phân định. Thiếu trường, sai dạng, hoặc khóa không sau ngày tạo thì không ghi.

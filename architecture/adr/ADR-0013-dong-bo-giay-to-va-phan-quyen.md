@@ -1,9 +1,9 @@
 # ADR-0013: Đồng bộ giấy tờ sau sáu dự báo; không thêm ghế, không đổi mẫu
 - Ngày: 2026-11-18
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này, sau bản chấm L-09 của ghế khác nhà cung cấp)
+- Trạng thái: ACCEPTED (Owner đã gộp [PR #47](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/47), merge `fc8077cf2f892dc1093b5bb26312db90886d339e`; quyết định giữ nguyên)
 - Người đề xuất: Grok (xAI), ghế thi công, theo lệnh thi công cùng ngày
-- Người chấm: để trống đến khi ghế khác nhà cung cấp chấm
-- Owner duyệt: hiệu lực khi Owner gộp
+- Người chấm: ChatGPT (OpenAI) (theo `reviewed_by` của PR); [bản chấm L-09](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/47#issuecomment-6984297276) trên HEAD `563f689e23b99c471d188c89df7194a14b34e599`. Hai lượt L-09 cuối trên HEAD này đều SUCCESS: [pull_request_target](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44346211998/job/134949187288); [pull_request](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44346208218/job/134949164881).
+- Owner duyệt: 18/11/2026 23:21:08 giờ Việt Nam (UTC+07:00; GitHub `merged_at`: `2026-11-18T16:21:08Z`), [PR #47](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/47); merge `fc8077cf2f892dc1093b5bb26312db90886d339e`.
 
 ## Quyết định
 1. **§8 khớp sổ, không hủy đồng hồ 3 tuần.** Ngày 18/11/2026 sổ có F-37–F-42, ba cặp A/B, dấu nhận robot khớp hash. `state/PROJECT_STATE.yaml` ghi `V3_G0_DAT_DIEU_KIEN_KY_THUAT`. Đó là điều kiện kỹ thuật của G0, không phải G1 (thư viện 0/40, dự báo 6/60). Cột dừng/đảo “quá 3 tuần → chỉ giữ Ledger” không bị hủy. ADR-0002 và mốc 31/03/2027 không đổi. Quyết định 1–7 của ADR-0010 không viết lại; câu pha cũ trong quyết định 2 của ADR đó giữ nguyên chữ đã chấm. Pha hiện tại đọc ở tệp trạng thái và ở §8.
