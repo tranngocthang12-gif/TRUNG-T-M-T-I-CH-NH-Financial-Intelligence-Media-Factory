@@ -68,14 +68,7 @@ Ruleset `Protect main history` (id 27474018) đã active trên nhánh mặc đ�
 
 GitHub **chưa** bắt check phải xanh trước khi merge. L-09 đỏ không tự chặn nút Merge. PR #43 không phải một vụ vi phạm L-09: trước lúc gộp, lượt L-09 sau đã success trên cả `pull_request` và `pull_request_target`.
 
-Nếu Owner muốn GitHub chặn merge khi check đỏ, Owner tự sửa ruleset đó (ghế thi công không sửa):
-1. Settings → Rules → Rulesets → `Protect main history`.
-2. Giữ Restrict deletions và Block force pushes. Không thêm bypass.
-3. Add rule → Require status checks to pass. Thêm đúng ba tên:
-   - `Test bat buoc (chan merge)`
-   - `L-09 nguoi cham khac nha cung cap (pull_request)`
-   - `L-09 nguoi cham khac nha cung cap (pull_request_target)`
-4. **Không** bật “Require a pull request before merging”: bật là robot không ghi được vào sổ.
+Không bật required status checks trong hướng dẫn này. `ledger_intake.yml` và `resolution_intake.yml` đều `contents: write` và `git push origin HEAD:main` thẳng vào `main`, không qua PR. `daily_cycle.yml` cũng đẩy `main`. Chưa chứng minh robot vẫn đẩy được nếu bật rule đó. Việc này chờ quyết định hoặc thiết kế riêng. Không yêu cầu Owner bật ngay. Không bật “Require a pull request before merging”.
 
 “Sau sáu tháng” ở G4 và Media là mốc xem xét, không phải hạn phải có 194 bất đồng. Không tự sửa `governance/SAFETY_STATE.yaml`.
 

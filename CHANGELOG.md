@@ -4,7 +4,7 @@
 - §8 khớp sáu dự báo F-37–F-42 và pha `V3_G0_DAT_DIEU_KIEN_KY_THUAT`. Không hủy cột dừng/đảo 3 tuần và không dời mốc ADR-0002.
 - Header ADR-0010 và dòng danh mục chuyển ACCEPTED theo PR #35 đã gộp (merge `400de577`). Quyết định 1–7 không viết lại.
 - Ghi phạm vi phép thử: cả bộ TTC so với Claude trần, không đo riêng Thư viện. Báo cáo tương lai tách câu trả lời ghế B khỏi phần biểu mẫu. “Sau sáu tháng” là mốc xem xét. Không sửa `SAFETY_STATE.yaml`, không sửa Ledger, không sửa mẫu 194.
-- Ruleset `Protect main history` chỉ có cấm xóa nhánh và cấm force-push. Không gọi PR #43 là vi phạm L-09. Các bước bật required checks nằm trong ADR-0013 cho Owner.
+- Ruleset `Protect main history` chỉ có cấm xóa nhánh và cấm force-push. Không gọi PR #43 là vi phạm L-09. Không yêu cầu Owner bật required status checks: `ledger_intake.yml` và `resolution_intake.yml` đẩy thẳng `main`, chưa chứng minh rule đó vẫn cho đẩy. Việc này chờ quyết định riêng.
 
 
 ## v3.0.6 — 2026-11-18 (ghế thi công; sửa giấy tờ) — nội dung do Grok (xAI) soạn theo lệnh Owner; ADR-0010; Owner gộp sau L-09
