@@ -3,7 +3,8 @@
 ## v3.0.7 — 2026-11-18 (PR-A, L-05 hạn khóa công bố) — Grok (xAI) soạn; ADR-0011 PROPOSED; chưa gộp
 - Dự báo mới bắt buộc `info_lock_at` (ngày thông tin có thể công bố), với ngày tạo < hạn khóa ≤ `resolve_at`. Không đặt lại sau khi ghi. Dấu nhận phải trước cả hạn khóa lẫn `resolve_at`.
 - Issue `[Publication]` ghi `ledger/publication_evidence.jsonl` khi kết quả công bố sớm. Có dòng đó thì ngừng nhận dự báo của câu hỏi. `published_at` phải có múi giờ; chỉ có ngày thì từ chối. Không ghi đè.
-- `capability_test_eligible` loại dự báo không chứng minh được đã ghi trước lúc công bố. Mẫu 194 và `engine/ledger.py` không đổi.
+- `capability_test_eligible` được `issue_summary` dùng để chặn phán quyết. Mẫu 194 không đổi thành phần. Thiếu bằng chứng thời điểm thì `CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN`, không rút cặp sau vào thay.
+- `info_lock_at` tự khai không đủ. Hạn khóa vào phép kiểm định chỉ khi khớp `governance/release_calendar.jsonl` do ghế khác ghi trước Issue.
 - F-37–F-42 giữ nguyên byte và hash. Chưa có bằng chứng công bố sau giờ ghi thì `legacy_unproven`, không vào phép kiểm định hợp lệ.
 
 

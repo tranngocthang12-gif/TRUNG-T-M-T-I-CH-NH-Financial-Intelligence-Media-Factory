@@ -235,7 +235,7 @@ def _same_day(a, b):
     except (KeyError, TypeError, ValueError):
         return False
 
-def issue_summary(all_rows, R):
+def issue_summary(all_rows, R, pub_rows=None, calendar=None):
     """Chấm dự báo từ Issue theo ARCHITECTURE v3.0 §4.1 bước 5 và ADR-0003.
     Theo ghế: n, đã phân định, VOID, chờ; Brier, Brier của xác suất nền, hiệu chuẩn.
     Cặp A–B: cùng câu hỏi (question + resolve_at), ghi cùng ngày (giờ VN, §4.2). Bất đồng = hai ghế ở hai phía 0,5.
@@ -249,7 +249,9 @@ def issue_summary(all_rows, R):
     - Phạm vi phép thử (ADR-0002): câu hỏi có luật event_before_date KHÔNG vào phép thử A–B — ghế A được tìm web, ghế B
       thì không, nên với loại câu hỏi mà sự kiện có thể đã xảy ra trước khi hỏi, bất đồng không đo thư viện mà đo việc
       tìm web. Các cặp đó vẫn là cặp, vẫn vào tỷ lệ bất đồng và Brier theo ghế; số của chúng báo riêng.
-    - Chỉ ra phán quyết khi CẢ 194 cặp đó đã đóng (phân định YES/NO, hoặc VOID). Còn cặp chưa đóng → "CHƯA ĐỦ MẪU".
+    - Chỉ ra phán quyết khi CẢ 194 cặp đó đã đóng (phân định YES/NO, hoặc VOID) VÀ từng cặp trong mẫu đã chứng minh thời điểm.
+      Cặp after_publication, legacy_unproven, self_declared_lock hoặc không đủ bằng chứng thì không tạo phán quyết năng lực.
+      Mẫu không được thay bằng cặp sau cho đủ chỗ. Chưa đủ bằng chứng → "CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN".
     - VOID là một quyền chọn của người phân định (bỏ câu hỏi), nên mỗi cặp VOID trong mẫu được tính theo hướng BẤT LỢI cho
       kết luận đang xét: xét "A hơn B" thì coi A sai ở mọi cặp VOID; xét "B hơn A" thì coi A đúng ở mọi cặp VOID. Hủy một
       câu hỏi vì thế không bao giờ làm kết luận nào dễ đạt hơn.
@@ -313,12 +315,29 @@ def issue_summary(all_rows, R):
     r = sum(1 for ab in fixed if is_res(ab))
     k = sum(1 for ab in fixed if is_res(ab) and right(ab[0]))
     full = n == TARGET_DISAGREEMENTS and r + v == n                              # đủ 194 cặp VÀ cả 194 cặp đã đóng
-    p_a = _binom_two_sided(k, n) if full else None                               # xét "A hơn B": mọi cặp VOID coi như A sai
-    p_b = _binom_two_sided(k + v, n) if full else None                           # xét "B hơn A": mọi cặp VOID coi như A đúng
-    verdict = ((f"CHƯA ĐỦ MẪU ({r + v}/{TARGET_DISAGREEMENTS} cặp bất đồng đầu tiên đã phân định hoặc VOID; đã ghi {n} cặp)")
-               if not full else
-               "A HƠN B CÓ Ý NGHĨA" if p_a < 0.05 and k > n / 2 else
-               "B HƠN A CÓ Ý NGHĨA" if p_b < 0.05 and k + v < n / 2 else "CHƯA THẤY KHÁC BIỆT A–B")
+    from tools.ledger_intake import capability_test_eligible, timing_verification_status
+    pubs, cals = pub_rows or [], calendar or []
+    blocked, reasons = [], {}
+    for ab_ in fixed:
+        bad = None
+        for side in ab_:
+            if not capability_test_eligible(side, pubs, cals):
+                bad = timing_verification_status(side, pubs, cals)
+                break
+        if bad:
+            blocked.append(ab_)
+            reasons[bad] = reasons.get(bad, 0) + 1
+    timing_ready = not blocked
+    p_a = _binom_two_sided(k, n) if full and timing_ready else None             # xét "A hơn B": mọi cặp VOID coi như A sai
+    p_b = _binom_two_sided(k + v, n) if full and timing_ready else None         # xét "B hơn A": mọi cặp VOID coi như A đúng
+    if not full:
+        verdict = (f"CHƯA ĐỦ MẪU ({r + v}/{TARGET_DISAGREEMENTS} cặp bất đồng đầu tiên đã phân định hoặc VOID; đã ghi {n} cặp)")
+    elif not timing_ready:
+        verdict = (f"CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN (mẫu {n} cặp bất đồng đầu tiên giữ nguyên, không thay cặp; "
+                   f"{len(blocked)} cặp chưa chứng minh thời điểm)")
+    else:
+        verdict = ("A HƠN B CÓ Ý NGHĨA" if p_a < 0.05 and k > n / 2 else
+                   "B HƠN A CÓ Ý NGHĨA" if p_b < 0.05 and k + v < n / 2 else "CHƯA THẤY KHÁC BIỆT A–B")
     ab = {"pairs": len(pairs), "unpaired": unpaired, "not_same_day": not_same_day, "disagreements": len(dis),
           "disagreements_out_of_scope": len(dis_all) - len(dis),
           "disagreements_all": len(dis_all),          # ADR-0007: mẫu số của disagreement_rate (gồm cả event_before_date)
@@ -329,7 +348,8 @@ def issue_summary(all_rows, R):
           "fixed_sample": {"n": n, "resolved": r, "void": v, "open": n - r - v, "a_correct": k,
                            "p_value_void_as_a_wrong": round(p_a, 4) if p_a is not None else None,
                            "p_value_void_as_a_right": round(p_b, 4) if p_b is not None else None},
-          "verdict": verdict}
+          "verdict": verdict,
+          "timing": {"blocked_pairs": len(blocked), "reasons": reasons, "sample_replaced": False}}
     if v:
         ab["void_rule"] = (f"{v} cặp bất đồng trong mẫu chốt bị VOID: tính A sai khi xét 'A hơn B', tính A đúng khi xét 'B hơn A' "
                            "(ADR-0003 quyết định 3)")
@@ -361,8 +381,10 @@ def scorecard(as_of):
     R = _load(RES)
     rows = [{**P[r["prediction_id"]], **r} for r in R if r.get("prediction_id") in P and r.get("outcome") is not None]
     void = sum(1 for r in R if r.get("prediction_id") in P and r.get("outcome") is None)
+    pubs = _load("ledger/publication_evidence.jsonl")
+    cals = _load("governance/release_calendar.jsonl")
     out = {"as_of": as_of, "total_predictions": len(all_rows), "resolved": len(rows), "void_data_error": void,
-           "issue_forecasts": issue_summary(all_rows, R), "procedures": {}}
+           "issue_forecasts": issue_summary(all_rows, R, pubs, cals), "procedures": {}}
     if rows:
         df = pd.DataFrame(rows)
         for proc, g in df.groupby("procedure"):

@@ -38,8 +38,14 @@ body:
     id: info_lock_at
     attributes:
       label: info_lock_at
-      description: "Ngày đầu tiên thông tin phân định CÓ THỂ công khai, YYYY-MM-DD (giờ Việt Nam). Phải sau hôm nay và không sau resolve_at. Ví dụ công bố CPI trước hạn chấm: ghi ngày công bố dự kiến, không ghi ngày resolve_at. Cùng câu hỏi thì hai ghế phải cùng một ngày. Không sửa được sau khi ghi."
+      description: "Ngày người gửi khai thông tin có thể công khai, YYYY-MM-DD. Đây chưa phải bằng chứng. Muốn vào phép kiểm định thì phải khớp một dòng lịch công bố độc lập (calendar_id)."
     validations: {required: true}
+  - type: input
+    id: calendar_id
+    attributes:
+      label: calendar_id
+      description: "Id một dòng đã có trong governance/release_calendar.jsonl, do ghế khác ghi trước Issue. Để trống thì dự báo vẫn có thể ghi nhưng không vào phép kiểm định."
+    validations: {required: false}
   - type: input
     id: p
     attributes:

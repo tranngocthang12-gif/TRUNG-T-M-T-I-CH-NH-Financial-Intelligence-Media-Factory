@@ -181,7 +181,9 @@ def check_ledger_rows(root) -> list[str]:
             versions = ledger_intake.control_b_versions(root / "governance" / "control_b_prompts.jsonl")
         except (OSError, ValueError):
             versions = []                                       # tệp ghim hỏng: check_control_b_prompts báo; mọi dòng B sẽ đỏ
-        return ledger_intake.ledger_errors(pred, res, versions, pub_rows=rows(root / "ledger" / "publication_evidence.jsonl") or [])
+        cal = ledger_intake.load_calendar(root)
+        return ledger_intake.ledger_errors(pred, res, versions, pub_rows=rows(root / "ledger" / "publication_evidence.jsonl") or [],
+                                           calendar=cal)
     except Exception as e:  # noqa: BLE001
         return [f"L-05: không chạy lại được luật nhận trên sổ ({str(e).splitlines()[0]})"]
 

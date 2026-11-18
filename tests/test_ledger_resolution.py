@@ -914,21 +914,34 @@ class ResolverSeatTests(_Base):
 
 
 class ScoringTests(_Base):
+    _CAL = {"calendar_id": "RC-TEST", "domains": ["nso.gov.vn"], "info_lock_at": "2026-12-20",
+            "evidence_url": "https://www.nso.gov.vn/lich-cong-bo",
+            "quote": "Lịch công bố số tháng 11 là ngày 20/12/2026.",
+            "recorder": "Owner", "recorded_at": "2026-11-01T00:00:00Z"}
+
     def _fake(self, n_pairs, a_right, start=1000, a_day="2026-11-17T02:00:00Z", b_day="2026-11-17T03:00:00Z"):
-        """Ghi thẳng n cặp bất đồng đã phân định (A=0,7; B=0,3), A đúng ở a_right cặp đầu."""
+        """Ghi thẳng n cặp bất đồng đã phân định (A=0,7; B=0,3), A đúng ở a_right cặp đầu.
+        Mỗi dòng có lịch công bố độc lập khớp info_lock_at, nên phép kiểm định nhị thức vẫn chạy khi thời điểm đã chứng minh."""
         preds, res = [], []
         for i in range(n_pairs):
             q = f"Câu hỏi giả lập số {i}?"
             for seat, p, num, day in (("A", 0.7, start + 2 * i, a_day), ("B", 0.3, start + 2 * i + 1, b_day)):
                 preds.append({"id": f"F-{num}", "issue_number": num, "issue_created_at": day, "seat": seat, "question": q,
-                              "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5})
+                              "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5, "info_lock_at": "2026-12-20",
+                              "resolution_source": "nso.gov.vn", "calendar_id": "RC-TEST",
+                              "author_seat": "Claude Project TTC" if seat == "A" else "Claude trần"})
                 res.append({"prediction_id": f"F-{num}", "outcome": 1 if i < a_right else 0, "resolution_issue": 90000 + start + i})
         return preds, res
 
-    def _score(self, preds, res):
+    def _score(self, preds, res, calendar=None, pubs=None):
         env = {**os.environ, "TTC_HOME": str(self.tmp), "PYTHONPATH": str(ROOT)}
-        (self.tmp / "p.json").write_text(json.dumps([preds, res]), encoding="utf-8")
-        code = "import json;from engine import ledger;p,r=json.load(open(r'%s'));print(json.dumps(ledger.issue_summary(p,r),ensure_ascii=False))" % (self.tmp / "p.json")
+        payload = {"p": preds, "r": res, "c": self._CAL if calendar is None else calendar, "pubs": pubs or []}
+        if isinstance(payload["c"], dict):
+            payload["c"] = [payload["c"]]
+        (self.tmp / "p.json").write_text(json.dumps(payload), encoding="utf-8")
+        code = ("import json;from engine import ledger;d=json.load(open(r'%s'));"
+                "print(json.dumps(ledger.issue_summary(d['p'],d['r'],d['pubs'],d['c']),ensure_ascii=False))"
+                ) % (self.tmp / "p.json")
         r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         return json.loads(r.stdout.strip().splitlines()[-1])
@@ -950,6 +963,28 @@ class ScoringTests(_Base):
         self.assertEqual(self._score(win_p, win_r)["ab"]["verdict"], "A HƠN B CÓ Ý NGHĨA")
         lose_p, lose_r = self._fake(194, 82)
         self.assertEqual(self._score(lose_p, lose_r)["ab"]["verdict"], "B HƠN A CÓ Ý NGHĨA")
+
+    def test_unproven_or_late_publication_blocks_verdict_and_keeps_the_sample(self):
+        """Cặp trong mẫu 194 không đủ thời điểm thì không có phán quyết năng lực, và không được rút cặp sau vào thay."""
+        preds, res = self._fake(194, 112)
+        bare = self._score(preds, res, calendar=[])["ab"]
+        self.assertEqual(bare["fixed_sample"]["n"], 194)
+        self.assertTrue(bare["verdict"].startswith("CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN"))
+        self.assertFalse(bare["timing"]["sample_replaced"])
+        self.assertEqual(bare["timing"]["reasons"].get("self_declared_lock"), 194)
+        late = {"question": preds[0]["question"], "resolve_at": "2026-12-31", "published_at": "2026-11-16T00:00:00Z",
+                "issue_created_at": "2026-11-18T00:00:00Z"}
+        poisoned = self._score(preds, res, pubs=[late])["ab"]
+        self.assertEqual(poisoned["fixed_sample"]["n"], 194)
+        self.assertEqual(poisoned["fixed_sample"]["a_correct"], 112)
+        self.assertTrue(poisoned["verdict"].startswith("CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN"))
+        self.assertNotIn("A HƠN B", poisoned["verdict"])
+        self.assertEqual(poisoned["timing"]["reasons"].get("after_publication"), 1)
+        more_p, more_r = self._fake(30, 30, start=8000)
+        still = self._score(preds + more_p, res + more_r, pubs=[late])["ab"]
+        self.assertEqual(still["fixed_sample"]["n"], 194)
+        self.assertEqual(still["fixed_sample"]["a_correct"], poisoned["fixed_sample"]["a_correct"])
+        self.assertTrue(still["verdict"].startswith("CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN"))
 
     def _void(self, res, pairs, start=1000):
         """Đổi kết quả của các cặp (theo số thứ tự cặp trong _fake) thành VOID cho cả A và B."""

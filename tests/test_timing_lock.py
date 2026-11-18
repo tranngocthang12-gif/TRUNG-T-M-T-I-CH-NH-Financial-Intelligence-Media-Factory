@@ -102,8 +102,8 @@ class TimingLockTests(unittest.TestCase):
         by_id = {r["id"]: r for r in rows}
         self.assertEqual(ledger_intake.timing_verification_status(by_id["F-510"], pubs), "after_publication")
         self.assertFalse(ledger_intake.capability_test_eligible(by_id["F-510"], pubs))
-        self.assertEqual(ledger_intake.timing_verification_status(by_id["F-509"], pubs), "eligible")
-        self.assertTrue(ledger_intake.capability_test_eligible(by_id["F-509"], pubs))
+        self.assertEqual(ledger_intake.timing_verification_status(by_id["F-509"], pubs), "self_declared_lock")
+        self.assertFalse(ledger_intake.capability_test_eligible(by_id["F-509"], pubs))
         self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])
         self.assertEqual(engine_ledger.TARGET_DISAGREEMENTS, 194)
 
@@ -131,6 +131,52 @@ class TimingLockTests(unittest.TestCase):
         text = tampered.read_text(encoding="utf-8").replace("3,50%", "3,51%", 1)
         tampered.write_text(text, encoding="utf-8")
         self.assertTrue(any("F-37" in e for e in laws_checks.check_timing_legacy_pin(self.tmp)))
+
+    def test_self_declared_lock_is_not_proof_and_late_publication_still_blocks(self):
+        """Nộp sau khi đã công bố nhưng trước info_lock_at tự khai, và bằng chứng công bố ghi muộn hơn Issue dự báo."""
+        cal = {"calendar_id": "RC-NSO-11", "domains": ["nso.gov.vn"], "info_lock_at": "2026-12-20",
+               "evidence_url": "https://www.nso.gov.vn/lich-cong-bo-thang-11",
+               "quote": "Số tháng 11 được công bố ngày 20/12/2026.",
+               "recorder": "Owner", "recorded_at": "2026-11-01T00:00:00Z"}
+        (self.tmp / "governance" / "release_calendar.jsonl").write_text(json.dumps(cal) + "\n", encoding="utf-8")
+        body = _forecast("A", question="CPI tháng 11 có tăng từ 3% trở lên so với cùng kỳ không?", lock="2026-12-20")
+        cited = body + "\n\n### calendar_id\n\nRC-NSO-11"
+        c, o = self._run("ledger_intake.py", 520, cited, "2026-12-07T02:00:00Z")
+        self.assertEqual(c, 0, o)
+        rows = [json.loads(l) for l in (self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()]
+        row = rows[-1]
+        before = json.dumps(row, sort_keys=True)
+        self.assertEqual(ledger_intake.timing_verification_status(row, [], [cal]), "eligible")
+        # lịch không khớp ngày tự khai thì không nhận
+        bad = _forecast("A", question="IIP tháng 11 có tăng từ 8% trở lên so với cùng kỳ không?", lock="2026-12-28")
+        c, o = self._run("ledger_intake.py", 521, bad + "\n\n### calendar_id\n\nRC-NSO-11", "2026-12-07T03:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("không khớp lịch", o)
+        # công bố thật ngày 6/12, Issue bằng chứng mở ngày 8/12 — sau dự báo 7/12, nên dòng dự báo không bị viết lại
+        c, o = self._run("resolution_intake.py", 620, _pub("F-520", "2026-12-06T01:00:00Z"), "2026-12-08T02:00:00Z")
+        self.assertEqual(c, 0, o)
+        rows2 = [json.loads(l) for l in (self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()]
+        again = [r for r in rows2 if r["id"] == "F-520"][0]
+        self.assertEqual(json.dumps(again, sort_keys=True), before)
+        pubs = [json.loads(l) for l in (self.tmp / "ledger" / "publication_evidence.jsonl").read_text(encoding="utf-8").splitlines()]
+        self.assertEqual(ledger_intake.timing_verification_status(again, pubs, [cal]), "after_publication")
+        self.assertFalse(ledger_intake.capability_test_eligible(again, pubs, [cal]))
+        self.assertEqual(ledger_intake.forecast_error(
+            {k: v for k, v in again.items() if k not in ledger_intake.SYSTEM_FIELDS},
+            again["issue_created_at"], [], [], live=False, pub_rows=pubs, calendar=[cal])[0], None)
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])
+        same = dict(cal, calendar_id="RC-SAME", recorder="Claude Project TTC")
+        late_cal = dict(cal, calendar_id="RC-LATE", recorded_at="2026-12-08T00:00:00Z")
+        (self.tmp / "governance" / "release_calendar.jsonl").write_text(
+            "\n".join(json.dumps(x, ensure_ascii=False) for x in (cal, same, late_cal)) + "\n", encoding="utf-8")
+        c, o = self._run("ledger_intake.py", 522,
+                         _forecast("A", question="Xuất khẩu tháng 11 có tăng từ 8% trở lên so với cùng kỳ không?", lock="2026-12-20")
+                         + "\n\n### calendar_id\n\nRC-SAME", "2026-12-07T04:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("không độc lập", o)
+        c, o = self._run("ledger_intake.py", 523,
+                         _forecast("A", question="Nhập khẩu tháng 11 có tăng từ 8% trở lên so với cùng kỳ không?", lock="2026-12-20")
+                         + "\n\n### calendar_id\n\nRC-LATE", "2026-12-07T05:00:00Z")
+        self.assertEqual(c, 2, o); self.assertIn("không đứng trước", o)
+        self.assertEqual(laws_checks.check_ledger_rows(self.tmp), [])
 
 
 if __name__ == "__main__":
