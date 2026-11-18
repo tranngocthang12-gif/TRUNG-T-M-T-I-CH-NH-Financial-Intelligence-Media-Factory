@@ -7,17 +7,17 @@
 
 ## Quyết định
 1. `sha256` và `bytes` trong `library/SOURCE_MANIFEST.json` luôn là của `library/sources/<doc_id>/text.md`. Chúng không phải hash PDF.
-2. Khi một dòng khai bất kỳ trường nào trong `original_sha256`, `original_bytes`, `original_path`, `text_sha256`, `text_bytes` hoặc khai `crosscheck`, thì phải có đủ năm trường gốc. `text_sha256`/`text_bytes` phải trùng `sha256`/`bytes` và trùng byte của `text.md`. `original_sha256` phải khác hash `text.md`. `original_path` là đường dẫn tương đối trong `library/sources/<doc_id>/`, không tuyệt đối, không `..`, không được là `text.md`. Máy đọc byte tệp đó và so SHA-256 cùng số byte.
-3. `may_mark_sourced` chỉ đúng khi quyết định 2 đã giữ và `crosscheck.method` là `page-by-page` với `pages_checked` = `pages_total` = đúng các trang `1..N` đã tách từ `text.md`. Khớp hash không phải bằng chứng nội dung chép đúng. `reading_queue` ghi `SOURCED` khi hàm này sai thì là lỗi L-01.
-4. `luat_ke_toan_88_2015`, nếu được khai tệp gốc, chỉ khớp SHA-256 `1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50`, 2566253 byte, 35 trang. Chưa có tệp đó trong kho và 35 trang chưa được đối chiếu trong manifest thì hàng đợi giữ `QUEUED`. PR này không chép PDF và không chuyển `SOURCED`.
-5. Dòng manifest cũ không có trường gốc vẫn hợp lệ. Không đổi `MANIFEST_KEYS` bắt buộc.
+2. Mọi dòng manifest phải có đủ `original_sha256`, `original_bytes`, `original_path`, `text_sha256`, `text_bytes`. Bỏ các trường này là lỗi cổng nguồn. Không còn đường vòng “không khai thì qua”. `files` trên `main` đang rỗng, nên không có dòng cũ để miễn. `MANIFEST_KEYS` của metadata `text.md` không thêm trường; ghim gốc do `origin_binding_errors` bắt trên mọi dòng.
+3. `text_sha256`/`text_bytes` phải trùng `sha256`/`bytes` và trùng byte của `text.md`. `original_sha256` phải khác hash `text.md`. `original_path` là đường dẫn tương đối trong `library/sources/<doc_id>/`, không tuyệt đối, không `..`, không được là `text.md`. Máy đọc byte tệp đó và so SHA-256 cùng số byte.
+4. Bằng chứng QC mà reviewer kiểm được là `crosscheck.method` = `page-by-page` và `crosscheck.pages`: mỗi trang một dòng `{page, sha256, head, tail}` tính lại từ `text.md`. Số `pages_checked`, dù kèm `pages_total`, không phải biên bản đó và không được `SOURCED`. `may_mark_sourced` chỉ đúng khi biên bản khớp từng trang và, với tài liệu đã biết hash, `original_sha256`/`original_bytes` khớp bản đã công bố. `reading_queue` ghi `SOURCED` khi hàm này sai thì là lỗi L-01. Ghi chú `CITED`, `TESTED`, `PROVEN` không dùng được khi tài liệu dẫn chiếu chưa có tệp gốc đã kiểm và biên bản từng trang. `DRAFT` vẫn được. `DISPUTED` không phải trạng thái dùng cho câu trả lời.
+5. `luat_ke_toan_88_2015` giữ `QUEUED`. Nếu được khai tệp gốc, chỉ khớp SHA-256 `1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50`, 2566253 byte, 35 trang, và biên bản đủ 35 trang. PR này không chép PDF và không chuyển `SOURCED`.
 
 ## Lý do
-Máy kiểm hiện chỉ so `text.md`. Hash đó có thể bị đọc nhầm là hash PDF. Không có đường nào buộc byte tệp gốc, và không có cửa nào chặn `SOURCED` khi chưa đối chiếu từng trang.
+Máy kiểm hiện chỉ so `text.md`. Hash đó có thể bị đọc nhầm là hash PDF. Hợp đồng “chỉ bắt original_* khi có khai” cho một nguồn mới đi qua cổng chỉ bằng cách bỏ các trường đó. Một số `pages_checked` không phải biên bản để reviewer đối chiếu từng trang. Manifest trên `main` đang rỗng, nên không cần đường vòng tương thích.
 
 ## Điều kiện hoàn tác
-- Owner nói một câu bỏ ghim kép: ADR mới ngừng bắt `original_*` khi khai. Không xóa byte tài liệu đã ghim bằng cách sửa hash cho khớp tệp khác.
-- Nếu luật này làm CI đỏ với mọi dòng manifest cũ không có trường gốc, đó là lỗi thi công: nới bằng cách giữ trường tùy chọn, không bằng cách đánh dấu `SOURCED`.
+- Owner nói một câu bỏ ghim bắt buộc: ADR mới ngừng bắt `original_*` trên mọi dòng. Không xóa byte tài liệu đã ghim bằng cách sửa hash cho khớp tệp khác.
+- Không mở lại đường “bỏ trường gốc thì qua cổng” khi `files` còn rỗng.
 
 ## Ảnh hưởng tới ARCHITECTURE.md
-Một mệnh đề ở mục nguồn: `sha256`/`bytes` là của `text.md`; tệp gốc ghim riêng; hash khớp không đủ để `SOURCED`.
+Một mệnh đề ở mục nguồn: `sha256`/`bytes` là của `text.md`; mọi dòng phải ghim tệp gốc; `SOURCED` và ghi chú dùng được cần `crosscheck.pages`, không chỉ `pages_checked`. Luật Kế toán 88/2015 giữ `QUEUED`.

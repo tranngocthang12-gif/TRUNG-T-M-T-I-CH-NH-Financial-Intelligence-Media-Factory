@@ -47,7 +47,7 @@ class OriginalBindingTests(unittest.TestCase):
              "original_sha256": hashlib.sha256(pdf).hexdigest(), "original_bytes": len(pdf),
              "original_path": f"library/sources/{doc}/{name}"}
         if cross:
-            e["crosscheck"] = {"method": "page-by-page", "pages_checked": pages, "pages_total": pages}
+            e["crosscheck"] = kn.page_crosscheck(text_b.decode("utf-8"))
         return e
 
     def _manifest(self, files):
@@ -105,13 +105,51 @@ class OriginalBindingTests(unittest.TestCase):
         errs = self._errs()
         self.assertTrue(any("SOURCED" in e and "hash khớp không" in e for e in errs), errs)
 
-    def test_legacy_manifest_without_original_fields_still_passes(self):
+    def test_legacy_manifest_without_original_fields_is_rejected(self):
         legacy = {k: v for k, v in self.entry.items() if k not in kn.ORIGINAL_KEYS and k != "crosscheck"}
         self._manifest({self.doc: legacy})
         self._queue("QUEUED")
-        errs, warns = kn.check_library(self.tmp)
-        self.assertEqual(errs, [])
-        self.assertTrue(any("QUEUED" in w for w in warns), warns)
+        errs, _warns = kn.check_library(self.tmp)
+        self.assertTrue(any("thiếu ghim tệp gốc" in e for e in errs), errs)
+
+    def test_cited_note_needs_verified_original_not_a_page_count(self):
+        bare = self._pin(self.doc, self.text_b, PDF, "goc.pdf", pages=2, cross=False)
+        self._manifest({self.doc: bare})
+        note = {"id": "KN-T2-mau", "tier": 2, "topic": "Phạm vi", "doc_ids": [self.doc],
+                "applies_to": "mọi doanh nghiệp", "effective_date": "2017-01-01",
+                "points": [
+                    {"id": "P1", "vi": "Luật điều chỉnh công tác kế toán",
+                     "addresses": [f"{self.doc}:p1:2"], "quote": "quy định về nội dung công tác kế toán",
+                     "kind": "TEXT_ATTESTED"},
+                    {"id": "P2", "vi": "Nhiệm vụ thu thập số liệu",
+                     "addresses": [f"{self.doc}:p2:2"], "quote": "Thu thập, xử lý thông tin, số liệu kế toán.",
+                     "kind": "TEXT_ATTESTED"},
+                    {"id": "P3", "vi": "Tên điều phạm vi",
+                     "addresses": [f"{self.doc}:p1:1"], "quote": "Điều 1. Phạm vi điều chỉnh",
+                     "kind": "TEXT_ATTESTED"}],
+                "not_said": ["Không nói về ngân hàng", "Không nói mức phạt"],
+                "testable_implications": [], "status": "CITED", "review_by": "2099-01-01",
+                "read_by": "ChatGPT (OpenAI)",
+                "self_check": {"parallelism": True, "one_word_one_meaning": True, "contrast_pairs": False,
+                               "question_answer": False, "counts_from_source": True, "doubts": []}}
+        (self.tmp / "contracts").mkdir()
+        shutil.copy(ROOT / "contracts" / "knowledge_note.schema.json", self.tmp / "contracts")
+        (self.tmp / "library" / "notes").mkdir()
+        (self.tmp / "library" / "INDEX.md").write_text("KN-T2-mau", encoding="utf-8")
+        (self.tmp / "library" / "notes" / "KN-T2-mau.json").write_text(json.dumps(note), encoding="utf-8")
+        (self.tmp / "library" / "audits").mkdir()
+        digest = kn.note_digest(note)
+        (self.tmp / "library" / "audits" / "KN-T2-mau.json").write_text(json.dumps({
+            "note_id": "KN-T2-mau", "auditor": "Owner", "verdict": "PASS", "date": "2026-11-18",
+            "note_sha256": digest}), encoding="utf-8")
+        errs = self._errs()
+        self.assertTrue(any("CITED" in e and "tệp gốc" in e for e in errs), errs)
+        counted = dict(bare, crosscheck={"method": "page-by-page", "pages_checked": 2, "pages_total": 2})
+        self._manifest({self.doc: counted})
+        self.assertTrue(any("pages_checked" in e for e in self._errs()), self._errs())
+        full = self._pin(self.doc, self.text_b, PDF, "goc.pdf", pages=2, cross=True)
+        self._manifest({self.doc: full})
+        self.assertFalse(any("KN-T2-mau" in e and "L-01" in e for e in self._errs()), self._errs())
 
     def test_known_accounting_law_rejects_wrong_pdf_and_cannot_be_sourced_early(self):
         self.assertEqual(KNOWN["original_sha256"], "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50")
