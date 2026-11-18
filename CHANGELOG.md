@@ -1,5 +1,13 @@
 # Changelog
 
+## v3.0.6 — 2026-11-18 (ghế thi công; sửa giấy tờ) — Grok (xAI) soạn theo lệnh Owner; ADR-0010; Owner gộp sau L-09
+- **Ghế thi công:** Grok (xAI). Không phải MINH TRÍ. Không được gộp, sửa luật, mở API, chạm engine ngoài lệnh.
+- **Pha:** `state/PROJECT_STATE.yaml` ghi `V3_G0_CHUA_THOAT`. ARCHITECTURE §8 ghi rõ: 3 dự báo thử chưa có; nhánh "chỉ giữ Ledger" Owner không thi hành ngày 17/11/2026; mốc 31/03/2027 của ADR-0002 giữ nguyên và chỉ dời bằng ADR mới.
+- **ADR-0008:** header và bảng ADR lật ACCEPTED (PR #31 đã đưa mã lên main). **ADR-0009** giữ PROPOSED; PR #32 không chấp nhận nó.
+- **Chữ:** tiêu đề §5, đường dẫn `docs/TTC_TANG_HOC_HIEU_v0.2.md`, các chỗ gọi MINH TRÍ là ghế hoặc là ghế A, BOOT bước 10, ARCHIVE các tệp trước v3.0, bàn giao 22/10.
+- **`requirements.txt`:** ghim pandas 2.3.3, numpy 2.2.6, scikit-learn 1.7.2, pyyaml 6.0.3, joblib 1.6.0, yfinance 1.8.0, jsonschema 4.26.0.
+- **Không làm:** không thu v3.0, không đổi mẫu 194, không thêm ghế C, không điền OWNER_MISSION hay GOVERNOR_POLICY, không chép thư viện.
+
 ## v3.0.5 — 2026-11-18 (dữ liệu và rủi ro sau nghiên cứu GitHub; thứ tự Owner duyệt) — Claude soạn, Owner gộp; ADR-0008
 - **Thiên lệch sống sót:** `config.yaml` `universe_basis: CURRENT`; báo cáo chu kỳ và `state/ENGINE_STATE.json` (`universe_basis`, `universe_bias`) ghi rõ backtest dùng VN30 hiện tại cho toàn bộ lịch sử nên kết quả bị đẩy lên. Danh sách theo từng kỳ: khuôn `data/vn30_history.csv` ở ADR-0008, việc dữ liệu giao ghế thi công hoặc Owner.
 - **BCTC theo ngày công bố:** `kind: FINANCIAL_STATEMENT` trong `SOURCE_MANIFEST.json` bắt buộc `period_end`, `published_on` (`period_end ≤ published_on ≤ accessed_on`); `engine/knowledge_notes.usable_on`; ghi chú trích BCTC có `effective_date` ≥ ngày công bố (`contracts/knowledge_note.schema.json` mô tả, `library/sources/README.md`).

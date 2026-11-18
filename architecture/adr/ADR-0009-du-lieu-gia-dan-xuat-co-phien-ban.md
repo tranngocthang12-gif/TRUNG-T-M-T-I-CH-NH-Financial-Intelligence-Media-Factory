@@ -1,7 +1,7 @@
 # ADR-0009: Bản giá dẫn xuất có phiên bản, không sửa bảng giá gốc
 
 - Ngày: 2026-11-18
-- Trạng thái: PROPOSED (chỉ ACCEPTED khi Owner gộp PR được L-09 chấm)
+- Trạng thái: PROPOSED (chỉ ACCEPTED khi Owner gộp PR được L-09 chấm). PR #32 ngày 18/11/2026 gộp `docs/RESEARCH_POINT_IN_TIME_LIMITATIONS.md`; bản đó tự nhận là disclosure, không đổi engine và không làm ADR này có hiệu lực.
 - Người đề xuất: ChatGPT (OpenAI), dựa trên khoảng trống đã xác nhận sau ADR-0006
 - Người chấm: ghế độc lập khác nhà cung cấp (L-09; chờ)
 - Owner duyệt: chờ PR tương ứng, không tự merge

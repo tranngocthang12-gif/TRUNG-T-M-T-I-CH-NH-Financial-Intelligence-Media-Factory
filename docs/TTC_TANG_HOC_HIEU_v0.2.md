@@ -3,11 +3,13 @@
 Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Nền: bản hiểu 21/10 (commit `3c9f69d`) · Thay bản v0.1 (ĐTT) ở phần miền và tên gọi.
 Trạng thái: THIẾT KẾ, chưa có mã. Các mặc định ở mục 9 do Claude chọn vì Owner chưa quyết; Owner đổi được bằng một câu.
 
+> Đính chính 18/11/2026 (ADR-0003 quyết định 9, ADR-0010): MINH TRÍ không phải ghế của kho này và không phải ghế A. Ghế thi công là Grok (xAI), Owner lập 18/11/2026. Bảng mục 2 giữ tên MINH TRÍ vì đó là nguồn khuôn ở một dự án khác, không phải người làm.
+
 ---
 
 ## 0. Một câu
 
-Lắp cỗ máy học hiểu đang chạy thật ở MINH TRÍ vào hai chỗ rỗng của kho này: `library/` (Thư viện 4 tầng) và `academy/` (Học viện), dùng đúng khuôn KNOWLEDGE_NOTE và các hợp đồng kho đã viết (`hypothesis`, `knowledge_item`, `prediction`, `resolution`), đo bằng **nhóm đối chứng B**, không mở ngân sách API.
+Lắp tầng học hiểu — khuôn lấy từ cỗ máy MINH TRÍ, ghế làm việc không phải MINH TRÍ — vào hai chỗ rỗng của kho này: `library/` (Thư viện 4 tầng) và `academy/` (Học viện), dùng đúng khuôn KNOWLEDGE_NOTE và các hợp đồng kho đã viết (`hypothesis`, `knowledge_item`, `prediction`, `resolution`), đo bằng **nhóm đối chứng B**, không mở ngân sách API.
 
 ## 1. Vai và kênh
 
@@ -15,11 +17,11 @@ Lắp cỗ máy học hiểu đang chạy thật ở MINH TRÍ vào hai chỗ r�
 |---|---|---|
 | Owner | gộp `main`, ký OWNER_MISSION, đổi luật/phạm vi, giữ đề thi | chat, GitHub |
 | Claude | thiết kế, soạn lệnh, chấm, ra đề thi, giữ đề | Gmail gửi lệnh `[TTC] #N — …`, kết `Dừng.` |
-| Ghế thi công (chưa lập; không phải MINH TRÍ) | chép nguồn, viết ghi chú, viết mã công cụ theo đặc tả, mở PR | đọc Gmail `[TTC] #N`, trả lời `BAO CAO [TTC] #N`; ghi lên nhánh `hoc-hieu`, không merge |
+| Ghế thi công — Grok (xAI), Owner lập 18/11/2026 (ADR-0010; không phải MINH TRÍ) | chép nguồn, viết ghi chú, viết mã công cụ theo đặc tả, mở PR nháp | đọc lệnh Owner, trả lời bằng PR; không merge |
 | CI (`tools/validate.py` + test) | kiểm máy, fail-closed | GitHub Actions |
 | Nhóm đối chứng B | Claude trần, không thư viện, trả lời cùng đề | chat riêng, kết quả ghi `academy/results/` |
 
-Luật kế thừa nguyên văn từ MINH TRÍ: người viết khác nhà người chấm; mọi khẳng định có địa chỉ; trích nguyên văn máy kiểm; `self_check` thật; không in nội dung tệp ra chat/email; tệp cho Claude đi bằng ZIP nhánh hoặc Claude tự đọc kho công khai.
+Luật kế thừa từ khuôn MINH TRÍ (dự án khác, không phải ghế của kho này): người viết khác nhà người chấm; mọi khẳng định có địa chỉ; trích nguyên văn máy kiểm; `self_check` thật; không in nội dung tệp ra chat/email; tệp cho Claude đi bằng ZIP nhánh hoặc Claude tự đọc kho công khai.
 
 ## 2. Đối chiếu: cỗ máy MINH TRÍ ↔ khuôn kho đã có
 
@@ -53,17 +55,17 @@ Mệnh đề cốt lõi ghi theo `knowledge_item` hiện có, thêm hai trườn
 
 - `contracts/exam_item.schema.json`: `exam_id`, `kind` (1 tự luận có địa chỉ / 2 bài tập số có đáp án do mã tính / 3 ca mù ẩn danh), `question`, `competency`, `answer_key` (chỉ với loại 2; loại 1 và 3 chấm theo mắt xích), `authored_by`, `held_out: true`, `released_at`.
 - Đề do Claude ra, **giữ ngoài kho** tới khi thi; sau kỳ thi mới commit vào `academy/exams/` cùng bài làm và điểm.
-- Mỗi kỳ thi, cùng đề được trả lời bởi **A** (MINH TRÍ có thư viện, chỉ được dùng ghi chú ≥ CITED và mệnh đề ≥ SUPPORTED, phải dẫn id) và **B** (Claude trần, không thư viện). Điểm ghi `academy/results/<exam_id>.json`: từng mắt PASS/FAIL, điểm A, điểm B, **độ đúng của A khi bất đồng với B**. Chỉ số này là thước đo chính của tầng học hiểu (v1.0 III.4, v2.2 §1).
-- Sau mỗi kỳ: phán quyết HELPED/HURT/UNUSED cho từng mệnh đề đã dùng (như MINH TRÍ); `competency_map` chỉ được nâng cấp bởi mã dựa trên kết quả, không bằng tay (A11).
+- Mỗi kỳ thi, cùng đề được trả lời bởi **A** (Claude trong Project, có thư viện, chỉ được dùng ghi chú ≥ CITED và mệnh đề ≥ SUPPORTED, phải dẫn id) và **B** (Claude trần, không thư viện). Điểm ghi `academy/results/<exam_id>.json`: từng mắt PASS/FAIL, điểm A, điểm B, **độ đúng của A khi bất đồng với B**. Chỉ số này là thước đo chính của tầng học hiểu (v1.0 III.4, v2.2 §1).
+- Sau mỗi kỳ: phán quyết HELPED/HURT/UNUSED cho từng mệnh đề đã dùng (cùng kiểu với khuôn cũ); `competency_map` chỉ được nâng cấp bởi mã dựa trên kết quả, không bằng tay (A11).
 - Mỗi kỳ thầy gài 1–2 ghi chú lỗi cố ý vào đợt chấm để đo người chấm.
 
 ## 7. Lộ trình: bốn PR, mỗi PR có điều kiện thoát
 
 | PR | Nội dung | Ai | Thoát khi |
 |---|---|---|---|
-| **TTC-1** Khởi động | `governance/ARCHITECT_HANDOFF_20261022.md`; 3 hợp đồng `knowledge_note`, `exam_item`, `dossier`; `library/INDEX.md`, `library/SOURCE_MANIFEST.json` (rỗng đúng dạng), `library/reading_queue.yaml` (danh mục mục 9), `academy/curriculum.md` v0.1; cập nhật `contracts/README.md` (24) | MINH TRÍ viết, Claude chấm | CI xanh; `validate.py` bớt 3 cảnh báo tương ứng |
-| **TTC-2** Công cụ | `engine/knowledge_notes.py`, `engine/knowledge_items.py` chuyển từ MINH TRÍ (địa chỉ trang/đoạn thay mã đoạn), test; `validate.py` gọi chúng; `daily_cycle.yml` chạy **đủ 7 test** (bản hiểu C5) | MINH TRÍ viết, Claude chấm | Test xanh; ghi chú mẫu bị từ chối đúng 12 ca lỗi |
-| **TTC-3** Đọc rộng | Chép 30–50 tài liệu gốc miền hẹp; ghi chú DRAFT cho từng tài liệu; Auditor nâng CITED | MINH TRÍ đọc, Claude chấm mẫu ở mốc 10 và 20 | 20 ghi chú CITED; ≤2/20 sai nghĩa |
+| **TTC-1** Khởi động | `governance/ARCHITECT_HANDOFF_20261022.md`; 3 hợp đồng `knowledge_note`, `exam_item`, `dossier`; `library/INDEX.md`, `library/SOURCE_MANIFEST.json` (rỗng đúng dạng), `library/reading_queue.yaml` (danh mục mục 9), `academy/curriculum.md` v0.1; cập nhật `contracts/README.md` (24) | Đã làm trong G0 bởi Claude, trước khi có ghế — không phải MINH TRÍ | CI xanh; `validate.py` bớt 3 cảnh báo tương ứng |
+| **TTC-2** Công cụ | `engine/knowledge_notes.py`, `engine/knowledge_items.py` chuyển từ khuôn cũ (địa chỉ trang/đoạn thay mã đoạn), test; `validate.py` gọi chúng; `daily_cycle.yml` chạy **đủ 7 test** (bản hiểu C5) | Đã làm trong G0 bởi Claude, trước khi có ghế — không phải MINH TRÍ | Test xanh; ghi chú mẫu bị từ chối đúng 12 ca lỗi |
+| **TTC-3** Đọc rộng | Chép 30–50 tài liệu gốc miền hẹp; ghi chú DRAFT cho từng tài liệu; Auditor nâng CITED | Grok (xAI) đọc, Claude chấm mẫu ở mốc 10 và 20 | 20 ghi chú CITED; ≤2/20 sai nghĩa |
 | **TTC-4** Thi lần một | 5 đề giữ kín; A và B cùng làm; sổ điểm; 3–5 mệnh đề OPEN đầu tiên có `invalidation_conditions` | Claude ra đề và chấm | Có số "độ đúng khi bất đồng với B" đầu tiên |
 
 Không làm trong lộ trình này: mở API, chạm engine định lượng, Media OS, `OWNER_PROFILE`.
@@ -75,6 +77,6 @@ Kho **giữ công khai** (để Claude đọc thẳng và để kiểm chứng c
 ## 9. Mặc định Claude đã chọn (Owner đổi bằng một câu)
 
 1. **Miền hẹp đầu tiên:** `doc_bctc` + `ngan_hang` + `chinh_sach_phap_luat` nền: Luật Kế toán 2015; Thông tư 200/2014 (chế độ kế toán DN) và các VAS liên quan BCTC (VAS 1, 21, 24); Luật Chứng khoán 2019; Nghị định 155/2020; Thông tư 96/2020 (công bố thông tin); Thông tư 41/2016 (tỷ lệ an toàn vốn ngân hàng); BCTC hợp nhất kiểm toán năm 2025 của 10 ngân hàng VN30. Khoảng 30–40 tài liệu, xếp ngắn → dài theo số trang.
-2. **Ghế thi công:** chưa lập; **không phải MINH TRÍ** (dự án kinh Phật, không tham gia tài chính). Trong G0 Claude soạn một mình theo lệnh Owner 22/10; ghế thi công độc lập lập sau và phản biện hồi cứu.
+2. **Ghế thi công:** Grok (xAI), Owner lập 18/11/2026 (ADR-0010). **Không phải MINH TRÍ** (dự án kinh Phật, không tham gia tài chính). Trong G0 Claude soạn một mình theo lệnh Owner 22/10; ghế này làm từ 18/11/2026, mở PR nháp, không tự gộp.
 3. **Nhánh làm việc:** `hoc-hieu`; Owner gộp khi Claude báo GỘP ĐƯỢC.
 4. **Kho giữ công khai** theo mục 8.

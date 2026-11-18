@@ -1,6 +1,6 @@
 # TRUNG TÂM TÀI CHÍNH — ARCHITECTURE v3.0 (bản hợp nhất, duy nhất có hiệu lực)
 
-Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0003 (ACCEPTED 17/11/2026), ADR-0002 và ADR-0004. Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
+Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0002, ADR-0003 và ADR-0004 (ACCEPTED 17/11/2026), ADR-0005, ADR-0006 và ADR-0007 (ACCEPTED 17/11/2026), ADR-0008 (ACCEPTED 18/11/2026, PR #31). ADR-0009 vẫn PROPOSED. Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010, hiệu lực khi Owner gộp). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập cho bản gốc — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
 Bản này **thay thế** v0.1, v0.2, v1.0, v2.0, v2.1, v2.2. Các bản cũ giữ nguyên chỗ nhưng được liệt kê là SUPERSEDED trong `architecture/ARCHIVE.md`, không xóa (luật INVALIDATED không xóa); `tools/validate.py` từ chối bất kỳ `ARCHITECTURE_v*.md` nào không có trong danh sách đó. Từ đây chỉ một tệp kiến trúc có hiệu lực; thay đổi đi qua ADR (`architecture/adr/`), mỗi ADR có điều kiện hoàn tác (L-07).
 
 > KHÔNG XÂY AI ĐOÁN THỊ TRƯỜNG. XÂY MỘT HỆ THỐNG biết thu thập bằng chứng, biết nghi ngờ chính nó, biết đo lường độ không chắc chắn, biết quản trị rủi ro, biết học từ kết quả, và biết cải thiện cách nó học.
@@ -9,7 +9,7 @@ Bản này **thay thế** v0.1, v0.2, v1.0, v2.0, v2.1, v2.2. Các bản cũ gi�
 
 ## 0. Điều gì đổi so với v2.2, và vì sao
 
-Rà soát 21–22/10/2026 (bản hiểu tại commit `3c9f69d` + nghiên cứu bằng chứng) kết luận: kiến trúc vượt xa vận hành (6 bản trong một ngày, 0 dự báo, thư viện rỗng); engine định lượng chạy đúng và trung thực báo "không tìm thấy gì"; thứ quyết định kết quả đầu tư theo bằng chứng là kỷ luật, chi phí và kế toán, không phải dự báo vĩ mô. v3.0 làm ba việc: gộp thành một bản; mở đường ghi dự báo không cần API; đặt tầng học hiểu (cỗ máy MINH TRÍ) vào Thư viện/Học viện với miền hẹp đầu tiên là kế toán ngân hàng.
+Rà soát 21–22/10/2026 (bản hiểu tại commit `3c9f69d` + nghiên cứu bằng chứng) kết luận: kiến trúc vượt xa vận hành (6 bản trong một ngày, 0 dự báo, thư viện rỗng); engine định lượng chạy đúng và trung thực báo "không tìm thấy gì"; thứ quyết định kết quả đầu tư theo bằng chứng là kỷ luật, chi phí và kế toán, không phải dự báo vĩ mô. v3.0 làm ba việc: gộp thành một bản; mở đường ghi dự báo không cần API; đặt tầng học hiểu vào Thư viện/Học viện (khuôn học có gốc từ MINH TRÍ; ghế làm việc không phải MINH TRÍ — ADR-0003, ADR-0010) với miền hẹp đầu tiên là kế toán ngân hàng.
 
 ## 1. Ba tinh hoa giữ nguyên, hai tinh hoa thêm
 
@@ -25,7 +25,7 @@ Thêm (từ nghiên cứu 2025–2026): (4) **thời điểm**: mọi kiểm đ�
    NỬA CHỨNG MINH            NỬA HỌC                     NỬA QUẢN TRỊ
    Prediction Ledger         Thư viện 4 tầng               governance/
    Nhóm đối chứng B          Học viện (đề kín, sổ điểm)    LAWS.md, GATES, SAFETY_STATE
-   Engine định lượng         Cỗ máy học hiểu (từ MINH TRÍ)  DATA_SOURCES, FIREWALL
+   Engine định lượng         Cỗ máy học hiểu (ghế thi công) DATA_SOURCES, FIREWALL
    (đối chứng âm)            KNOWLEDGE_NOTE → mệnh đề       ADR
         └──────────────────────────┼──────────────────────────┘
                                    ▼
@@ -41,7 +41,7 @@ Thêm (từ nghiên cứu 2025–2026): (4) **thời điểm**: mọi kiểm đ�
 |---|---|---|
 | Owner | ký OWNER_MISSION, gộp `main`, đổi luật/phạm vi, giữ danh mục thật ngoài kho | commit số liệu cá nhân |
 | Claude (kiến trúc sư trưởng) | thiết kế, soạn lệnh, chấm PR, ra và giữ đề thi, chấm thi | tự gộp, tự ghi kho, là phản biện độc lập cho thiết kế của mình |
-| Ghế thi công (chưa lập; **không phải MINH TRÍ** — Owner 22/10/2026, ADR-0003) | chép nguồn, viết ghi chú, mệnh đề, mã công cụ theo đặc tả, mở PR nháp | merge, sửa luật, mở API, chạm engine ngoài lệnh |
+| Ghế thi công — Grok (xAI), Owner lập 18/11/2026 (ADR-0010; **không phải MINH TRÍ**) | chép nguồn, viết ghi chú, mệnh đề, mã công cụ theo đặc tả, mở PR nháp | merge, sửa luật, mở API, chạm engine ngoài lệnh |
 | Nhóm B | Claude trần, phiên mới không dự án không tệp, prompt cố định có hash | thấy thư viện hay câu trả lời của A |
 | CI | kiểm schema, địa chỉ, trích nguyên văn, dấu thời gian Ledger, test | — |
 
@@ -63,9 +63,9 @@ Cùng ngày, cùng câu hỏi; phiên Claude mới không dự án, không tệp
 Giữ nguyên mã; chạy hằng tuần thay vì hằng ngày (thứ Sáu, từ v3.0.2); đóng băng không gian giả thuyết (13 feature × 3 mô hình × VN30); thêm Deflated Sharpe và sổ đăng ký thử `research/trial_registry.jsonl` (đã làm v3.0.2: mỗi lần thử đăng ký có hash chuỗi và được đẩy lên `main` trước khi chạy, lần thử bỏ dở vẫn được đếm, kết quả chỉ-ghi-thêm có neo lịch sử, CI đối chiếu); giả thuyết mới chỉ chạy khi đã đăng ký trước. Kho dữ liệu đổi sang ghi tăng dần (append) để git không phình (C2 — đã làm, ADR-0006: kho cũ đóng băng, dòng mới nối vào tệp tháng, kiểm toán bắt mọi lần viết lại). Benchmark ghi rõ là "bình quân đều VN30 hiện tại", không gọi là VN-Index (C6).
 ADR-0008: báo cáo gắn nhãn thiên lệch sống sót khi danh sách là VN30 hiện tại; giấy không khớp ở phiên khóa trần/sàn; báo cáo có sụt giảm lớn nhất (backtest và NAV giấy).
 
-## 5. Nửa HỌC (Thư viện + Học viện) — cỗ máy học hiểu từ MINH TRÍ
+## 5. Nửa HỌC (Thư viện + Học viện) — ghế thi công, không phải MINH TRÍ
 
-Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2_20261022.md`; tóm tắt luật:
+Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 - Nguồn: chỉ tài liệu gốc công khai, ghim sha256 + ngày phát hành + ngày truy cập + trạng thái pháp lý + **trạng thái hiệu lực** (`effective_from`, `superseded_by`) (L-01, L-08); BCTC thêm `period_end` và `published_on` — số liệu chỉ dùng từ ngày công bố (ADR-0008, `knowledge_notes.usable_on`). Thứ cấp chỉ là CROSS_TEXT_SYNTHESIS.
 - Địa chỉ: `<doc_id>:p<trang>:<đoạn>` / `<doc_id>:t<bảng>:<dòng>`; trích nguyên văn máy kiểm.
 - Đơn vị: KNOWLEDGE_NOTE (`contracts/knowledge_note.schema.json`) với `not_said ≥ 2`, `testable_implications`, `self_check`; DRAFT không dùng cho mệnh đề hay quyết định.
@@ -100,6 +100,8 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2_20261022.md`; tóm tắt luật:
 | G3 (tháng 4–6) | thống kê, vĩ mô truyền dẫn, luật thị trường; DSR vào engine | ≥ 150 dự báo đã chấm; báo cáo hiệu chuẩn đầu tiên | Brier A tệ hơn B có ý nghĩa → kiểm lại thư viện |
 | G4 (sau 6 tháng) | báo cáo đánh giá | chỉ cân nhắc API/Media khi ≥ 194 bất đồng đã chấm | — |
 
+G0 chưa thoát. Cột thoát ("Action xanh trên 3 dự báo thử") chưa đạt: sổ chưa có dự báo thử. Cột dừng/đảo ("quá 3 tuần → chỉ giữ Ledger") đã quá hạn nếu tính từ 22/10/2026 hoặc từ ngày gộp 24/10/2026. Ngày 17/11/2026 Owner không thi hành nhánh đó. ADR-0002 xét điều kiện hoàn tác của ADR-0001 (30 ngày sau ngày gộp, tức 23/11/2026, dưới 20 dự báo hợp lệ thì *xét* thu hẹp) và quyết định không thu hẹp; mốc xét lại là 31/03/2027. Hai đồng hồ không phải một luật. `state/PROJECT_STATE.yaml` ghi pha `V3_G0_CHUA_THOAT` cho tới khi có 3 dự báo thử đi qua Action xanh. Dời mốc 31/03/2027 thêm lần nữa phải bằng ADR mới nêu bằng chứng đã đổi, không bằng sửa ngày trong ADR-0002 (ADR-0010).
+
 Không có trong lộ trình: tiền thật; cấp vốn 4+ chỉ xét khi G3 cho alpha có ý nghĩa và Owner quyết.
 
 ## 9. Chế độ hỏng và phòng thủ (bổ sung v1.0 IX)
@@ -121,6 +123,6 @@ Không có trong lộ trình: tiền thật; cấp vốn 4+ chỉ xét khi G3 ch
 |---|---|
 | v0.1 32 mục, v0.2 engine | Engine giữ làm đối chứng âm; 32 mục được bao bởi §2–§6 |
 | v1.0 Prediction Ledger, Scorecard, nhóm B, ba vòng học, walking skeleton | Giữ nguyên tinh thần; Ledger có đường thủ công; nhóm B hiện thực ở §4.2; ba vòng học chạy qua Học viện |
-| v2.0 Thư viện 4 tầng, Học viện, Phòng thi, KNOWLEDGE_NOTE, Hỏi chuyên gia | Thư viện/Học viện/Phòng thi giữ, hiện thực bằng cỗ máy MINH TRÍ; "Hỏi chuyên gia nhập vai" hoãn tới G4 |
+| v2.0 Thư viện 4 tầng, Học viện, Phòng thi, KNOWLEDGE_NOTE, Hỏi chuyên gia | Thư viện/Học viện/Phòng thi giữ, hiện thực bằng ghế thi công theo khuôn học (không phải MINH TRÍ); "Hỏi chuyên gia nhập vai" hoãn tới G4 |
 | v2.1 ba tốc độ, blind-spot, influence, chính trị–địa chính trị, sân chơi ảo | Địa chính trị và chính sách giữ ở mức bản đồ phơi nhiễm và luật thị trường; làn nhanh 15–30 phút, influence, blind-spot hoãn tới G4 |
 | v2.2 tinh hoa, chuỗi giá trị hai đầu, quan sát thực địa | Tinh hoa và thước đo A–B giữ làm trục; chuỗi giá trị và quan sát Owner vào Thư viện tầng 3 khi có dossier |
