@@ -9,6 +9,7 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import laws_checks, ledger_intake, resolution_intake  # noqa: E402
 from tools.ledger_intake import control_b_hash  # noqa: E402
+from tests._calendar_fixture import calendar_id_for, ensure_calendar, with_calendar, verified_ids  # noqa: E402
 
 B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
 Q1 = "Nợ nhóm 3-5 của VCB tại 31/12/2026 cao hơn tại 30/9/2026?"
@@ -26,9 +27,18 @@ def _forecast(seat, question, p, resolve_at="2026-12-31", rule="comparison", aut
          "resolution_rule": rule, "resolve_at": resolve_at, "p": str(p), "base_rate": "0.5",
          "invalidation_conditions": "Nguồn đổi định nghĩa chỉ tiêu",
          "author_seat": author or ("Claude Project TTC" if seat == "A" else "Claude trần"), "model_cutoff": "2026-06"}
+    if "info_lock_at" not in f:
+        f["info_lock_at"] = f["resolve_at"]
     if seat == "B":
         f["prompt_hash"] = B_HASH
+    doms = ledger_intake.promised_domains(source)
+    if doms:                     # lịch test do robot ghim (tests/_calendar_fixture.py); _Base.setUp ghim trước các ngày thường dùng
+        f["calendar_id"] = calendar_id_for(f["info_lock_at"], doms, "Gemini (Google)" if f["author_seat"].startswith("Owner") else "Owner")
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items())
+
+
+COMMON_LOCKS = ("2026-11-20", "2026-12-01", "2026-12-11", "2026-12-15", "2026-12-20", "2026-12-31", "2027-01-01",
+                "2027-01-31", "2027-02-28")
 
 
 def _resolution(ids, outcome, resolver="Owner", quote="Tỷ lệ nợ xấu 1,12% tại 31/12/2026",
@@ -47,6 +57,8 @@ class _Base(unittest.TestCase):
         for g in ("CONTROL_B_PROMPT.md", "control_b_prompts.jsonl"):
             shutil.copy(ROOT / "governance" / g, self.tmp / "governance")
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
+        for lock in COMMON_LOCKS:
+            ensure_calendar(self.tmp, lock, ["nso.gov.vn"])
         for n, seat, q, p, ra, rule in [(101, "A", Q1, 0.30, "2026-12-31", "comparison"),
                                          (102, "B", Q1, 0.60, "2026-12-31", "comparison"),
                                          (103, "A", Q2, 0.70, "2027-01-31", "event_before_date"),
@@ -57,6 +69,8 @@ class _Base(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _run(self, script, number, body, created, **env):
+        if script == "ledger_intake.py" and not env.pop("no_calendar", False):
+            body = with_calendar(self.tmp, body)
         e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
              "TTC_INTAKE_NOW": _just_after(created), **env}
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / script)], env=e, capture_output=True, text=True)
@@ -86,7 +100,9 @@ class _Base(unittest.TestCase):
         code = textwrap.dedent(f"""
             import json
             from engine import ledger
-            print(json.dumps(ledger.scorecard("{as_of}")["issue_forecasts"], ensure_ascii=False))
+            ids = [json.loads(l)["id"] for l in open(r"{self.tmp / 'ledger' / 'predictions.jsonl'}", encoding="utf-8") if l.strip()]
+            # giả lập kiểm toán GitHub đã xác nhận xuất xứ mọi dòng (test xuất xứ thật: tests/test_timing_lock.py)
+            print(json.dumps(ledger.scorecard("{as_of}", verified=set(ids))["issue_forecasts"], ensure_ascii=False))
         """)
         r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
@@ -381,7 +397,8 @@ class IntakeOrderTests(_Base):
         errs = laws_checks.check_ledger_rows(self.tmp)
         self.assertTrue(any("Issue #401" in e and "không khớp kết quả chạy lại" in e for e in errs), errs)
         self.assertEqual(laws_checks.check_ledger_chain(self.tmp), [])           # hash chuỗi không thấy gì
-        new = ledger_intake.post_write_errors(before[0], before[1], self._rows("predictions.jsonl"), self._rows())
+        new = ledger_intake.post_write_errors(before[0], before[1], self._rows("predictions.jsonl"), self._rows(),
+                                              cal_before=ledger_intake.load_calendar(self.tmp))   # lịch của kho tạm
         self.assertTrue(new and all("Issue #401" in e for e in new), new)
         # trạng thái 2: phân định (mở 03:00) ghi kết quả cho cả B (mở 03:01)
         rp = self.tmp / "ledger" / "resolutions.jsonl"
@@ -494,6 +511,7 @@ class IntakeOrderTests(_Base):
         shutil.copytree(ROOT, repo, ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache", "*.gz", "reports", "paper"))
         for n in ("predictions.jsonl", "resolutions.jsonl"):
             shutil.copy(self.tmp / "ledger" / n, repo / "ledger" / n)
+        shutil.copy(self.tmp / "governance" / "release_calendar.jsonl", repo / "governance" / "release_calendar.jsonl")
         r = subprocess.run([sys.executable, str(repo / "tools" / "validate.py")], capture_output=True, text=True, cwd=str(repo))
         self.assertIn("dự báo A+B trong Ledger 2/60 (không tính 2 dự báo đã VOID)", r.stdout, r.stdout[-1500:] + r.stderr[-500:])
         self.assertNotIn("L-05", r.stdout, r.stdout[-1500:])                    # và sổ này qua toàn bộ kiểm lại của validate
@@ -642,6 +660,8 @@ class IntakeWorkflowRaceTests(unittest.TestCase):
         for g in ("CONTROL_B_PROMPT.md", "control_b_prompts.jsonl"):
             shutil.copy(ROOT / "governance" / g, seed / "governance")
         shutil.copytree(ROOT / "tools", seed / "tools", ignore=shutil.ignore_patterns("__pycache__"))
+        for lock in COMMON_LOCKS:                                              # lịch công bố do robot ghim trước mọi Issue dự báo
+            ensure_calendar(seed, lock, ["nso.gov.vn"])
         (seed / "ledger" / ".gitkeep").write_text("")
         self._git(seed, "add", "-A"); self._git(seed, "commit", "-qm", "seed"); self._git(seed, "push", "-q", "origin", "HEAD:main")
         self.bin = self.tmp / "bin"; self.bin.mkdir()
@@ -912,21 +932,36 @@ class ResolverSeatTests(_Base):
 
 
 class ScoringTests(_Base):
+    _CAL = (lambda r: {**r, "hash": laws_checks.line_hash(r)})(
+        {"calendar_id": "CAL-TEST", "domains": ["nso.gov.vn"], "info_lock_at": "2026-12-20",
+         "evidence_url": "https://www.nso.gov.vn/lich-cong-bo", "quote": "Lịch công bố số tháng 11 là ngày 20/12/2026.",
+         "recorder": "Owner", "issue_number": 900001, "issue_created_at": "2026-11-01T00:00:00Z", "prev_hash": "GENESIS"})
+
     def _fake(self, n_pairs, a_right, start=1000, a_day="2026-11-17T02:00:00Z", b_day="2026-11-17T03:00:00Z"):
-        """Ghi thẳng n cặp bất đồng đã phân định (A=0,7; B=0,3), A đúng ở a_right cặp đầu."""
+        """Ghi thẳng n cặp bất đồng đã phân định (A=0,7; B=0,3), A đúng ở a_right cặp đầu.
+        Mỗi dòng có lịch công bố độc lập khớp info_lock_at, nên phép kiểm định nhị thức vẫn chạy khi thời điểm đã chứng minh."""
         preds, res = [], []
         for i in range(n_pairs):
             q = f"Câu hỏi giả lập số {i}?"
             for seat, p, num, day in (("A", 0.7, start + 2 * i, a_day), ("B", 0.3, start + 2 * i + 1, b_day)):
                 preds.append({"id": f"F-{num}", "issue_number": num, "issue_created_at": day, "seat": seat, "question": q,
-                              "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5})
+                              "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5, "info_lock_at": "2026-12-20",
+                              "resolution_source": "nso.gov.vn", "calendar_id": "CAL-TEST",
+                              "author_seat": "Claude Project TTC" if seat == "A" else "Claude trần"})
                 res.append({"prediction_id": f"F-{num}", "outcome": 1 if i < a_right else 0, "resolution_issue": 90000 + start + i})
         return preds, res
 
-    def _score(self, preds, res):
+    def _score(self, preds, res, calendar=None, pubs=None, verified=None):
+        """verified=None: giả lập kiểm toán GitHub đã xác nhận xuất xứ mọi dòng; truyền tập khác để thử fail closed."""
         env = {**os.environ, "TTC_HOME": str(self.tmp), "PYTHONPATH": str(ROOT)}
-        (self.tmp / "p.json").write_text(json.dumps([preds, res]), encoding="utf-8")
-        code = "import json;from engine import ledger;p,r=json.load(open(r'%s'));print(json.dumps(ledger.issue_summary(p,r),ensure_ascii=False))" % (self.tmp / "p.json")
+        payload = {"p": preds, "r": res, "c": self._CAL if calendar is None else calendar, "pubs": pubs or [],
+                   "v": verified_ids(preds) if verified is None else sorted(verified)}
+        if isinstance(payload["c"], dict):
+            payload["c"] = [payload["c"]]
+        (self.tmp / "p.json").write_text(json.dumps(payload), encoding="utf-8")
+        code = ("import json;from engine import ledger;d=json.load(open(r'%s'));"
+                "print(json.dumps(ledger.issue_summary(d['p'],d['r'],d['pubs'],d['c'],set(d['v'])),ensure_ascii=False))"
+                ) % (self.tmp / "p.json")
         r = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), env=env, capture_output=True, text=True)
         self.assertEqual(r.returncode, 0, r.stderr[-2000:])
         return json.loads(r.stdout.strip().splitlines()[-1])
@@ -948,6 +983,33 @@ class ScoringTests(_Base):
         self.assertEqual(self._score(win_p, win_r)["ab"]["verdict"], "A HƠN B CÓ Ý NGHĨA")
         lose_p, lose_r = self._fake(194, 82)
         self.assertEqual(self._score(lose_p, lose_r)["ab"]["verdict"], "B HƠN A CÓ Ý NGHĨA")
+
+    def test_unproven_or_late_publication_blocks_verdict_and_keeps_the_sample(self):
+        """Cặp trong mẫu 194 không đủ thời điểm thì không có phán quyết năng lực, và không được rút cặp sau vào thay."""
+        preds, res = self._fake(194, 112)
+        bare = self._score(preds, res, calendar=[])["ab"]
+        self.assertEqual(bare["fixed_sample"]["n"], 194)
+        self.assertTrue(bare["verdict"].startswith("CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN"))
+        self.assertFalse(bare["timing"]["sample_replaced"])
+        self.assertEqual(bare["timing"]["reasons"].get("calendar_invalid"), 194)     # trích lịch không có trong sổ lịch
+        unverified = self._score(preds, res, verified=[])["ab"]                       # kiểm toán GitHub chưa xác nhận: fail closed
+        self.assertEqual(unverified["fixed_sample"]["n"], 194)
+        self.assertTrue(unverified["verdict"].startswith("CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN"))
+        self.assertEqual(unverified["timing"]["reasons"].get("provenance_unverified"), 194)
+        self.assertEqual(unverified["a_correct"], 0)                                  # không có điểm năng lực nào từ dòng chưa xác nhận
+        late = {"question": preds[0]["question"], "resolve_at": "2026-12-31", "published_at": "2026-11-16T00:00:00Z",
+                "issue_created_at": "2026-11-18T00:00:00Z"}
+        poisoned = self._score(preds, res, pubs=[late])["ab"]
+        self.assertEqual(poisoned["fixed_sample"]["n"], 194)
+        self.assertEqual(poisoned["fixed_sample"]["a_correct"], 112)
+        self.assertTrue(poisoned["verdict"].startswith("CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN"))
+        self.assertNotIn("A HƠN B", poisoned["verdict"])
+        self.assertEqual(poisoned["timing"]["reasons"].get("after_publication"), 1)
+        more_p, more_r = self._fake(30, 30, start=8000)
+        still = self._score(preds + more_p, res + more_r, pubs=[late])["ab"]
+        self.assertEqual(still["fixed_sample"]["n"], 194)
+        self.assertEqual(still["fixed_sample"]["a_correct"], poisoned["fixed_sample"]["a_correct"])
+        self.assertTrue(still["verdict"].startswith("CHƯA ĐỦ ĐIỀU KIỆN KẾT LUẬN"))
 
     def _void(self, res, pairs, start=1000):
         """Đổi kết quả của các cặp (theo số thứ tự cặp trong _fake) thành VOID cho cả A và B."""

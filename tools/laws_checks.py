@@ -138,10 +138,14 @@ def _chain_errors(path, label) -> list[str]:
 
 def check_ledger_chain(root) -> list[str]:
     errs = []
-    for name, label in (("predictions.jsonl", "Ledger"), ("resolutions.jsonl", "Ledger phân định")):
+    for name, label in (("predictions.jsonl", "Ledger"), ("resolutions.jsonl", "Ledger phân định"),
+                        ("publication_evidence.jsonl", "Bằng chứng công bố")):
         path = pathlib.Path(root) / "ledger" / name
         if path.is_file():
             errs += _chain_errors(path, label)
+    cal = pathlib.Path(root) / "governance" / "release_calendar.jsonl"     # lịch công bố: chuỗi hash, chỉ ghi thêm (L-05)
+    if cal.is_file():
+        errs += _chain_errors(cal, "Lịch công bố")
     return errs
 
 
@@ -168,7 +172,8 @@ def check_ledger_rows(root) -> list[str]:
     pred, res = rows(pred_p), rows(res_p)
     if pred is None or res is None:
         return []
-    if not pred and not res:
+    cal_p = root / "governance" / "release_calendar.jsonl"
+    if not pred and not res and not (cal_p.is_file() and cal_p.read_text(encoding="utf-8").strip()):
         return []
     try:
         import jsonschema  # noqa: F401
@@ -180,7 +185,9 @@ def check_ledger_rows(root) -> list[str]:
             versions = ledger_intake.control_b_versions(root / "governance" / "control_b_prompts.jsonl")
         except (OSError, ValueError):
             versions = []                                       # tệp ghim hỏng: check_control_b_prompts báo; mọi dòng B sẽ đỏ
-        return ledger_intake.ledger_errors(pred, res, versions)
+        cal = ledger_intake.load_calendar(root)
+        return ledger_intake.ledger_errors(pred, res, versions, pub_rows=rows(root / "ledger" / "publication_evidence.jsonl") or [],
+                                           calendar=cal)
     except Exception as e:  # noqa: BLE001
         return [f"L-05: không chạy lại được luật nhận trên sổ ({str(e).splitlines()[0]})"]
 
@@ -199,6 +206,31 @@ def _config(root):
 
 
 ENGINE_GATE_CLOSED = "closed"
+
+
+def check_timing_legacy_pin(root) -> list[str]:
+    """L-05 chuyển tiếp: F-37–F-42 không được sửa và không được gắn info_lock_at sau khi đã ghi.
+    Sổ tạm không chứa các mã này thì không lỗi (không bắt mọi kho phải có đủ sáu dòng)."""
+    from tools import ledger_intake
+    path = pathlib.Path(root) / "ledger" / "predictions.jsonl"
+    if not path.is_file():
+        return []
+    errs = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except ValueError:
+            return []
+        rid = row.get("id")
+        if rid not in ledger_intake.LEGACY_TIMING_HASHES:
+            continue
+        if ledger_intake.line_hash(row) != ledger_intake.LEGACY_TIMING_HASHES[rid]:
+            errs.append(f"L-05: {rid} lệch hash đã ghim cho chuyển tiếp thời điểm — không sửa dự báo lịch sử F-37–F-42")
+        if "info_lock_at" in row:
+            errs.append(f"L-05: {rid} không được gắn info_lock_at sau khi đã ghi")
+    return errs
 
 
 def check_engine_gate(root) -> list[str]:
@@ -586,5 +618,5 @@ def check_exams(root, today=None) -> list[str]:
 
 def run_all(root) -> list[str]:
     return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root) + check_ledger_rows(root)
-            + check_engine_gate(root) + check_control_b_prompts(root) + check_v302_boundary(root) + check_trial_registry(root) + check_personal_data(root)
+            + check_timing_legacy_pin(root) + check_engine_gate(root) + check_control_b_prompts(root) + check_v302_boundary(root) + check_trial_registry(root) + check_personal_data(root)
             + check_exams(root))

@@ -1,9 +1,9 @@
 # ADR-0010: Lập ghế thi công; sửa lệch giấy tờ đã xác nhận
 - Ngày: 2026-11-18
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này, sau bản chấm L-09 của ghế khác nhà cung cấp)
+- Trạng thái: ACCEPTED 18/11/2026. Căn cứ: Owner gộp PR #35, merge `400de5775f6d832ff453ccc2d88c91eb35936d1a` (2026-11-18T06:02:26Z). L-09 trên HEAD được chấm `de9e682e833da6f27a871ad5d47bcf4f12251b5c`: hai job L-09 success, bình luận chủ kho `GỘP ĐƯỢC — commit de9e682`, `reviewed_by: Claude (Anthropic)`. Các lượt L-09 đỏ trước đó là trước khi sửa; lượt cuối trước lúc gộp là success. Không viết lại quyết định 1–7.
 - Người đề xuất: Grok (xAI), theo lệnh Owner cùng ngày: sửa các vấn đề đã nêu và giao ghế thi công cho ghế này
-- Người chấm: ghế khác nhà cung cấp (L-09), ghi ở PR. Ghế này không tự chấm.
-- Owner duyệt: lệnh trong chat vận hành 18/11/2026; hiệu lực khi Owner gộp
+- Người chấm: Claude (Anthropic), PR #35, HEAD `de9e682e833da6f27a871ad5d47bcf4f12251b5c`
+- Owner duyệt: 18/11/2026, PR #35, merge `400de5775f6d832ff453ccc2d88c91eb35936d1a`
 - Ai soạn: `authored_by: Grok (xAI)` là lời khai attribution — nội dung do ghế này soạn theo lệnh Owner. Lịch sử Git không xác nhận lời khai đó. Metadata commit chỉ chứng minh ai ghi commit lên Git. Commit `7ff741b5833179d597c8751d838e23aa5eecf427` (tạo ADR-0010, `requirements.txt`, `state/PROJECT_STATE.yaml`, `architecture/ARCHIVE.md`, `BOOT.md`, và sửa handoff): Git author và Git committer đều là `tranngocthang12-gif <tranngocthang12@gmail.com>`, GitHub map về login `tranngocthang12-gif`. Commit `02e5d7e` và `4641fcf`: author và committer tên `Grok (xAI)`, login `grok-xai`. Người mở PR #35 là login `tranngocthang12-gif`. Không cái nào trong các tên đó tự chứng minh ai soạn câu chữ. Không sửa tác giả các commit đã đẩy. Chủ kho giữ nút Merge.
 
 ## Quyết định

@@ -32,7 +32,19 @@ body:
     id: resolve_at
     attributes:
       label: resolve_at
-      description: Ngày phân định, YYYY-MM-DD, phải sau hôm nay
+      description: Ngày phân định, YYYY-MM-DD, phải sau hôm nay. Đây là hạn chấm, không phải ngày thông tin được công bố.
+    validations: {required: true}
+  - type: input
+    id: info_lock_at
+    attributes:
+      label: info_lock_at
+      description: "Ngày đầu tiên thông tin phân định có thể công khai, YYYY-MM-DD. Phải trùng đúng info_lock_at của dòng lịch calendar_id; ngày tự khai khác lịch bị từ chối."
+    validations: {required: true}
+  - type: input
+    id: calendar_id
+    attributes:
+      label: calendar_id
+      description: "BẮT BUỘC. Id (CAL-…) một dòng governance/release_calendar.jsonl do robot ghim từ Issue [Calendar] mở TRƯỚC Issue này, do ghế khác người viết ghi. Thiếu hoặc sai thì robot không nhận dự báo."
     validations: {required: true}
   - type: input
     id: p

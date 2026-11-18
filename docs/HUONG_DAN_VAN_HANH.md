@@ -31,9 +31,12 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
 ## 6. Ghi một cặp dự báo A/B (Owner làm tay — ARCHITECTURE §4.1–4.2)
 1. Ghế A (Claude trong Project) soạn câu hỏi có/không, nguồn phân định, ngày phân định, xác suất.
 2. Ghế B: mở một chat Claude **mới**, không Project, không tệp, tắt tìm web; dán nguyên khối prompt trong `governance/CONTROL_B_PROMPT.md` rồi dán câu hỏi; chép ba dòng trả lời.
+0. **Trước** khi mở Issue dự báo, ghim lịch công bố: Tab **Issues** → **New issue** → mẫu **Calendar**. Điền `calendar_id` mới (ví dụ `CAL-NSO-CPI-2026-12`), tên miền nguồn (`nso.gov.vn`), `info_lock_at` = ngày lịch chính thức nói số liệu ra, đường dẫn trang lịch, câu trích nguyên văn, và `recorder` = **Owner** hoặc một nhà cung cấp khác người viết dự báo. Chờ robot bình luận ✅ (kèm dòng `ledger-attest: calendars …`) **rồi mới** mở Issue dự báo — dự báo mở trước dấu nhận của lịch sẽ không bao giờ được tính là năng lực. Không sửa, không xóa bình luận ✅ đó. Lịch sai ngày thì ghim mã mới, không sửa mã cũ.
 3. Tab **Issues** → **New issue** → mẫu **Forecast**. Mở hai Issue **trong cùng một ngày**: một cho ghế A, một cho ghế B, **cùng một câu chữ** ở ô question, cùng nguồn, cùng luật, cùng ngày phân định.
    - `p`, `base_rate`: chỉ ghi con số (0.35 hoặc 0,35 đều được); không ghi %, không ghi chữ.
-   - `resolve_at`: đúng dạng `2026-12-10`.
+   - `resolve_at`: đúng dạng `2026-12-10`. Đây là ngày phân định, không phải ngày số liệu ra.
+   - `info_lock_at`: ngày đầu tiên thông tin **có thể** được công bố, dạng `2026-12-06`, sau hôm nay và không sau `resolve_at`. Phải **trùng đúng** ngày của lịch ở `calendar_id`. Hai ghế cùng một ngày. Không sửa được sau khi ghi. Bỏ trống thì robot từ chối.
+   - `calendar_id`: **bắt buộc** — mã lịch đã ghim ở bước 0. Thiếu, sai mã, lịch khác tên miền với `resolution_source`, lịch do cùng nhà cung cấp với ghế viết ghi, hoặc lịch ghim sau Issue này: robot từ chối.
    - `resolution_source`: phải có **tên miền** của nguồn, ví dụ `nso.gov.vn` hoặc `https://www.sbv.gov.vn`. Lúc phân định máy chỉ nhận đường dẫn thuộc tên miền ghi ở đây.
    - `model_cutoff`: dạng `2026-06`.
    - `author_seat`: bắt đầu bằng tên mô hình ("Claude Project TTC", "Claude trần").
@@ -42,8 +45,9 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
    - **Không sửa, không xóa bình luận ✅ của robot.** Dòng dấu nhận là bằng chứng dự báo đã có từ lúc Issue mở; mất nó thì kiểm toán sổ báo đỏ.
    - Nếu việc "Ledger intake" đỏ mà dự báo đã vào sổ nhưng chưa có bình luận ✅: vào tab **Actions**, mở lần chạy đó, bấm **Re-run all jobs** trong vòng 6 giờ kể từ lúc mở Issue (và trước ngày `resolve_at`). Robot sẽ đăng bổ sung dấu nhận, không ghi trùng.
    - Quá 6 giờ mà dự báo đã nằm trong sổ nhưng chưa có dấu nhận: vẫn bấm **Re-run all jobs** để robot đăng dấu nhận muộn. Việc "Kiem toan so" sẽ còn đỏ ở dòng đó; tới ngày `resolve_at` thì **hủy câu hỏi đó** — mở Issue mẫu **Resolution**, chọn `VOID`, ghi lý do ở `void_reason` (ví dụ "F-123 không có dấu nhận đúng hạn do sự cố ngày …") — kiểm toán xanh lại. VOID không ghi được trước `resolve_at`. Vì vậy **khi thấy "Ledger intake" đỏ, bấm chạy lại ngay trong ngày**.
-   - Mở Issue dự báo **ít nhất 30 phút trước nửa đêm** của ngày liền trước `resolve_at`; sát hơn thì robot từ chối (dấu nhận sẽ rơi sang ngày phân định).
+   - Mở Issue dự báo **ít nhất 30 phút trước nửa đêm** của ngày liền trước `info_lock_at` và của ngày liền trước `resolve_at`; sát hơn thì robot từ chối.
 5. Mỗi ghế chỉ một dự báo cho một câu hỏi. Ghi nhầm thì không xóa được: sổ chỉ ghi thêm. Câu hỏi viết sai thì tới `resolve_at` chọn `VOID` trong Issue **Resolution** (cả hai ghế của câu hỏi cùng bị hủy). VOID không làm đẹp được kết quả: phép kiểm định A–B dùng đúng 194 cặp bất đồng đầu tiên theo số Issue hoàn tất cặp; một cặp bị VOID vẫn giữ chỗ của nó và bị tính theo hướng bất lợi cho kết luận đang xét; một cặp bị bỏ mặc không phân định thì phép kiểm định chưa ra kết luận.
+6. Phép thử này đo cả bộ TTC so với Claude trần, không đo riêng Thư viện. Khi báo cáo, tách câu trả lời của ghế B khỏi phần biểu mẫu do người khác điền. Không sửa dòng đã ghi. F-38, F-40, F-42 đã ghi trong sổ rằng phần hoàn thiện biểu mẫu là theo lệnh G0 của Owner, không phải lời nguyên văn của ghế B.
 
 ## 7. Phân định khi tới hạn
 1. Tới ngày `resolve_at` (giờ Việt Nam), **Owner hoặc một ghế AI khác nhà cung cấp với ghế viết** (ví dụ ChatGPT) mở nguồn đã ghi trong dự báo, tìm con số hoặc sự kiện.
@@ -62,8 +66,14 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
 4. Có commit mới sau khi chấm → việc đó đỏ lại → chấm lại bản mới.
 5. Owner bấm **Merge pull request**. Không ghế AI nào bấm thay.
 
-## 9. Bảo vệ nhánh main (làm một lần — L-10)
-Settings → Rules → Rulesets → New branch ruleset → áp cho `main` → bật **Restrict deletions** và **Block force pushes** → Create. Hai luật này không cản vòng học và robot ghi dự báo. **Không** bật "Require a pull request before merging": bật là robot không ghi được vào sổ.
+## 9. Bảo vệ nhánh main (L-10) — trạng thái đã đo 18/11/2026
+Ruleset `Protect main history` (id 27474018) đã active trên nhánh mặc định. Bypass rỗng. Chỉ có hai rule: cấm xóa nhánh và cấm force-push. API branch protection cổ điển của `main` trả 404. Hai rule này không cản vòng học và robot ghi dự báo.
+
+GitHub **chưa** bắt check phải xanh trước khi merge. L-09 đỏ không tự chặn nút Merge. PR #43 không phải một vụ vi phạm L-09: trước lúc gộp, lượt L-09 sau đã success trên cả `pull_request` và `pull_request_target`.
+
+Không bật required status checks trong hướng dẫn này. `ledger_intake.yml` và `resolution_intake.yml` đều `contents: write` và `git push origin HEAD:main` thẳng vào `main`, không qua PR. `daily_cycle.yml` cũng đẩy `main`. Chưa chứng minh robot vẫn đẩy được nếu bật rule đó. Việc này chờ quyết định hoặc thiết kế riêng. Không yêu cầu Owner bật ngay. Không bật “Require a pull request before merging”.
+
+“Sau sáu tháng” ở G4 và Media là mốc xem xét, không phải hạn phải có 194 bất đồng. Không tự sửa `governance/SAFETY_STATE.yaml`.
 
 ## 10. Khi CI đỏ
 - "Test bat buoc (chan merge)" đỏ: không gộp; đọc dòng `LỖI:` trong log và giao ghế viết sửa.

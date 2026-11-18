@@ -4,6 +4,7 @@ import json, os, pathlib, shutil, subprocess, sys, tempfile, unittest
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import laws_checks  # noqa: E402
+from tests._calendar_fixture import with_calendar, verified_ids  # noqa: E402,F401
 
 
 def _tmp_repo():
@@ -106,6 +107,7 @@ class LawsChecksTests(unittest.TestCase):
         self.assertTrue(laws_checks.check_ledger_chain(self.tmp))
 
     def _run_intake(self, body, created="2026-10-22T10:00:00Z", number=7):
+        body = with_calendar(self.tmp, body)
         env = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
                "TTC_INTAKE_NOW": created.replace(":00:00Z", ":01:00Z")}        # robot chạy một phút sau khi Issue mở
         p = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=env, cwd=self.tmp,
@@ -114,6 +116,7 @@ class LawsChecksTests(unittest.TestCase):
 
     BODY = ("### seat\n\nA\n\n### question\n\nNợ nhóm 3–5 của ngân hàng X tại 31/12/2026 cao hơn 30/9/2026?\n\n"
             "### resolution_source\n\nhttps://example.vn/bctc\n\n### resolution_rule\n\ncomparison\n\n### resolve_at\n\n{resolve}\n\n"
+            "### info_lock_at\n\n{resolve}\n\n"
             "### p\n\n0.6\n\n### base_rate\n\n0.5\n\n### invalidation_conditions\n\nBCTC bị điều chỉnh hồi tố\n\n"
             "### author_seat\n\nClaude Project TTC\n\n### model_cutoff\n\n2026-06\n\n### library_refs\n\n_No response_\n\n### prompt_hash\n\n_No response_\n")
 
