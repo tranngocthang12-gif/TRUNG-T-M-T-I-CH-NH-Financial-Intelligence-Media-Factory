@@ -28,6 +28,8 @@ def _forecast(seat="A", question="CPI tháng 11/2026 so với cùng kỳ từ 5,
     if seat == "B":
         f["prompt_hash"] = B_HASH
     f.update(kw)
+    if "info_lock_at" not in f:
+        f["info_lock_at"] = f["resolve_at"]
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items() if v is not None)
 
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## v3.0.7 — 2026-11-18 (PR-A, L-05 hạn khóa công bố) — Grok (xAI) soạn; ADR-0011 PROPOSED; chưa gộp
+- Dự báo mới bắt buộc `info_lock_at` (ngày thông tin có thể công bố), với ngày tạo < hạn khóa ≤ `resolve_at`. Không đặt lại sau khi ghi. Dấu nhận phải trước cả hạn khóa lẫn `resolve_at`.
+- Issue `[Publication]` ghi `ledger/publication_evidence.jsonl` khi kết quả công bố sớm. Có dòng đó thì ngừng nhận dự báo của câu hỏi. `published_at` phải có múi giờ; chỉ có ngày thì từ chối. Không ghi đè.
+- `capability_test_eligible` loại dự báo không chứng minh được đã ghi trước lúc công bố. Mẫu 194 và `engine/ledger.py` không đổi.
+- F-37–F-42 giữ nguyên byte và hash. Chưa có bằng chứng công bố sau giờ ghi thì `legacy_unproven`, không vào phép kiểm định hợp lệ.
+
+
 ## v3.0.6 — 2026-11-18 (ghế thi công; sửa giấy tờ) — nội dung do Grok (xAI) soạn theo lệnh Owner; ADR-0010; Owner gộp sau L-09
 - **Ai soạn:** `authored_by: Grok (xAI)` là lời khai attribution, không phải kết luận của lịch sử Git. Commit `7ff741b5833179d597c8751d838e23aa5eecf427` (tạo ADR-0010, `requirements.txt`, `state/PROJECT_STATE.yaml`, `architecture/ARCHIVE.md`, `BOOT.md`, sửa handoff): Git author và Git committer đều `tranngocthang12-gif <tranngocthang12@gmail.com>`, login `tranngocthang12-gif`. Commit `02e5d7e` và `4641fcf`: author và committer `Grok (xAI)`, login `grok-xai`. Metadata chỉ chứng minh ai ghi commit lên Git. Không sửa tác giả commit đã đẩy.
 - **Ba điểm trên `4641fcf`:** (A) metadata `7ff741b` như dòng trên. (B) ARCHITECTURE §4.3 thêm một câu trỏ ADR-0009; không sửa quyết định 1–7 của ADR đó. (C) header ADR-0009: Owner duyệt là 18/11/2026 giờ Việt Nam (17/11 18:32:23 UTC).

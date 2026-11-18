@@ -62,7 +62,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools.laws_checks import ATTEST_WINDOW, TRIAL_HEADERS  # noqa: E402  một định nghĩa cho bên ghi và bên kiểm
 
-APPEND_ONLY = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "research/trial_registry.jsonl",
+APPEND_ONLY = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "ledger/publication_evidence.jsonl",
+               "research/trial_registry.jsonl",
                "paper/nav.csv", "paper/decisions.csv", "paper/trades.csv",
                "governance/control_b_prompts.jsonl")   # phiên bản prompt ghế B đã có hiệu lực: không sửa, không xóa
 TRIALS, REGISTRY = "research/trials.csv", "research/trial_registry.jsonl"
@@ -140,7 +141,7 @@ def store_snapshot_errors(root, base) -> list[str]:
     return store_errors(base_files, head_files, legacy)
 
 
-def issue_crosscheck_errors(pred_rows, res_rows, issues: dict, owner: str) -> list[str]:
+def issue_crosscheck_errors(pred_rows, res_rows, issues: dict, owner: str, pub_rows=()) -> list[str]:
     """issues: {số: {"created_at": iso, "user": login, "is_pr": bool}} lấy từ GitHub."""
     errs = []
     def check(label, number, created):
@@ -162,6 +163,11 @@ def issue_crosscheck_errors(pred_rows, res_rows, issues: dict, owner: str) -> li
         if n is not None and n not in seen:
             seen.add(n)
             check(f"phân định {r.get('prediction_id')}", n, r.get("resolution_issue_created_at"))
+    for r in pub_rows or ():
+        n = r.get("issue_number")
+        if n is not None and n not in seen:
+            seen.add(n)
+            check(f"bằng chứng công bố {r.get('prediction_ids')}", n, r.get("issue_created_at"))
     return errs
 
 
@@ -169,11 +175,20 @@ def _ts(iso):
     return datetime.fromisoformat(str(iso).replace("Z", "+00:00"))
 
 
-_MARK_RE = re.compile(r"ledger-attest:\s*(predictions|resolutions)\s+(\S+)\s+([0-9a-f]{64})(?![0-9a-f])")
+_MARK_RE = re.compile(r"ledger-attest:\s*(predictions|resolutions|publications)\s+(\S+)\s+([0-9a-f]{64})(?![0-9a-f])")
 VN = timezone(timedelta(hours=7))
 
 
-def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, notes=None) -> list:
+def _forecast_attest_bound(row):
+    """Mốc dấu nhận phải đứng trước: info_lock_at nếu sớm hơn resolve_at, không thì resolve_at."""
+    resolve_at = str(row.get("resolve_at") or "")
+    lock = str(row.get("info_lock_at") or "")
+    if lock and (not resolve_at or lock < resolve_at):
+        return lock, "info_lock_at"
+    return (resolve_at or None), "resolve_at"
+
+
+def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, notes=None, pub_rows=()) -> list:
     """comments: {số Issue: [{"user": login, "created_at": iso, "updated_at": iso, "body": str}]}.
     Trả về [(số Issue, lỗi, "predictions" | "resolutions")]; KHÔNG có khoảng miễn kiểm cho Issue vừa mở. Một dòng đạt khi Issue của nó có bình luận ✅
     của github-actions[bot], chưa sửa, đăng không trước giờ tạo Issue, chứa 'ledger-attest: <sổ> <mã> <hash>' đúng hash
@@ -185,7 +200,7 @@ def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, note
     bao giờ có điểm, và trong phép kiểm định A–B nó bị tính theo hướng bất lợi cho kết luận đang xét. Việc đó được ghi vào
     `notes` để in ra. Dự báo không có dấu nhận nào của robot thì VOID cũng không gỡ được. (VOID chỉ ghi được từ resolve_at,
     nên cho tới lúc đó dòng ấy vẫn là lỗi.)"""
-    def find(number, ledger, rid, rhash, before_day=None, window=ATTEST_WINDOW):
+    def find(number, ledger, rid, rhash, before_day=None, window=ATTEST_WINDOW, before_label="resolve_at"):
         """→ (True, "") khi có dấu nhận hợp lệ; (False, lý do) khi không; (None, "") khi Issue không có trên GitHub
         (issue_crosscheck_errors đã báo)."""
         it = issues.get(number)
@@ -218,7 +233,7 @@ def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, note
                 why = (f"dấu nhận đăng lúc {c.get('created_at')}, cách giờ tạo Issue {it.get('created_at')} quá "
                        f"{int(window.total_seconds() // 3600)} giờ"); continue
             if before_day and posted.astimezone(VN).date().isoformat() >= str(before_day):
-                why = f"dấu nhận đăng lúc {c.get('created_at')}, không trước ngày resolve_at {before_day} (giờ Việt Nam)"; continue
+                why = f"dấu nhận đăng lúc {c.get('created_at')}, không trước ngày {before_label} {before_day} (giờ Việt Nam)"; continue
             ok = True
         if ok and other:
             ok, why = False, f"robot còn đăng dấu nhận với hash khác cho cùng mã {rid} — không xác định được nội dung nào có trước"
@@ -245,7 +260,8 @@ def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, note
         if "issue_number" not in r:
             continue
         n, rid = r.get("issue_number"), r.get("id")
-        ok, why = find(n, "predictions", rid, r.get("hash"), r.get("resolve_at"))
+        before, label = _forecast_attest_bound(r)
+        ok, why = find(n, "predictions", rid, r.get("hash"), before, before_label=label)
         if ok is not False:
             continue
         if rid in voided and find(n, "predictions", rid, r.get("hash"), None, None)[0]:
@@ -257,16 +273,23 @@ def attestation_failures(pred_rows, res_rows, issues: dict, comments: dict, note
                                "chạy lại job nhận của Issue này trong vòng 6 giờ kể từ lúc Issue mở; đã quá hạn thì vẫn chạy lại job "
                                "để robot đăng dấu nhận muộn, và khi tới resolve_at thì hủy câu hỏi của dòng này bằng Issue Resolution "
                                "chọn VOID") + ("predictions",))
-    return pred_errs + res_errs
+    pub_errs = []
+    for r in pub_rows or ():
+        n = r.get("issue_number")
+        ok, why = find(n, "publications", f"PBN-{n}", r.get("hash"), window=ATTEST_WINDOW)
+        if ok is False:
+            pub_errs.append(error(f"bằng chứng công bố PBN-{n}", n, why,
+                                  "chạy lại job của Issue bằng chứng trong vòng 6 giờ kể từ lúc Issue mở") + ("publications",))
+    return pred_errs + res_errs + pub_errs
 
 
-def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict) -> list[str]:
+def attestation_errors(pred_rows, res_rows, issues: dict, comments: dict, pub_rows=()) -> list[str]:
     """Danh sách lỗi dấu nhận (xem attestation_failures) với MỘT lượt đọc bình luận."""
-    return [f[1] for f in attestation_failures(pred_rows, res_rows, issues, comments)]
+    return [f[1] for f in attestation_failures(pred_rows, res_rows, issues, comments, pub_rows=pub_rows)]
 
 
 def attestation_errors_with_retry(pred_rows, res_rows, issues: dict, fetch, tries=ATTEST_TRIES, wait=ATTEST_WAIT,
-                                  sleep=time.sleep, now=None) -> list[str]:
+                                  sleep=time.sleep, now=None, pub_rows=()) -> list[str]:
     """Như attestation_errors, nhưng ĐỌC LẠI bình luận khi còn dòng thiếu dấu nhận mà dấu nhận vẫn có thể tới đúng hạn.
     Lý do: robot nhận đẩy commit trước rồi mới đăng bình luận ✅; kiểm toán chạy sau khi MỘT robot xong nhưng đọc cả main,
     nên có thể thấy dòng của robot KHÁC vừa đẩy mà chưa kịp đăng dấu nhận. fetch(): hàm trả về {số Issue: [bình luận]}.
@@ -276,7 +299,11 @@ def attestation_errors_with_retry(pred_rows, res_rows, issues: dict, fetch, trie
     - Tối đa `tries` lượt đọc, cách nhau `wait` giây. Hết lượt mà vẫn thiếu → trả về lỗi như thường: đây không phải
       khoảng miễn kiểm, không dòng nào được coi là đạt khi chưa có dấu nhận."""
     now = now or datetime.now(timezone.utc)
-    due = {r.get("issue_number"): str(r.get("resolve_at") or "") for r in pred_rows if "issue_number" in r}
+    due = {}
+    for r in pred_rows:
+        if "issue_number" in r:
+            before, _ = _forecast_attest_bound(r)
+            due[r.get("issue_number")] = str(before or "")
     def fresh(number):
         """Dự báo: dấu nhận còn có thể tới đúng hạn — Issue mở chưa quá ATTEST_WINDOW và chưa sang ngày resolve_at."""
         try:
@@ -287,14 +314,14 @@ def attestation_errors_with_retry(pred_rows, res_rows, issues: dict, fetch, trie
     def may_still_arrive(f):
         return f[2] == "resolutions" or fresh(f[0])
     notes = []
-    fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes)
+    fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes, pub_rows=pub_rows)
     for _ in range(max(1, int(tries)) - 1):
         if not any(may_still_arrive(f) for f in fails):
             break
         print(f"(còn {len(fails)} dòng chưa thấy dấu nhận mà dấu nhận vẫn có thể tới: chờ {wait:g} giây rồi đọc lại bình luận)")
         sleep(wait)
         notes = []
-        fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes)
+        fails = attestation_failures(pred_rows, res_rows, issues, fetch(), notes, pub_rows=pub_rows)
     for n in notes:
         print("::notice::" + n)
     return [f[1] for f in fails]
@@ -499,16 +526,17 @@ def main() -> int:
     if a.github:
         repo, token = os.environ.get("GITHUB_REPOSITORY", ""), os.environ.get("GITHUB_TOKEN", "")
         pred, res = _rows("ledger/predictions.jsonl"), _rows("ledger/resolutions.jsonl")
-        need = any("issue_number" in r for r in pred) or any(r.get("resolution_issue") is not None for r in res)
+        pub = _rows("ledger/publication_evidence.jsonl")
+        need = any("issue_number" in r for r in pred) or any(r.get("resolution_issue") is not None for r in res) or bool(pub)
         if not repo:
             print("(bỏ qua đối chiếu Issue: không có GITHUB_REPOSITORY)")
         else:
             try:
                 if need:
                     issues = fetch_issues(repo, token)
-                    errs += issue_crosscheck_errors(pred, res, issues, repo.split("/")[0])
+                    errs += issue_crosscheck_errors(pred, res, issues, repo.split("/")[0], pub)
                     errs += attestation_errors_with_retry(pred, res, issues, lambda: fetch_comments(repo, token),
-                                                          tries=a.attest_tries, wait=a.attest_wait)
+                                                          tries=a.attest_tries, wait=a.attest_wait, pub_rows=pub)
                 br = _api(f"https://api.github.com/repos/{repo}/branches/main", token)
                 rules = _api(f"https://api.github.com/repos/{repo}/rules/branches/main", token)
                 if not br.get("protected") and not rules:

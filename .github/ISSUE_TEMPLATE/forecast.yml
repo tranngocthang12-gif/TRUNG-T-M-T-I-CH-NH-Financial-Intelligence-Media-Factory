@@ -32,7 +32,13 @@ body:
     id: resolve_at
     attributes:
       label: resolve_at
-      description: Ngày phân định, YYYY-MM-DD, phải sau hôm nay
+      description: Ngày phân định, YYYY-MM-DD, phải sau hôm nay. Đây là hạn chấm, không phải ngày thông tin được công bố.
+    validations: {required: true}
+  - type: input
+    id: info_lock_at
+    attributes:
+      label: info_lock_at
+      description: "Ngày đầu tiên thông tin phân định CÓ THỂ công khai, YYYY-MM-DD (giờ Việt Nam). Phải sau hôm nay và không sau resolve_at. Ví dụ công bố CPI trước hạn chấm: ghi ngày công bố dự kiến, không ghi ngày resolve_at. Cùng câu hỏi thì hai ghế phải cùng một ngày. Không sửa được sau khi ghi."
     validations: {required: true}
   - type: input
     id: p

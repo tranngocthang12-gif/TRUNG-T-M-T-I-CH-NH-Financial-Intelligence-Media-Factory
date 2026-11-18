@@ -114,6 +114,7 @@ class LawsChecksTests(unittest.TestCase):
 
     BODY = ("### seat\n\nA\n\n### question\n\nNợ nhóm 3–5 của ngân hàng X tại 31/12/2026 cao hơn 30/9/2026?\n\n"
             "### resolution_source\n\nhttps://example.vn/bctc\n\n### resolution_rule\n\ncomparison\n\n### resolve_at\n\n{resolve}\n\n"
+            "### info_lock_at\n\n{resolve}\n\n"
             "### p\n\n0.6\n\n### base_rate\n\n0.5\n\n### invalidation_conditions\n\nBCTC bị điều chỉnh hồi tố\n\n"
             "### author_seat\n\nClaude Project TTC\n\n### model_cutoff\n\n2026-06\n\n### library_refs\n\n_No response_\n\n### prompt_hash\n\n_No response_\n")
 

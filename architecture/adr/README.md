@@ -31,3 +31,4 @@ Mẫu tệp `ADR-NNNN-<slug>.md`:
 | ADR-0008 | Thiên lệch sống sót, ngày công bố BCTC, khóa biên độ trong giấy, sụt giảm lớn nhất | ACCEPTED 18/11/2026. Căn cứ: Owner gộp PR #31, merge `8c4fd4305b8154adda2ea0e1abf4e43cd7b647ab`. Không viện bản disclosure của PR #32 |
 | ADR-0009 | Phiên bản và nguồn gốc giá dẫn xuất, không sửa raw ADR-0006 | ACCEPTED 18/11/2026. PR #32 đưa chính tệp này lên main (merge `432f456`); L-09 `GỘP ĐƯỢC — commit c4d8a03`, người viết ChatGPT (OpenAI), người chấm Grok (xAI); hai job L-09 success. Điều 7 chưa đổi engine |
 | ADR-0010 | Lập ghế thi công là Grok (xAI); sửa lệch giấy tờ | PROPOSED |
+| ADR-0011 | Khóa nhận dự báo theo ngày thông tin có thể công bố | PROPOSED |

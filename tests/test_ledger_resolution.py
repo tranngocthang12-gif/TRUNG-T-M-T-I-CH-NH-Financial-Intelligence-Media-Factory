@@ -26,6 +26,8 @@ def _forecast(seat, question, p, resolve_at="2026-12-31", rule="comparison", aut
          "resolution_rule": rule, "resolve_at": resolve_at, "p": str(p), "base_rate": "0.5",
          "invalidation_conditions": "Nguồn đổi định nghĩa chỉ tiêu",
          "author_seat": author or ("Claude Project TTC" if seat == "A" else "Claude trần"), "model_cutoff": "2026-06"}
+    if "info_lock_at" not in f:
+        f["info_lock_at"] = f["resolve_at"]
     if seat == "B":
         f["prompt_hash"] = B_HASH
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items())

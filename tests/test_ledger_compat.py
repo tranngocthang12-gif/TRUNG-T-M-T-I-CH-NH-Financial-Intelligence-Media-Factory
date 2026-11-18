@@ -21,7 +21,8 @@ def _form(seat, question, resolve_at="2099-02-15", p="0.25"):
               "invalidation_conditions": "Ngân hàng đổi cách phân loại nợ",
               "author_seat": "Claude Project TTC" if seat == "A" else "Claude trần",
               "model_cutoff": "2026-06", "library_refs": "_No response_" if seat == "B" else "KN-T2-vas-01",
-              "prompt_hash": B_HASH if seat == "B" else "_No response_"}
+              "prompt_hash": B_HASH if seat == "B" else "_No response_",
+              "info_lock_at": resolve_at}
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in fields.items())
 
 

@@ -21,7 +21,7 @@ concurrency:
 jobs:
   intake:
     if: >-
-      (contains(github.event.issue.labels.*.name, 'resolution') || startsWith(github.event.issue.title, '[Resolution]')) &&
+      (contains(github.event.issue.labels.*.name, 'resolution') || startsWith(github.event.issue.title, '[Resolution]') || contains(github.event.issue.labels.*.name, 'publication') || startsWith(github.event.issue.title, '[Publication]')) &&
       github.event.issue.user.login == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -55,8 +55,15 @@ jobs:
             out=$(python tools/resolution_intake.py)
             code=$?
             if [ "$code" != "0" ]; then break; fi
-            git add ledger/resolutions.jsonl
-            git commit -q -m "ledger: resolution #${ISSUE_NUMBER}"
+            if [ -f ledger/resolutions.jsonl ]; then git add ledger/resolutions.jsonl; fi
+            if [ -f ledger/publication_evidence.jsonl ]; then git add ledger/publication_evidence.jsonl; fi
+            msg="ledger: resolution #${ISSUE_NUMBER}"
+            tmpf="${TMPDIR:-/tmp}/ttc-intake-$$-$i.json"
+            printf '%s' "$out" > "$tmpf"
+            kind=$(python -c 'import json,sys; print((json.load(open(sys.argv[1])) or {}).get("kind") or "")' "$tmpf")
+            rm -f "$tmpf"
+            if [ "$kind" = "publication" ]; then msg="ledger: publication #${ISSUE_NUMBER}"; fi
+            git commit -q -m "$msg"
             if git push -q origin HEAD:main; then break; fi
             out="$fail"
             code=1

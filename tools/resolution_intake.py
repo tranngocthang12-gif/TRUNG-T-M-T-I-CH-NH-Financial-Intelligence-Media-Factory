@@ -266,6 +266,50 @@ def replay(pred_rows, res_rows) -> list[str]:
     return errs
 
 
+def publication_main(data, number, created, author, pred_rows) -> int:
+    """Ghi ledger/publication_evidence.jsonl. Không ghi resolutions.jsonl, không đóng mẫu 194."""
+    from tools.ledger_intake import PUB, publication_prepare, post_write_errors
+    pub_rows = load_rows(PUB)
+    old = [r for r in pub_rows if r.get("issue_number") == number]
+    if old:
+        try:
+            msg, want = publication_prepare(data, number, created, author, pred_rows,
+                                            [r for r in pub_rows if r.get("issue_number") != number])
+        except Exception as e:  # noqa: BLE001
+            msg, want = str(e).splitlines()[0], None
+        have = [{k: v for k, v in r.items() if k not in SYSTEM_FIELDS} for r in old]
+        if msg or want is None or [want] != have:
+            return reject("sổ đã có bằng chứng công bố mang số Issue này nhưng nội dung không khớp thân Issue lúc mở")
+        attest = "publications PBN-%s %s" % (number, old[0].get("hash"))
+        print(json.dumps({"ok": True, "duplicate": True, "kind": "publication", "attest": [attest],
+                          "message": "Bằng chứng công bố #%s đã có, bỏ qua" % number}, ensure_ascii=False))
+        return 3
+    try:
+        msg, row = publication_prepare(data, number, created, author, pred_rows, pub_rows)
+    except (TypeError, ValueError) as e:
+        return reject(f"không đọc được mốc thời gian ({str(e).splitlines()[0]})")
+    if msg:
+        return reject(msg)
+    rows = chain([row], pub_rows[-1]["hash"] if pub_rows else "GENESIS")
+    res_rows = load_rows(RES)
+    try:
+        broken = post_write_errors(pred_rows, res_rows, pred_rows, res_rows, pub_rows, pub_rows + [strict_loads(dumps(r)) for r in rows])
+    except Exception as e:  # noqa: BLE001
+        broken = [f"không chạy được kiểm lại ({str(e).splitlines()[0]})"]
+    if broken:
+        return system_error("ghi bằng chứng công bố sẽ làm sổ không qua kiểm lại — " + broken[0] + " — nên KHÔNG ghi")
+    PUB.parent.mkdir(parents=True, exist_ok=True)
+    with PUB.open("a", encoding="utf-8") as f:
+        for r in rows:
+            f.write(dumps(r) + "\n")
+    attest = "publications PBN-%s %s" % (number, rows[0]["hash"])
+    ids = ", ".join(row["prediction_ids"])
+    print(json.dumps({"ok": True, "kind": "publication", "attest": [attest],
+                      "message": "Đã ghi bằng chứng công bố cho %s tại %s" % (ids, row["published_at"])},
+                     ensure_ascii=False))
+    return 0
+
+
 def main() -> int:
     number = int(os.environ["ISSUE_NUMBER"])
     created = os.environ["ISSUE_CREATED_AT"]
@@ -282,6 +326,8 @@ def main() -> int:
         print(json.dumps({"ok": False, "message": "Lỗi hệ thống: thiếu thư viện jsonschema"}, ensure_ascii=False))
         return 1
     res_rows, pred_rows = load_rows(RES), load_rows(PRED)
+    if str(data.get("notice", "")).strip().upper() == "PUBLICATION":
+        return publication_main(data, number, created, author, pred_rows)
     old = [r for r in res_rows if r.get("resolution_issue") == number]
     if old:
         # Chạy lại job: không ghi trùng, và trả lại dấu nhận để workflow đăng nếu lần trước chưa đăng được — nhưng CHỈ khi các

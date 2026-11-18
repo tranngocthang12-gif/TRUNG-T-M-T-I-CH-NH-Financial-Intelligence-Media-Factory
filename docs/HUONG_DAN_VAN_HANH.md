@@ -33,7 +33,8 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
 2. Ghế B: mở một chat Claude **mới**, không Project, không tệp, tắt tìm web; dán nguyên khối prompt trong `governance/CONTROL_B_PROMPT.md` rồi dán câu hỏi; chép ba dòng trả lời.
 3. Tab **Issues** → **New issue** → mẫu **Forecast**. Mở hai Issue **trong cùng một ngày**: một cho ghế A, một cho ghế B, **cùng một câu chữ** ở ô question, cùng nguồn, cùng luật, cùng ngày phân định.
    - `p`, `base_rate`: chỉ ghi con số (0.35 hoặc 0,35 đều được); không ghi %, không ghi chữ.
-   - `resolve_at`: đúng dạng `2026-12-10`.
+   - `resolve_at`: đúng dạng `2026-12-10`. Đây là ngày phân định, không phải ngày số liệu ra.
+   - `info_lock_at`: ngày đầu tiên thông tin **có thể** được công bố, dạng `2026-12-06`, sau hôm nay và không sau `resolve_at`. Hai ghế cùng một ngày. Không sửa được sau khi ghi. Bỏ trống thì robot từ chối.
    - `resolution_source`: phải có **tên miền** của nguồn, ví dụ `nso.gov.vn` hoặc `https://www.sbv.gov.vn`. Lúc phân định máy chỉ nhận đường dẫn thuộc tên miền ghi ở đây.
    - `model_cutoff`: dạng `2026-06`.
    - `author_seat`: bắt đầu bằng tên mô hình ("Claude Project TTC", "Claude trần").
@@ -42,7 +43,7 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
    - **Không sửa, không xóa bình luận ✅ của robot.** Dòng dấu nhận là bằng chứng dự báo đã có từ lúc Issue mở; mất nó thì kiểm toán sổ báo đỏ.
    - Nếu việc "Ledger intake" đỏ mà dự báo đã vào sổ nhưng chưa có bình luận ✅: vào tab **Actions**, mở lần chạy đó, bấm **Re-run all jobs** trong vòng 6 giờ kể từ lúc mở Issue (và trước ngày `resolve_at`). Robot sẽ đăng bổ sung dấu nhận, không ghi trùng.
    - Quá 6 giờ mà dự báo đã nằm trong sổ nhưng chưa có dấu nhận: vẫn bấm **Re-run all jobs** để robot đăng dấu nhận muộn. Việc "Kiem toan so" sẽ còn đỏ ở dòng đó; tới ngày `resolve_at` thì **hủy câu hỏi đó** — mở Issue mẫu **Resolution**, chọn `VOID`, ghi lý do ở `void_reason` (ví dụ "F-123 không có dấu nhận đúng hạn do sự cố ngày …") — kiểm toán xanh lại. VOID không ghi được trước `resolve_at`. Vì vậy **khi thấy "Ledger intake" đỏ, bấm chạy lại ngay trong ngày**.
-   - Mở Issue dự báo **ít nhất 30 phút trước nửa đêm** của ngày liền trước `resolve_at`; sát hơn thì robot từ chối (dấu nhận sẽ rơi sang ngày phân định).
+   - Mở Issue dự báo **ít nhất 30 phút trước nửa đêm** của ngày liền trước `info_lock_at` và của ngày liền trước `resolve_at`; sát hơn thì robot từ chối.
 5. Mỗi ghế chỉ một dự báo cho một câu hỏi. Ghi nhầm thì không xóa được: sổ chỉ ghi thêm. Câu hỏi viết sai thì tới `resolve_at` chọn `VOID` trong Issue **Resolution** (cả hai ghế của câu hỏi cùng bị hủy). VOID không làm đẹp được kết quả: phép kiểm định A–B dùng đúng 194 cặp bất đồng đầu tiên theo số Issue hoàn tất cặp; một cặp bị VOID vẫn giữ chỗ của nó và bị tính theo hướng bất lợi cho kết luận đang xét; một cặp bị bỏ mặc không phân định thì phép kiểm định chưa ra kết luận.
 
 ## 7. Phân định khi tới hạn
