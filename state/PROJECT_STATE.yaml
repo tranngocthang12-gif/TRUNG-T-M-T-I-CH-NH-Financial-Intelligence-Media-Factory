@@ -1,9 +1,9 @@
 version: 0.5
-phase: V3_G0_CHUA_THOAT
-current_focus: "G0 chưa thoát (ADR-0010, 18/11/2026). Cột thoát §8 chưa đạt: 0 dự báo thử qua Action xanh. Không có biên bản Owner bác riêng nhánh 'chỉ giữ Ledger' ngày 17/11; kết luận đang lưu là ADR-0002 (PR #29): không thu hẹp v3.0, mốc xét lại 31/03/2027. Hai đồng hồ không phải một luật. Đường dự báo → phân định → chấm A–B → kiểm toán đã có mã (PR #28). Ghế thi công là Grok (xAI). Điều kiện thoát G1 (§8) chưa phải việc của pha này: ≥ 40 tài liệu gốc có hash, ≥ 60 dự báo A+B."
+phase: V3_G0_DAT_DIEU_KIEN_KY_THUAT
+current_focus: "G0 đã đạt điều kiện kỹ thuật tại architecture/ARCHITECTURE.md §8 ngày 18/11/2026: 6 dự báo thật F-37–F-42, 3 cặp A/B (CPI, IIP, bán lẻ), mỗi cặp cùng câu hỏi và cùng ngày theo giờ Việt Nam; cả 6 có dấu nhận robot khớp hash. Kiểm toán cuối run 44286714267 SUCCESS trên main f1be343fc342694a247790293fc2bf0ddaa6f979. G1 chưa đạt: mới có 6/60 dự báo A+B, thư viện vẫn 0/40 tài liệu gốc ghim. Chưa phân định, chưa kết luận năng lực dự báo. Ghi nhận này không thay đổi cột dừng/đảo 3 tuần hoặc quyết định ADR-0002 (mốc xét lại 31/03/2027); hai đồng hồ không phải một luật."
 deployment_level: 0
 open_blockers:
-  - "Ledger chưa có dự báo nào (0/60); Owner ghi cặp A/B theo docs/HUONG_DAN_VAN_HANH.md mục 6. Chưa có tệp ledger/predictions.jsonl"
+  - "G1 chưa đạt: Ledger có 6/60 dự báo A+B, gồm 3 cặp CPI #37/#38, IIP #39/#40, bán lẻ #41/#42. Tiếp tục thu thập dự báo đúng quy trình; tới resolve_at 2026-12-20 mới phân định theo nguồn đã hứa."
   - "Thư viện rỗng (0/40 tài liệu gốc ghim, 0 ghi chú). Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010). Không chép nguồn khi chưa có bản gốc và sha256"
   - "OWNER_MISSION chưa được Owner ký — AI không điền tệp này"
   - "GOVERNOR_POLICY còn TODO — AI không điền tệp này. deployment_level 0 nên các TODO này chặn vốn, không mở vốn"
@@ -13,16 +13,11 @@ open_blockers:
   - "ADR-0009 ACCEPTED qua PR #32 (merge 432f456, L-09 trên c4d8a03). Điều 7 của ADR đó chưa cho đổi engine/adjust.py hay data.sources"
 last_session:
   date: 2026-11-18
-  type: "SỬA GIẤY TỜ ĐÃ XÁC NHẬN + LẬP GHẾ THI CÔNG (ADR-0010)"
+  type: "G0 ĐẠT ĐIỀU KIỆN KỸ THUẬT — 6 DỰ BÁO, 3 CẶP A/B"
   done:
-    - "Owner giao ghế thi công cho Grok (xAI). ADR-0010. Không gộp main, không sửa LAWS.md, không mở API, không chạm engine"
-    - "PROJECT_STATE chuyển V3_G0_CHUA_THOAT. §8 không biến ADR-0002 thành biên bản cột 3 tuần"
-    - "ADR-0008 lật ACCEPTED chỉ vì Owner gộp PR #31 (merge 8c4fd43), không viện disclosure PR #32"
-    - "ADR-0009 ghi ACCEPTED: PR #32 đưa chính tệp lên main và có L-09 GỘP ĐƯỢC trên c4d8a03. Sửa câu sai 'chỉ gộp disclosure'"
-    - "Sửa tiêu đề §5, đường dẫn docs/TTC_TANG_HOC_HIEU_v0.2.md, chỗ gọi MINH TRÍ là ghế, BOOT bước 10, ARCHIVE các tệp trước v3.0"
-    - "requirements.txt ghim pandas==2.3.3 (hạ major so với pandas 3.0.5 của máy rà soát) và các số trên máy ghế thi công. Không có log CI chứng minh đây là bộ CI đã phân giải. Không đổi số pin"
-    - "TTC-2 ghi làm một phần: không có engine/knowledge_items.py; CI là tests.yml không phải daily_cycle.yml"
-    - "Kênh: không đặt mới. Gmail handoff mục 2 còn; lên main là PR (ADR-0003); hoc-hieu là mặc định Claude chưa được Owner chọn"
-    - "Trả quyết định 9 của ADR-0003 về chữ đã chấm. authored_by Grok (xAI) là lời khai ghế soạn. Commit 02e5d7e author grok-xai, không phải login chủ kho. Người mở PR là tranngocthang12-gif"
-  tests: "tools/validate.py trên bản làm việc; CI của PR chạy lại toàn bộ. Cổng L-09 đỏ cho tới khi ghế khác nhà cung cấp chấm — đúng luật"
-next_gap: "(1) Owner gộp PR của ADR-0010 chỉ sau bản chấm L-09 của ghế khác nhà cung cấp. (2) Vòng học hằng tuần 16:30 thứ Sáu 20/11/2026. (3) Issue Forecast đầu tiên do Owner dán — ghế thi công không mở Issue hộ và không tự ghi sổ. (4) data/vn30_history.csv khi có công bố HOSE. (5) TTC-3 (chép tài liệu gốc) chỉ bắt đầu khi Owner chỉ nguồn và tệp gốc tải được để ghim sha256."
+    - "Owner tranngocthang12-gif mở Forecast Issues #37–#42 ngày 18/11/2026 theo giờ Việt Nam; robot ghi 6 dòng F-37–F-42 vào ledger/predictions.jsonl."
+    - "Đối chiếu đủ 6 dấu nhận ledger-attest của github-actions[bot] với hash từng dòng Ledger; 3 cặp A/B cùng câu hỏi và cùng ngày."
+    - "Kiểm toán GitHub run 44286714267 SUCCESS trên main f1be343fc342694a247790293fc2bf0ddaa6f979: kiểm lại luật, tính chỉ-ghi-thêm và đối chiếu Issue/dấu nhận."
+    - "Cập nhật trạng thái theo bằng chứng G0; G1 chưa đạt. deployment_level giữ 0; không mở giao dịch."
+  tests: "6/6 dấu nhận khớp Ledger; 6 dự báo thuộc 3 cặp A/B; kiểm toán https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44286714267 SUCCESS. PR cập nhật state cần CI và ghế khác nhà cung cấp chấm L-09 trước khi Owner gộp."
+next_gap: "(1) Ghế khác nhà cung cấp chấm PR cập nhật trạng thái đúng commit theo L-09; Owner quyết định gộp. (2) Tiếp tục dự báo A/B và xây thư viện để tiến tới G1, chưa tuyên bố G1 đạt. (3) Tới 2026-12-20, phân định 3 câu hỏi theo nguồn đã hứa và quy trình Resolution. (4) Vòng học hằng tuần 16:30 thứ Sáu 20/11/2026. (5) data/vn30_history.csv khi có công bố HOSE; TTC-3 chỉ bắt đầu khi Owner chỉ nguồn và tệp gốc tải được để ghim sha256."
