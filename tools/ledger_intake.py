@@ -654,6 +654,23 @@ def load_rows(path):
     return [strict_loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()] if path.is_file() else []
 
 
+NEW_FORECAST_FIELDS = ("info_lock_at", "calendar_id")
+
+
+def schema_for_forecast(schema=None, legacy=False):
+    """Dự báo mới bắt buộc info_lock_at và calendar_id trong contract. Dòng F-37–F-42 (legacy=True) không bị đòi hai trường."""
+    schema = schema or _schema()
+    required = list(schema.get("required") or [])
+    for key in NEW_FORECAST_FIELDS:
+        if key not in required:
+            required.append(key)
+    if legacy:
+        required = [key for key in required if key not in NEW_FORECAST_FIELDS]
+    if required == list(schema.get("required") or []):
+        return schema
+    return {**schema, "required": required}
+
+
 def _schema():
     return json.loads(SCHEMA.read_text(encoding="utf-8"))
 
@@ -671,8 +688,14 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=Tru
       luôn chứa cả các phân định ghi SAU dòng đang xét, nên chỉ phân định mở KHÔNG SAU dự báo mới là lỗi ở đây; trường hợp
       còn lại (dự báo mở trước nhưng ghi sau phân định) do resolution_intake.replay bắt: phân định khi ấy không phủ nó."""
     import jsonschema
+    active = schema_for_forecast(schema, legacy_timing)
     try:
-        jsonschema.validate(data, schema or _schema())
+        jsonschema.validate(data, active)
+    except jsonschema.ValidationError as e:
+        msg = str(e).splitlines()[0]
+        # Thiếu đúng hai trường lịch: để info_lock_error / calendar_lock_error nói tiếng Việt. Schema vẫn required.
+        if not (e.validator == "required" and any(f"'{key}'" in msg for key in NEW_FORECAST_FIELDS)):
+            return f": không khớp forecast_issue.schema.json — {msg}", ""
     except Exception as e:  # noqa: BLE001
         return f": không khớp forecast_issue.schema.json — {str(e).splitlines()[0]}", ""
     for k in NUMERIC:

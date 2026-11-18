@@ -119,9 +119,13 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
              "- Lần thử đã đăng ký nhưng không có kết quả (L-06; vẫn tính vào số lần thử): "
              + (", ".join(research.abandoned_trials(ledger_df)) or "không có"), ""]
         if sc["procedures"]:
-            L += ["| Chuyên gia | n | Brier | Brier baseline mạnh nhất | Skill | Tỷ lệ đúng | Kết luận |", "|---|---|---|---|---|---|---|"]
-            L += [f"| {k} | {v['n']} | {v['brier']} | {v['brier_base_rate']} | {v['brier_skill']} | {v['hit_rate']} | {v['verdict']} |"
+            L += ["| Chuyên gia | n | Brier | Brier baseline mạnh nhất | Skill | Tỷ lệ YES quan sát | Độ chính xác chiều | Kết luận |",
+                  "|---|---|---|---|---|---|---|---|"]
+            L += [f"| {k} | {v['n']} | {v['brier']} | {v['brier_base_rate']} | {v['brier_skill']} | {v['observed_yes_rate']} | "
+                  f"{'không có chiều' if v['directional_accuracy'] is None else v['directional_accuracy']} | {v['verdict']} |"
                   for k, v in sc["procedures"].items()]
+            L += ["", "Tỷ lệ YES quan sát = mean(outcome), không phải tỷ lệ dự báo đúng. Độ chính xác chiều: p>0,5 là YES, "
+                  "p<0,5 là NO; p=0,5 không vào mẫu số. Cột hit_rate trong bảng hiệu chuẩn vẫn là tỷ lệ YES của ô."]
         with open(path(f"reports/cycle_{as_of}.md"), "a", encoding="utf-8") as f:
             f.write("\n".join(L) + "\n")
     return {"as_of": as_of, "trials": done, "alerts": alerts, "nav": nav, "decision": decision,

@@ -348,6 +348,69 @@ class CapabilityScoreTests(unittest.TestCase):
         self.assertTrue(full["ab"]["timing"]["fixed_sample_counts_are_capability"])
 
 
+class DirectionalAccuracyTests(unittest.TestCase):
+    """hit_rate cũ = mean(outcome). Tách observed_yes_rate và directional_accuracy. Không đổi Brier hay right() của mẫu 194."""
+    CAL = (lambda r: {**r, "hash": laws_checks.line_hash(r)})(
+        {"calendar_id": "CAL-TEST", "domains": ["nso.gov.vn"], "info_lock_at": "2026-12-20",
+         "evidence_url": "https://www.nso.gov.vn/lich", "quote": "Số tháng 11 được công bố ngày 20/12/2026.",
+         "recorder": "Owner", "issue_number": 900001, "issue_created_at": "2026-11-01T00:00:00Z", "prev_hash": "GENESIS"})
+
+    def test_yes_no_and_neutral_are_not_collapsed_into_hit_rate(self):
+        cases = [("yes-right", 0.8, 1), ("no-right", 0.2, 0), ("yes-wrong", 0.9, 0),
+                 ("no-wrong", 0.1, 1), ("neutral-yes", 0.5, 1), ("neutral-no", 0.5, 0)]
+        preds, res = [], []
+        for i, (name, p, outcome) in enumerate(cases):
+            num = 3000 + i
+            q = f"Câu hướng {name} có đủ mười ký tự không?"
+            preds.append({"id": f"F-{num}", "issue_number": num, "issue_created_at": "2026-11-17T02:00:00Z", "seat": "A",
+                          "question": q, "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5, "info_lock_at": "2026-12-20",
+                          "resolution_source": "nso.gov.vn", "calendar_id": "CAL-TEST", "author_seat": "Claude Project TTC"})
+            res.append({"prediction_id": f"F-{num}", "outcome": outcome, "resolution_issue": 80000 + num})
+        verified = {p["id"] for p in preds}
+        out = engine_ledger.issue_summary(preds, res, [], [self.CAL], verified, "injected")
+        a = out["scores"]["A"]
+        self.assertEqual(a["observed_yes_rate"], 0.5)            # 3 YES / 6 dòng
+        self.assertEqual(a["hit_rate"], a["observed_yes_rate"])
+        self.assertEqual(a["hit_rate_meaning"], "observed_yes_rate")
+        self.assertEqual((a["directional_correct"], a["directional_n"], a["neutral_excluded"], a["directional_accuracy"]),
+                         (2, 4, 2, 0.5))
+        self.assertEqual(a["brier"], 0.3667)                     # (2×0,04 + 2×0,81 + 2×0,25) / 6
+        bin_ = a["calibration"]["0.5-0.6"]
+        self.assertEqual((bin_["n"], bin_["hit_rate"]), (2, 0.5))  # tỷ lệ YES trong ô, không phải accuracy
+        self.assertEqual(a["calibration_hit_rate_meaning"], "observed_yes_rate_in_bin")
+        self.assertEqual(engine_ledger.TARGET_DISAGREEMENTS, 194)
+        # p = 0,5 không tạo bất đồng (tích hai phía = 0), nên không đụng mẫu 194. Một bất đồng thật vẫn chấm đúng chiều.
+        q = "Cặp bất đồng thật có bị đổi luật 194 không?"
+        for seat, p, num in (("A", 0.2, 3100), ("B", 0.8, 3101)):
+            preds.append({"id": f"F-{num}", "issue_number": num, "issue_created_at": "2026-11-17T02:00:00Z", "seat": seat,
+                          "question": q, "resolve_at": "2026-12-31", "p": p, "base_rate": 0.5, "info_lock_at": "2026-12-20",
+                          "resolution_source": "nso.gov.vn", "calendar_id": "CAL-TEST",
+                          "author_seat": "Claude Project TTC" if seat == "A" else "Claude trần"})
+            res.append({"prediction_id": f"F-{num}", "outcome": 0, "resolution_issue": 82000 + num})
+        out2 = engine_ledger.issue_summary(preds, res, [], [self.CAL], {p["id"] for p in preds}, "injected")
+        self.assertEqual(out2["ab"]["a_correct"], 1)
+        self.assertEqual(out2["ab"]["disagreements_resolved"], 1)
+
+
+class ForecastSchemaTests(unittest.TestCase):
+    def test_schema_requires_lock_fields_and_legacy_rows_still_replay(self):
+        import jsonschema
+        schema = json.loads((ROOT / "contracts" / "forecast_issue.schema.json").read_text(encoding="utf-8"))
+        self.assertIn("info_lock_at", schema["required"])
+        self.assertIn("calendar_id", schema["required"])
+        body = {"seat": "A", "question": "Câu hỏi đủ dài để qua schema?", "resolution_source": "nso.gov.vn",
+                "resolution_rule": "comparison", "resolve_at": "2026-12-31", "p": 0.4, "base_rate": 0.5,
+                "invalidation_conditions": "đổi rổ", "author_seat": "Grok (xAI)", "model_cutoff": "2026-06"}
+        with self.assertRaises(jsonschema.ValidationError):
+            jsonschema.validate(body, schema)
+        legacy_schema = ledger_intake.schema_for_forecast(schema, legacy=True)
+        self.assertNotIn("info_lock_at", legacy_schema["required"])
+        self.assertNotIn("calendar_id", legacy_schema["required"])
+        errs = ledger_intake.ledger_errors(ledger_intake.load_rows(ROOT / "ledger" / "predictions.jsonl"),
+                                           ledger_intake.load_rows(ROOT / "ledger" / "resolutions.jsonl"))
+        self.assertEqual(errs, [])
+
+
 class LegacyTests(unittest.TestCase):
     def test_legacy_forecasts_stay_pinned_and_are_not_valid_without_proof(self):
         pred = ledger_intake.load_rows(ROOT / "ledger" / "predictions.jsonl")

@@ -205,6 +205,7 @@ TARGET_DISAGREEMENTS = 194        # ARCHITECTURE v3.0 §4.2: phát hiện A đú
 MIN_PAIRS_FOR_RATE_WARNING = 60   # governance/CONTROL_B_PROMPT.md: "dưới 10% sau 60 câu" thì mở ADR đổi nhóm B
 
 def _calibration(ps, os_):
+    """Mỗi ô: hit_rate là tỷ lệ kết quả YES thực tế (quan sát), đúng nghĩa hiệu chuẩn. Không phải độ chính xác chiều."""
     out = {}
     for k in range(10):
         lo, hi = k / 10, (k + 1) / 10
@@ -235,8 +236,35 @@ def _same_day(a, b):
     except (KeyError, TypeError, ValueError):
         return False
 
+def _direction_stats(ps, os_):
+    """Tách hai số hay bị gọi chung là hit_rate.
+    observed_yes_rate = mean(outcome): tỷ lệ sự kiện xảy ra, kể cả dự báo p = 0,5.
+    directional_accuracy: p > 0,5 coi là chiều YES, p < 0,5 coi là chiều NO; đúng khi chiều khớp outcome.
+    p cách 0,5 không quá 1e-12 là trung lập: không vào tử số và không vào mẫu số (directional_n).
+    Không có chiều nào thì directional_accuracy là None, không phải 0.
+    hit_rate giữ khóa cũ và BẰNG observed_yes_rate. Không dùng khóa này làm tỷ lệ dự báo đúng.
+    Không đổi Brier và không đổi right() của phép thử 194 cặp (p > 0,5)."""
+    if not os_:
+        yes = None
+    else:
+        yes = round(float(np.mean(os_)), 3)
+    directional = correct = neutral = 0
+    for p, o in zip(ps, os_):
+        if abs(float(p) - 0.5) <= 1e-12:
+            neutral += 1
+            continue
+        directional += 1
+        call = 1 if float(p) > 0.5 else 0
+        if call == int(o):
+            correct += 1
+    return {"observed_yes_rate": yes, "directional_accuracy": round(correct / directional, 3) if directional else None,
+            "directional_n": directional, "directional_correct": correct, "neutral_excluded": neutral,
+            "hit_rate": yes, "hit_rate_meaning": "observed_yes_rate"}
+
+
 def _seat_scores(rows, outcome):
-    """Brier, Brier xác suất nền, Brier đồng xu, mean_p, hit_rate, hiệu chuẩn cho các dòng ĐÃ có kết quả YES/NO."""
+    """Brier, Brier xác suất nền, Brier đồng xu, mean_p, tỷ lệ YES, độ chính xác chiều, hiệu chuẩn.
+    Hiệu chuẩn giữ hit_rate = tỷ lệ YES trong ô. Điểm này chỉ tính dòng ĐÃ có kết quả YES/NO."""
     ps = [float(p["p"]) for p in rows]; os_ = [outcome[p["id"]] for p in rows]
     bs = []
     for p in rows:
@@ -245,8 +273,8 @@ def _seat_scores(rows, outcome):
     return {"n": len(rows), "brier": round(float(np.mean([(a - b) ** 2 for a, b in zip(ps, os_)])), 4),
             "brier_base_rate": round(float(np.mean([(a - b) ** 2 for a, b in zip(bs, os_)])), 4),
             "brier_coin": round(float(np.mean([(0.5 - b) ** 2 for b in os_])), 4),
-            "mean_p": round(float(np.mean(ps)), 3), "hit_rate": round(float(np.mean(os_)), 3),
-            "calibration": _calibration(ps, os_)}
+            "mean_p": round(float(np.mean(ps)), 3), "calibration_hit_rate_meaning": "observed_yes_rate_in_bin",
+            "calibration": _calibration(ps, os_), **_direction_stats(ps, os_)}
 
 RAW_AUDIT_LABEL = ("SỐ LIỆU THÔ ĐỂ KIỂM TOÁN — KHÔNG PHẢI BẰNG CHỨNG NĂNG LỰC: gồm cả dự báo chưa chứng minh thời điểm "
                    "(L-05, ADR-0011). Không trích các số này như điểm năng lực.")
@@ -446,8 +474,36 @@ def scorecard(as_of, verified=None):
             n = len(g)
             verdict = ("CHƯA ĐỦ MẪU" if n < CFG["ledger"]["min_n_for_verdict"] else
                        "HƠN BASELINE" if bss > 0 else "KHÔNG HƠN BASELINE")
+            stats = _direction_stats(p.tolist(), o.tolist())
             out["procedures"][proc] = {"n": n, "brier": round(brier, 4), "brier_base_rate": round(brier_base, 4),
-                                       "brier_skill": round(bss, 4), "best_baseline": best, "hit_rate": round(float(o.mean()), 3),
-                                       "mean_p": round(float(p.mean()), 3), "calibration": buckets, "verdict": verdict}
+                                       "brier_skill": round(bss, 4), "best_baseline": best, **stats,
+                                       "mean_p": round(float(p.mean()), 3),
+                                       "calibration_hit_rate_meaning": "observed_yes_rate_in_bin",
+                                       "calibration": buckets, "verdict": verdict}
+    from tools.laws_checks import file_sha256, price_data_as_of
+    pred_path, res_path = ROOT / PRED, ROOT / RES
+    issue = out["issue_forecasts"]
+    emitted = bool(issue.get("scores"))
+    out["freshness"] = {
+        "report_as_of": as_of,
+        "data_as_of": price_data_as_of(ROOT),
+        "source_commit": _source_commit(),
+        "ledger_sha256": file_sha256(pred_path) if pred_path.is_file() else None,
+        "resolutions_sha256": file_sha256(res_path) if res_path.is_file() else None,
+        "ledger_rows": len(all_rows),
+        "capability_scores_emitted": emitted,
+        "capability_note": ("Điểm năng lực issue_forecasts.scores chỉ khi nguồn xác nhận bắt đầu bằng 'github'. "
+                            "Không có xác nhận GitHub thì scores rỗng; raw_audit không phải điểm năng lực."),
+    }
     save_json("reports/scorecard.json", out)
     return out
+
+
+def _source_commit():
+    """Commit đang chạy lúc ghi báo cáo. Độ mới sau đó xét bằng hash sổ, không bằng việc SHA này còn là HEAD."""
+    import subprocess
+    try:
+        return subprocess.check_output(["git", "-C", str(REPO), "rev-parse", "HEAD"], text=True,
+                                       stderr=subprocess.DEVNULL).strip()
+    except (OSError, subprocess.CalledProcessError):
+        return None

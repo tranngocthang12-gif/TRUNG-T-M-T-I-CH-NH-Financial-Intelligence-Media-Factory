@@ -2,9 +2,9 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "trung-tam-tai-chinh/contracts/forecast_issue.schema.json",
   "title": "FORECAST_ISSUE",
-  "description": "Dự báo ghi qua GitHub Issue 'Forecast' (ARCHITECTURE v3.0 §4.1). Tương thích prediction.schema.json: question, resolution_rule, probability, base_rate; mở rộng seat, resolution_source, resolve_at, invalidation_conditions.",
+  "description": "Dự báo ghi qua GitHub Issue 'Forecast' (ARCHITECTURE v3.0 §4.1). Tương thích prediction.schema.json: question, resolution_rule, probability, base_rate; mở rộng seat, resolution_source, resolve_at, invalidation_conditions. Dự báo mới bắt buộc info_lock_at và calendar_id. F-37–F-42 là ngoại lệ đã ghim: replay bỏ hai trường khỏi required, không sửa và không gắn hồi tố.",
   "type": "object",
-  "required": ["seat", "question", "resolution_source", "resolution_rule", "resolve_at", "p", "base_rate", "invalidation_conditions", "author_seat", "model_cutoff"],
+  "required": ["seat", "question", "resolution_source", "resolution_rule", "resolve_at", "info_lock_at", "calendar_id", "p", "base_rate", "invalidation_conditions", "author_seat", "model_cutoff"],
   "properties": {
     "seat": {"type": "string", "enum": ["A", "B"]},
     "question": {"type": "string", "minLength": 10},

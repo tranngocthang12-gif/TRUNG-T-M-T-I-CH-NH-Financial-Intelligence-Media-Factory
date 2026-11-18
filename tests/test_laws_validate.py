@@ -141,5 +141,29 @@ class LawsChecksTests(unittest.TestCase):
         self.assertEqual(len((self.tmp / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines()), 2)
 
 
+class ScorecardFreshnessTests(unittest.TestCase):
+    def test_stale_or_unproven_capability_is_rejected(self):
+        tmp = _tmp_repo()
+        try:
+            pred = tmp / "ledger" / "predictions.jsonl"
+            pred.write_text('{"id":"F-1"}\n', encoding="utf-8")
+            (tmp / "ledger" / "resolutions.jsonl").write_text("", encoding="utf-8")
+            (tmp / "reports" / "scorecard.json").write_text("{}", encoding="utf-8")
+            self.assertTrue(any("freshness" in e for e in laws_checks.check_scorecard_freshness(tmp)))
+            digest = laws_checks.file_sha256(pred)
+            res = laws_checks.file_sha256(tmp / "ledger" / "resolutions.jsonl")
+            good = {"as_of": "2026-11-19", "issue_forecasts": {"scores": {}, "timing_verification_source": "none"},
+                    "freshness": {"report_as_of": "2026-11-19", "data_as_of": None, "source_commit": "abc",
+                                  "ledger_sha256": digest, "resolutions_sha256": res, "capability_scores_emitted": False}}
+            (tmp / "reports" / "scorecard.json").write_text(json.dumps(good), encoding="utf-8")
+            self.assertEqual(laws_checks.check_scorecard_freshness(tmp), [])
+            good["issue_forecasts"]["scores"] = {"A": {"brier": 0.2}}
+            good["freshness"]["capability_scores_emitted"] = True
+            (tmp / "reports" / "scorecard.json").write_text(json.dumps(good), encoding="utf-8")
+            self.assertTrue(any("GitHub" in e for e in laws_checks.check_scorecard_freshness(tmp)))
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     unittest.main()

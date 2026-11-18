@@ -616,7 +616,68 @@ def check_exams(root, today=None) -> list[str]:
     return errs
 
 
+def file_sha256(path) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def price_data_as_of(root):
+    """Ngày cuối trong data/store/prices.csv.gz, hoặc None nếu kho không có tệp giá."""
+    p = pathlib.Path(root) / "data" / "store" / "prices.csv.gz"
+    if not p.is_file():
+        return None
+    import gzip
+    last = None
+    with gzip.open(p, "rt", encoding="utf-8", newline="") as f:
+        next(f, None)
+        for line in f:
+            if line.strip():
+                last = line.split(",", 1)[0].strip()
+    return last or None
+
+
+def check_scorecard_freshness(root) -> list[str]:
+    """Báo cáo điểm không được cũ hơn sổ và không được mang điểm năng lực khi chưa có xác nhận GitHub.
+    Kho tạm không có cả hai tệp thì bỏ qua. Vòng học ghi lại scorecard qua engine.ledger.scorecard."""
+    root = pathlib.Path(root)
+    report, pred = root / "reports" / "scorecard.json", root / "ledger" / "predictions.jsonl"
+    if not report.is_file() or not pred.is_file():
+        return []
+    try:
+        sc = json.loads(report.read_text(encoding="utf-8"))
+    except ValueError:
+        return ["scorecard: reports/scorecard.json không phải JSON"]
+    fresh = sc.get("freshness")
+    if not isinstance(fresh, dict):
+        return ["scorecard: thiếu khối freshness (ngày báo cáo, ngày dữ liệu, commit nguồn, hash sổ) — không trích điểm từ bản cũ"]
+    errs = []
+    if fresh.get("ledger_sha256") != file_sha256(pred):
+        errs.append("scorecard: hash sổ dự báo không khớp reports/scorecard.json — báo cáo cũ hơn Ledger, không được trích điểm")
+    res = root / "ledger" / "resolutions.jsonl"
+    res_hash = file_sha256(res) if res.is_file() else None
+    if fresh.get("resolutions_sha256") != res_hash:
+        errs.append("scorecard: hash sổ phân định không khớp reports/scorecard.json")
+    data_as_of = price_data_as_of(root)
+    if data_as_of and fresh.get("data_as_of") != data_as_of:
+        errs.append(f"scorecard: data_as_of {fresh.get('data_as_of')!r} khác ngày cuối của data/store/prices.csv.gz ({data_as_of})")
+    if fresh.get("report_as_of") != sc.get("as_of"):
+        errs.append("scorecard: freshness.report_as_of không trùng as_of")
+    if not fresh.get("source_commit"):
+        errs.append("scorecard: thiếu source_commit")
+    issue = sc.get("issue_forecasts") or {}
+    scores = issue.get("scores") or {}
+    source = str(issue.get("timing_verification_source") or "")
+    if scores and not source.startswith("github"):
+        errs.append("scorecard: có scores năng lực dù nguồn xác nhận không phải GitHub — không gán điểm khi chưa đủ bằng chứng L-05")
+    if bool(fresh.get("capability_scores_emitted")) != bool(scores):
+        errs.append("scorecard: capability_scores_emitted không khớp scores")
+    return errs
+
+
 def run_all(root) -> list[str]:
     return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root) + check_ledger_rows(root)
             + check_timing_legacy_pin(root) + check_engine_gate(root) + check_control_b_prompts(root) + check_v302_boundary(root) + check_trial_registry(root) + check_personal_data(root)
-            + check_exams(root))
+            + check_exams(root) + check_scorecard_freshness(root))
