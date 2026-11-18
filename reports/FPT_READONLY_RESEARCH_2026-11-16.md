@@ -59,7 +59,7 @@ Không gọi TB đều này là chỉ số VN30/VN-Index được công bố; kh
 
 ## Phân tích cơ bản và kết luận
 
-`library/SOURCE_MANIFEST.json` hiện chưa ghim BCTC FPT gốc; không phát biểu doanh thu, lợi nhuận, EPS, P/E, định giá hay giá mục tiêu. Không tự khai nguồn, không thêm tài liệu vào thư viện khi chưa có URL/tài liệu gốc theo quy trình.
+`library/SOURCE_MANIFEST.json` hiện chưa ghim BCTC FPT gốc; không phát biểu doanh thu, lợi nhuận, EPS, P/E hoặc ước tính giá trị hợp lý của cổ phiếu. Không tự khai nguồn, không thêm tài liệu vào thư viện khi chưa có URL/tài liệu gốc theo quy trình.
 
 **Kết luận có giới hạn:** trên chuỗi giá Yahoo đã lưu đến 16/11/2026, xu hướng FPT giảm và sức mạnh tương đối yếu trong 30 mã đang cấu hình. Dữ liệu chưa đủ nguồn chính thức để kết luận giá cổ phiếu bị định giá thấp/cao, tạo alpha hay có điểm mua/bán. Không ghi Ledger và không giao dịch thật.
 
