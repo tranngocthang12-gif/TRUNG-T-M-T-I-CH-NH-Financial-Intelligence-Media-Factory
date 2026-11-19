@@ -821,6 +821,26 @@ class DocsConsistencyTests(unittest.TestCase):
         for n in range(1, 11):
             self.assertIn(f"**L-{n:02d} ", laws)
 
+    def test_living_status_is_one_sourced_document_not_zero(self):
+        arch = (ROOT / "architecture" / "ARCHITECTURE.md").read_text(encoding="utf-8")
+        state = (ROOT / "state" / "PROJECT_STATE.yaml").read_text(encoding="utf-8")
+        boot = (ROOT / "BOOT.md").read_text(encoding="utf-8")
+        gates = (ROOT / "governance" / "GATES.md").read_text(encoding="utf-8")
+        self.assertNotIn("Thư viện vẫn 0/40", arch)
+        self.assertIn("Thư viện 1/40", arch)
+        self.assertIn("quá 3 tuần → chỉ giữ Ledger", arch)
+        self.assertNotIn("0/40", state)
+        self.assertIn("1/40", state)
+        self.assertNotIn("Intelligence Orchestrator", boot)
+        self.assertIn("STALE", boot)
+        self.assertIn("INVALID", boot)
+        self.assertNotIn("Orchestrator chỉ dừng", gates)
+        self.assertIn("OWNER GATE", gates)
+        adr12 = (ROOT / "architecture" / "adr" / "ADR-0012-ghim-tep-goc.md").read_text(encoding="utf-8")
+        adr13 = (ROOT / "architecture" / "adr" / "ADR-0013-dong-bo-giay-to-va-phan-quyen.md").read_text(encoding="utf-8")
+        self.assertIn("giữ `QUEUED`", adr12)
+        self.assertIn("thư viện 0/40", adr13)
+
 
 if __name__ == "__main__":
     unittest.main()

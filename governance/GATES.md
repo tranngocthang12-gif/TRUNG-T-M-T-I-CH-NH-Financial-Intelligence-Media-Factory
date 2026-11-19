@@ -1,7 +1,7 @@
 # Các cổng (Gates)
 
-## Cổng dừng của Orchestrator
-Orchestrator chỉ dừng khi gặp một trong:
+## Cổng dừng của vận hành v3.0
+Ghế thi công, robot và vòng học dừng khi gặp một trong:
 - **OWNER GATE** — cần Owner duyệt
 - **CAPITAL GATE** — liên quan tiền thật
 - **LEGAL / COMPLIANCE UNCERTAINTY**

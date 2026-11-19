@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19 — Đồng bộ trạng thái thư viện 1/40 và giấy vận hành — Grok (xAI) soạn
+- `architecture/ARCHITECTURE.md` §8 và `state/PROJECT_STATE.yaml` hết câu thư viện 0/40. Hiện trạng: 1/40, Luật Kế toán 88/2015 `SOURCED`, ghi chú KN-T2 vẫn `DRAFT`, chưa `CITED`, G1 chưa đạt. Không đổi checksum, không đổi `DRAFT`, không viết lại quyết định ADR-0012/0013.
+- `BOOT.md` không còn gọi ghế đang làm việc là Intelligence Orchestrator. Scorecard là bản dẫn xuất: Ledger có thẩm quyền; `STALE`/`ABSENT` không dùng để kết luận năng lực; `INVALID` dừng; không lấy `total_predictions: 0` của bản cũ để phủ nhận F-37–F-42. Không tự sinh scorecard.
+- `GATES.md` đổi tên cổng cho khớp vận hành v3.0; điều kiện dừng giữ nguyên. §3 nêu ngoại lệ robot Ledger, Resolution, Calendar, Publication và vòng học ghi thẳng `main` (ADR-0013). Ngoại lệ không phải quyền AI tự duyệt kiến trúc. Không sửa ruleset, `SAFETY_STATE.yaml`, cột dừng 3 tuần, mốc 31/03/2027, mẫu 194.
+
 ## 2026-11-19 — Làm mới scorecard khi giá không đổi; không đẩy bản STALE — Grok (xAI) soạn
 - Tình huống A: `engine/run_cycle.py` hết bỏ qua cả scorecard khi ngày giá mới nhất bằng ngày đã xử lý. Ledger vẫn có thể tăng (robot). Đường `--scorecard-only` và nhánh bỏ qua nghiên cứu gọi `refresh_scorecard_report`: viết lại `reports/scorecard.json` từ sổ, không đăng ký trial, không backtest, không đụng NAV giấy, model hay `ENGINE_STATE`. Đã FRESH đúng `as_of` thì không ghi lại.
 - Tình huống B: `daily_cycle.yml` sau `git pull --rebase` sinh lại scorecard, chạy `validate.py --require-fresh-scorecard`, rồi mới commit/push. Sổ đổi trong lúc ghi thì thử lại tối đa 3 lần trong mã và 5 lần trong workflow; hết lần thì thoát 1, không đẩy bản cũ như thể còn hợp lệ.
