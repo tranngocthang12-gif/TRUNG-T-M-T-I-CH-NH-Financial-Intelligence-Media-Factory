@@ -195,16 +195,36 @@ class OriginalBindingTests(unittest.TestCase):
         self._queue("SOURCED", doc)
         self.assertTrue(any("SOURCED" in e for e in self._errs()))
 
-    def test_repo_does_not_mark_the_law_sourced_or_pin_an_unchecked_pdf(self):
+    def test_repo_pins_the_checked_accounting_law_pdf(self):
         man = json.loads((ROOT / "library" / "SOURCE_MANIFEST.json").read_text(encoding="utf-8"))
-        self.assertEqual(man.get("files"), {})
+        entry = man["files"]["luat_ke_toan_88_2015"]
+        self.assertEqual(entry["original_sha256"], KNOWN["original_sha256"])
+        self.assertEqual(entry["original_bytes"], KNOWN["original_bytes"])
+        self.assertEqual(entry["text_sha256"], entry["sha256"])
+        pdf = (ROOT / entry["original_path"]).read_bytes()
+        text = (ROOT / "library/sources/luat_ke_toan_88_2015/text.md").read_text(encoding="utf-8")
+        self.assertEqual(hashlib.sha256(pdf).hexdigest(), KNOWN["original_sha256"])
+        self.assertEqual(len(pdf), KNOWN["original_bytes"])
+        self.assertEqual(hashlib.sha256(text.encode("utf-8")).hexdigest(), entry["text_sha256"])
+        pages, _ = kn.parse_text(text)
+        self.assertEqual(set(pages), set(range(1, 36)))
+        self.assertTrue(kn.may_mark_sourced(entry, pages, "luat_ke_toan_88_2015", text))
+        self.assertEqual(entry["crosscheck"]["pdf_check"]["checker"], "Claude (Anthropic)")
+        self.assertEqual(entry["crosscheck"]["pdf_check"]["result"], "MATCH")
+        self.assertEqual(entry["crosscheck"]["pdf_check"]["text_sha256"], entry["text_sha256"])
+        # 8 lỗi chép đã sửa sau khi đọc ảnh trang (p11, p12, p23, p32): bản chép phải giữ dạng in, không quay về bản cũ
+        self.assertNotEqual(entry["text_sha256"], "bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3")
+        for printed in ("quản lý và sử dụng hoá đơn", "được cụ thể hoá các sổ", "thì Toà án tuyên bố phá sản",
+                        "Có quan hệ kinh tế, tài chính với đơn vị kế toán đó;"):
+            self.assertIn(printed, text)
         import yaml
         items = (yaml.safe_load((ROOT / "library" / "reading_queue.yaml").read_text(encoding="utf-8")) or {}).get("items") or []
         law = next(i for i in items if i.get("doc_id") == "luat_ke_toan_88_2015")
-        self.assertEqual(law.get("status"), "QUEUED")
-        self.assertTrue(all(i.get("status") != "SOURCED" for i in items))
+        self.assertEqual(law.get("status"), "SOURCED")
+        note = json.loads((ROOT / "library/notes/KN-T2-luat-ke-toan-88-2015-goc.json").read_text(encoding="utf-8"))
+        self.assertEqual(note["status"], "DRAFT")
         errs, _ = kn.check_library(ROOT)
-        self.assertFalse(any("SOURCED" in e for e in errs), errs)
+        self.assertFalse(any("luat_ke_toan_88_2015" in e for e in errs), errs)
 
 
 TABLE = textwrap.dedent("""\

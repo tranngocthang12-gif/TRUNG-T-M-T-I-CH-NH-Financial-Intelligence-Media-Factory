@@ -4,4 +4,4 @@ Chỉ ghi chú theo `contracts/knowledge_note.schema.json` mới được liệt
 
 | id | tầng | chủ đề | mã/ngành | doc_ids | status | review_by |
 |---|---|---|---|---|---|---|
-| (chưa có) | | | | | | |
+| KN-T2-luat-ke-toan-88-2015-goc | 2 | Phạm vi, giá gốc, cấm tẩy xóa và hiệu lực của bản gốc Luật Kế toán 88/2015/QH13 | luật / kế toán | luat_ke_toan_88_2015 | DRAFT | 2027-11-18 |

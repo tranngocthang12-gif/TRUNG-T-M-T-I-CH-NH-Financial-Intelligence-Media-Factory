@@ -1,0 +1,141 @@
+{
+  "id": "KN-T2-luat-ke-toan-88-2015-goc",
+  "tier": 2,
+  "topic": "Phạm vi, giá gốc, cấm tẩy xóa và hiệu lực của bản gốc Luật Kế toán 88/2015/QH13",
+  "doc_ids": [
+    "luat_ke_toan_88_2015"
+  ],
+  "applies_to": "Người đọc bản gốc Luật Kế toán 88/2015/QH13. Không đủ để áp dụng câu đã bị luật sau sửa.",
+  "effective_date": "2017-01-01",
+  "points": [
+    {
+      "id": "P1",
+      "vi": "Điều 1: luật điều chỉnh nội dung công tác kế toán, tổ chức bộ máy, người làm kế toán, kinh doanh dịch vụ kế toán, quản lý nhà nước và tổ chức nghề nghiệp.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p1:13"
+      ],
+      "quote": "Luật này quy định về nội dung công tác kế toán, tổ chức bộ máy kế toán, người làm kế toán, hoạt động kinh doanh dịch vụ kế toán, quản lý nhà nước về kế toán và tổ chức nghề nghiệp về kế toán.",
+      "kind": "TEXT_ATTESTED"
+    },
+    {
+      "id": "P2",
+      "vi": "Khoản 1 Điều 2 lấy cơ quan có nhiệm vụ thu, chi ngân sách nhà nước các cấp làm đối tượng áp dụng.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p1:15"
+      ],
+      "quote": "Cơ quan có nhiệm vụ thu, chi ngân sách nhà nước các cấp.",
+      "kind": "TEXT_ATTESTED"
+    },
+    {
+      "id": "P3",
+      "vi": "Điều 3 khoản 5: giá gốc là giá trị được ghi nhận ban đầu của tài sản hoặc nợ phải trả.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p2:4"
+      ],
+      "quote": "Giá gốc là giá trị được ghi nhận ban đầu của tài sản hoặc nợ phải trả.",
+      "kind": "TEXT_ATTESTED"
+    },
+    {
+      "id": "P4",
+      "vi": "Điều 6 khoản 1, đoạn ngay sau tiêu đề Điều 6: tài sản và nợ phải trả được ghi nhận ban đầu theo giá gốc. Cùng đoạn còn nói một số tài sản được ghi nhận theo giá trị hợp lý sau ghi nhận ban đầu; ý này không tách câu đó.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p3:16"
+      ],
+      "quote": "Giá trị tài sản và nợ phải trả được ghi nhận ban đầu theo giá gốc.",
+      "kind": "TEXT_ATTESTED"
+    },
+    {
+      "id": "P5",
+      "vi": "Điều 13 khoản 1 cấm giả mạo, khai man hoặc ép buộc người khác làm vậy, và cấm tẩy xóa chứng từ kế toán hoặc tài liệu kế toán khác.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p7:10"
+      ],
+      "quote": "Giả mạo, khai man hoặc thỏa thuận, ép buộc người khác giả mạo, khai man, tẩy xóa chứng từ kế toán hoặc tài liệu kế toán khác.",
+      "kind": "TEXT_ATTESTED"
+    },
+    {
+      "id": "P6",
+      "vi": "Điều 18 khoản 3: nội dung trên chứng từ không được viết tắt, không được tẩy xóa, sửa chữa.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p10:4"
+      ],
+      "quote": "không được viết tắt, không được tẩy xóa, sửa chữa",
+      "kind": "TEXT_ATTESTED"
+    },
+    {
+      "id": "P7",
+      "vi": "Điều 72 khoản 1: Luật này có hiệu lực thi hành từ ngày 01 tháng 01 năm 2017.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p35:3"
+      ],
+      "quote": "Luật này có hiệu lực thi hành từ ngày 01 tháng 01 năm 2017.",
+      "kind": "TEXT_ATTESTED"
+    },
+    {
+      "id": "P8",
+      "vi": "Điều 72 khoản 2 làm Luật kế toán số 03/2003/QH11 hết hiệu lực kể từ ngày Luật 88/2015 có hiệu lực. Đó là thay thế luật năm 2003, không phải việc Luật 88/2015 bị thay thế.",
+      "addresses": [
+        "luat_ke_toan_88_2015:p35:4"
+      ],
+      "quote": "Luật kế toán số 03/2003/QH11 hết hiệu lực kể từ ngày Luật này có hiệu lực thi hành.",
+      "kind": "TEXT_ATTESTED"
+    }
+  ],
+  "counts": [
+    {
+      "what": "khoản liệt kê đối tượng áp dụng tại Điều 2 trên trang 1 của bản PDF",
+      "n": 10,
+      "addresses": [
+        "luat_ke_toan_88_2015:p1:15",
+        "luat_ke_toan_88_2015:p1:16",
+        "luat_ke_toan_88_2015:p1:17",
+        "luat_ke_toan_88_2015:p1:18",
+        "luat_ke_toan_88_2015:p1:19",
+        "luat_ke_toan_88_2015:p1:20",
+        "luat_ke_toan_88_2015:p1:21",
+        "luat_ke_toan_88_2015:p1:22",
+        "luat_ke_toan_88_2015:p1:23",
+        "luat_ke_toan_88_2015:p1:24"
+      ]
+    }
+  ],
+  "not_said": [
+    "Không nói Luật 88/2015/QH13 đã bị bãi bỏ hoặc bị thay thế toàn bộ.",
+    "Không nói mức tiền phạt hoặc hình thức xử lý vi phạm hành chính.",
+    "Không trích lời văn bản hợp nhất 25/VBHN-VPQH hoặc 41/VBHN-VPQH.",
+    "Không nói khoản 1 Điều 3 về báo cáo tài chính còn nguyên văn sau Luật 56/2024/QH15; câu trong tệp này là lời năm 2015."
+  ],
+  "testable_implications": [
+    {
+      "statement": "Ghi chú áp dụng luật kế toán cho kỳ sau 01/01/2025 không được lấy nguyên câu định nghĩa báo cáo tài chính ở trang 1 bản 2015 này làm định nghĩa đang hiệu lực nếu chưa đối chiếu Luật 56/2024/QH15.",
+      "data_needed": "Điều 2 của Luật 56/2024/QH15 và văn bản hợp nhất Luật Kế toán sau 01/01/2025",
+      "threshold": "Nếu định nghĩa báo cáo tài chính trong luật sửa đổi khác câu tại luat_ke_toan_88_2015:p1:27 thì câu p1:27 không được dùng làm định nghĩa hiện hành",
+      "check_by": "2027-03-31"
+    }
+  ],
+  "reading_flags": [
+    {
+      "addresses": [
+        "luat_ke_toan_88_2015:p10:4"
+      ],
+      "note": "Cùng một đoạn có hai phủ định 'không được viết tắt' và 'không được tẩy xóa, sửa chữa'. Không được đọc thành cho phép sửa chứng từ.",
+      "material": true,
+      "criterion": "NEGATION"
+    }
+  ],
+  "status": "DRAFT",
+  "review_by": "2027-11-18",
+  "read_by": "Grok (xAI)",
+  "self_check": {
+    "parallelism": true,
+    "one_word_one_meaning": true,
+    "contrast_pairs": false,
+    "question_answer": false,
+    "counts_from_source": true,
+    "doubts": [
+      "Tệp chép PDF ký số 88.signed.pdf, là bản gốc 2015, không phải văn bản đang áp dụng sau các sửa đổi một phần của Luật 38/2019/QH14 và Luật 56/2024/QH15.",
+      "Trang 1 có dấu 'Văn bản gửi đăng Công báo' và dấu công văn đến. Không chép hai dấu đó vì là dấu hành chính chồng lên, không phải lời luật; chữ viết tay trên dấu công văn đến không đọc đủ. Khối chữ ký số VGCA đọc được thì có chép.",
+      "Trang 33 viết 'tẩy xoá' tại điểm về Giấy chứng nhận, trong khi Điều 13, Điều 18 và Điều 27 viết 'tẩy xóa'. Giữ đúng từng chỗ trên PDF, không chuẩn hóa chính tả."
+    ]
+  }
+}
