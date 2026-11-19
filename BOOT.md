@@ -1,8 +1,8 @@
 
 # BOOT — Lệnh khởi động cho mọi AI làm việc trong TRUNG TÂM TÀI CHÍNH
 
-Bạn là Intelligence Orchestrator của TRUNG TÂM TÀI CHÍNH — một tổ chức trí tuệ tài chính.
-Bạn KHÔNG phải chatbot đoán thị trường.
+Bạn là ghế đang làm việc trong TRUNG TÂM TÀI CHÍNH theo lệnh Owner.
+Bạn KHÔNG phải chatbot đoán thị trường. Sáu tháng đầu không có Orchestrator độc lập: Owner, GitHub Actions và ghế thi công theo lệnh là đủ (`architecture/ARCHITECTURE.md` §2).
 
 > KHÔNG XÂY AI ĐOÁN THỊ TRƯỜNG. XÂY MỘT HỆ THỐNG biết thu thập bằng chứng, biết nghi ngờ chính nó,
 > biết đo lường độ không chắc chắn, biết quản trị rủi ro, biết học từ kết quả, và biết cải thiện cách nó học.
@@ -15,7 +15,7 @@ Bạn KHÔNG phải chatbot đoán thị trường.
 4. `governance/GATES.md` — các cổng phải dừng
 5. `governance/DATA_SOURCES.yaml` — nguồn dữ liệu được phép / cấm
 6. `state/PROJECT_STATE.yaml` và `academy/competency_map.yaml` — đang ở đâu, năng lực tới đâu
-7. `state/ENGINE_STATE.json`, `reports/scorecard.json` và báo cáo mới nhất trong `reports/` — bộ não đang thấy gì, ai đang đúng
+7. `state/ENGINE_STATE.json` và báo cáo mới nhất trong `reports/` — việc vòng học đã chạy. `reports/scorecard.json` là bản dẫn xuất, không phải sổ. Ledger (`ledger/predictions.jsonl`, `ledger/resolutions.jsonl`) là nguồn có thẩm quyền. Trước khi dùng scorecard, đọc khối `freshness` hoặc chạy `python tools/validate.py`. `STALE` hoặc `ABSENT`: không dùng để kết luận năng lực; không lấy `total_predictions: 0` của một bản cũ để phủ nhận các dòng đã có trong Ledger, kể cả F-37–F-42. `INVALID`: lỗi theo luật kiểm hiện hành, dừng. Không tự điền số vào scorecard.
 8. KIẾN TRÚC HIỆN HÀNH: **một tệp duy nhất** `architecture/ARCHITECTURE.md` (v3.0, 22/10/2026) + `governance/LAWS.md`. Các bản v0.1–v2.2 là SUPERSEDED (xem `architecture/ARCHIVE.md`), chỉ tra cứu. Thay đổi kiến trúc đi qua `architecture/adr/`
 9. `library/INFORMATION_MAP.md` — bản đồ thông tin cần có
 10. `contracts/` — khuôn đầu ra có hiệu lực. `orchestrator/ORCHESTRATOR.md`, `orchestrator/AUTO_MODE.md`, `media/MEDIA_OS.md`, `architecture/engines/` và `experts/` là đồ trước v3.0: được giữ để tra cứu, không phải lệnh đang làm theo. ARCHITECTURE §2: không có Orchestrator trong 6 tháng đầu. Media hoãn (§6). Đừng đọc các tệp đó rồi điều phối hay viết Media.

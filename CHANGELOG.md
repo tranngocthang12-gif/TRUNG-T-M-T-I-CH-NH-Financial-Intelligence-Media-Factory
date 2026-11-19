@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-19 — Đồng bộ trạng thái thư viện 1/40 và giấy vận hành — Grok (xAI) soạn
+- `architecture/ARCHITECTURE.md` §8 và `state/PROJECT_STATE.yaml` hết câu thư viện 0/40. Hiện trạng: 1/40, Luật Kế toán 88/2015 `SOURCED`, ghi chú KN-T2 vẫn `DRAFT`, chưa `CITED`, G1 chưa đạt. Không đổi checksum, không đổi `DRAFT`, không viết lại quyết định ADR-0012/0013.
+- `BOOT.md` không còn gọi ghế đang làm việc là Intelligence Orchestrator. Scorecard là bản dẫn xuất: Ledger có thẩm quyền; `STALE`/`ABSENT` không dùng để kết luận năng lực; `INVALID` dừng; không lấy `total_predictions: 0` của bản cũ để phủ nhận F-37–F-42. Không tự sinh scorecard.
+- `GATES.md` đổi tên cổng cho khớp vận hành v3.0; điều kiện dừng giữ nguyên. §3 nêu ngoại lệ robot Ledger, Resolution, Calendar, Publication và vòng học ghi thẳng `main` (ADR-0013). Ngoại lệ không phải quyền AI tự duyệt kiến trúc. Không sửa ruleset, `SAFETY_STATE.yaml`, cột dừng 3 tuần, mốc 31/03/2027, mẫu 194.
+
 ## 2026-11-19 — Đối chiếu toàn văn 35 trang PDF Luật Kế toán 88/2015, sửa 8 lỗi chép — Claude (Anthropic) soạn
 - Đọc ảnh cả 35 trang của `88.signed.pdf` đã ghim (SHA-256 `1fd9336a…cfca50`, 2566253 byte, 35 trang — khớp ADR-0012 quyết định 6) và so từng câu với `text.md`. PDF là bản quét không có lớp chữ.
 - 8 lỗi chép, đã sửa (số byte không đổi): trang 11 Điều 20 khoản 2 `sử dụng hóa đơn` → `hoá đơn`; trang 12 Điều 25 khoản 3 `cụ thể hóa` → `cụ thể hoá`; trang 23 Điều 48 khoản 2 `Tòa án` → `Toà án`; trang 32 Điều 68 khoản 1–5 cuối khoản `.` → `;`. Không có lệch số, Điều, khoản, điểm hay dẫn chiếu.
