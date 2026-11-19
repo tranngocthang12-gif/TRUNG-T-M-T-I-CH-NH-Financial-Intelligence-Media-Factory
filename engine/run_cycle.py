@@ -132,6 +132,50 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
     return {"as_of": as_of, "trials": done, "alerts": alerts, "nav": nav, "decision": decision,
             "experts": ex, "resolved": len(resolved), "quality": quality}
 
+def refresh_scorecard_report(as_of, attempts=3, while_writing=None):
+    """Viết lại reports/scorecard.json từ Ledger hiện tại. Không đăng ký trial, không backtest, không đụng NAV giấy hay model.
+    Nếu sổ đổi trong lúc ghi, thử lại tối đa `attempts` lần. Hết lần mà chưa FRESH thì trả 1 — kể cả khi lần ghi cuối
+    tình cờ khớp sổ vừa bị sửa — và không coi bản đó là được phát hành. Đã FRESH đúng `as_of` thì không ghi lại
+    (`generated_at` không đổi). Không bật TTC_PROVENANCE_ONLINE: điểm năng lực chỉ do scorecard() phát khi xuất xứ GitHub
+    đã được xác nhận.
+    `while_writing(i)` nếu có: gọi sau khi chụp sổ và trước scorecard(), để thử nghiệm mô phỏng robot ghi xen giữa."""
+    from tools.laws_checks import scorecard_freshness, scorecard_sources
+    root = ROOT
+    attempts = max(1, int(attempts))
+    if while_writing is None:
+        status, _why = scorecard_freshness(root)
+        if status == "FRESH":
+            try:
+                current = json.loads((root / "reports" / "scorecard.json").read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                current = {}
+            if current.get("as_of") == as_of:
+                print(f"[scorecard] đã FRESH as_of={as_of} — không ghi lại")
+                return 0
+    last = None
+    for i in range(attempts):
+        before = scorecard_sources(root)
+        if while_writing is not None:
+            while_writing(i)
+        sc = ledger.scorecard(as_of)
+        after = scorecard_sources(root)
+        recorded = (sc.get("freshness") or {}).get("sources")
+        if before != after or recorded != after:
+            last = ("drift",)
+            print("[scorecard] sổ đổi trong lúc ghi — thử lại")
+            continue
+        status, why = scorecard_freshness(root)
+        if status == "FRESH":
+            print(f"[scorecard] FRESH as_of={as_of} predictions={sc.get('total_predictions')}")
+            return 0
+        last = (status, why)
+        if status == "INVALID":
+            print(f"[scorecard] INVALID — không phát hành: {why}")
+            return 1
+    print(f"[scorecard] không ổn định sau {attempts} lần: {last}")
+    return 1
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--source", default=CFG["data"]["source"])
@@ -139,7 +183,12 @@ def main():
     ap.add_argument("--trials", type=int, default=None)
     ap.add_argument("--no-llm", action="store_true")
     ap.add_argument("--force", action="store_true", help="chạy lại dù ngày này đã xử lý")
+    ap.add_argument("--scorecard-only", action="store_true",
+                    help="chỉ sinh lại scorecard từ Ledger; không nghiên cứu, không trial, không paper, không model")
     a = ap.parse_args()
+    if a.scorecard_only:
+        as_of = a.as_of or str(data.load_panel(None)[0].index[-1].date())
+        raise SystemExit(refresh_scorecard_report(as_of))
     live = a.source in ("live", "vnstock")
     ing = None
     if live:
@@ -159,7 +208,10 @@ def main():
             st = load_json("state/ENGINE_STATE.json", {})
             st["data_ingest"] = ing
             save_json("state/ENGINE_STATE.json", st)
-        print(f"[cycle] Ngày {newest} đã xử lý (có thể hôm nay nghỉ giao dịch). Bỏ qua.")
+        # Giá không đổi không có nghĩa Ledger không đổi. Chỉ viết lại scorecard; không mở trial.
+        if refresh_scorecard_report(newest) != 0:
+            raise SystemExit(1)
+        print(f"[cycle] Ngày {newest} đã xử lý (có thể hôm nay nghỉ giao dịch). Bỏ qua nghiên cứu.")
         return
     r = cycle(a.as_of, a.trials, use_llm=not a.no_llm, live=live, ingest=ing)
     print(f"[cycle] {r['as_of']} | thử nghiệm: {len(r['trials'])} | cảnh báo: {r['alerts']} | NAV: {r['nav']:,.0f}")
