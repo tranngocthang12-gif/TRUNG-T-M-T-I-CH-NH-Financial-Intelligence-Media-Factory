@@ -17,11 +17,16 @@ Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ v�
      sha256 của tệp, nên đổi hay bỏ `source_id` không lách được kiểm tra này;
   6. trạng thái engine nằm trong danh sách cho phép VERIFIABLE = APPLIED hoặc DA_NAM_TRONG_GIA_NGUON (giá gốc đã chứa
      điều chỉnh). Mọi trạng thái khác, kể cả trạng thái engine chưa biết, đều bị cách ly.
-     Riêng DA_NAM_TRONG_GIA_NGUON: engine đặt trạng thái này CHỈ theo nguồn (yahoo) và `observed_at`, không xét bước giá, và
-     chuỗi kiểm chứng sẽ không áp hệ số. Cổng tự đo lại bước giá gốc tại phiên sự kiện từ `close` (không tin cột
-     `raw_return` của bảng sự kiện) và chỉ nhận khi giá chứng minh được nguồn đã điều chỉnh: bước giá gốc nằm trong biên độ
-     VÀ bước giá sau khi nhân tỷ lệ nằm ngoài biên độ (giả thuyết "giá chưa điều chỉnh" bị bác). Còn gãy, hoặc không phân
-     biệt được hai giả thuyết (tỷ lệ nhỏ), thì CÁCH LY GIA_CHUA_LIEN_TUC và nhiễm ô.
+  7. GIÁ phải chứng minh đúng một giả thuyết, đo trực tiếp từ `close` (không tin `raw_return`/`adj_return` của bảng sự kiện),
+     biên độ theo `adjust.limits`/`bands` (chỉ đọc). Hai giả thuyết tại phiên sự kiện: "giá gốc chưa điều chỉnh" (bước giá gốc
+     ngoài biên, bước giá sau khi nhân tỷ lệ trong biên) và "giá gốc đã điều chỉnh" (bước giá gốc trong biên, sau khi nhân tỷ
+     lệ ngoài biên). Engine không kiểm đủ: APPLIED chỉ xét bước giá sau khi nhân tỷ lệ; DA_NAM_TRONG_GIA_NGUON chỉ xét nguồn
+     yahoo và `observed_at`. Cổng dùng CHUNG một hàm `_price_hypothesis` cho cả hai:
+       - APPLIED (chuỗi kiểm chứng sẽ áp hệ số) chỉ nhận khi giá chứng minh "chưa điều chỉnh"; không thì CÁCH LY
+         GIA_KHONG_CHUNG_MINH_HE_SO;
+       - DA_NAM_TRONG_GIA_NGUON (không áp hệ số) chỉ nhận khi giá chứng minh "đã điều chỉnh"; không thì CÁCH LY
+         GIA_CHUA_LIEN_TUC.
+     Mơ hồ (cả hai bước giá trong biên) hoặc sai cả hai (cả hai ngoài biên) đều bị cách ly và nhiễm ô.
 Không đạt thì CÁCH LY: không đưa vào hệ số của chuỗi kiểm chứng, và mọi ô giá của mã đó TRƯỚC ngày giao dịch của sự kiện bị
 đánh dấu TAINTED (không bảo đảm so sánh được qua sự kiện). Cổng KHÔNG đổi ngày hộ và KHÔNG suy ngày đúng từ bước nhảy giá.
 Sự kiện tiền mặt chưa có bằng chứng ghim nên chưa được xét; chuỗi kiểm chứng là chuỗi giá gốc cộng các sự kiện cổ phiếu
@@ -53,7 +58,10 @@ Q = "CACH_LY_"
 STATES = (OK, NA_NODATA, NA_CASH, Q + "THIEU_BANG_CHUNG", Q + "BANG_CHUNG_HONG", Q + "THIEU_NGAY_CONG_BO",
           Q + "CONG_BO_SAU_NGAY_CAT", Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", Q + "TY_LE_LECH", Q + "LECH_NGAY",
           Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE", Q + "LOAI_SU_KIEN_LECH",
-          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC")
+          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC", Q + "GIA_KHONG_CHUNG_MINH_HE_SO")
+# trạng thái engine → giả thuyết giá phải được chứng minh; trạng thái cách ly khi không chứng minh được
+EXPECTED_HYPOTHESIS = {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}
+HYPOTHESIS_FAIL_STATE = {"CAN_HE_SO": Q + "GIA_KHONG_CHUNG_MINH_HE_SO", "DA_DIEU_CHINH": Q + "GIA_CHUA_LIEN_TUC"}
 
 NEW_COLS = ["verify_state", "verify_reason", "evidence_id", "official_ex_date", "official_trade_date",
             "session_offset", "in_verified_chain", "taints"]
@@ -128,15 +136,19 @@ def _match(ticker, ex_date, typ, docs):
     return best[1] if best else None
 
 
-def _continuity_problem(r, close, td):
-    """Lý do giá gốc KHÔNG chứng minh được nguồn đã chứa điều chỉnh tại phiên td, hoặc None. Đo trực tiếp từ `close`."""
+def _price_hypothesis(r, close, td):
+    """(giả thuyết, mô tả) mà giá gốc tại phiên td chứng minh, đo trực tiếp từ `close` (không dùng cột của bảng sự kiện).
+
+    Giả thuyết: "CAN_HE_SO" (bước giá gốc ngoài biên, nhân tỷ lệ thì trong biên: giá gốc chưa điều chỉnh, cần hệ số),
+    "DA_DIEU_CHINH" (bước giá gốc trong biên, nhân tỷ lệ thì ngoài biên: nguồn đã điều chỉnh), "MO_HO" (cả hai trong biên),
+    "SAI_CA_HAI" (cả hai ngoài biên), hoặc None khi không đo được."""
     s = close[r["ticker"]].dropna()
     before = s[s.index < td]
     if before.empty or td not in s.index:
-        return "không có phiên giá liền trước để đo bước giá"
+        return None, "không có phiên giá liền trước để đo bước giá"
     p0, p1 = float(before.iloc[-1]), float(s.loc[td])
     if not (np.isfinite(p0) and np.isfinite(p1) and p0 > 0 and p1 > 0):
-        return "giá gốc quanh phiên sự kiện không hợp lệ"
+        return None, "giá gốc quanh phiên sự kiện không hợp lệ"
     _, K = adjust.obs_returns(close[[r["ticker"]]])
     k = K.at[td, r["ticker"]]
     L = adjust.limits(close.index, [r["ticker"]]).at[td, r["ticker"]]
@@ -144,13 +156,26 @@ def _continuity_problem(r, close, td):
     raw = p1 / p0 - 1
     adj = (1 + raw) * float(r["ratio"]) - 1
     raw_in, adj_in = -dn <= raw <= up, -dn <= adj <= up
-    if not raw_in:
-        return (f"engine báo giá nguồn đã chứa điều chỉnh nhưng giá gốc còn bước gãy {raw:+.2%} tại {td.date()} "
-                f"(biên −{dn:.2%}/+{up:.2%})")
-    if adj_in:
-        return (f"bước giá gốc {raw:+.2%} và bước giá nếu nhân tỷ lệ {adj:+.2%} đều trong biên tại {td.date()}: "
-                "giá không phân biệt được nguồn đã hay chưa điều chỉnh")
-    return None
+    desc = (f"tại {td.date()}: bước giá gốc {raw:+.2%} ({'trong' if raw_in else 'ngoài'} biên), sau điều chỉnh tỷ lệ "
+            f"{float(r['ratio'])} {adj:+.2%} ({'trong' if adj_in else 'ngoài'} biên); biên −{dn:.2%}/+{up:.2%}")
+    if raw_in and adj_in:
+        return "MO_HO", desc + "; giá không phân biệt được nguồn đã hay chưa điều chỉnh"
+    if not raw_in and not adj_in:
+        return "SAI_CA_HAI", desc + "; không giả thuyết nào giải thích được bước giá"
+    return ("CAN_HE_SO" if adj_in else "DA_DIEU_CHINH"), desc
+
+
+def _price_problem(r, close, td):
+    """(trạng thái cách ly, lý do) nếu giá không chứng minh đúng giả thuyết mà trạng thái engine đòi hỏi, hoặc None."""
+    want = EXPECTED_HYPOTHESIS[r["status"]]
+    got, desc = _price_hypothesis(r, close, td)
+    if got == want:
+        return None
+    lead = {"CAN_HE_SO": "engine áp hệ số (APPLIED) nhưng giá không chứng minh giá gốc cần hệ số",
+            "DA_DIEU_CHINH": "engine báo giá nguồn đã chứa điều chỉnh nhưng giá không chứng minh điều đó"}[want]
+    tail = {"CAN_HE_SO": "; giá gốc còn bước gãy", "SAI_CA_HAI": "; giá gốc còn bước gãy",
+            "DA_DIEU_CHINH": "; giá gốc liên tục, áp hệ số sẽ tạo bước gãy"}.get(got, "")
+    return HYPOTHESIS_FAIL_STATE[want], f"{lead} — {desc}{tail}"
 
 
 def _judge(r, d, close, base, as_of):
@@ -190,10 +215,9 @@ def _judge(r, d, close, base, as_of):
     if r["status"] not in VERIFIABLE:
         return (Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", f"trạng thái engine {r['status']} không nằm trong danh sách cho phép "
                 f"{', '.join(VERIFIABLE)}", otd, 0.0)
-    if r["status"] == "DA_NAM_TRONG_GIA_NGUON":
-        why = _continuity_problem(r, close, td)
-        if why:
-            return Q + "GIA_CHUA_LIEN_TUC", why, otd, 0.0
+    bad_price = _price_problem(r, close, td)
+    if bad_price:
+        return bad_price[0], bad_price[1], otd, 0.0
     return OK, "bản gốc ghim hợp lệ, ngày công bố hợp lệ, tỷ lệ và ngày áp dụng khớp", otd, 0.0
 
 

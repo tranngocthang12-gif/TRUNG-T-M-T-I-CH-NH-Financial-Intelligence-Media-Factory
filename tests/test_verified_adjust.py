@@ -622,3 +622,68 @@ def test_mb_events_digest_covers_provenance_columns(tmp_path, col, value):
     assert a["events_verification_digest"] != b["events_verification_digest"], col
     assert a["derivation_id"] != b["derivation_id"], col
 
+
+
+# ---------- 8. hồi quy phản biện L-09 vòng 3 (ChatGPT, PR #55, SHA 7584b18): MEDIUM-C ------------------------------------------
+# Engine đặt APPLIED khi bước giá SAU khi nhân tỷ lệ nằm trong biên, không đòi bước giá GỐC nằm ngoài biên. Cổng phải tự kiểm
+# hai giả thuyết từ `close`: chỉ nhận APPLIED khi giá gốc VƯỢT biên và giá sau điều chỉnh NẰM TRONG biên. Mơ hồ (cả hai trong
+# biên) hoặc sai cả hai (cả hai ngoài biên) → cách ly, nhiễm ô (TAINTED), không áp hệ số.
+def _applied(close, ratio):
+    return adjust.build_events(close, _obs(close), _ev("AAA", IDX[BRK], ratio=ratio), _none())
+
+
+def test_mc_applied_ambiguous_small_ratio_on_unbroken_price_is_quarantined(tmp_path):
+    """Ca phản biện nêu: giá không gãy, tỷ lệ 1,05. Bước giá gốc ~0% và sau điều chỉnh ~+5% đều trong biên ±7% → mơ hồ."""
+    close = _close(ratio=1.0)
+    events = _applied(close, 1.05)
+    assert events.status.tolist() == ["APPLIED"]                       # engine áp, dù giá không có bước gãy
+    ev = va.verify_events(events, close, [_doc(tmp_path, ratio=1.05)], evidence_root=tmp_path, as_of=AS_OF)
+    r = ev.iloc[0]
+    assert r.verify_state == va.Q + "GIA_KHONG_CHUNG_MINH_HE_SO", r.verify_reason
+    assert "không phân biệt" in r.verify_reason
+    assert not r.in_verified_chain and r.taints
+    m = va.taint_mask(close.index, close.columns, ev)
+    assert m.iloc[:BRK].values.all() and not m.iloc[BRK:].values.any()
+    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()   # không áp 1/1,05
+
+
+def test_mc_applied_where_both_hypotheses_fail_is_quarantined(tmp_path):
+    """Sai cả hai: giá gốc gãy −50% (ngoài biên) và nhân tỷ lệ 3,0 ra +50% (cũng ngoài biên). Engine không tự ra APPLIED trong ca
+    này, nên bảng sự kiện bị sửa trạng thái thành APPLIED: cổng vẫn phải tự đo và cách ly."""
+    close = _close()
+    events = _applied(close, 3.0)
+    assert events.status.tolist() == ["KHONG_KHOP"]
+    events = events.assign(status="APPLIED", price_factor=1 / 3.0, split_factor=1 / 3.0)
+    ev = va.verify_events(events, close, [_doc(tmp_path, ratio=3.0)], evidence_root=tmp_path, as_of=AS_OF)
+    r = ev.iloc[0]
+    assert r.verify_state == va.Q + "GIA_KHONG_CHUNG_MINH_HE_SO", r.verify_reason
+    assert "sau điều chỉnh" in r.verify_reason and "ngoài biên" in r.verify_reason
+    assert not r.in_verified_chain and r.taints
+    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()
+
+
+def test_mc_applied_genuine_break_restored_by_factor_is_verified(tmp_path):
+    """Dương: giá gốc gãy −50% (ngoài biên), nhân tỷ lệ 2,0 ra ~0% (trong biên) → DA_KIEM_CHUNG; hệ số khôi phục liên tục."""
+    close = _close()
+    events = _applied(close, RATIO)
+    assert events.status.tolist() == ["APPLIED"]
+    ev = va.verify_events(events, close, [_doc(tmp_path)], evidence_root=tmp_path, as_of=AS_OF)
+    assert ev.verify_state.tolist() == [va.OK] and ev.in_verified_chain.all() and not ev.taints.any()
+    F, _ = va.verified_factors(close.index, close.columns, ev)
+    adj = close["AAA"] * F["AAA"]
+    step = adj.iloc[BRK] / adj.iloc[BRK - 1] - 1
+    raw_step = close["AAA"].iloc[BRK] / close["AAA"].iloc[BRK - 1] - 1
+    assert raw_step == pytest.approx(-0.5, abs=0.01) and abs(step) < 0.01
+
+
+def test_mc_applied_check_uses_close_not_the_events_table(tmp_path):
+    """Bảng sự kiện bị sửa raw_return/adj_return cho giống bước gãy thật vẫn không qua: cổng đo lại từ `close`."""
+    close = _close(ratio=1.0)
+    events = _applied(close, 1.05).assign(raw_return=-0.5, adj_return=0.0)
+    ev = va.verify_events(events, close, [_doc(tmp_path, ratio=1.05)], evidence_root=tmp_path, as_of=AS_OF)
+    assert ev.verify_state.tolist() == [va.Q + "GIA_KHONG_CHUNG_MINH_HE_SO"]
+
+
+def test_mc_applied_and_already_in_price_share_one_hypothesis_check():
+    """Hai trạng thái dùng chung một hàm kiểm hai giả thuyết, tránh lệch logic."""
+    assert va.EXPECTED_HYPOTHESIS == {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}

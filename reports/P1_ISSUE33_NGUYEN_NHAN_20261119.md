@@ -62,10 +62,22 @@ Trên `5b0f588`, 19 test mới thất bại. Đột biến: 7 đột biến cho 
 
 Số đo thật với bản gốc của PR #54 không đổi so với `5b0f588`: 0 sự kiện vào chuỗi kiểm chứng; 34,5% ô cách ly trong 252 phiên; trạng thái từng sự kiện giống hệt. Ba sự kiện có văn bản đã bị cách ly vì sai loại trước khi tới bước kiểm liên tục.
 
-## 7. Chưa đạt
+## 7. Khắc phục phản biện L-09 vòng 3 (ChatGPT, trên `7584b18`)
+
+Bản chấm vòng 3 xác nhận MEDIUM-A và MEDIUM-B đã khắc phục, bốn phát hiện vòng 1 vẫn còn mã và test. Phát hiện mới duy nhất là MEDIUM-C. Đây chính là điểm "ngoài phạm vi vòng 2" mà báo cáo vòng 2 đã ghi.
+
+| Phát hiện | Sửa | Test đối kháng (`test_mc*`) |
+|---|---|---|
+| MEDIUM-C: nhánh `APPLIED` vẫn ra `DA_KIEM_CHUNG` và bị áp hệ số khi giá không chứng minh cần điều chỉnh. Engine chỉ xét bước giá sau khi nhân tỷ lệ | Một hàm chung `_price_hypothesis` đo từ `close` cả bước giá gốc lẫn bước giá sau khi nhân tỷ lệ, theo biên `adjust.limits`/`bands` (chỉ đọc), cho cả hai trạng thái được phép (`EXPECTED_HYPOTHESIS`). `APPLIED` chỉ được nhận khi giá gốc NGOÀI biên VÀ giá sau điều chỉnh TRONG biên. Mơ hồ (cả hai trong biên) hoặc sai cả hai (cả hai ngoài biên) → `CACH_LY_GIA_KHONG_CHUNG_MINH_HE_SO`, TAINTED, không áp hệ số. `DA_NAM_TRONG_GIA_NGUON` giữ đúng quy tắc vòng 2 (`CACH_LY_GIA_CHUA_LIEN_TUC`) và dùng chung hàm | Mơ hồ: giá không gãy, tỷ lệ 1,05 (ca phản biện nêu). Sai cả hai: gãy −50%, tỷ lệ 3,0, trạng thái bị sửa thành APPLIED. Điều chỉnh hợp lệ: gãy −50%, tỷ lệ 2,0, hệ số khôi phục liên tục (bước giá sau điều chỉnh < 1%). Bảng sự kiện bị sửa `raw_return`/`adj_return`. Hai trạng thái dùng chung một bảng giả thuyết |
+
+Trên `7584b18`: 4 test âm mới thất bại; test dương (điều chỉnh hợp lệ) đạt, đúng vai trò đối chứng. Sau sửa: cả 5 đạt; 99 test của vòng 1 và 2 đạt cả trước lẫn sau. Đột biến: 21/21 bị test bắt (11 vòng 1, 7 vòng 2 viết lại theo hàm chung, 3 vòng 3: bỏ kiểm giá cho APPLIED, bỏ lời gọi kiểm giá, đảo hai giả thuyết).
+
+Số đo thật không đổi so với `7584b18`: 0 sự kiện vào chuỗi kiểm chứng; 34,5% ô cách ly trong 252 phiên; trạng thái từng sự kiện giống hệt.
+
+## 8. Chưa đạt
 
 - Ngày chính thức của VCB và TCB lệch ngày gãy của chuỗi giá gốc; nguyên nhân sự lệch ở nguồn dữ liệu chưa xác định và không được suy từ giá.
 - Yahoo ghi mọi sự kiện cổ phiếu là `stock_split`; văn bản HOSE của VCB, TCB, FPT là `stock_dividend`. Cổng không suy loại. Chưa có quyết định về cách ghi loại đúng cho dòng Yahoo (cần Owner, ADR-0009 điều 7).
 - Cần bản gốc HOSE/VSD cho TPB, HDB, TCB 2026 và mọi sự kiện cổ phiếu còn lại, rồi một PR riêng, có Owner theo ADR-0009 điều 7, để quyết định cách biểu diễn "ngày chính thức" khác "ngày chuỗi gãy" trong dữ liệu dẫn xuất.
-- Ngoài phạm vi vòng 2, chưa sửa: với `APPLIED`, engine chỉ xét bước giá SAU khi nhân tỷ lệ. Với tỷ lệ nhỏ, một sự kiện ở phiên không có bước gãy vẫn có thể thành `APPLIED`, và khi đủ bằng chứng thì vào chuỗi kiểm chứng và bị áp hệ số. Đây cùng lớp "không phân biệt hai giả thuyết" với MEDIUM-A. Đề nghị người phản biện và Owner quyết định có áp cùng quy tắc cho `APPLIED` hay không.
+- `engine/adjust.py` (chuỗi hiện hành) vẫn có thể ra `APPLIED` ở phiên không có bước gãy khi tỷ lệ nhỏ. Cổng kiểm chứng đã chặn trường hợp này (vòng 3), nhưng chuỗi hiện hành chưa đổi. Sửa engine sản xuất cần Owner và một PR riêng (ADR-0009 điều 7).
 - Chưa có bản dẫn xuất nào được công bố; chưa đổi `data.sources`; `deployment_level` giữ 0.
