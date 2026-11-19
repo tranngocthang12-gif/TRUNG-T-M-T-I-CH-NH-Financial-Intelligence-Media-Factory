@@ -4,8 +4,15 @@
 (`engine/verified_adjust.py`); ghi: manifest.json (derivation_id, hash đầu vào, nguồn gốc), events_verification.csv,
 taint_by_ticker.csv, before_after.md (đối chiếu chuỗi hiện hành với chuỗi kiểm chứng, ADR-0009 điều 5).
 
-Không sửa kho raw, không gọi `data.write_derived`, không gọi mạng. Từ chối ghi vào các thư mục dữ liệu và quản trị của kho.
-Cùng đầu vào và cùng `--created-at` cho ra cùng từng byte. Dùng: python tools/build_verified_derivation.py --out DIR
+Không sửa kho raw, không gọi `data.write_derived`, không gọi mạng.
+
+Chính sách đầu ra (ADR-0009 điều 6, không ghi đè bản dẫn xuất đã xuất):
+  - `--out` phải nằm NGOÀI kho: từ chối mọi đường bên trong thư mục mã (REPO) và thư mục dữ liệu (TTC_HOME), kể cả
+    `reports/`, và kể cả khi đi vòng qua liên kết tượng trưng;
+  - `--out` phải CHƯA tồn tại (tệp, thư mục rỗng hay thư mục đã có bản dẫn xuất đều bị từ chối). Thư mục được tạo nguyên tử
+    (`mkdir` không `exist_ok`) và từng tệp được mở ở chế độ tạo-mới (`x`), nên không có đường nào ghi đè tệp đã có.
+  Muốn dựng lại thì xuất ra thư mục mới; hai bản cũ/mới được so bằng `derivation_id`, không đè lên nhau.
+Từ chối thì thoát mã 2, không tạo gì. Cùng đầu vào và cùng `--created-at` cho ra cùng từng byte. Dùng: python tools/build_verified_derivation.py --out DIR
 [--as-of YYYY-MM-DD] [--evidence MANIFEST ...] [--created-at ISO] [--code-commit SHA]"""
 from __future__ import annotations
 
@@ -23,20 +30,28 @@ from engine import adjust, data, verified_adjust as va
 from engine.config import CFG, REPO, ROOT
 
 DEFAULT_EVIDENCE = ["data/evidence/corporate_actions/EVIDENCE_MANIFEST.json"]
-PROTECTED = ("data", "engine", "governance", "architecture", "contracts", "state", "ledger", "library", "research", "tools", "tests")
 HORIZONS = (20, 60, 120, 252)
+OUT_FILES = ("manifest.json", "events_verification.csv", "taint_by_ticker.csv", "before_after.md")
 
 
 def out_is_protected(out: pathlib.Path) -> str | None:
-    out = out.resolve()
-    for base in {ROOT.resolve(), REPO.resolve()}:
+    """Lý do từ chối `--out`, hoặc None nếu được phép. Không tạo, không sửa gì."""
+    if out.is_symlink() or out.exists():
+        return f"{out} đã tồn tại; không ghi đè bản dẫn xuất (ADR-0009 điều 6). Chọn thư mục mới chưa có."
+    res = out.resolve()
+    for name, base in (("thư mục dữ liệu TTC_HOME", ROOT.resolve()), ("thư mục mã của kho", REPO.resolve())):
         try:
-            rel = out.relative_to(base)
+            rel = res.relative_to(base)
         except ValueError:
             continue
-        if not rel.parts or rel.parts[0] in PROTECTED or rel.parts[0].startswith("."):
-            return f"{out} nằm trong thư mục được bảo vệ của kho ({rel.parts[0] if rel.parts else '.'})"
+        where = rel.parts[0] if rel.parts else "."
+        return f"{res} nằm trong {name} ({where}); bản dẫn xuất chỉ được xuất ra ngoài kho"
     return None
+
+
+def _create(path: pathlib.Path):
+    """Mở tệp ở chế độ tạo-mới: lỗi nếu tệp đã có, không bao giờ ghi đè."""
+    return open(path, "x", encoding="utf-8", newline="")
 
 
 def _horizon_returns(adj, n):
@@ -65,11 +80,13 @@ def build(out, as_of, evidence, created_at, code_commit):
     man["coverage"] = cov
     man["evidence_manifests"] = sorted(pathlib.Path(p).name for p in evidence if (ROOT / p).is_file())
 
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "manifest.json").write_text(json.dumps(man, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+    out.mkdir(parents=True, exist_ok=False)        # nguyên tử: lỗi nếu thư mục xuất hiện giữa lúc kiểm và lúc ghi
+    with _create(out / "manifest.json") as f:
+        f.write(json.dumps(man, ensure_ascii=False, indent=2, sort_keys=True))
     cols = ["ticker", "ex_date", "type", "source", "source_status", "ratio", "status", "trade_date", "verify_state",
             "verify_reason", "evidence_id", "official_ex_date", "official_trade_date", "session_offset", "in_verified_chain"]
-    ev[cols].sort_values(["ticker", "ex_date", "type"]).to_csv(out / "events_verification.csv", index=False, date_format="%Y-%m-%d")
+    with _create(out / "events_verification.csv") as f:
+        ev[cols].sort_values(["ticker", "ex_date", "type"]).to_csv(f, index=False, date_format="%Y-%m-%d")
     w = taint.iloc[-252:]
     t = pd.DataFrame({"ticker": taint.columns, "tainted_cells_window": w.sum().values, "window_cells": len(w),
                       "tainted_cells_all": taint.sum().values, "all_cells": len(taint)})
@@ -78,7 +95,8 @@ def build(out, as_of, evidence, created_at, code_commit):
     cnt = {k: int(v) for k, v in q.groupby("ticker").size().items()}
     t["last_quarantined_event_trade_date"] = [last.get(k, "") for k in t["ticker"]]
     t["quarantined_stock_events"] = [cnt.get(k, 0) for k in t["ticker"]]
-    t.sort_values("ticker").to_csv(out / "taint_by_ticker.csv", index=False)
+    with _create(out / "taint_by_ticker.csv") as f:
+        t.sort_values("ticker").to_csv(f, index=False)
 
     lines = [f"# Đối chiếu trước/sau — chuỗi hiện hành và chuỗi kiểm chứng (as_of {as_of.date()})", "",
              f"derivation_id `{man['derivation_id']}`; mã commit `{code_commit}`; bằng chứng nạp: {len(docs)} bản gốc từ "
@@ -120,7 +138,8 @@ def build(out, as_of, evidence, created_at, code_commit):
     lines += ["", "## Giới hạn", "",
               "- Chưa nối vào vòng học hay `data.sources` (ADR-0009 điều 7). Không phải bản dẫn xuất được công bố.",
               "- Nhãn RETROSPECTIVE: không có vintage, không tuyên bố point-in-time đầy đủ.", ""]
-    (out / "before_after.md").write_text("\n".join(lines), encoding="utf-8")
+    with _create(out / "before_after.md") as f:
+        f.write("\n".join(lines))
     return man
 
 
@@ -142,7 +161,11 @@ def main() -> int:
         r = subprocess.run(["git", "-C", str(REPO), "rev-parse", "HEAD"], capture_output=True, text=True)
         commit = r.stdout.strip() if r.returncode == 0 else "UNKNOWN"
     created = a.created_at or pd.Timestamp.now(tz="UTC").strftime("%Y-%m-%dT%H:%M:%SZ")
-    man = build(out, a.as_of, a.evidence or DEFAULT_EVIDENCE, created, commit)
+    try:
+        man = build(out, a.as_of, a.evidence or DEFAULT_EVIDENCE, created, commit)
+    except FileExistsError as e:
+        print("TỪ CHỐI:", f"{e.filename} đã tồn tại; không ghi đè bản dẫn xuất (ADR-0009 điều 6)", file=sys.stderr)
+        return 2
     print(f"{man['derivation_id']}: {man['coverage']['in_verified_chain']} sự kiện vào chuỗi kiểm chứng; "
           f"{man['coverage']['tainted_share_window']:.1%} ô cách ly trong cửa sổ gần nhất; ghi vào {out}")
     return 0

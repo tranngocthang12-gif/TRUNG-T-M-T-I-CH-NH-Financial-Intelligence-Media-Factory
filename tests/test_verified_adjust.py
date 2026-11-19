@@ -286,3 +286,214 @@ def test_tool_refuses_protected_output_dirs(tmp_path, sub):
     r = _tool(home, home / sub)
     assert r.returncode == 2 and "TỪ CHỐI" in r.stderr
     assert _digest(home) == before
+
+
+# ---------- 6. hồi quy phản biện L-09 (ChatGPT, PR #55, SHA ec47dc8): bốn phát hiện MEDIUM ----------------------------------
+
+# MEDIUM-1: loại sự kiện phải trùng đúng. Bản gốc stock_dividend không kiểm được sự kiện engine stock_split và ngược lại.
+@pytest.mark.parametrize("engine_typ,doc_typ", [("stock_split", "stock_dividend"), ("stock_dividend", "stock_split")])
+def test_m1_event_type_mismatch_is_quarantined(tmp_path, engine_typ, doc_typ):
+    close, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK], typ=engine_typ), _none(), [_doc(tmp_path, typ=doc_typ)])
+    r = ev.iloc[0]
+    assert r.status == "APPLIED"                                           # cùng mã, ngày, tỷ lệ: chỉ khác loại
+    assert r.verify_state == va.Q + "LOAI_SU_KIEN_LECH", r.verify_reason
+    assert not r.in_verified_chain and r.taints and r.evidence_id == "hose-test-1"
+    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()
+
+
+def test_m1_yahoo_already_adjusted_split_vs_dividend_document_is_quarantined(tmp_path):
+    """Đúng ca FPT thật: Yahoo ghi stock_split (giá nguồn đã chứa điều chỉnh), văn bản HOSE là stock_dividend."""
+    close = _close(ratio=1.0)
+    yahoo = _ev("AAA", IDX[BRK], typ="stock_split", source="yahoo", status="TU_DONG")
+    events = adjust.build_events(close, _obs(close, "2030-01-01"), _none(), yahoo)
+    assert events.status.tolist() == ["DA_NAM_TRONG_GIA_NGUON"]
+    ev = va.verify_events(events, close, [_doc(tmp_path, typ="stock_dividend")], evidence_root=tmp_path, as_of=AS_OF)
+    assert ev.verify_state.tolist() == [va.Q + "LOAI_SU_KIEN_LECH"] and not ev.in_verified_chain.any()
+
+
+def test_m1_same_type_document_preferred_over_other_type_at_same_distance(tmp_path):
+    other = _doc(tmp_path, sid="hose-khac-loai", typ="stock_split", content=b"%PDF van ban khac loai")
+    same = _doc(tmp_path, sid="hose-dung-loai", typ="stock_dividend", content=b"%PDF van ban dung loai")
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK], typ="stock_dividend"), _none(), [other, same])
+    assert ev.verify_state.tolist() == [va.OK] and ev.evidence_id.tolist() == ["hose-dung-loai"]
+
+
+# MEDIUM-2: danh sách cho phép trạng thái engine; tỷ lệ phải là số hữu hạn dương.
+def test_m2_zero_ratio_event_with_zero_ratio_document_is_not_verified(tmp_path):
+    """Ca phản biện nêu: sự kiện tỷ lệ 0 → engine LOI_TY_LE; manifest ghi official_ratio=0. Trước đây thành DA_KIEM_CHUNG."""
+    close, events, ev = _run(tmp_path, _ev("AAA", IDX[BRK], ratio=0.0), _none(), [_doc(tmp_path, ratio=0)])
+    assert events.status.tolist() == ["LOI_TY_LE"]
+    r = ev.iloc[0]
+    assert r.verify_state.startswith(va.Q) and r.verify_state != va.OK, r.verify_reason
+    assert not r.in_verified_chain and r.taints
+    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()
+
+
+@pytest.mark.parametrize("status", ["LOI_TY_LE", "LOAI_KHONG_HO_TRO", "LOAI_BAT_THUONG", "TRANG_THAI_MOI_CHUA_BIET"])
+def test_m2_engine_status_outside_allow_list_is_quarantined(tmp_path, status):
+    """Mọi điều kiện bằng chứng đều đạt; chỉ trạng thái engine nằm ngoài danh sách cho phép → vẫn cách ly và vẫn nhiễm."""
+    close, events, _ = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [])
+    events = events.assign(status=status)
+    ev = va.verify_events(events, close, [_doc(tmp_path)], evidence_root=tmp_path, as_of=AS_OF)
+    r = ev.iloc[0]
+    assert r.verify_state == va.Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", r.verify_reason
+    assert not r.in_verified_chain and r.taints
+    assert not va.taint_mask(close.index, close.columns, ev).iloc[BRK:].values.any()
+    assert va.taint_mask(close.index, close.columns, ev).iloc[:BRK].values.all()
+
+
+@pytest.mark.parametrize("bad", [0, -2.0, float("nan"), float("inf"), "2.0", True, [2.0]])
+def test_m2_non_positive_or_non_numeric_document_ratio_is_quarantined(tmp_path, bad):
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path, official_ratio=bad)])
+    assert ev.verify_state.tolist() == [va.Q + "TY_LE_LECH"] and not ev.in_verified_chain.any()
+
+
+def test_m2_allow_list_is_exactly_two_states():
+    assert va.VERIFIABLE == ("APPLIED", "DA_NAM_TRONG_GIA_NGUON")
+
+
+# MEDIUM-3: source_id bắt buộc; kiểm tra trùng ngày không lách được bằng source_id rỗng hay khai trùng tệp.
+def _two_dates(tmp_path, docs):
+    """Dòng nhập tay ở ngày gãy (BRK) và dòng Yahoo ở ngày chính thức (BRK+7) cho cùng một văn bản."""
+    official = IDX[BRK + 7]
+    close = _close()
+    return _run(tmp_path, _ev("AAA", IDX[BRK]), _ev("AAA", official, source="yahoo", status="TU_DONG"), docs,
+                close=close, obs=_obs(close, "2030-01-01"))
+
+
+@pytest.mark.parametrize("sid", ["", "   ", None])
+def test_m3_missing_or_blank_source_id_cannot_bypass_duplicate_date_check(tmp_path, sid):
+    d = _doc(tmp_path, ex=IDX[BRK + 7])
+    if sid is None:
+        d.pop("source_id")
+    else:
+        d["source_id"] = sid
+    _, _, ev = _two_dates(tmp_path, [d])
+    assert not ev.in_verified_chain.any(), ev[["source", "verify_state", "verify_reason"]].to_dict("records")
+    assert set(ev.verify_state) <= {va.Q + "BANG_CHUNG_HONG"}
+
+
+def test_m3_same_file_declared_under_two_source_ids_is_a_date_conflict(tmp_path):
+    """Cùng một tệp (cùng sha256) khai thành hai mục có source_id khác nhau: vẫn là một bản gốc bị engine áp ở hai ngày."""
+    a = _doc(tmp_path, ex=IDX[BRK], sid="hose-ban-a")
+    b = {**a, "source_id": "hose-ban-b", "official_ex_date": str(IDX[BRK + 7].date())}
+    _, _, ev = _two_dates(tmp_path, [a, b])
+    assert not ev.in_verified_chain.any()
+    assert (ev.verify_state == va.Q + "XUNG_DOT_NGAY").all(), ev.verify_reason.tolist()
+
+
+def test_m3_source_id_with_valid_unique_document_still_verifies(tmp_path):
+    """Không quá tay: một văn bản hợp lệ, một ngày engine, có source_id → vẫn DA_KIEM_CHUNG."""
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path)])
+    assert ev.verify_state.tolist() == [va.OK]
+
+
+# MEDIUM-4: chỉ xuất ra ngoài kho, không ghi đè.
+def test_m4_refuses_output_inside_code_repo_even_outside_protected_dirs(tmp_path):
+    home = _home(tmp_path)
+    out = REPO / "reports" / "_verified_derivation_test_should_not_exist"
+    assert not out.exists()
+    r = _tool(home, out)
+    assert r.returncode == 2 and "TỪ CHỐI" in r.stderr and not out.exists()
+
+
+@pytest.mark.parametrize("sub", ["reports/verified", "khac/verified"])
+def test_m4_refuses_output_anywhere_inside_data_home(tmp_path, sub):
+    home = _home(tmp_path)
+    before = _digest(home)
+    r = _tool(home, home / sub)
+    assert r.returncode == 2 and "TỪ CHỐI" in r.stderr and _digest(home) == before
+
+
+def test_m4_rerun_into_existing_output_is_refused_and_bytes_kept(tmp_path):
+    home = _home(tmp_path)
+    out = tmp_path / "o"
+    assert _tool(home, out).returncode == 0
+    first = _digest(out)
+    # đổi đầu vào để lần dựng sau ra bản khác: nếu ghi đè được thì bytes sẽ đổi
+    (home / "data/evidence/corporate_actions/EVIDENCE_MANIFEST.json").unlink()
+    r = _tool(home, out)
+    assert r.returncode == 2 and "TỪ CHỐI" in r.stderr
+    assert _digest(out) == first
+
+
+@pytest.mark.parametrize("kind", ["empty_dir", "file", "dangling_symlink"])
+def test_m4_any_existing_output_path_is_refused(tmp_path, kind):
+    home = _home(tmp_path)
+    out = tmp_path / "o"
+    if kind == "empty_dir":
+        out.mkdir()
+    elif kind == "file":
+        out.write_bytes(b"khong duoc ghi de")
+    else:
+        out.symlink_to(tmp_path / "chua_co")
+    r = _tool(home, out)
+    assert r.returncode == 2 and "TỪ CHỐI" in r.stderr
+    if kind == "file":
+        assert out.read_bytes() == b"khong duoc ghi de"
+    if kind == "empty_dir":
+        assert list(out.iterdir()) == []
+    if kind == "dangling_symlink":
+        assert not (tmp_path / "chua_co").exists()
+
+
+def test_m4_symlink_parent_pointing_into_repo_is_refused(tmp_path):
+    home = _home(tmp_path)
+    link = tmp_path / "link_vao_kho"
+    link.symlink_to(REPO / "reports")
+    out = link / "_verified_derivation_test_should_not_exist"
+    r = _tool(home, out)
+    assert r.returncode == 2 and "TỪ CHỐI" in r.stderr
+    assert not (REPO / "reports" / "_verified_derivation_test_should_not_exist").exists()
+
+
+def _bvd():
+    sys.path.insert(0, str(REPO / "tools"))
+    import build_verified_derivation as bvd                                  # noqa: E402
+    return bvd
+
+
+def test_m4_build_refuses_out_dir_that_appeared_after_the_check(tmp_path):
+    """Lớp hai (mkdir nguyên tử): thư mục xuất xuất hiện giữa lúc kiểm và lúc ghi, kể cả rỗng → `build` không ghi gì vào đó."""
+    out = tmp_path / "race"
+    out.mkdir()
+    with pytest.raises(FileExistsError):
+        _bvd().build(out, None, [], "2026-11-19T00:00:00Z", "testcommit")
+    assert list(out.iterdir()) == []
+
+
+@pytest.mark.parametrize("kind", ["empty_dir", "file", "dangling_symlink"])
+def test_m4_out_check_alone_rejects_existing_paths(tmp_path, kind):
+    """Lớp một (kiểm trước, không tạo gì): `out_is_protected` tự từ chối, không dựa vào mkdir."""
+    out = tmp_path / "o"
+    if kind == "empty_dir":
+        out.mkdir()
+    elif kind == "file":
+        out.write_bytes(b"x")
+    else:
+        out.symlink_to(tmp_path / "chua_co")
+    why = _bvd().out_is_protected(out)
+    assert why and "đã tồn tại" in why
+
+
+def test_m4_out_check_allows_fresh_path_outside_repo(tmp_path):
+    assert _bvd().out_is_protected(tmp_path / "moi" / "chua_co") is None
+
+
+@pytest.mark.parametrize("ratio", [0.0, -2.0])
+def test_m2_ratio_check_alone_rejects_non_positive_even_if_engine_says_applied(tmp_path, ratio):
+    """Lớp tỷ lệ độc lập với danh sách cho phép: bảng sự kiện bị sửa thành APPLIED với tỷ lệ không dương, văn bản ghi
+    cùng tỷ lệ → vẫn TY_LE_LECH."""
+    close, events, _ = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [])
+    events = events.assign(ratio=ratio, status="APPLIED")
+    ev = va.verify_events(events, close, [_doc(tmp_path, ratio=ratio)], evidence_root=tmp_path, as_of=AS_OF)
+    assert ev.verify_state.tolist() == [va.Q + "TY_LE_LECH"] and not ev.in_verified_chain.any()
+
+
+def test_m4_create_helper_refuses_existing_file(tmp_path):
+    """Lớp ba: từng tệp mở ở chế độ tạo-mới."""
+    f = tmp_path / "manifest.json"
+    f.write_text("ban cu", encoding="utf-8")
+    with pytest.raises(FileExistsError):
+        _bvd()._create(f)
+    assert f.read_text(encoding="utf-8") == "ban cu"

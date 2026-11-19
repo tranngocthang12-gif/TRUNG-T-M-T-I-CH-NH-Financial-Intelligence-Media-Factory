@@ -7,12 +7,16 @@ CHUỖI GIÁ GỐC GÃY trong kho, chưa chắc là ngày giao dịch không hư
 biên độ giá sau điều chỉnh nằm trong sàn. Đó là nguyên nhân một sự kiện chưa đối chiếu vẫn thành APPLIED.
 
 Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ vào chuỗi đó khi đủ cả sáu điều kiện:
-  1. có bản gốc đã ghim trong manifest (url, issuer), tệp tồn tại, đúng sha256 và số byte;
+  1. có bản gốc đã ghim trong manifest (source_id, url, issuer, path, sha256 đều là chuỗi không rỗng), tệp tồn tại, đúng
+     sha256 và số byte; loại sự kiện in trên văn bản (`event_type`) TRÙNG ĐÚNG loại của sự kiện engine (không coi
+     `stock_split` và `stock_dividend` là một);
   2. có ngày công bố (`published_at`) hợp lệ: có mặt, không muộn hơn ngày cắt `as_of`, sớm hơn ngày không hưởng quyền;
-  3. tỷ lệ in trên văn bản (`official_ratio`) trùng tỷ lệ của sự kiện;
+  3. tỷ lệ in trên văn bản (`official_ratio`) là số hữu hạn dương và trùng tỷ lệ của sự kiện;
   4. NGÀY GIAO DỊCH mà engine đang áp sự kiện trùng ngày giao dịch của ngày không hưởng quyền chính thức;
-  5. không có sự kiện nào khác của cùng bản gốc được engine áp ở ngày khác;
-  6. trạng thái engine là APPLIED hoặc DA_NAM_TRONG_GIA_NGUON (giá gốc đã chứa điều chỉnh).
+  5. không có sự kiện nào khác của cùng bản gốc được engine áp ở ngày khác; "cùng bản gốc" xét theo cả `source_id` lẫn
+     sha256 của tệp, nên đổi hay bỏ `source_id` không lách được kiểm tra này;
+  6. trạng thái engine nằm trong danh sách cho phép VERIFIABLE = APPLIED hoặc DA_NAM_TRONG_GIA_NGUON (giá gốc đã chứa
+     điều chỉnh). Mọi trạng thái khác, kể cả trạng thái engine chưa biết, đều bị cách ly.
 Không đạt thì CÁCH LY: không đưa vào hệ số của chuỗi kiểm chứng, và mọi ô giá của mã đó TRƯỚC ngày giao dịch của sự kiện bị
 đánh dấu TAINTED (không bảo đảm so sánh được qua sự kiện). Cổng KHÔNG đổi ngày hộ và KHÔNG suy ngày đúng từ bước nhảy giá.
 Sự kiện tiền mặt chưa có bằng chứng ghim nên chưa được xét; chuỗi kiểm chứng là chuỗi giá gốc cộng các sự kiện cổ phiếu
@@ -32,6 +36,8 @@ from . import adjust
 STOCK = adjust.STOCK
 IMPACT = ("APPLIED", "KHONG_KHOP", "DA_NAM_TRONG_GIA_NGUON", "LOI_TY_LE")   # trạng thái engine cho thấy có chỗ gãy dữ liệu thật
 NO_DATA = ("KHONG_CO_MA", "CHUA_DEN_HAN", "NGOAI_DU_LIEU")                   # không có cửa sổ giá để so
+VERIFIABLE = ("APPLIED", "DA_NAM_TRONG_GIA_NGUON")                           # danh sách cho phép: chỉ hai trạng thái này được kiểm
+DOC_REQUIRED = ("source_id", "url", "issuer", "path", "sha256")
 WINDOW_DAYS = 45          # bản gốc phải có ngày không hưởng quyền cách ngày engine không quá ngần này ngày lịch
 RATIO_TOL = 1e-9
 
@@ -41,7 +47,8 @@ NA_CASH = "KHONG_XET_TIEN_MAT"
 Q = "CACH_LY_"
 STATES = (OK, NA_NODATA, NA_CASH, Q + "THIEU_BANG_CHUNG", Q + "BANG_CHUNG_HONG", Q + "THIEU_NGAY_CONG_BO",
           Q + "CONG_BO_SAU_NGAY_CAT", Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", Q + "TY_LE_LECH", Q + "LECH_NGAY",
-          Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE")
+          Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE", Q + "LOAI_SU_KIEN_LECH",
+          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE")
 
 NEW_COLS = ["verify_state", "verify_reason", "evidence_id", "official_ex_date", "official_trade_date",
             "session_offset", "in_verified_chain", "taints"]
@@ -74,10 +81,19 @@ def load_evidence(manifest_paths) -> list[dict]:
     return docs
 
 
+def _positive_number(x):
+    """Số hữu hạn dương (không nhận bool, chuỗi, None, NaN, vô cực, 0, số âm)."""
+    if isinstance(x, bool) or not isinstance(x, (int, float, np.integer, np.floating)):
+        return None
+    v = float(x)
+    return v if np.isfinite(v) and v > 0 else None
+
+
 def _doc_problem(d, base):
-    for k in ("url", "issuer", "path", "sha256"):
-        if not d.get(k):
-            return f"mục manifest thiếu trường {k}"
+    for k in DOC_REQUIRED:
+        v = d.get(k)
+        if not isinstance(v, str) or not v.strip():
+            return f"mục manifest thiếu trường {k} (phải là chuỗi không rỗng)"
     p = pathlib.Path(base) / d["path"]
     if not p.is_file():
         return "tệp bản gốc không tồn tại tại đường dẫn đã ghi"
@@ -89,8 +105,11 @@ def _doc_problem(d, base):
     return None
 
 
-def _match(ticker, ex_date, docs):
-    """Bản gốc cổ phiếu của cùng mã có ngày không hưởng quyền gần ngày của sự kiện nhất, trong WINDOW_DAYS ngày lịch."""
+def _match(ticker, ex_date, typ, docs):
+    """Bản gốc cổ phiếu của cùng mã có ngày không hưởng quyền gần ngày của sự kiện nhất, trong WINDOW_DAYS ngày lịch.
+
+    Bản gốc khác loại vẫn được ghép (ưu tiên bản cùng loại khi cùng khoảng cách) để `_judge` CÁCH LY với lý do rõ ràng
+    và để bản gốc đó vẫn tham gia kiểm tra trùng ngày, thay vì bị bỏ qua lặng lẽ."""
     best = None
     for d in docs:
         if d.get("ticker") != ticker or d.get("event_type") not in STOCK:
@@ -98,9 +117,9 @@ def _match(ticker, ex_date, docs):
         od = _ts(d.get("official_ex_date"))
         if pd.isna(od) or pd.isna(ex_date):
             continue
-        gap = abs((od - ex_date).days)
-        if gap <= WINDOW_DAYS and (best is None or gap < best[0]):
-            best = (gap, d)
+        key = (abs((od - ex_date).days), d.get("event_type") != typ)
+        if key[0] <= WINDOW_DAYS and (best is None or key < best[0]):
+            best = (key, d)
     return best[1] if best else None
 
 
@@ -109,6 +128,9 @@ def _judge(r, d, close, base, as_of):
     bad = _doc_problem(d, base)
     if bad:
         return Q + "BANG_CHUNG_HONG", bad, pd.NaT, np.nan
+    if d.get("event_type") != r["type"]:
+        return (Q + "LOAI_SU_KIEN_LECH", f"văn bản là {d.get('event_type')}, engine ghi sự kiện là {r['type']}; "
+                "không coi hai loại là một", pd.NaT, np.nan)
     pub, off = _ts(d.get("published_at")), _ts(d.get("official_ex_date"))
     if pd.isna(pub):
         return Q + "THIEU_NGAY_CONG_BO", "bản gốc không có published_at; không lấy ngày hưởng quyền thay ngày công bố", pd.NaT, np.nan
@@ -117,7 +139,10 @@ def _judge(r, d, close, base, as_of):
     if pub >= off:
         return Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", f"công bố {pub.date()} không sớm hơn ngày không hưởng quyền {off.date()}", pd.NaT, np.nan
     ro, rv = d.get("official_ratio"), r["ratio"]
-    if ro is None or pd.isna(rv) or not abs(float(ro) - float(rv)) <= RATIO_TOL:
+    fo, fv = _positive_number(ro), _positive_number(rv)
+    if fo is None or fv is None:
+        return Q + "TY_LE_LECH", f"tỷ lệ không hợp lệ (văn bản {ro!r}, sự kiện {rv!r}); phải là số hữu hạn dương", pd.NaT, np.nan
+    if not abs(fo - fv) <= RATIO_TOL:
         return Q + "TY_LE_LECH", f"tỷ lệ in trên văn bản {ro} khác tỷ lệ sự kiện {rv}", pd.NaT, np.nan
     sess = close[r["ticker"]].dropna().index
     pos = int(sess.searchsorted(off))
@@ -132,6 +157,9 @@ def _judge(r, d, close, base, as_of):
                 otd, offset)
     if r["status"] == "KHONG_KHOP":
         return Q + "GIA_KHONG_KHOP_TY_LE", "ngày và tỷ lệ khớp bản gốc nhưng bước giá không giải thích được bằng tỷ lệ", otd, 0.0
+    if r["status"] not in VERIFIABLE:
+        return (Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", f"trạng thái engine {r['status']} không nằm trong danh sách cho phép "
+                f"{', '.join(VERIFIABLE)}", otd, 0.0)
     return OK, "bản gốc ghim hợp lệ, ngày công bố hợp lệ, tỷ lệ và ngày áp dụng khớp", otd, 0.0
 
 
@@ -148,7 +176,7 @@ def verify_events(events, close, docs, *, evidence_root, as_of) -> pd.DataFrame:
         elif r["status"] in NO_DATA:
             r["verify_state"], r["verify_reason"] = NA_NODATA, f"trạng thái engine {r['status']}: không có cửa sổ giá để so"
         else:
-            d = _match(r["ticker"], r["ex_date"], docs)
+            d = _match(r["ticker"], r["ex_date"], r["type"], docs)
             if d is None:
                 r["verify_state"], r["verify_reason"] = Q + "THIEU_BANG_CHUNG", "không có bản gốc ghim cho sự kiện này trong manifest"
             else:
@@ -157,20 +185,32 @@ def verify_events(events, close, docs, *, evidence_root, as_of) -> pd.DataFrame:
                     _judge(r, d, close, evidence_root, as_of)
         recs.append(r)
         matched.append(d)
-    # một bản gốc mà engine áp ở hơn một ngày: không bên nào được coi là đã kiểm
-    by_doc: dict[str, set] = {}
-    for r in recs:
-        if r["evidence_id"] and pd.notna(r["trade_date"]):
-            by_doc.setdefault(r["evidence_id"], set()).add(r["trade_date"])
-    for r in recs:
-        dates = by_doc.get(r["evidence_id"], ())
+    # một bản gốc mà engine áp ở hơn một ngày: không bên nào được coi là đã kiểm. Khóa nhận dạng bản gốc gồm source_id
+    # (nếu có) VÀ sha256 nội dung khai báo, nên một bản gốc thiếu source_id, hoặc cùng tệp khai hai source_id, vẫn bị bắt.
+    def _keys(d):
+        if d is None:
+            return []
+        return [("sid", v.strip()) if k == "source_id" else ("sha", v.strip().lower())
+                for k in ("source_id", "sha256") if isinstance((v := d.get(k)), str) and v.strip()]
+
+    by_doc: dict[tuple, set] = {}
+    for r, d in zip(recs, matched):
+        if pd.notna(r["trade_date"]):
+            for k in _keys(d):
+                by_doc.setdefault(k, set()).add(r["trade_date"])
+    for r, d in zip(recs, matched):
+        dates = set().union(*[by_doc.get(k, set()) for k in _keys(d)]) if d is not None else set()
         if r["verify_state"] == OK and len(dates) > 1:
             r["verify_state"] = Q + "XUNG_DOT_NGAY"
             r["verify_reason"] = ("cùng bản gốc nhưng engine áp ở nhiều ngày: "
                                   + ", ".join(sorted(str(x.date()) for x in dates)))
     out = pd.DataFrame(recs, columns=list(events.columns) + [c for c in NEW_COLS if c not in ("in_verified_chain", "taints")])
-    out["in_verified_chain"] = out["verify_state"] == OK
-    out["taints"] = out["verify_state"].str.startswith(Q) & out["status"].isin(IMPACT) & out["trade_date"].notna()
+    # Phòng thủ hai lớp: vào chuỗi kiểm chứng chỉ khi trạng thái kiểm là OK VÀ trạng thái engine nằm trong danh sách cho phép.
+    out["in_verified_chain"] = (out["verify_state"] == OK) & out["status"].isin(VERIFIABLE)
+    # Đóng khi nghi ngờ: mọi sự kiện bị cách ly có ngày giao dịch đều nhiễm ô trước nó, trừ khi engine báo không có cửa sổ giá.
+    # (Trạng thái engine chưa biết cũng nhiễm.)
+    out["taints"] = (out["verify_state"].str.startswith(Q) & ~out["status"].isin(NO_DATA)
+                     & out["trade_date"].notna())
     return out
 
 
