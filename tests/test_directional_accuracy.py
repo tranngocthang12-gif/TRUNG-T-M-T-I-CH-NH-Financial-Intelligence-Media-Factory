@@ -18,7 +18,9 @@ class DirectionTests(unittest.TestCase):
         self.assertEqual(stats["directional_accuracy"], 1.0)
         self.assertEqual(stats["directional_n"], 2)
         self.assertEqual(stats["directional_abstain"], 0)
-        self.assertNotIn("hit_rate", stats)
+        # Tương thích: khóa cũ hit_rate giữ ĐÚNG giá trị cũ (tỷ lệ YES), có nhãn nghĩa; không phải tỷ lệ đúng (= 1,0 ở đây)
+        self.assertEqual(stats["hit_rate"], stats["observed_yes_rate"])
+        self.assertIn("KHÔNG phải tỷ lệ dự báo đúng", stats["hit_rate_meaning"])
 
     def test_two_wrong_calls_are_zero_even_though_half_the_outcomes_are_yes(self):
         stats = directional_call_stats([0.9, 0.1], [0, 1])
@@ -45,17 +47,22 @@ class DirectionTests(unittest.TestCase):
         self.assertEqual(wrong["directional_accuracy"], 0.0)
         self.assertEqual(right["observed_yes_rate"], wrong["observed_yes_rate"])
         self.assertEqual(right["brier_base_rate"], wrong["brier_base_rate"])
-        self.assertNotIn("hit_rate", right)
+        self.assertEqual(right["hit_rate"], right["observed_yes_rate"])            # bí danh cũ, cùng số với trước PR
+        self.assertEqual(right["calibration"]["0.9-1.0"]["observed_yes_rate"], right["calibration"]["0.9-1.0"]["hit_rate"])
         self.assertEqual(TARGET_DISAGREEMENTS, 194)
         self.assertIn("không phải baseline độc lập", right["baseline_note"])
 
-    def test_freshness_names_the_commit_and_the_ledger_count(self):
-        fresh = _freshness("2026-11-19", 6)
-        self.assertEqual(fresh["ledger_rows"], 6)
-        self.assertEqual(fresh["cycle_as_of"], "2026-11-19")
+    def test_freshness_names_the_commit_the_ledgers_and_the_data_date(self):
+        fresh = _freshness("2026-11-19", {"scores": {}, "timing_verification_source": "none: test"})
+        self.assertEqual(fresh["report_as_of"], "2026-11-19")
         self.assertRegex(fresh["generated_at"], r"^\d{4}-\d{2}-\d{2}T")
         self.assertTrue(fresh["source_commit"] is None or len(fresh["source_commit"]) >= 7)
-        self.assertIn("Không phải bằng chứng năng lực", fresh["note"])
+        pred = fresh["sources"]["ledger/predictions.jsonl"]
+        self.assertEqual(pred["rows"], len([l for l in (ROOT / "ledger" / "predictions.jsonl").read_text(encoding="utf-8").splitlines() if l.strip()]))
+        self.assertRegex(pred["sha256"], r"^[0-9a-f]{64}$")
+        self.assertIn("ledger/resolutions.jsonl", fresh["sources"])
+        self.assertFalse(fresh["capability_scores_emitted"])
+        self.assertIn("STALE", fresh["note"])
 
 
 class NewForecastContractTests(unittest.TestCase):
