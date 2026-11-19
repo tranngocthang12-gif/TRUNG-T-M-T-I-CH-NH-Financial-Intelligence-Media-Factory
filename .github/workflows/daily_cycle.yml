@@ -61,10 +61,19 @@ jobs:
           git config user.email "ttc-engine@users.noreply.github.com"
           git add -A data state research knowledge paper reports fact ledger memory library/notes
           git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F)"
-          # Ledger intake co the da day du bao len main trong luc vong hoc chay: rebase roi day, thu lai toi 5 lan
+          # Robot có thể đã đẩy Ledger lên main trong lúc vòng học chạy. Sau rebase, scorecard của snapshot cũ là STALE.
+          # Sinh lại từ sổ mới, hậu kiểm FRESH, rồi mới push. Tối đa 5 lần. Lệch sau khi làm mới thì dừng, không đẩy bản cũ.
           for i in 1 2 3 4 5; do
-            git pull -q --rebase origin main && git push && exit 0
-            git rebase --abort 2>/dev/null || true
+            if ! git pull -q --rebase origin main; then
+              git rebase --abort 2>/dev/null || true
+              sleep $(( i * 10 ))
+              continue
+            fi
+            python -m engine.run_cycle --scorecard-only --source store || exit 1
+            python tools/validate.py --require-fresh-scorecard || exit 1
+            git add reports/scorecard.json
+            git diff --cached --quiet || git commit -m "scorecard: lam moi theo so sau khi dong bo main"
+            git push && exit 0
             sleep $(( i * 10 ))
           done
           exit 1
