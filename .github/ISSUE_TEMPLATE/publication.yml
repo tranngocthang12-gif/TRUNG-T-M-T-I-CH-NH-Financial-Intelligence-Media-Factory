@@ -1,0 +1,42 @@
+name: Publication
+description: Ghi bằng chứng kết quả đã được công bố trước hạn phân định (ADR-0011). Không chấm YES/NO. Không sửa hạn khóa của dự báo.
+title: "[Publication] "
+labels: ["publication"]
+body:
+  - type: input
+    id: notice
+    attributes:
+      label: notice
+      description: Ghi đúng PUBLICATION. Issue này không phải Resolution.
+      value: PUBLICATION
+    validations: {required: true}
+  - type: input
+    id: forecast_ids
+    attributes:
+      label: forecast_ids
+      description: Một mã dự báo của câu hỏi (ví dụ F-101). Mọi dự báo cùng câu hỏi bị khóa nhận thêm.
+    validations: {required: true}
+  - type: input
+    id: published_at
+    attributes:
+      label: published_at
+      description: Mốc kết quả đã công khai, ISO có múi giờ, ví dụ 2026-12-06T02:00:00Z. Chỉ ghi ngày là bị từ chối. Không được sau giờ mở Issue này.
+    validations: {required: true}
+  - type: input
+    id: evidence_url
+    attributes:
+      label: evidence_url
+      description: Đường dẫn https:// thuộc tên miền đã hứa trong dự báo.
+    validations: {required: true}
+  - type: textarea
+    id: quote
+    attributes:
+      label: quote
+      description: Trích nguyên văn chỗ nguồn cho thấy kết quả đã công bố.
+    validations: {required: true}
+  - type: input
+    id: recorder
+    attributes:
+      label: recorder
+      description: Ghế đọc nguồn. Bắt đầu bằng Owner hoặc nhà cung cấp khác ghế viết dự báo. Không được là Claude nếu dự báo do Claude viết.
+    validations: {required: true}

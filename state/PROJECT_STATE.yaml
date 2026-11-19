@@ -1,31 +1,23 @@
-version: 0.4
-phase: V3_G1_LEDGER_AB_VA_THU_VIEN
-current_focus: "Hoàn thiện kiến trúc v3.0 (Owner 17/11/2026, ADR-0002): đường dự báo → phân định → chấm A–B → kiểm toán đã đi trọn vòng (PR #28); dự báo, Thư viện và các việc khác là việc dài hạn, không có hạn chót trong giai đoạn này. Điều kiện thoát G1 (§8): ≥ 40 tài liệu gốc có hash, ≥ 60 dự báo A+B, tỷ lệ bất đồng đo được. Mốc xét thu hẹp v3.0 (ADR-0002): 31/03/2027 cần ≥ 20 dự báo hợp lệ."
+version: 0.5
+phase: V3_G0_DAT_DIEU_KIEN_KY_THUAT
+current_focus: "G0 đã đạt điều kiện kỹ thuật tại architecture/ARCHITECTURE.md §8 ngày 18/11/2026: 6 dự báo thật F-37–F-42, 3 cặp A/B (CPI, IIP, bán lẻ), mỗi cặp cùng câu hỏi và cùng ngày theo giờ Việt Nam; cả 6 có dấu nhận robot khớp hash. Kiểm toán cuối run 44286714267 SUCCESS trên main f1be343fc342694a247790293fc2bf0ddaa6f979. G1 chưa đạt: mới có 6/60 dự báo A+B, thư viện vẫn 0/40 tài liệu gốc ghim. Chưa phân định, chưa kết luận năng lực dự báo. Ghi nhận này không thay đổi cột dừng/đảo 3 tuần hoặc quyết định ADR-0002 (mốc xét lại 31/03/2027); hai đồng hồ không phải một luật."
 deployment_level: 0
 open_blockers:
-  - "Ledger chưa có dự báo nào (0/60); Owner ghi cặp A/B theo docs/HUONG_DAN_VAN_HANH.md mục 6"
-  - "Thư viện rỗng (0/40 tài liệu gốc ghim, 0 ghi chú); ghế thi công chưa lập — không phải MINH TRÍ (Owner 22/10/2026)"
-  - "OWNER_MISSION chưa được Owner ký"
-  - "GOVERNOR_POLICY còn TODO"
+  - "G1 chưa đạt: Ledger có 6/60 dự báo A+B, gồm 3 cặp CPI #37/#38, IIP #39/#40, bán lẻ #41/#42. Tiếp tục thu thập dự báo đúng quy trình; tới resolve_at 2026-12-20 mới phân định theo nguồn đã hứa."
+  - "Thư viện rỗng (0/40 tài liệu gốc ghim, 0 ghi chú). Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010). Không chép nguồn khi chưa có bản gốc và sha256"
+  - "OWNER_MISSION chưa được Owner ký — AI không điền tệp này"
+  - "GOVERNOR_POLICY còn TODO — AI không điền tệp này. deployment_level 0 nên các TODO này chặn vốn, không mở vốn"
   - "OWNER GATE: chưa có nguồn giá chính thức — vnstock bị PyPI cách ly, Yahoo là nguồn tạm có lỗi; SSI FastConnect / DNSE cần tài khoản Owner"
   - "Sự kiện quyền TCB 11/06/2024 và VCB 03/03/2025 trong data/corporate_actions.csv ở trạng thái CAN_DOI_CHIEU — cần đường dẫn CBTT chính thức"
-  - "Backtest dùng VN30 HIỆN TẠI cho toàn bộ lịch sử (thiên lệch sống sót, đã gắn nhãn — ADR-0008); cần data/vn30_history.csv từ công bố xét duyệt định kỳ của HOSE (ghế thi công hoặc Owner)"
+  - "Backtest dùng VN30 HIỆN TẠI cho toàn bộ lịch sử (thiên lệch sống sót, đã gắn nhãn — ADR-0008, ACCEPTED qua PR #31); cần data/vn30_history.csv từ công bố xét duyệt định kỳ của HOSE (ghế thi công hoặc Owner)"
+  - "ADR-0009 ACCEPTED qua PR #32 (merge 432f456, L-09 trên c4d8a03). Điều 7 của ADR đó chưa cho đổi engine/adjust.py hay data.sources"
 last_session:
-  date: 2026-11-17
-  type: "RÀ SOÁT TOÀN BỘ + SỬA (v3.0.1 → v3.0.5)"
+  date: 2026-11-18
+  type: "G0 ĐẠT ĐIỀU KIỆN KỸ THUẬT — 6 DỰ BÁO, 3 CẶP A/B"
   done:
-    - "v3.0.5 (đề xuất, ADR-0008 — thứ tự Owner duyệt 18/11/2026): nhãn thiên lệch sống sót trong báo cáo và ENGINE_STATE; BCTC trong Thư viện có period_end + published_on, số liệu chỉ dùng từ ngày công bố (knowledge_notes.usable_on); giấy không khớp ở phiên khóa trần/sàn; sụt giảm lớn nhất của backtest và NAV giấy trong báo cáo"
-    - "v3.0.4 (PR #30, Owner gộp 17/11/2026, commit f9f3417; Gemini chấm GỘP ĐƯỢC tại 5b90973): ADR-0002/0004/0005 ACCEPTED; chữ cột Máy kiểm L-09/L-10; ADR-0006 kho giá ghi tăng dần (C2); ADR-0007; đóng 19 PR nháp UMLF + 5 Issue theo L-07; chạy tay kiểm toán sổ trên main lần đầu: đạt; ruleset Protect main history Active trên main (Restrict deletions + Block force pushes)"
-    - "v3.0.3 (PR #29, Owner gộp 17/11/2026, commit b8158be; Gemini chấm GỘP ĐƯỢC tại 6201090): ADR-0002, ADR-0004, ADR-0005; registry_push dừng khi hai vòng học đăng ký trùng từng byte"
-    - "v3.0.1 (PR #27, đã gộp): dòng dự báo Issue không còn làm vỡ vòng học; intake chỉ nhận Issue do chủ kho mở, lúc mở"
-    - "v3.0.2 (PR #28): phân định qua Issue 'Resolution'; chấm A–B kiểm định chốt mẫu 194 hai phía; sổ thử L-06 + Deflated Sharpe + không gian giả thuyết đóng băng; kiểm máy Thư viện (L-01, L-04, L-08); cổng chấm PR có bản chấm trên kho (L-09); kiểm toán sổ chỉ-ghi-thêm và đối chiếu Issue thật (L-05); engine hằng tuần; CI chạy đủ mọi test"
-    - "Sáu vòng chấm độc lập của ghế khác nhà cung cấp (25 điểm + 4 điểm HIGH ở vòng 6) + một lượt tự rà toàn bộ; bảng luật ↔ máy kiểm ở ADR-0003"
-    - "Vòng 7 (ChatGPT chấm commit 2ba54fc): không loại dòng nào được miễn kiểm; kết quả thử chỉ-ghi-thêm có neo sha256; kiểm toán tự chạy sau mỗi lần robot ghi; tổng số lần thử gồm cả lần bỏ dở"
-    - "v3.0.3 — nội dung: ADR-0002 không thu hẹp v3.0, dự báo là việc dài hạn, câu hỏi event_before_date ngoài phép thử A–B; ADR-0004 đóng bốn việc tồn (mốc v3.0.2 cố định trong config.yaml, brier_void_worst, tên khóa chọn mẫu, giữ hành vi dấu nhận trễ); ADR-0005 tạm gác engine kịch bản"
-    - "Vòng 10 — vòng chấm cuối (ChatGPT chấm commit 9367976): năm điểm vòng 9 đã đóng; sửa 1 MEDIUM chặn gộp — kiểm toán đọc lại dấu nhận 15 lượt cách nhau 30 giây, phủ hết chuỗi thử lại 200 giây của bước đăng dấu nhận; 4 việc tồn sau gộp ghi ở cuối ADR-0003"
-    - "Vòng 9 (ChatGPT chấm commit a69f204): phiên bản prompt ghế B ghim theo ngày mở Issue, một luật cho cả lúc nhận lẫn lúc kiểm lại; chạy lại job không xin được dấu nhận cho dòng robot đã từ chối; VOID chỉ ghi được khi tới hạn; mẫu của kiểm định A–B là 194 cặp bất đồng đầu tiên theo thứ tự ghi dự báo, cặp VOID tính theo hướng bất lợi cho kết luận đang xét; mốc v3.0.2 xác định bằng tổ tiên; kiểm toán đọc lại dấu nhận phân định bất kể tuổi Issue; nguồn phân định chỉ nhận https"
-    - "Vòng 8 (ChatGPT chấm commit 69e282a): hai robot ghi khác thứ tự mở Issue không còn làm hỏng sổ (luật theo trạng thái sổ + robot tự kiểm trước khi ghi + hạn ghi); phục hồi bằng ghi thêm (chạy lại job; Issue mới); đường ghi dự báo của engine đóng — sổ chỉ nhận dòng từ Issue; research/trials.csv có một khuôn cố định; kiểm toán đọc lại dấu nhận trước khi báo đỏ"
-    - "Vòng 6: máy chủ nguồn tách bằng urllib; số và ngày chặt; đăng ký thử đẩy lên main trước khi chạy backtest; dấu nhận của github-actions[bot] cho từng dòng sổ; CI chạy lại luật nhận trên mọi dòng sổ"
-    - "Soạn đợt dự báo A/B số 1 (10 câu) — dài hạn, chưa mở Issue (ADR-0002)"
-  tests: "tests/test_*.py: 4 tệp unittest + test_governance + 6 test script engine, tất cả chặn gộp; tools/validate.py 0 cảnh báo"
-next_gap: "(1) Lần chạy thật đầu tiên của phần mới: vòng học hằng tuần 16:30 thứ Sáu 20/11/2026 (lần đầu đẩy sổ đăng ký thử lên main trước backtest; lần đầu ghi giá vào tệp tháng data/store/prices/ theo ADR-0006); hai robot nhận khi có Issue Forecast/Resolution đầu tiên. (2) ADR-0008 phần dữ liệu: data/vn30_history.csv từ công bố HOSE (ghế thi công hoặc Owner), rồi PR chuyển universe_basis sang HISTORICAL. (3) Dài hạn: ghi dự báo A/B (đợt 1 đã soạn), lập ghế thi công cho Thư viện, đề thi Học viện khi có ghi chú CITED."
+    - "Owner tranngocthang12-gif mở Forecast Issues #37–#42 ngày 18/11/2026 theo giờ Việt Nam; robot ghi 6 dòng F-37–F-42 vào ledger/predictions.jsonl."
+    - "Đối chiếu đủ 6 dấu nhận ledger-attest của github-actions[bot] với hash từng dòng Ledger; 3 cặp A/B cùng câu hỏi và cùng ngày."
+    - "Kiểm toán GitHub run 44286714267 SUCCESS trên main f1be343fc342694a247790293fc2bf0ddaa6f979: kiểm lại luật, tính chỉ-ghi-thêm và đối chiếu Issue/dấu nhận."
+    - "Cập nhật trạng thái theo bằng chứng G0; G1 chưa đạt. deployment_level giữ 0; không mở giao dịch."
+  tests: "6/6 dấu nhận khớp Ledger; 6 dự báo thuộc 3 cặp A/B; kiểm toán https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/actions/runs/44286714267 SUCCESS. PR cập nhật state cần CI và ghế khác nhà cung cấp chấm L-09 trước khi Owner gộp."
+next_gap: "(1) Ghế khác nhà cung cấp chấm PR cập nhật trạng thái đúng commit theo L-09; Owner quyết định gộp. (2) Tiếp tục dự báo A/B và xây thư viện để tiến tới G1, chưa tuyên bố G1 đạt. (3) Tới 2026-12-20, phân định 3 câu hỏi theo nguồn đã hứa và quy trình Resolution. (4) Vòng học hằng tuần 16:30 thứ Sáu 20/11/2026. (5) data/vn30_history.csv khi có công bố HOSE; TTC-3 chỉ bắt đầu khi Owner chỉ nguồn và tệp gốc tải được để ghim sha256."

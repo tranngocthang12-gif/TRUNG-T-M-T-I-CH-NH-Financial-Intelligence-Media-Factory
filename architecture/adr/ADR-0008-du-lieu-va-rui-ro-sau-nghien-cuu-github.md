@@ -1,6 +1,6 @@
 # ADR-0008: Thiên lệch sống sót, ngày công bố BCTC, khóa biên độ trong giấy, sụt giảm lớn nhất
 - Ngày: 2026-11-18
-- Trạng thái: PROPOSED (ACCEPTED khi Owner gộp PR chứa tệp này)
+- Trạng thái: ACCEPTED 18/11/2026. Căn cứ duy nhất: Owner gộp PR #31, merge commit `8c4fd4305b8154adda2ea0e1abf4e43cd7b647ab`. Không viện `docs/RESEARCH_POINT_IN_TIME_LIMITATIONS.md` — tệp đó vào main ở PR #32, không phải căn cứ của trạng thái này. Header còn chữ PROPOSED sau khi gộp; ADR-0010 chỉ lật chữ trạng thái, không quyết định lại nội dung.
 - Người đề xuất: Claude (kiến trúc sư trưởng). Đầu vào: bản "Nghiên cứu GitHub — học tinh hoa đầu tư chứng khoán" (góp ý tư vấn, không phải quyết định kiến trúc) và bản đối chiếu của Claude với mã trên `main`
 - Người chấm: ghế khác nhà cung cấp (L-09), ghi ở PR
 - Owner duyệt: thứ tự bốn việc — Owner "ĐỒNG Ý" 18/11/2026 (chat vận hành); áp dụng khi gộp PR

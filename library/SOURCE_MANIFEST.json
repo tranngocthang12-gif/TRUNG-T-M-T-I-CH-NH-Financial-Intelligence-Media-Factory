@@ -1,1 +1,287 @@
-{"schema": "ttc-source-manifest/v1", "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day: sha256, bytes, issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08)", "files": {}}
+{
+  "schema": "ttc-source-manifest/v1",
+  "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day. sha256 va bytes LUON la text.md, khong phai PDF. Moi dong phai co original_sha256, original_bytes, original_path (trong library/sources/<doc_id>/, khong phai text.md), text_sha256 va text_bytes (phai trung sha256/bytes). Bo cac truong do la loi cong nguon, khong con duong vong. Hai hash khong duoc trung. Hash tung trang tinh ca bang, khong chi doan van. SOURCED va ghi chu CITED/TESTED/PROVEN can them pdf_check da doi chieu PDF; hash tu sinh khong du. Luat Ke toan 88/2015 da ghim 88.signed.pdf va SOURCED; ghi chu KN-T2 van DRAFT vi nguoi doi chieu PDF trung ghe nguoi doc. Cac truong con lai: issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08, ADR-0012).",
+  "files": {
+    "luat_ke_toan_88_2015": {
+      "sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
+      "bytes": 101331,
+      "issuer": "Quốc hội",
+      "issued_on": "2015-11-20",
+      "accessed_on": "2026-11-19",
+      "source_url": "https://datafiles.chinhphu.vn/cpp/files/vbpq/2016/01/88.signed.pdf",
+      "data_source": "Công báo / Cổng TTĐT Chính phủ",
+      "legal_status": "Văn bản quy phạm gốc: Luật số 88/2015/QH13, Quốc hội thông qua ngày 20/11/2015, hiệu lực 01/01/2017 (Điều 72). Không bị thay thế toàn bộ. Điều 72 khoản 2 chỉ làm Luật kế toán số 03/2003/QH11 hết hiệu lực. Luật 88/2015 đã bị sửa đổi, bổ sung một phần (không phải thay thế) bởi Luật Quản lý thuế số 38/2019/QH14 (hiệu lực 01/07/2020) và Luật số 56/2024/QH15 (thông qua 29/11/2024, hiệu lực phần lớn 01/01/2025). Văn bản hợp nhất 25/VBHN-VPQH ngày 26/02/2025 của Văn phòng Quốc hội chỉ để tra cứu; nguồn thứ cấp còn nêu 41/VBHN-VPQH ngày 31/03/2026. Hợp nhất không thay thế bản gốc và không được dùng làm text.md. text.md chép PDF ký số 88.signed.pdf; không phải văn bản hợp nhất.",
+      "license": "public-domain-vn-law",
+      "kind": "LAW",
+      "effective_from": "2017-01-01",
+      "effective_to": null,
+      "superseded_by": null,
+      "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50",
+      "original_bytes": 2566253,
+      "original_path": "library/sources/luat_ke_toan_88_2015/88.signed.pdf",
+      "text_sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
+      "text_bytes": 101331,
+      "crosscheck": {
+        "method": "page-by-page",
+        "pages": [
+          {
+            "page": 1,
+            "sha256": "5b59579f3a336cf8da33fec17ea1244d6158254e906d49eddfffc2432785b95c",
+            "head": "Ký bởi: Cổng Thông tin điện tử Chính",
+            "tail": "mực kế toán và chế độ kế toán."
+          },
+          {
+            "page": 2,
+            "sha256": "c2488f2d9d6b8726d85fe3c75d1343d4e42d7d01f200bff5ad9d4caf412cb358",
+            "head": "2. Chế độ kế toán là những quy",
+            "tail": "hiện từng nội dung công việc kế toán."
+          },
+          {
+            "page": 3,
+            "sha256": "7d86a952c66526e288f26bc26735a836af1fcf748a08b67b55e26689feae4c8b",
+            "head": "17. Phương tiện điện tử là phương tiện",
+            "tail": "phải giải trình trong báo cáo tài chính."
+          },
+          {
+            "page": 4,
+            "sha256": "1eceec9d02565245df84ec44d8fb2fa29432c7f647afc0d447834942a121a32b",
+            "head": "3. Đơn vị kế toán phải thu thập,",
+            "tail": "xử lý nợ công; h) Tài sản công;"
+          },
+          {
+            "page": 5,
+            "sha256": "346070c98e072f7a4378f28d23335598a8c2c97c291a96197493344cea573395",
+            "head": "i) Tài sản, các khoản phải thu, nghĩa",
+            "tail": "toán tổng hợp trong một kỳ kế toán."
+          },
+          {
+            "page": 6,
+            "sha256": "9ef1db64ec99fc450a891c049c5b7bc861f1f63abf92acfe04ab2d0bad3e030b",
+            "head": "3. Bộ Tài chính hướng dẫn áp dụng",
+            "tail": "toán tháng và được quy định như sau:"
+          },
+          {
+            "page": 7,
+            "sha256": "09cb40b1eb5430954047ab61605b15f6741c91c83cc88dffa801d4c864bad2a8",
+            "head": "a) Kỳ kế toán năm là 12 tháng,",
+            "tail": "quy định tại Điều 41 của Luật này."
+          },
+          {
+            "page": 8,
+            "sha256": "2254a3c6717bd6c52427d1dc99874773534c9a9e9c4b1ed54920f00fb629d52d",
+            "head": "5. Ban hành, công bố chuẩn mực kế",
+            "tail": "quản và lưu trữ tài liệu kế toán."
+          },
+          {
+            "page": 9,
+            "sha256": "5a4d8097ba3fd9eab3c6c3ad45e0b5d375459ef6f87922db9ec3a42a9f42e0ce",
+            "head": "2. Đơn vị kế toán có trách nhiệm",
+            "tail": "có hiệu lực để giao dịch, thanh toán."
+          },
+          {
+            "page": 10,
+            "sha256": "d25a9786e644ba6e74cc32b4396b22acffaa0508209b0cd0ee22f810f4b84ea1",
+            "head": "Điều 18. Lập và lưu trữ chứng từ",
+            "tail": "như chữ ký trên chứng từ bằng giấy."
+          },
+          {
+            "page": 11,
+            "sha256": "eb9fcb9e76103f2ed450d5f0c200b8a62eded469cfb84ba2743692052c1b1212",
+            "head": "Điều 20. Hóa đơn 1. Hóa đơn là",
+            "tail": "kế toán áp dụng ở đơn vị mình."
+          },
+          {
+            "page": 12,
+            "sha256": "9fe9e442a3f079f4f824237c73700ceca9c27bf87bcb86dfe8a3366abac3ab45",
+            "head": "2. Đơn vị kế toán được chi tiết",
+            "tail": "dưới; không ghi chồng lên nhau; không ghi"
+          },
+          {
+            "page": 13,
+            "sha256": "01f26de95877127195d821c0242791ad8ef8dfad3a8fc319eb40475400f7c5fc",
+            "head": "cách dòng; trường hợp ghi không hết trang",
+            "tail": "giá theo tỷ giá giao dịch thực tế;"
+          },
+          {
+            "page": 14,
+            "sha256": "bf99d958f9538308f1070af0aad99d2384f863c78fa7aa89c818c778f4ddb14e",
+            "head": "c) Các tài sản hoặc nợ phải trả",
+            "tail": "toán năm theo quy định của pháp luật."
+          },
+          {
+            "page": 15,
+            "sha256": "c99d96375880bef342bdd36c0751d10838a25a1ce500b7e34742158269152662",
+            "head": "4. Bộ Tài chính quy định chi tiết",
+            "tail": "quy định của Luật ngân sách nhà nước."
+          },
+          {
+            "page": 16,
+            "sha256": "37685818a13fb6164ef485291b799c9ab315a44bb3b843660f711e9168282cd9",
+            "head": "2. Đơn vị kế toán không sử dụng",
+            "tail": "có thẩm quyền và trước khi công khai."
+          },
+          {
+            "page": 17,
+            "sha256": "788871f7381138275f4dca08840e0c8c7934f458f959ab2eda1d25d7364d307c",
+            "head": "2. Đơn vị kế toán khi được kiểm",
+            "tail": "có thẩm quyền kiểm tra kế toán có"
+          },
+          {
+            "page": 18,
+            "sha256": "825397a81125bf1eae4dd50e205dfd8f355ec8348f969ff26ab6a91dcfd53980",
+            "head": "thể kéo dài thời gian kiểm tra; thời",
+            "tail": "sử dụng sai mục đích, không hiệu quả;"
+          },
+          {
+            "page": 19,
+            "sha256": "dc825198b7dc4dde7e221f1653ad123e0e109e79132e29be6d966ff1bd33a8dd",
+            "head": "b) Các nghiệp vụ được phê duyệt đúng",
+            "tail": "toán trước khi lập báo cáo tài chính."
+          },
+          {
+            "page": 20,
+            "sha256": "955e2d82055dea5933eab875e24c999e0e4d4279415e3032d67cbb47404801d4",
+            "head": "4. Việc kiểm kê phải phản ánh đúng",
+            "tail": "kế toán bị mất hoặc bị hủy hoại."
+          },
+          {
+            "page": 21,
+            "sha256": "05f304c9cff704a58f8ba0ca61e598e135e38158635b91d14f44c8e0376e4988",
+            "head": "Mục 6 CÔNG VIỆC KẾ TOÁN TRONG TRƯỜNG",
+            "tail": "phải thực hiện các công việc sau đây:"
+          },
+          {
+            "page": 22,
+            "sha256": "57806e5c401ee3b8488381586b2ec2941ba3ae713930873ab585b1fa4385b152",
+            "head": "a) Căn cứ vào biên bản bàn giao,",
+            "tail": "quy định tại Điều 41 của Luật này."
+          },
+          {
+            "page": 23,
+            "sha256": "ec24d385eaf726a5732c1cd1312a2d5dfa15e5e92a03f2e93e100b71cdb444a9",
+            "head": "2. Trường hợp đơn vị kế toán bị",
+            "tail": "toán trong thời gian mình làm kế toán."
+          },
+          {
+            "page": 24,
+            "sha256": "6f3fd044e7fce01495e6ca460cc5678746d7633c6ab49db4baff2a0112928938",
+            "head": "Điều 52. Những người không được làm kế",
+            "tail": "Có chứng chỉ bồi dưỡng kế toán trưởng;"
+          },
+          {
+            "page": 25,
+            "sha256": "3582e9b4a5fb61ec5ac0d4e3f677a26893bd8ed81eca0e534b1cba61f1b2eff5",
+            "head": "d) Có thời gian công tác thực tế",
+            "tail": "trung thực mọi thông tin, tài liệu liên"
+          },
+          {
+            "page": 26,
+            "sha256": "537c77badd50ee8ac997c27991ddc7dd5d474e010595fe9054aa62b102782fd3",
+            "head": "quan đến công việc thuê làm kế toán,",
+            "tail": "làm toàn bộ thời gian cho một doanh"
+          },
+          {
+            "page": 27,
+            "sha256": "20d0758feae1b04856253512d8d73c9a902b969d55d53a1a86b73ebc3c82e10b",
+            "head": "nghiệp kinh doanh dịch vụ kế toán hoặc",
+            "tail": "doanh nghiệp kinh doanh dịch vụ kế toán;"
+          },
+          {
+            "page": 28,
+            "sha256": "a6c0a57e307f99228ae2d6e5c22ebceb643b112ce74204b0b84963a8228c2e7a",
+            "head": "b) Thành lập chi nhánh doanh nghiệp kinh",
+            "tail": "giám đốc hoặc tổng giám đốc chi nhánh;"
+          },
+          {
+            "page": 29,
+            "sha256": "36b17448ae02ecd93ba80228f624a0f6a2e3525fdd9f034a37bce383fe2a441b",
+            "head": "c) Giám đốc hoặc tổng giám đốc chi",
+            "tail": "ngày nhận tài liệu giải trình bổ sung."
+          },
+          {
+            "page": 30,
+            "sha256": "b852de760eb7b1166bb5994fcc3639420a4d66bedc822fd5fc005b07e262b46d",
+            "head": "Điều 63. Cấp lại Giấy chứng nhận đủ",
+            "tail": "báo bằng văn bản cho Bộ Tài chính:"
+          },
+          {
+            "page": 31,
+            "sha256": "680db2d562633e101f85f5f4f1334babf909a8a39e49d32569662adea34b58f1",
+            "head": "a) Danh sách kế toán viên hành nghề",
+            "tail": "người trực tiếp thực hiện dịch vụ kế"
+          },
+          {
+            "page": 32,
+            "sha256": "fabb2e33c29cd5e03e665af133b09b272941cc9f2e69bc0e486544295ce164ab",
+            "head": "toán của doanh nghiệp, hộ kinh doanh dịch",
+            "tail": "giấy tờ khác có giá trị tương đương;"
+          },
+          {
+            "page": 33,
+            "sha256": "672b39f5e401dc2c937d44511059d0d02da01bce47bbba2d7ee745ba3e265a1e",
+            "head": "e) Làm sai lệch hoặc thông đồng, móc",
+            "tail": "Bị thu hồi chứng chỉ kế toán viên;"
+          },
+          {
+            "page": 34,
+            "sha256": "e96e024ae1455578413119f459aa13c277c9dc3aaf17c201fb6edaf228b3ad17",
+            "head": "c) Bị kết tội bằng bản án của",
+            "tail": "nhà nước về kế toán tại địa phương."
+          },
+          {
+            "page": 35,
+            "sha256": "ae37e7e6c257c33d587bd98042836f27a90d3f02efb5feacc42bdccc96f1c558",
+            "head": "CHƯƠNG VI ĐIỀU KHOẢN THI HÀNH Điều 72.",
+            "tail": "2015. CHỦ TỊCH QUỐC HỘI Nguyễn Sinh Hùng"
+          }
+        ],
+        "pages_checked": 35,
+        "pages_total": 35,
+        "pdf_check": {
+          "checker": "Claude (Anthropic)",
+          "result": "MATCH",
+          "pages_checked": [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+            8,
+            9,
+            10,
+            11,
+            12,
+            13,
+            14,
+            15,
+            16,
+            17,
+            18,
+            19,
+            20,
+            21,
+            22,
+            23,
+            24,
+            25,
+            26,
+            27,
+            28,
+            29,
+            30,
+            31,
+            32,
+            33,
+            34,
+            35
+          ],
+          "evidence": "Đối chiếu ngày 2026-11-19 trên tệp đã ghim 88.signed.pdf (SHA-256 1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50, 2566253 byte, 35 trang; pdfinfo: bản quét HP Scanjet, ký số VGCA 19.01.2016 16:25:22 +07:00, không có lớp chữ nên không dùng OCR làm bằng chứng). Phương pháp: render từng trang bằng pdftoppm (110 dpi toàn trang, 200–600 dpi vùng nghi ngờ), đọc ảnh và so từng câu, từng từ với đoạn [pN] tương ứng của text.md: số Điều, khoản, điểm a)–i), mọi con số, ngày, tỷ lệ, dẫn chiếu chéo, vị trí dấu thanh (hoà/hòa, xoá/xóa, khoá/khóa, uỷ/ủy) và dấu câu cuối khoản. 35/35 trang được đọc bằng ảnh bởi các phiên Claude (Anthropic); mọi điểm lệch được Claude render lại độc lập và xác minh trước khi sửa. Kết quả trên bản text.md trước (sha256 bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3): 8 lỗi chép, đã sửa, số byte không đổi: p11 Điều 20 khoản 2 'sử dụng hóa đơn' → 'sử dụng hoá đơn' (ảnh in 'hoá', cùng câu có 'hình thức hóa đơn' in 'hóa'); p12 Điều 25 khoản 3 'cụ thể hóa' → 'cụ thể hoá'; p23 Điều 48 khoản 2 'thì Tòa án' → 'thì Toà án'; p32 Điều 68 khoản 1–5 kết thúc '.' → ';' (khoản 6 giữ '.'). Sau sửa, 35/35 trang MATCH về chữ, số, dấu thanh và dấu câu. Không chép (đúng quy ước): số trang in đầu trang, số viết tay cuối trang, logo và dấu 'Văn bản gửi đăng Công báo', dấu công văn đến và chữ viết tay trang 1, con dấu và chữ ký tay trang 35, định dạng đậm/nghiêng, ngắt dòng trong đoạn. Nguồn in tự trộn hai kiểu dấu (vd 'Cộng HÒA' ở quốc hiệu, 'Cộng hoà' ở căn cứ và câu kết; 'Toà án' trang 23 nhưng 'Tòa án' trang 24, 27, 34); text.md giữ đúng dạng in từng chỗ. Điểm c khoản 2 Điều 71 (trang 34) in dấu '.' và được giữ nguyên. Biên bản pdf_check trước của Grok (xAI) dựa trên OCR Tesseract (cụm 6 từ đầu/cuối, recall ≥ 0,963) gắn với bản text.md cũ; nó hết hiệu lực khi text.md đổi (ADR-0012 quyết định 5). Biên bản này do Claude (Anthropic) lập, cũng là người sửa 8 điểm trên: cần phản biện độc lập khác nhà cung cấp (L-09) trước khi Owner gộp.",
+          "text_sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
+          "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50"
+        }
+      }
+    }
+  }
+}

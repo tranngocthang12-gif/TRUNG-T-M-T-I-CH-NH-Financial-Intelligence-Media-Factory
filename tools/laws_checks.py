@@ -138,10 +138,14 @@ def _chain_errors(path, label) -> list[str]:
 
 def check_ledger_chain(root) -> list[str]:
     errs = []
-    for name, label in (("predictions.jsonl", "Ledger"), ("resolutions.jsonl", "Ledger phân định")):
+    for name, label in (("predictions.jsonl", "Ledger"), ("resolutions.jsonl", "Ledger phân định"),
+                        ("publication_evidence.jsonl", "Bằng chứng công bố")):
         path = pathlib.Path(root) / "ledger" / name
         if path.is_file():
             errs += _chain_errors(path, label)
+    cal = pathlib.Path(root) / "governance" / "release_calendar.jsonl"     # lịch công bố: chuỗi hash, chỉ ghi thêm (L-05)
+    if cal.is_file():
+        errs += _chain_errors(cal, "Lịch công bố")
     return errs
 
 
@@ -168,7 +172,8 @@ def check_ledger_rows(root) -> list[str]:
     pred, res = rows(pred_p), rows(res_p)
     if pred is None or res is None:
         return []
-    if not pred and not res:
+    cal_p = root / "governance" / "release_calendar.jsonl"
+    if not pred and not res and not (cal_p.is_file() and cal_p.read_text(encoding="utf-8").strip()):
         return []
     try:
         import jsonschema  # noqa: F401
@@ -180,7 +185,9 @@ def check_ledger_rows(root) -> list[str]:
             versions = ledger_intake.control_b_versions(root / "governance" / "control_b_prompts.jsonl")
         except (OSError, ValueError):
             versions = []                                       # tệp ghim hỏng: check_control_b_prompts báo; mọi dòng B sẽ đỏ
-        return ledger_intake.ledger_errors(pred, res, versions)
+        cal = ledger_intake.load_calendar(root)
+        return ledger_intake.ledger_errors(pred, res, versions, pub_rows=rows(root / "ledger" / "publication_evidence.jsonl") or [],
+                                           calendar=cal)
     except Exception as e:  # noqa: BLE001
         return [f"L-05: không chạy lại được luật nhận trên sổ ({str(e).splitlines()[0]})"]
 
@@ -199,6 +206,31 @@ def _config(root):
 
 
 ENGINE_GATE_CLOSED = "closed"
+
+
+def check_timing_legacy_pin(root) -> list[str]:
+    """L-05 chuyển tiếp: F-37–F-42 không được sửa và không được gắn info_lock_at sau khi đã ghi.
+    Sổ tạm không chứa các mã này thì không lỗi (không bắt mọi kho phải có đủ sáu dòng)."""
+    from tools import ledger_intake
+    path = pathlib.Path(root) / "ledger" / "predictions.jsonl"
+    if not path.is_file():
+        return []
+    errs = []
+    for raw in path.read_text(encoding="utf-8").splitlines():
+        if not raw.strip():
+            continue
+        try:
+            row = json.loads(raw)
+        except ValueError:
+            return []
+        rid = row.get("id")
+        if rid not in ledger_intake.LEGACY_TIMING_HASHES:
+            continue
+        if ledger_intake.line_hash(row) != ledger_intake.LEGACY_TIMING_HASHES[rid]:
+            errs.append(f"L-05: {rid} lệch hash đã ghim cho chuyển tiếp thời điểm — không sửa dự báo lịch sử F-37–F-42")
+        if "info_lock_at" in row:
+            errs.append(f"L-05: {rid} không được gắn info_lock_at sau khi đã ghi")
+    return errs
 
 
 def check_engine_gate(root) -> list[str]:
@@ -584,7 +616,125 @@ def check_exams(root, today=None) -> list[str]:
     return errs
 
 
+# ---------- Độ mới của reports/scorecard.json ----------
+# Ledger là nguồn có thẩm quyền; scorecard là bản dẫn xuất. Robot ghi sổ đẩy thẳng main giữa hai vòng học, nên scorecard đã
+# commit thường cũ hơn sổ: đó là STALE, không phải lỗi. STALE không chặn validate.py tiền kiểm (nếu chặn, vòng học không bao giờ
+# chạy được để sinh scorecard mới) và không được dùng để kết luận năng lực. Hậu kiểm của vòng học (validate.py
+# --require-fresh-scorecard) đòi FRESH. INVALID (điểm năng lực không có xuất xứ GitHub, khối freshness tự mâu thuẫn) luôn chặn.
+SCORECARD = "reports/scorecard.json"
+SCORECARD_SOURCES = ("ledger/predictions.jsonl", "ledger/resolutions.jsonl", "ledger/publication_evidence.jsonl",
+                     "governance/release_calendar.jsonl")
+_PRICE_STORE, _PRICE_STORE_DIR = "data/store/prices.csv.gz", "data/store/prices"
+
+
+def file_digest(path) -> dict:
+    """{"rows": số dòng khác rỗng, "sha256": hash byte của tệp}; tệp không có → {"rows": 0, "sha256": None}."""
+    path = pathlib.Path(path)
+    if not path.is_file():
+        return {"rows": 0, "sha256": None}
+    raw = path.read_bytes()
+    return {"rows": sum(1 for line in raw.decode("utf-8").splitlines() if line.strip()),
+            "sha256": hashlib.sha256(raw).hexdigest()}
+
+
+def scorecard_sources(root) -> dict:
+    """Số dòng và hash của mọi sổ mà scorecard dẫn xuất từ đó."""
+    root = pathlib.Path(root)
+    return {rel: file_digest(root / rel) for rel in SCORECARD_SOURCES}
+
+
+def _price_paths(root):
+    root = pathlib.Path(root)
+    store, store_dir = _PRICE_STORE, _PRICE_STORE_DIR
+    try:
+        import yaml
+        cfg = yaml.safe_load((root / "config.yaml").read_text(encoding="utf-8")) or {}
+        data = cfg.get("data") or {}
+        store, store_dir = data.get("store") or store, data.get("store_dir") or store_dir
+    except (OSError, ImportError, ValueError, AttributeError):
+        pass
+    out = [root / store]
+    d = root / store_dir
+    if d.is_dir():
+        out += sorted(d.glob("*.csv"))
+    return [p for p in out if p.is_file()]
+
+
+def price_data_as_of(root, as_of=None):
+    """Ngày quan sát giá hợp lệ mới nhất (YYYY-MM-DD) trên CẢ kho cũ đóng băng lẫn mọi tệp tháng (ADR-0006), không phải giờ
+    sinh báo cáo. Dòng không đọc được ngày bị bỏ qua. as_of: bỏ dòng có ngày sau as_of (báo cáo tại một ngày không nhìn trước).
+    Không có dòng giá nào → None."""
+    import gzip
+    cap = date.fromisoformat(str(as_of)[:10]) if as_of else None
+    best = None
+    for p in _price_paths(root):
+        opener = gzip.open if p.suffix == ".gz" else open
+        with opener(p, "rt", encoding="utf-8", newline="") as f:
+            for row in csv.DictReader(f):
+                try:
+                    d = date.fromisoformat(str(row.get("date") or "")[:10])
+                except ValueError:
+                    continue
+                if (cap is None or d <= cap) and (best is None or d > best):
+                    best = d
+    return best.isoformat() if best else None
+
+
+def scorecard_freshness(root):
+    """→ (trạng thái, lý do). ABSENT: chưa có scorecard. FRESH: khớp sổ và dữ liệu giá hiện tại. STALE: cũ hơn sổ hoặc dữ
+    liệu giá (hoặc bản cũ không có khối freshness) — không chặn tiền kiểm, KHÔNG dùng để kết luận năng lực. INVALID: tệp hỏng,
+    hoặc có điểm năng lực mà nguồn xác nhận không phải GitHub, hoặc khối freshness tự mâu thuẫn — luôn là lỗi."""
+    root = pathlib.Path(root)
+    report = root / SCORECARD
+    if not report.is_file():
+        return "ABSENT", []
+    try:
+        sc = json.loads(report.read_text(encoding="utf-8"))
+    except ValueError:
+        return "INVALID", [f"{SCORECARD} không phải JSON"]
+    if not isinstance(sc, dict):
+        return "INVALID", [f"{SCORECARD} không phải đối tượng JSON"]
+    invalid, stale = [], []
+    issue = sc.get("issue_forecasts") if isinstance(sc.get("issue_forecasts"), dict) else {}
+    scores = issue.get("scores") or {}
+    source = str(issue.get("timing_verification_source") or "")
+    if scores and not source.startswith("github"):
+        invalid.append(f"{SCORECARD} có issue_forecasts.scores (điểm năng lực) dù nguồn xác nhận xuất xứ là {source!r}, không "
+                       "phải GitHub — không phát hành điểm năng lực khi chưa đủ bằng chứng L-05 (ADR-0011 quyết định 10)")
+    fresh = sc.get("freshness")
+    if not isinstance(fresh, dict):
+        stale.append(f"{SCORECARD} không có khối freshness (bản sinh trước khi có kiểm độ mới) — không biết nó dẫn xuất từ sổ nào")
+    else:
+        if fresh.get("report_as_of") != sc.get("as_of"):
+            invalid.append(f"{SCORECARD}: freshness.report_as_of khác as_of")
+        if bool(fresh.get("capability_scores_emitted")) != bool(scores):
+            invalid.append(f"{SCORECARD}: freshness.capability_scores_emitted không khớp issue_forecasts.scores")
+        recorded = fresh.get("sources") if isinstance(fresh.get("sources"), dict) else {}
+        for rel, now in scorecard_sources(root).items():
+            was = recorded.get(rel) if isinstance(recorded.get(rel), dict) else {}
+            if was.get("rows") != now["rows"] or was.get("sha256") != now["sha256"]:
+                stale.append(f"{rel}: scorecard dẫn xuất từ {was.get('rows')} dòng / sha256 {str(was.get('sha256'))[:12]}, "
+                             f"sổ hiện có {now['rows']} dòng / sha256 {str(now['sha256'])[:12]}")
+        try:
+            data_now = price_data_as_of(root, sc.get("as_of"))
+        except (OSError, ValueError, EOFError) as e:
+            data_now = None
+            stale.append(f"không đọc được kho giá để so ngày dữ liệu ({str(e).splitlines()[0]})")
+        if data_now and fresh.get("data_as_of") != data_now:
+            stale.append(f"data_as_of {fresh.get('data_as_of')!r} khác ngày giá mới nhất trong kho ({data_now})")
+    if invalid:
+        return "INVALID", invalid + stale
+    return ("STALE", stale) if stale else ("FRESH", [])
+
+
+def check_scorecard_integrity(root) -> list[str]:
+    """Phần CHẶN của kiểm scorecard (run_all/validate.py): chỉ INVALID. STALE do validate.py báo cảnh báo, hoặc lỗi khi
+    --require-fresh-scorecard (hậu kiểm vòng học)."""
+    status, reasons = scorecard_freshness(root)
+    return [f"scorecard INVALID: {r}" for r in reasons] if status == "INVALID" else []
+
+
 def run_all(root) -> list[str]:
     return (check_one_architecture(root) + check_no_recommendation(root) + check_ledger_chain(root) + check_ledger_rows(root)
-            + check_engine_gate(root) + check_control_b_prompts(root) + check_v302_boundary(root) + check_trial_registry(root) + check_personal_data(root)
-            + check_exams(root))
+            + check_timing_legacy_pin(root) + check_engine_gate(root) + check_control_b_prompts(root) + check_v302_boundary(root) + check_trial_registry(root) + check_personal_data(root)
+            + check_exams(root) + check_scorecard_integrity(root))

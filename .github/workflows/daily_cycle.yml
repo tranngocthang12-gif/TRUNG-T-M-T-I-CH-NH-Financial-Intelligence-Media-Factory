@@ -15,6 +15,7 @@ on:
 
 permissions:
   contents: write
+  issues: read          # scorecard doi chieu Issue lich/bang chung va dau nhan cua bot (ADR-0011, fail closed khi loi)
 
 concurrency:
   group: daily-cycle
@@ -37,17 +38,23 @@ jobs:
       - name: Kiem tra chong nhin truoc tuong lai
         run: python -m tests.test_no_lookahead
       - name: Kiem tra cau truc bo nao
+        # scorecard STALE (so da co dong moi tu robot) chi la CANH BAO o day: chan o buoc nay thi vong hoc khong bao gio
+        # chay duoc de sinh scorecard moi. scorecard INVALID (diem nang luc khong co xuat xu GitHub) van chan.
         run: python tools/validate.py
       - name: Chay vong hoc (dang ky tung lan thu len main truoc khi chay)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           TTC_REGISTRY_PUSH: "1"
+          TTC_PROVENANCE_ONLINE: "1"
+          GITHUB_TOKEN: ${{ github.token }}
           TRIALS: ${{ github.event.inputs.trials || '6' }}
         run: |
           case "$TRIALS" in ''|*[!0-9]*) echo "trials phai la so nguyen khong am: '$TRIALS'"; exit 1;; esac
           python -m engine.run_cycle --source live --trials "$TRIALS"
       - name: Kiem lai sau khi chay (ket qua trai luat thi khong ghi vao main)
-        run: python tools/validate.py
+        # Hau kiem nghiem: reports/scorecard.json vua sinh phai khop so dong + sha256 cua Ledger, Resolution, bang chung cong bo,
+        # lich, va ngay gia moi nhat (kho cu + tep thang, ADR-0006). Lech la loi: khong ghi scorecard sai len main.
+        run: python tools/validate.py --require-fresh-scorecard
       - name: Ghi ket qua vao bo nao
         run: |
           git config user.name "ttc-engine"

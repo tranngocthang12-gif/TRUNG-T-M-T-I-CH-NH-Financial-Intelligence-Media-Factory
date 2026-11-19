@@ -1,10 +1,10 @@
 # ADR-0009: Bản giá dẫn xuất có phiên bản, không sửa bảng giá gốc
 
 - Ngày: 2026-11-18
-- Trạng thái: PROPOSED (chỉ ACCEPTED khi Owner gộp PR được L-09 chấm)
+- Trạng thái: ACCEPTED 18/11/2026 (giờ Việt Nam). Header cũ nói PROPOSED cho tới khi Owner gộp một PR đã được L-09 chấm. Điều đó đã xảy ra ở PR #32, không phải "chỉ gộp disclosure": PR đưa chính tệp này lên main (merge `432f45681ad8b661e98af4d7046abb9f100c0a1f`, 2026-11-17 18:32:23 UTC = 2026-11-18 01:32:23 giờ Việt Nam) cùng `docs/RESEARCH_POINT_IN_TIME_LIMITATIONS.md`. Chứng cứ L-09 trên kho: thân PR `authored_by: ChatGPT (OpenAI)`, `reviewed_by: Grok (xAI)`; bình luận chủ kho dòng đầu `GỘP ĐƯỢC — commit c4d8a0348e8edfc8526a7440c5b73eb9d0446b36` (comment 6957163809), SHA đó là HEAD đã gộp; job L-09 conclusion success (run 44148860085 và run 44148862798). ADR-0010 chỉ ghi nhận điều kiện của header này. Mục 1–7 không đổi. Điều 7 vẫn chưa cho đổi engine.
 - Người đề xuất: ChatGPT (OpenAI), dựa trên khoảng trống đã xác nhận sau ADR-0006
-- Người chấm: ghế độc lập khác nhà cung cấp (L-09; chờ)
-- Owner duyệt: chờ PR tương ứng, không tự merge
+- Người chấm: Grok (xAI), bản chấm PR #32 cho commit `c4d8a0348e8edfc8526a7440c5b73eb9d0446b36`
+- Owner duyệt: gộp PR #32 ngày 18/11/2026 (giờ Việt Nam; 17/11 18:32:23 UTC)
 
 ## Phạm vi và bất biến
 

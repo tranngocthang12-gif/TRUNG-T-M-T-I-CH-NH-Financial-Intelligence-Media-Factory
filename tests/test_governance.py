@@ -9,6 +9,7 @@ import yaml
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import laws_checks, ledger_audit, review_gate  # noqa: E402
+from tests._calendar_fixture import with_calendar, verified_ids  # noqa: E402,F401
 from tools.ledger_intake import control_b_hash, dumps, parse_cutoff, parse_issue_form, parse_number, promised_domains, vn_day  # noqa: E402
 
 B_HASH = control_b_hash(ROOT / "governance" / "CONTROL_B_PROMPT.md")
@@ -28,6 +29,11 @@ def _forecast(seat="A", question="CPI tháng 11/2026 so với cùng kỳ từ 5,
     if seat == "B":
         f["prompt_hash"] = B_HASH
     f.update(kw)
+    if "info_lock_at" not in f:
+        ra = str(f.get("resolve_at") or "")
+        # resolve_at sai dạng không được kéo info_lock_at sai theo — nếu không, contract mới từ chối thiếu lịch
+        # trước khi tới đúng luật ngày đang được kiểm.
+        f["info_lock_at"] = ra if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", ra) else "2026-12-10"
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items() if v is not None)
 
 
@@ -45,6 +51,7 @@ class IntakeRuleTests(unittest.TestCase):
         shutil.rmtree(self.tmp, ignore_errors=True)
 
     def _fc(self, number, body, created="2026-11-17T02:00:00Z", **env):
+        body = with_calendar(self.tmp, body)
         e = {**os.environ, "ISSUE_NUMBER": str(number), "ISSUE_CREATED_AT": created, "ISSUE_BODY": body,
              "TTC_INTAKE_NOW": _just_after(created), **env}
         r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=e, capture_output=True, text=True)
@@ -154,7 +161,7 @@ class IntakeRuleTests(unittest.TestCase):
         for i, ra in enumerate(("20261210", "2026-W50-4", "2026-12-10T00:00:00", "٢٠٢٦-١٢-١٠"), 1):
             c, o = self._fc(i, _forecast(resolve_at=ra))
             self.assertEqual(c, 2, o); self.assertIn("YYYY-MM-DD", o)
-        c, o = self._fc(10, _forecast(resolution_source="Thông cáo báo chí của Cục Thống kê"))
+        c, o = self._fc(10, _forecast(resolution_source="Thông cáo báo chí của Cục Thống kê", calendar_id="CAL-KHONG-MIEN"))
         self.assertEqual(c, 2, o); self.assertIn("tên miền", o)                  # lời hứa về nguồn phải máy kiểm được
         c, o = self._fc(11, _forecast(resolution_source="Cục Thống kê (nso.gov.vn) — thông cáo CPI"))
         self.assertEqual(c, 0, o)
@@ -520,7 +527,8 @@ class LedgerReplayTests(unittest.TestCase):
         shutil.copytree(ROOT / "tools", self.tmp / "tools", ignore=shutil.ignore_patterns("__pycache__"))
         self.led = self.tmp / "ledger" / "predictions.jsonl"
         for n, seat in ((1, "A"), (2, "B")):
-            e = {**os.environ, "ISSUE_NUMBER": str(n), "ISSUE_CREATED_AT": "2026-11-17T02:00:00Z", "ISSUE_BODY": _forecast(seat),
+            e = {**os.environ, "ISSUE_NUMBER": str(n), "ISSUE_CREATED_AT": "2026-11-17T02:00:00Z",
+                 "ISSUE_BODY": with_calendar(self.tmp, _forecast(seat)),
                  "TTC_INTAKE_NOW": _just_after("2026-11-17T02:00:00Z")}
             r = subprocess.run([sys.executable, str(self.tmp / "tools" / "ledger_intake.py")], env=e, capture_output=True, text=True)
             self.assertEqual(r.returncode, 0, r.stdout)

@@ -1,0 +1,48 @@
+name: Calendar
+description: Ghim một ngày công bố chính thức vào governance/release_calendar.jsonl (ADR-0011). Mở TRƯỚC mọi Issue dự báo trích lịch này.
+title: "[Calendar] "
+labels: ["calendar"]
+body:
+  - type: input
+    id: notice
+    attributes:
+      label: notice
+      description: Ghi đúng CALENDAR.
+      value: CALENDAR
+    validations: {required: true}
+  - type: input
+    id: calendar_id
+    attributes:
+      label: calendar_id
+      description: "Mã mới, dạng CAL-<chữ/số . _ ->, ví dụ CAL-NSO-CPI-2026-12. Đã ghim thì không sửa, không ghi đè: ngày khác thì dùng mã khác."
+    validations: {required: true}
+  - type: input
+    id: domains
+    attributes:
+      label: domains
+      description: Tên miền nguồn chính thức, cách nhau bằng dấu phẩy, ví dụ nso.gov.vn. Phải trùng tên miền trong resolution_source của dự báo.
+    validations: {required: true}
+  - type: input
+    id: info_lock_at
+    attributes:
+      label: info_lock_at
+      description: Ngày đầu tiên số liệu có thể được công bố theo lịch chính thức, YYYY-MM-DD, phải sau hôm nay (giờ Việt Nam).
+    validations: {required: true}
+  - type: input
+    id: evidence_url
+    attributes:
+      label: evidence_url
+      description: Đường dẫn https:// tới trang lịch công bố, thuộc một tên miền ở trên.
+    validations: {required: true}
+  - type: textarea
+    id: quote
+    attributes:
+      label: quote
+      description: Trích nguyên văn câu lịch nêu ngày công bố (≥ 15 ký tự).
+    validations: {required: true}
+  - type: input
+    id: recorder
+    attributes:
+      label: recorder
+      description: Ghế đọc lịch. Bắt đầu bằng Owner hoặc tên nhà cung cấp; phải khác nhà cung cấp của ghế viết dự báo sẽ trích lịch này.
+    validations: {required: true}

@@ -5,6 +5,8 @@ name: Resolution intake (Resolution issue)
 # Thu tu (ADR-0003 quyet dinh 10): mot Issue phan dinh chi ghi ket qua cho du bao mo TRUOC no; neu so dang co du bao cua cau
 # hoi mo cung luc hoac sau Issue nay thi khong ghi gi (mo Issue Resolution moi). Truoc khi ghi, tools/resolution_intake.py
 # tu chay lai toan bo luat kiem tren trang thai sau khi ghi va khong ghi khi da sat han dau nhan.
+# Cung workflow nhan Issue "[Publication]" (ledger/publication_evidence.jsonl) va "[Calendar]" (governance/release_calendar.jsonl,
+# ADR-0011): moc thoi gian cua lich la so Issue + gio tao Issue do GitHub cap va gio bot dang dau nhan, khong co truong tu khai.
 # Than Issue va moi gia tri do nguoi dung nhap chi di qua bien moi truong, khong chen vao lenh.
 on:
   issues:
@@ -21,7 +23,7 @@ concurrency:
 jobs:
   intake:
     if: >-
-      (contains(github.event.issue.labels.*.name, 'resolution') || startsWith(github.event.issue.title, '[Resolution]')) &&
+      (contains(github.event.issue.labels.*.name, 'resolution') || startsWith(github.event.issue.title, '[Resolution]') || contains(github.event.issue.labels.*.name, 'publication') || startsWith(github.event.issue.title, '[Publication]') || contains(github.event.issue.labels.*.name, 'calendar') || startsWith(github.event.issue.title, '[Calendar]')) &&
       github.event.issue.user.login == github.repository_owner
     runs-on: ubuntu-latest
     timeout-minutes: 15
@@ -55,8 +57,17 @@ jobs:
             out=$(python tools/resolution_intake.py)
             code=$?
             if [ "$code" != "0" ]; then break; fi
-            git add ledger/resolutions.jsonl
-            git commit -q -m "ledger: resolution #${ISSUE_NUMBER}"
+            if [ -f ledger/resolutions.jsonl ]; then git add ledger/resolutions.jsonl; fi
+            if [ -f ledger/publication_evidence.jsonl ]; then git add ledger/publication_evidence.jsonl; fi
+            if [ -f governance/release_calendar.jsonl ]; then git add governance/release_calendar.jsonl; fi
+            msg="ledger: resolution #${ISSUE_NUMBER}"
+            tmpf="${TMPDIR:-/tmp}/ttc-intake-$$-$i.json"
+            printf '%s' "$out" > "$tmpf"
+            kind=$(python -c 'import json,sys; print((json.load(open(sys.argv[1])) or {}).get("kind") or "")' "$tmpf")
+            rm -f "$tmpf"
+            if [ "$kind" = "publication" ]; then msg="ledger: publication #${ISSUE_NUMBER}"; fi
+            if [ "$kind" = "calendar" ]; then msg="ledger: calendar #${ISSUE_NUMBER}"; fi
+            git commit -q -m "$msg"
             if git push -q origin HEAD:main; then break; fi
             out="$fail"
             code=1
