@@ -49,9 +49,23 @@ Khoảng trống mới: engine đang áp tự động ba chia tách Yahoo gần 
 
 Trên mã `ec47dc8`, 31 test mới thất bại. Đột biến: gỡ từng lớp sửa (11 đột biến: bỏ kiểm loại, đảo ưu tiên loại, bỏ danh sách cho phép, bỏ kiểm tỷ lệ dương, thu hẹp nhiễm, bỏ `source_id` bắt buộc, bỏ khóa sha256, cho ghi trong kho, bỏ kiểm tồn tại, `exist_ok=True`, mở `w`) — cả 11 bị test bắt.
 
-## 6. Chưa đạt
+## 6. Khắc phục phản biện L-09 vòng 2 (ChatGPT, trên `5b0f588`)
+
+Bản chấm vòng 2 xác nhận cả 4 sửa chữa vòng 1 đã đạt (cả 11 đột biến của vòng 1 vẫn bị test bắt sau vòng 2) và nêu hai vấn đề mới.
+
+| Phát hiện | Sửa | Test đối kháng (`tests/test_verified_adjust.py`, nhóm `test_ma*`, `test_mb*`) |
+|---|---|---|
+| MEDIUM-A: `DA_NAM_TRONG_GIA_NGUON` được xác minh dù chuỗi giá gốc còn bước gãy. Engine đặt trạng thái này chỉ theo nguồn yahoo và `observed_at` | Cổng tự đo lại bước giá gốc tại phiên sự kiện từ chuỗi `close`, không tin cột `raw_return` của bảng sự kiện. Biên độ lấy theo `adjust.limits`/`bands`, chỉ đọc. Chỉ nhận khi bước giá gốc nằm trong biên VÀ bước giá sau khi nhân tỷ lệ nằm ngoài biên (bác được giả thuyết "chưa điều chỉnh"). Còn gãy, hoặc không phân biệt được hai giả thuyết, thì `CACH_LY_GIA_CHUA_LIEN_TUC`, nhiễm ô giá, không vào chuỗi | Gãy −50%, tỷ lệ 2,0, yahoo `observed_at` sau ex_date (ca phản biện nêu). Gãy −50% nhưng tỷ lệ 3,0 (nhánh "còn gãy" test độc lập). Tỷ lệ nhỏ 1,02 (mơ hồ). Cột `raw_return` bị sửa thành 0. Đối chứng dương: giá liên tục, tỷ lệ 2,0 → vẫn `DA_KIEM_CHUNG` |
+| MEDIUM-B: `derivation_id` thiếu metadata chứng cứ | Manifest lưu toàn bộ metadata từng văn bản, chuẩn hóa JSON, để kiểm toán. Khóa `derivation_id` băm toàn bộ metadata đó, không chọn lọc trường. `events_verification_digest` thêm `ratio`, `source`, `source_status`, `verify_reason`, `evidence_id`, `official_ex_date`, `official_trade_date`, `session_offset`, `taints` | Ngày chính thức Thứ Bảy và Chủ Nhật cùng rơi vào phiên Thứ Hai: cùng `DA_KIEM_CHUNG`, cùng `trade_date`, nhưng `derivation_id` khác (chạy qua công cụ, đầu-cuối). Đổi từng trường văn bản: loại, ngày chính thức, tỷ lệ, path, mã, khóa chứng từ, trường lạ. Đổi từng cột kết quả kiểm |
+
+Trên `5b0f588`, 19 test mới thất bại. Đột biến: 7 đột biến cho vòng 2 (bỏ kiểm liên tục, bỏ nhánh còn gãy, bỏ nhánh mơ hồ, tin cột `raw_return`, quay lại danh sách trường văn bản cũ, quay lại cột digest cũ, bỏ ngày chính thức khỏi digest). Cả 7 bị bắt, cùng 11 đột biến của vòng 1.
+
+Số đo thật với bản gốc của PR #54 không đổi so với `5b0f588`: 0 sự kiện vào chuỗi kiểm chứng; 34,5% ô cách ly trong 252 phiên; trạng thái từng sự kiện giống hệt. Ba sự kiện có văn bản đã bị cách ly vì sai loại trước khi tới bước kiểm liên tục.
+
+## 7. Chưa đạt
 
 - Ngày chính thức của VCB và TCB lệch ngày gãy của chuỗi giá gốc; nguyên nhân sự lệch ở nguồn dữ liệu chưa xác định và không được suy từ giá.
 - Yahoo ghi mọi sự kiện cổ phiếu là `stock_split`; văn bản HOSE của VCB, TCB, FPT là `stock_dividend`. Cổng không suy loại. Chưa có quyết định về cách ghi loại đúng cho dòng Yahoo (cần Owner, ADR-0009 điều 7).
 - Cần bản gốc HOSE/VSD cho TPB, HDB, TCB 2026 và mọi sự kiện cổ phiếu còn lại, rồi một PR riêng, có Owner theo ADR-0009 điều 7, để quyết định cách biểu diễn "ngày chính thức" khác "ngày chuỗi gãy" trong dữ liệu dẫn xuất.
+- Ngoài phạm vi vòng 2, chưa sửa: với `APPLIED`, engine chỉ xét bước giá SAU khi nhân tỷ lệ. Với tỷ lệ nhỏ, một sự kiện ở phiên không có bước gãy vẫn có thể thành `APPLIED`, và khi đủ bằng chứng thì vào chuỗi kiểm chứng và bị áp hệ số. Đây cùng lớp "không phân biệt hai giả thuyết" với MEDIUM-A. Đề nghị người phản biện và Owner quyết định có áp cùng quy tắc cho `APPLIED` hay không.
 - Chưa có bản dẫn xuất nào được công bố; chưa đổi `data.sources`; `deployment_level` giữ 0.

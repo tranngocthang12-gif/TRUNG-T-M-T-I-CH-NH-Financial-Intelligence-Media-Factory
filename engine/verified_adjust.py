@@ -17,6 +17,11 @@ Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ v�
      sha256 của tệp, nên đổi hay bỏ `source_id` không lách được kiểm tra này;
   6. trạng thái engine nằm trong danh sách cho phép VERIFIABLE = APPLIED hoặc DA_NAM_TRONG_GIA_NGUON (giá gốc đã chứa
      điều chỉnh). Mọi trạng thái khác, kể cả trạng thái engine chưa biết, đều bị cách ly.
+     Riêng DA_NAM_TRONG_GIA_NGUON: engine đặt trạng thái này CHỈ theo nguồn (yahoo) và `observed_at`, không xét bước giá, và
+     chuỗi kiểm chứng sẽ không áp hệ số. Cổng tự đo lại bước giá gốc tại phiên sự kiện từ `close` (không tin cột
+     `raw_return` của bảng sự kiện) và chỉ nhận khi giá chứng minh được nguồn đã điều chỉnh: bước giá gốc nằm trong biên độ
+     VÀ bước giá sau khi nhân tỷ lệ nằm ngoài biên độ (giả thuyết "giá chưa điều chỉnh" bị bác). Còn gãy, hoặc không phân
+     biệt được hai giả thuyết (tỷ lệ nhỏ), thì CÁCH LY GIA_CHUA_LIEN_TUC và nhiễm ô.
 Không đạt thì CÁCH LY: không đưa vào hệ số của chuỗi kiểm chứng, và mọi ô giá của mã đó TRƯỚC ngày giao dịch của sự kiện bị
 đánh dấu TAINTED (không bảo đảm so sánh được qua sự kiện). Cổng KHÔNG đổi ngày hộ và KHÔNG suy ngày đúng từ bước nhảy giá.
 Sự kiện tiền mặt chưa có bằng chứng ghim nên chưa được xét; chuỗi kiểm chứng là chuỗi giá gốc cộng các sự kiện cổ phiếu
@@ -48,7 +53,7 @@ Q = "CACH_LY_"
 STATES = (OK, NA_NODATA, NA_CASH, Q + "THIEU_BANG_CHUNG", Q + "BANG_CHUNG_HONG", Q + "THIEU_NGAY_CONG_BO",
           Q + "CONG_BO_SAU_NGAY_CAT", Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", Q + "TY_LE_LECH", Q + "LECH_NGAY",
           Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE", Q + "LOAI_SU_KIEN_LECH",
-          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE")
+          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC")
 
 NEW_COLS = ["verify_state", "verify_reason", "evidence_id", "official_ex_date", "official_trade_date",
             "session_offset", "in_verified_chain", "taints"]
@@ -123,6 +128,31 @@ def _match(ticker, ex_date, typ, docs):
     return best[1] if best else None
 
 
+def _continuity_problem(r, close, td):
+    """Lý do giá gốc KHÔNG chứng minh được nguồn đã chứa điều chỉnh tại phiên td, hoặc None. Đo trực tiếp từ `close`."""
+    s = close[r["ticker"]].dropna()
+    before = s[s.index < td]
+    if before.empty or td not in s.index:
+        return "không có phiên giá liền trước để đo bước giá"
+    p0, p1 = float(before.iloc[-1]), float(s.loc[td])
+    if not (np.isfinite(p0) and np.isfinite(p1) and p0 > 0 and p1 > 0):
+        return "giá gốc quanh phiên sự kiện không hợp lệ"
+    _, K = adjust.obs_returns(close[[r["ticker"]]])
+    k = K.at[td, r["ticker"]]
+    L = adjust.limits(close.index, [r["ticker"]]).at[td, r["ticker"]]
+    up, dn = adjust.bands(L, k if pd.notna(k) else 1.0)
+    raw = p1 / p0 - 1
+    adj = (1 + raw) * float(r["ratio"]) - 1
+    raw_in, adj_in = -dn <= raw <= up, -dn <= adj <= up
+    if not raw_in:
+        return (f"engine báo giá nguồn đã chứa điều chỉnh nhưng giá gốc còn bước gãy {raw:+.2%} tại {td.date()} "
+                f"(biên −{dn:.2%}/+{up:.2%})")
+    if adj_in:
+        return (f"bước giá gốc {raw:+.2%} và bước giá nếu nhân tỷ lệ {adj:+.2%} đều trong biên tại {td.date()}: "
+                "giá không phân biệt được nguồn đã hay chưa điều chỉnh")
+    return None
+
+
 def _judge(r, d, close, base, as_of):
     """(state, reason, official_trade_date, offset) cho một sự kiện cổ phiếu đã khớp bản gốc d."""
     bad = _doc_problem(d, base)
@@ -160,6 +190,10 @@ def _judge(r, d, close, base, as_of):
     if r["status"] not in VERIFIABLE:
         return (Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", f"trạng thái engine {r['status']} không nằm trong danh sách cho phép "
                 f"{', '.join(VERIFIABLE)}", otd, 0.0)
+    if r["status"] == "DA_NAM_TRONG_GIA_NGUON":
+        why = _continuity_problem(r, close, td)
+        if why:
+            return Q + "GIA_CHUA_LIEN_TUC", why, otd, 0.0
     return OK, "bản gốc ghim hợp lệ, ngày công bố hợp lệ, tỷ lệ và ngày áp dụng khớp", otd, 0.0
 
 
@@ -248,6 +282,27 @@ def _files_hash(root, rels):
     return h.hexdigest()
 
 
+DIGEST_COLS = ["ticker", "ex_date", "type", "ratio", "source", "source_status", "status", "trade_date", "verify_state",
+               "verify_reason", "evidence_id", "official_ex_date", "official_trade_date", "session_offset",
+               "in_verified_chain", "taints"]
+
+
+def _canon(x):
+    """Dạng JSON chuẩn, xác định của metadata văn bản (số numpy → số Python; giá trị lạ → chuỗi có kiểu)."""
+    if isinstance(x, dict):
+        return {str(k): _canon(v) for k, v in sorted(x.items(), key=lambda kv: str(kv[0]))}
+    if isinstance(x, (list, tuple)):
+        return [_canon(v) for v in x]
+    if isinstance(x, (bool, str)) or x is None:
+        return x
+    if isinstance(x, (int, np.integer)):
+        return int(x)
+    if isinstance(x, (float, np.floating)):
+        v = float(x)
+        return v if np.isfinite(v) else f"float:{v}"
+    return f"{type(x).__name__}:{x}"
+
+
 def derivation_manifest(*, root, cfg, as_of, docs, ev, code_commit, created_at=None) -> dict:
     """Manifest dẫn xuất theo ADR-0009 điều 2. `derivation_id` chỉ phụ thuộc đầu vào, không phụ thuộc `created_at`."""
     root = pathlib.Path(root)
@@ -257,9 +312,14 @@ def derivation_manifest(*, root, cfg, as_of, docs, ev, code_commit, created_at=N
     ce = [cfg["corporate_actions"]["manual"], cfg["corporate_actions"]["yahoo_cache"]]
     ce = [p for p in ce if (root / p).is_file()]
     cfg_p = root / "config.yaml"
-    srcs = [{k: d_.get(k) for k in ("source_id", "url", "issuer", "published_at", "sha256", "bytes")} for d_ in docs]
-    srcs.sort(key=lambda x: str(x["source_id"]))
-    core = ev[["ticker", "ex_date", "type", "status", "verify_state", "trade_date", "in_verified_chain"]]
+    # Toàn bộ metadata của từng văn bản (loại, ngày chính thức, tỷ lệ, path, mã, khóa chứng từ và mọi trường khác) được
+    # ghi vào manifest để kiểm toán VÀ vào khóa derivation_id. Không chọn lọc trường: trường nào đổi thì định danh đổi.
+    srcs = [_canon({k: v for k, v in d_.items() if not str(k).startswith("_")}) for d_ in docs]
+    srcs.sort(key=lambda x: json.dumps(x, sort_keys=True, ensure_ascii=False))
+    core = ev[[c for c in DIGEST_COLS if c in ev.columns]].copy()
+    for c in ("ex_date", "trade_date", "official_ex_date", "official_trade_date"):
+        if c in core.columns:
+            core[c] = pd.to_datetime(core[c], errors="coerce").dt.strftime("%Y-%m-%d")
     digest = hashlib.sha256(core.to_csv(index=False).encode()).hexdigest()
     m = {"derivation_id": "", "created_at": created_at, "as_of": str(pd.Timestamp(as_of).date()),
          "raw_snapshot_hash": _files_hash(root, raw_rels), "raw_snapshot_files": raw_rels, "code_commit": code_commit,

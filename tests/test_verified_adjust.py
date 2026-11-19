@@ -218,19 +218,19 @@ def test_coverage_counts_states(tmp_path):
 
 # ---------- 5. công cụ dựng bản dẫn xuất ----------------------------------------------------------------------------------------
 
-def _home(tmp_path, with_doc=True, tamper=False):
+def _home(tmp_path, with_doc=True, tamper=False, break_idx=BRK, doc_over=None):
     """Dựng kho tổng hợp trong tmp (TTC_HOME): giá gốc, sự kiện nhập tay, bản gốc ghim."""
     home = tmp_path / "home"
     (home / "data/store").mkdir(parents=True)
     (home / "data/derived").mkdir(parents=True)
-    close = _close()
+    close = _close(break_idx=break_idx)
     rows = [{"date": d.strftime("%Y-%m-%d"), "ticker": "AAA", "open": p, "high": p, "low": p, "close": p, "volume": 1000.0,
              "observed_at": "2026-01-01 00:00:00.000000", "source": "yahoo"} for d, p in close["AAA"].items()]
     pd.DataFrame(rows).to_csv(home / "data/store/prices.csv.gz", index=False)
-    _ev("AAA", IDX[BRK]).to_csv(home / "data/corporate_actions.csv", index=False)
+    _ev("AAA", IDX[break_idx]).to_csv(home / "data/corporate_actions.csv", index=False)
     _none().to_csv(home / "data/derived/yahoo_actions.csv", index=False)
     if with_doc:
-        d = _doc(home)
+        d = _doc(home, ex=IDX[break_idx], **(doc_over or {}))
         if tamper:
             (home / d["path"]).write_bytes(b"x")
         mp = home / "data/evidence/corporate_actions/EVIDENCE_MANIFEST.json"
@@ -497,3 +497,128 @@ def test_m4_create_helper_refuses_existing_file(tmp_path):
     with pytest.raises(FileExistsError):
         _bvd()._create(f)
     assert f.read_text(encoding="utf-8") == "ban cu"
+
+
+# ---------- 7. hồi quy phản biện L-09 vòng 2 (ChatGPT, PR #55, SHA 5b0f588): MEDIUM-A và MEDIUM-B -------------------------
+
+# MEDIUM-A: DA_NAM_TRONG_GIA_NGUON do engine đặt CHỈ theo nguồn yahoo + observed_at, không xét bước giá. Cổng phải tự chứng minh
+# chuỗi giá gốc liên tục tại phiên sự kiện; không chứng minh được thì cách ly và nhiễm ô (đóng khi nghi ngờ).
+def _yahoo_seen_after(close, ratio=RATIO, typ="stock_dividend"):
+    yahoo = _ev("AAA", IDX[BRK], typ=typ, ratio=ratio, source="yahoo", status="TU_DONG")
+    return adjust.build_events(close, _obs(close, "2030-01-01"), _none(), yahoo)
+
+
+def test_ma_already_in_price_status_with_raw_break_is_quarantined_and_tainted(tmp_path):
+    """Ca phản biện nêu: giá gốc giảm 50% tại sự kiện tỷ lệ 2,0; nguồn yahoo, observed_at sau ex_date; văn bản đúng loại, ngày,
+    tỷ lệ, SHA. Engine đặt DA_NAM_TRONG_GIA_NGUON dù chuỗi còn bước gãy −50%."""
+    close = _close()                                                  # bước gãy −50% tại BRK
+    events = _yahoo_seen_after(close)
+    assert events.status.tolist() == ["DA_NAM_TRONG_GIA_NGUON"]
+    assert events.raw_return.iloc[0] == pytest.approx(-0.5, abs=0.01)
+    ev = va.verify_events(events, close, [_doc(tmp_path)], evidence_root=tmp_path, as_of=AS_OF)
+    r = ev.iloc[0]
+    assert r.verify_state == va.Q + "GIA_CHUA_LIEN_TUC", r.verify_reason
+    assert not r.in_verified_chain and r.taints
+    m = va.taint_mask(close.index, close.columns, ev)
+    assert m.iloc[:BRK].values.all() and not m.iloc[BRK:].values.any()
+    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()
+
+
+def test_ma_already_in_price_with_raw_break_not_explained_by_ratio_is_quarantined(tmp_path):
+    """Nhánh 'còn gãy' độc lập với nhánh 'mơ hồ': giá gốc gãy −50% nhưng văn bản và sự kiện ghi tỷ lệ 3,0, nên nhân tỷ lệ
+    cũng ra +50% (ngoài biên). Không giả thuyết nào giải thích được bước giá → vẫn phải cách ly."""
+    close = _close()
+    events = _yahoo_seen_after(close, ratio=3.0)
+    assert events.status.tolist() == ["DA_NAM_TRONG_GIA_NGUON"]
+    ev = va.verify_events(events, close, [_doc(tmp_path, ratio=3.0)], evidence_root=tmp_path, as_of=AS_OF)
+    r = ev.iloc[0]
+    assert r.verify_state == va.Q + "GIA_CHUA_LIEN_TUC" and "bước gãy" in r.verify_reason, r.verify_reason
+    assert r.taints and not r.in_verified_chain
+
+
+def test_ma_already_in_price_ambiguous_small_ratio_is_quarantined(tmp_path):
+    """Tỷ lệ nhỏ (1,02): cả giả thuyết 'giá đã điều chỉnh' lẫn 'giá chưa điều chỉnh' đều nằm trong biên độ, nên giá không
+    chứng minh được nguồn đã điều chỉnh. Đóng khi nghi ngờ: cách ly."""
+    close = _close(ratio=1.0)
+    events = _yahoo_seen_after(close, ratio=1.02)
+    assert events.status.tolist() == ["DA_NAM_TRONG_GIA_NGUON"]
+    ev = va.verify_events(events, close, [_doc(tmp_path, ratio=1.02)], evidence_root=tmp_path, as_of=AS_OF)
+    assert ev.verify_state.tolist() == [va.Q + "GIA_CHUA_LIEN_TUC"] and ev.taints.all() and not ev.in_verified_chain.any()
+
+
+def test_ma_already_in_price_with_continuous_raw_still_verifies(tmp_path):
+    """Không quá tay: giá liên tục và tỷ lệ 2,0 phân biệt rõ hai giả thuyết → vẫn DA_KIEM_CHUNG, không áp thêm hệ số."""
+    close = _close(ratio=1.0)
+    ev = va.verify_events(_yahoo_seen_after(close), close, [_doc(tmp_path)], evidence_root=tmp_path, as_of=AS_OF)
+    assert ev.verify_state.tolist() == [va.OK] and ev.in_verified_chain.all() and not ev.taints.any()
+    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()
+
+
+def test_ma_continuity_check_uses_close_not_the_events_raw_return_column(tmp_path):
+    """Bảng sự kiện bị sửa cột raw_return thành 0 vẫn không qua cổng: cổng đo lại bước giá từ chuỗi giá gốc."""
+    close = _close()
+    events = _yahoo_seen_after(close).assign(raw_return=0.0)
+    ev = va.verify_events(events, close, [_doc(tmp_path)], evidence_root=tmp_path, as_of=AS_OF)
+    assert ev.verify_state.tolist() == [va.Q + "GIA_CHUA_LIEN_TUC"]
+
+
+# MEDIUM-B: derivation_id phải đổi khi BẤT KỲ metadata chứng cứ nào đổi, kể cả khi trạng thái và ngày giao dịch không đổi.
+MONDAY = next(i for i in range(BRK, len(IDX)) if IDX[i].weekday() == 0)
+
+
+def _derive(home, out):
+    r = _tool(home, out)
+    assert r.returncode == 0, r.stderr
+    return json.loads((out / "manifest.json").read_text(encoding="utf-8"))
+
+
+def test_mb_weekend_official_date_change_changes_derivation_id(tmp_path):
+    """Ca phản biện nêu: ngày chính thức Thứ Bảy hay Chủ Nhật đều rơi vào phiên Thứ Hai; DA_KIEM_CHUNG, trade_date giống nhau
+    nhưng metadata nguồn khác → hai bản dẫn xuất phải có derivation_id khác, và manifest lưu ngày chính thức để kiểm toán."""
+    sat, sun = IDX[MONDAY] - pd.Timedelta(days=2), IDX[MONDAY] - pd.Timedelta(days=1)
+    pub = str((sat - pd.Timedelta(days=6)).date())
+    hs = _home(tmp_path / "sat", break_idx=MONDAY, doc_over={"official_ex_date": str(sat.date()), "published_at": pub})
+    hu = _home(tmp_path / "sun", break_idx=MONDAY, doc_over={"official_ex_date": str(sun.date()), "published_at": pub})
+    ms, mu = _derive(hs, tmp_path / "os"), _derive(hu, tmp_path / "ou")
+    assert ms["coverage"]["in_verified_chain"] == 1 and mu["coverage"]["in_verified_chain"] == 1
+    es = pd.read_csv(tmp_path / "os/events_verification.csv")
+    eu = pd.read_csv(tmp_path / "ou/events_verification.csv")
+    assert es.trade_date.tolist() == eu.trade_date.tolist() and es.verify_state.tolist() == eu.verify_state.tolist()
+    assert es.official_ex_date.tolist() != eu.official_ex_date.tolist()
+    assert ms["derivation_id"] != mu["derivation_id"]
+    assert ms["source_documents"][0]["official_ex_date"] == str(sat.date())
+    assert mu["source_documents"][0]["official_ex_date"] == str(sun.date())
+
+
+def _manifest_for(home, docs, ev):
+    cfg = {"data": {"store": "data/store/prices.csv.gz", "store_dir": "data/store/prices"},
+           "corporate_actions": {"manual": "data/corporate_actions.csv", "yahoo_cache": "data/derived/yahoo_actions.csv"}}
+    return va.derivation_manifest(root=home, cfg=cfg, as_of=AS_OF, docs=docs, ev=ev, code_commit="c", created_at="t")
+
+
+@pytest.mark.parametrize("field,value", [("event_type", "stock_split"), ("official_ex_date", "2099-01-01"),
+                                         ("official_ratio", 3.0), ("path", "khac/ban_goc.pdf"), ("ticker", "BBB"),
+                                         ("source_id", "hose-khac"), ("published_at", "2000-01-01"),
+                                         ("url", "https://example.invalid/khac.pdf"), ("issuer", "khac"),
+                                         ("sha256", "0" * 64), ("bytes", 1), ("ghi_chu_moi", "x")])
+def test_mb_every_evidence_field_is_bound_into_derivation_id(tmp_path, field, value):
+    """Cùng raw/code/config/sự kiện và cùng bảng kết quả kiểm; chỉ đổi một trường của văn bản → derivation_id phải đổi."""
+    home = _home(tmp_path, with_doc=False)
+    close, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [])
+    d = _doc(tmp_path)
+    a, b = _manifest_for(home, [d], ev), _manifest_for(home, [{**d, field: value}], ev)
+    assert a["derivation_id"] != b["derivation_id"], field
+
+
+@pytest.mark.parametrize("col,value", [("official_ex_date", pd.Timestamp("2099-01-01")),
+                                       ("official_trade_date", pd.Timestamp("2099-01-02")), ("evidence_id", "hose-khac"),
+                                       ("session_offset", 3.0), ("verify_reason", "ly do khac"), ("ratio", 9.0),
+                                       ("source", "nguon-khac"), ("source_status", "TRANG_THAI_KHAC")])
+def test_mb_events_digest_covers_provenance_columns(tmp_path, col, value):
+    home = _home(tmp_path, with_doc=False)
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path)])
+    a = _manifest_for(home, [], ev)
+    b = _manifest_for(home, [], ev.assign(**{col: value}))
+    assert a["events_verification_digest"] != b["events_verification_digest"], col
+    assert a["derivation_id"] != b["derivation_id"], col
+
