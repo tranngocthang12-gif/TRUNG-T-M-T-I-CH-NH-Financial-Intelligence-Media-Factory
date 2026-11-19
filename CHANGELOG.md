@@ -5,6 +5,11 @@
 - `BOOT.md` không còn gọi ghế đang làm việc là Intelligence Orchestrator. Scorecard là bản dẫn xuất: Ledger có thẩm quyền; `STALE`/`ABSENT` không dùng để kết luận năng lực; `INVALID` dừng; không lấy `total_predictions: 0` của bản cũ để phủ nhận F-37–F-42. Không tự sinh scorecard.
 - `GATES.md` đổi tên cổng cho khớp vận hành v3.0; điều kiện dừng giữ nguyên. §3 nêu ngoại lệ robot Ledger, Resolution, Calendar, Publication và vòng học ghi thẳng `main` (ADR-0013). Ngoại lệ không phải quyền AI tự duyệt kiến trúc. Không sửa ruleset, `SAFETY_STATE.yaml`, cột dừng 3 tuần, mốc 31/03/2027, mẫu 194.
 
+## 2026-11-19 — Làm mới scorecard khi giá không đổi; không đẩy bản STALE — Grok (xAI) soạn
+- Tình huống A: `engine/run_cycle.py` hết bỏ qua cả scorecard khi ngày giá mới nhất bằng ngày đã xử lý. Ledger vẫn có thể tăng (robot). Đường `--scorecard-only` và nhánh bỏ qua nghiên cứu gọi `refresh_scorecard_report`: viết lại `reports/scorecard.json` từ sổ, không đăng ký trial, không backtest, không đụng NAV giấy, model hay `ENGINE_STATE`. Đã FRESH đúng `as_of` thì không ghi lại.
+- Tình huống B: `daily_cycle.yml` sau `git pull --rebase` sinh lại scorecard, chạy `validate.py --require-fresh-scorecard`, rồi mới commit/push. Sổ đổi trong lúc ghi thì thử lại tối đa 3 lần trong mã và 5 lần trong workflow; hết lần thì thoát 1, không đẩy bản cũ như thể còn hợp lệ.
+- Không bật đối chiếu GitHub trong đường làm mới. Không có `TTC_PROVENANCE_ONLINE` thì không phát `issue_forecasts.scores`. Không đổi Brier, `hit_rate`, `directional_accuracy`, `observed_yes_rate`, mẫu 194, `right()`, L-05, `engine/adjust.py` hay `SAFETY_STATE.yaml`.
+
 ## 2026-11-19 — Đối chiếu toàn văn 35 trang PDF Luật Kế toán 88/2015, sửa 8 lỗi chép — Claude (Anthropic) soạn
 - Đọc ảnh cả 35 trang của `88.signed.pdf` đã ghim (SHA-256 `1fd9336a…cfca50`, 2566253 byte, 35 trang — khớp ADR-0012 quyết định 6) và so từng câu với `text.md`. PDF là bản quét không có lớp chữ.
 - 8 lỗi chép, đã sửa (số byte không đổi): trang 11 Điều 20 khoản 2 `sử dụng hóa đơn` → `hoá đơn`; trang 12 Điều 25 khoản 3 `cụ thể hóa` → `cụ thể hoá`; trang 23 Điều 48 khoản 2 `Tòa án` → `Toà án`; trang 32 Điều 68 khoản 1–5 cuối khoản `.` → `;`. Không có lệch số, Điều, khoản, điểm hay dẫn chiếu.
