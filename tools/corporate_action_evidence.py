@@ -226,12 +226,20 @@ def build_report(store=None):
              "Chỉ số liệu đọc từ bản gốc HOSE đã ghim sha256 và từ kho hiện có. Không lấy ngày hay tỷ lệ từ báo chí.",
              "Công cụ không sửa kho và không sửa mã điều chỉnh.", ""]
     lines += ["## (a) Bản gốc đã ghim", ""]
+    lines += ["Ngày ký in trên văn bản không phải ngày HOSE công bố. Loại sự kiện theo văn bản tách khỏi loại kỹ thuật "
+              "của engine; ánh xạ chưa chứng minh ghi CHUA_XAC_MINH và không đưa vào `event_type` (trường cổng "
+              "verified-adjusted đọc).", ""]
     for doc in docs:
+        published = (f"ngày công bố {doc['published_at']}" if doc.get("published_at")
+                     else f"ngày công bố CHƯA XÁC MINH ({doc.get('published_at_note', '')})")
         lines.append(
-            f"- {doc['ticker']} ({doc['source_id']}): ngày giao dịch không hưởng quyền {doc['official_ex_date']}; "
+            f"- {doc['ticker']} ({doc['source_id']}): ngày ký {doc.get('signed_date')}; {published}; "
+            f"ngày giao dịch không hưởng quyền {doc['official_ex_date']}; "
             f"ngày đăng ký cuối cùng {doc.get('official_record_date')}; tỷ lệ in trên văn bản "
-            f"{doc.get('official_ratio_text')} (hệ số (cổ cũ + cổ mới) / cổ cũ = {doc.get('official_ratio')}). "
-            f"{doc.get('note', '')}"
+            f"{doc.get('official_ratio_text')} (hệ số (cổ cũ + cổ mới) / cổ cũ = {doc.get('official_ratio')}); "
+            f"loại theo văn bản {doc.get('source_event_class')} («{doc.get('source_event_text')}»); "
+            f"ánh xạ kỹ thuật {doc.get('technical_event_type')} ({doc.get('technical_mapping_status')}): "
+            f"{doc.get('technical_mapping_note')} {doc.get('note', '')}"
         )
     lines += ["", "## (b) Đo trên kho", "",
               "Bước nhảy là lợi suất đóng cửa lớn nhất trong ±15 phiên của chính mã quanh ngày không hưởng quyền chính thức. "
