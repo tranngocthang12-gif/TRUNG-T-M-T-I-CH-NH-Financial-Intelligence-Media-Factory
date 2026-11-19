@@ -1,9 +1,15 @@
 # Changelog
 
+## 2026-11-19 — Đối chiếu toàn văn 35 trang PDF Luật Kế toán 88/2015, sửa 8 lỗi chép — Claude (Anthropic) soạn
+- Đọc ảnh cả 35 trang của `88.signed.pdf` đã ghim (SHA-256 `1fd9336a…cfca50`, 2566253 byte, 35 trang — khớp ADR-0012 quyết định 6) và so từng câu với `text.md`. PDF là bản quét không có lớp chữ.
+- 8 lỗi chép, đã sửa (số byte không đổi): trang 11 Điều 20 khoản 2 `sử dụng hóa đơn` → `hoá đơn`; trang 12 Điều 25 khoản 3 `cụ thể hóa` → `cụ thể hoá`; trang 23 Điều 48 khoản 2 `Tòa án` → `Toà án`; trang 32 Điều 68 khoản 1–5 cuối khoản `.` → `;`. Không có lệch số, Điều, khoản, điểm hay dẫn chiếu.
+- `text.md`: `bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3` → `4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c`. Máy tính lại hash trang: chỉ trang 11, 12, 23, 32 đổi. `pdf_check` của Grok (xAI) (OCR, cụm 6 từ đầu/cuối) hết hiệu lực vì bản chép đổi (ADR-0012 quyết định 5); biên bản mới `checker: Claude (Anthropic)`, `result: MATCH`, `pages_checked` 1..35, kèm danh sách 8 điểm sửa.
+- Claude vừa sửa vừa lập biên bản đối chiếu: chưa có phản biện độc lập. `authored_by: Grok (xAI); Claude (Anthropic)`. Ghi chú `KN-T2` giữ `DRAFT`; không trích đoạn nào bị sửa.
+
 ## 2026-11-19 — Ghim PDF Luật Kế toán 88/2015 và chuyển SOURCED — Grok (xAI) soạn
 - Hợp nhất `main` `c911ba8681af75754da742f5925ccc419ba320fa` vào nhánh PR #44. Không sửa thân quyết định ADR-0012.
-- `library/sources/luat_ke_toan_88_2015/88.signed.pdf` là bản tải lại từ Cổng TTĐT Chính phủ, SHA-256 `1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50`, 2566253 byte, 35 trang. `text.md` không đổi (`bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3`).
-- Manifest có đủ `original_*`, `text_*` và `crosscheck` từng trang cộng `pdf_check` của Grok (xAI), kết quả MATCH. Hàng đợi chuyển `SOURCED`. Ghi chú `KN-T2-luat-ke-toan-88-2015-goc` giữ `DRAFT`: ghế đối chiếu PDF trùng ghế đọc, chưa có biên bản CITED.
+- `library/sources/luat_ke_toan_88_2015/88.signed.pdf` là bản tải lại từ Cổng TTĐT Chính phủ, SHA-256 `1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50`, 2566253 byte, 35 trang. `text.md` lúc đó không đổi (`bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3`); sau đó Claude sửa 8 lỗi chép — xem mục trên.
+- Manifest có đủ `original_*`, `text_*` và `crosscheck` từng trang cộng `pdf_check` của Grok (xAI), kết quả MATCH (biên bản này đã được thay — xem mục trên). Hàng đợi chuyển `SOURCED`. Ghi chú `KN-T2-luat-ke-toan-88-2015-goc` giữ `DRAFT`: chưa có biên bản CITED.
 - Không sửa `governance/SAFETY_STATE.yaml`, Ledger, mẫu 194, hay dữ liệu giá.
 
 ## 2026-11-19 — Đồng bộ hồ sơ chấp nhận ADR-0011–0013 — ChatGPT (OpenAI) soạn

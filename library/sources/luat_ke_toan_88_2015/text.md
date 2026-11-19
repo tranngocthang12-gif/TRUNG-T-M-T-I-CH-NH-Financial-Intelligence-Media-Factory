@@ -356,7 +356,7 @@ g) Chữ ký, họ và tên của người lập, người duyệt và những n
 
 1. Hóa đơn là chứng từ kế toán do tổ chức, cá nhân bán hàng, cung cấp dịch vụ lập, ghi nhận thông tin bán hàng, cung cấp dịch vụ theo quy định của pháp luật.
 
-2. Nội dung, hình thức hóa đơn, trình tự lập, quản lý và sử dụng hóa đơn thực hiện theo quy định của pháp luật về thuế.
+2. Nội dung, hình thức hóa đơn, trình tự lập, quản lý và sử dụng hoá đơn thực hiện theo quy định của pháp luật về thuế.
 
 Điều 21. Quản lý, sử dụng chứng từ kế toán
 
@@ -425,7 +425,7 @@ d) Số tiền của nghiệp vụ kinh tế, tài chính phát sinh ghi vào c�
 
 2. Mỗi đơn vị kế toán chỉ sử dụng một hệ thống sổ kế toán cho một kỳ kế toán năm.
 
-3. Đơn vị kế toán được cụ thể hóa các sổ kế toán đã chọn để phục vụ yêu cầu kế toán của đơn vị.
+3. Đơn vị kế toán được cụ thể hoá các sổ kế toán đã chọn để phục vụ yêu cầu kế toán của đơn vị.
 
 Điều 26. Mở sổ, ghi sổ, khóa sổ và lưu trữ sổ kế toán
 
@@ -820,7 +820,7 @@ b) Mở sổ kế toán theo dõi các nghiệp vụ kinh tế, tài chính liê
 c) Bàn giao toàn bộ tài liệu kế toán của đơn vị kế toán bị giải thể hoặc chấm dứt hoạt động sau khi xử lý xong cho đơn vị kế toán cấp trên hoặc tổ chức, cá nhân lưu trữ theo quy định tại Điều 41 của Luật này.
 
 [p23]
-2. Trường hợp đơn vị kế toán bị tuyên bố phá sản thì Tòa án tuyên bố phá sản chỉ định người thực hiện công việc kế toán quy định tại khoản 1 Điều này.
+2. Trường hợp đơn vị kế toán bị tuyên bố phá sản thì Toà án tuyên bố phá sản chỉ định người thực hiện công việc kế toán quy định tại khoản 1 Điều này.
 
 CHƯƠNG III
 TỔ CHỨC BỘ MÁY KẾ TOÁN VÀ NGƯỜI LÀM KẾ TOÁN
@@ -1139,15 +1139,15 @@ Doanh nghiệp kinh doanh dịch vụ kế toán, hộ kinh doanh dịch vụ k�
 [p32]
 toán của doanh nghiệp, hộ kinh doanh dịch vụ kế toán thuộc các trường hợp sau đây:
 
-1. Là cha đẻ, mẹ đẻ, cha nuôi, mẹ nuôi, vợ, chồng, con đẻ, con nuôi, anh, chị, em ruột của người có trách nhiệm quản lý, điều hành, kế toán trưởng của đơn vị kế toán, trừ trường hợp đơn vị kế toán là doanh nghiệp tư nhân, công ty trách nhiệm hữu hạn do một cá nhân làm chủ sở hữu và các trường hợp khác do Chính phủ quy định.
+1. Là cha đẻ, mẹ đẻ, cha nuôi, mẹ nuôi, vợ, chồng, con đẻ, con nuôi, anh, chị, em ruột của người có trách nhiệm quản lý, điều hành, kế toán trưởng của đơn vị kế toán, trừ trường hợp đơn vị kế toán là doanh nghiệp tư nhân, công ty trách nhiệm hữu hạn do một cá nhân làm chủ sở hữu và các trường hợp khác do Chính phủ quy định;
 
-2. Có quan hệ kinh tế, tài chính với đơn vị kế toán đó.
+2. Có quan hệ kinh tế, tài chính với đơn vị kế toán đó;
 
-3. Không đủ năng lực chuyên môn hoặc không đủ điều kiện để thực hiện dịch vụ kế toán.
+3. Không đủ năng lực chuyên môn hoặc không đủ điều kiện để thực hiện dịch vụ kế toán;
 
-4. Đang cung cấp dịch vụ làm kế toán trưởng cho khách hàng là tổ chức có quan hệ kinh tế, tài chính với đơn vị kế toán đó.
+4. Đang cung cấp dịch vụ làm kế toán trưởng cho khách hàng là tổ chức có quan hệ kinh tế, tài chính với đơn vị kế toán đó;
 
-5. Đơn vị kế toán yêu cầu thực hiện những công việc không đúng với chuẩn mực đạo đức nghề nghiệp hoặc không đúng với yêu cầu về chuyên môn, nghiệp vụ kế toán, tài chính.
+5. Đơn vị kế toán yêu cầu thực hiện những công việc không đúng với chuẩn mực đạo đức nghề nghiệp hoặc không đúng với yêu cầu về chuyên môn, nghiệp vụ kế toán, tài chính;
 
 6. Các trường hợp khác theo quy định của pháp luật.
 

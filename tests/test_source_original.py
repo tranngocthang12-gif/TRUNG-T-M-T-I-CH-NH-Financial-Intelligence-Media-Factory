@@ -209,8 +209,14 @@ class OriginalBindingTests(unittest.TestCase):
         pages, _ = kn.parse_text(text)
         self.assertEqual(set(pages), set(range(1, 36)))
         self.assertTrue(kn.may_mark_sourced(entry, pages, "luat_ke_toan_88_2015", text))
-        self.assertEqual(entry["crosscheck"]["pdf_check"]["checker"], "Grok (xAI)")
+        self.assertEqual(entry["crosscheck"]["pdf_check"]["checker"], "Claude (Anthropic)")
         self.assertEqual(entry["crosscheck"]["pdf_check"]["result"], "MATCH")
+        self.assertEqual(entry["crosscheck"]["pdf_check"]["text_sha256"], entry["text_sha256"])
+        # 8 lỗi chép đã sửa sau khi đọc ảnh trang (p11, p12, p23, p32): bản chép phải giữ dạng in, không quay về bản cũ
+        self.assertNotEqual(entry["text_sha256"], "bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3")
+        for printed in ("quản lý và sử dụng hoá đơn", "được cụ thể hoá các sổ", "thì Toà án tuyên bố phá sản",
+                        "Có quan hệ kinh tế, tài chính với đơn vị kế toán đó;"):
+            self.assertIn(printed, text)
         import yaml
         items = (yaml.safe_load((ROOT / "library" / "reading_queue.yaml").read_text(encoding="utf-8")) or {}).get("items") or []
         law = next(i for i in items if i.get("doc_id") == "luat_ke_toan_88_2015")

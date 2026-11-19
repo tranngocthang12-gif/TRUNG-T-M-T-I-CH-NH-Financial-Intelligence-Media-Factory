@@ -3,7 +3,7 @@
   "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day. sha256 va bytes LUON la text.md, khong phai PDF. Moi dong phai co original_sha256, original_bytes, original_path (trong library/sources/<doc_id>/, khong phai text.md), text_sha256 va text_bytes (phai trung sha256/bytes). Bo cac truong do la loi cong nguon, khong con duong vong. Hai hash khong duoc trung. Hash tung trang tinh ca bang, khong chi doan van. SOURCED va ghi chu CITED/TESTED/PROVEN can them pdf_check da doi chieu PDF; hash tu sinh khong du. Luat Ke toan 88/2015 da ghim 88.signed.pdf va SOURCED; ghi chu KN-T2 van DRAFT vi nguoi doi chieu PDF trung ghe nguoi doc. Cac truong con lai: issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08, ADR-0012).",
   "files": {
     "luat_ke_toan_88_2015": {
-      "sha256": "bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3",
+      "sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
       "bytes": 101331,
       "issuer": "Quốc hội",
       "issued_on": "2015-11-20",
@@ -19,7 +19,7 @@
       "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50",
       "original_bytes": 2566253,
       "original_path": "library/sources/luat_ke_toan_88_2015/88.signed.pdf",
-      "text_sha256": "bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3",
+      "text_sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
       "text_bytes": 101331,
       "crosscheck": {
         "method": "page-by-page",
@@ -86,13 +86,13 @@
           },
           {
             "page": 11,
-            "sha256": "f59f93a1b887c46d270b37916d4fb12f67e1631afe4a501471e28ad9dc2aa4ec",
+            "sha256": "eb9fcb9e76103f2ed450d5f0c200b8a62eded469cfb84ba2743692052c1b1212",
             "head": "Điều 20. Hóa đơn 1. Hóa đơn là",
             "tail": "kế toán áp dụng ở đơn vị mình."
           },
           {
             "page": 12,
-            "sha256": "a05ddbccc4448605b89c1443d31dc280c8bfb1344f9279f8e013fd1b659167dc",
+            "sha256": "9fe9e442a3f079f4f824237c73700ceca9c27bf87bcb86dfe8a3366abac3ab45",
             "head": "2. Đơn vị kế toán được chi tiết",
             "tail": "dưới; không ghi chồng lên nhau; không ghi"
           },
@@ -158,7 +158,7 @@
           },
           {
             "page": 23,
-            "sha256": "927c34c378d0af31f246261b2c47d19b65b58cb6bb95ebd91dfa2dda4cb0d150",
+            "sha256": "ec24d385eaf726a5732c1cd1312a2d5dfa15e5e92a03f2e93e100b71cdb444a9",
             "head": "2. Trường hợp đơn vị kế toán bị",
             "tail": "toán trong thời gian mình làm kế toán."
           },
@@ -212,7 +212,7 @@
           },
           {
             "page": 32,
-            "sha256": "00fa61aaf4a44d2fbc2dde5d212c8a98b8df6b11a7998c8848f1aa7313d1a938",
+            "sha256": "fabb2e33c29cd5e03e665af133b09b272941cc9f2e69bc0e486544295ce164ab",
             "head": "toán của doanh nghiệp, hộ kinh doanh dịch",
             "tail": "giấy tờ khác có giá trị tương đương;"
           },
@@ -238,7 +238,7 @@
         "pages_checked": 35,
         "pages_total": 35,
         "pdf_check": {
-          "checker": "Grok (xAI)",
+          "checker": "Claude (Anthropic)",
           "result": "MATCH",
           "pages_checked": [
             1,
@@ -277,8 +277,8 @@
             34,
             35
           ],
-          "evidence": "Tải lại 88.signed.pdf ngày 2026-11-19 từ source_url; SHA-256 và 2566253 byte khớp bản đã công bố; PDF scan 35 trang. Tesseract vie, psm 6, 180 dpi: cụm 6 từ đầu và cuối (bỏ dấu) của từng trang text.md nằm trong OCR, trừ đầu trang 1 vì khối chữ ký số VGCA bị OCR vỡ; recall từng trang từ 0,963 trở lên, 31/35 trang là 1,000. Nhìn ảnh: trang 1 có khối 'Ký bởi: Cổng Thông tin điện tử Chính phủ', email thongtinchinhphu@chinhphu.vn, thời gian ký 19.01.2016 16:25:22 +07:00, quốc hiệu CỘNG HÒA và căn cứ 'Cộng hoà'; không chép dấu 'Văn bản gửi đăng Công báo' và chữ tay trên dấu công văn đến. Trang 10 viết 'tẩy xóa'; trang 17 viết thường 'trung ương'; trang 33 viết 'tẩy xoá'; trang 35 viết 'khoá XIII' và Nguyễn Sinh Hùng. text.md giữ nguyên sha256 bd31f9b8.",
-          "text_sha256": "bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3",
+          "evidence": "Đối chiếu ngày 2026-11-19 trên tệp đã ghim 88.signed.pdf (SHA-256 1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50, 2566253 byte, 35 trang; pdfinfo: bản quét HP Scanjet, ký số VGCA 19.01.2016 16:25:22 +07:00, không có lớp chữ nên không dùng OCR làm bằng chứng). Phương pháp: render từng trang bằng pdftoppm (110 dpi toàn trang, 200–600 dpi vùng nghi ngờ), đọc ảnh và so từng câu, từng từ với đoạn [pN] tương ứng của text.md: số Điều, khoản, điểm a)–i), mọi con số, ngày, tỷ lệ, dẫn chiếu chéo, vị trí dấu thanh (hoà/hòa, xoá/xóa, khoá/khóa, uỷ/ủy) và dấu câu cuối khoản. 35/35 trang được đọc bằng ảnh bởi các phiên Claude (Anthropic); mọi điểm lệch được Claude render lại độc lập và xác minh trước khi sửa. Kết quả trên bản text.md trước (sha256 bd31f9b83d891e559c0b356c0f7efcb1c86f4d379cac55cea1c726a23ba0d2b3): 8 lỗi chép, đã sửa, số byte không đổi: p11 Điều 20 khoản 2 'sử dụng hóa đơn' → 'sử dụng hoá đơn' (ảnh in 'hoá', cùng câu có 'hình thức hóa đơn' in 'hóa'); p12 Điều 25 khoản 3 'cụ thể hóa' → 'cụ thể hoá'; p23 Điều 48 khoản 2 'thì Tòa án' → 'thì Toà án'; p32 Điều 68 khoản 1–5 kết thúc '.' → ';' (khoản 6 giữ '.'). Sau sửa, 35/35 trang MATCH về chữ, số, dấu thanh và dấu câu. Không chép (đúng quy ước): số trang in đầu trang, số viết tay cuối trang, logo và dấu 'Văn bản gửi đăng Công báo', dấu công văn đến và chữ viết tay trang 1, con dấu và chữ ký tay trang 35, định dạng đậm/nghiêng, ngắt dòng trong đoạn. Nguồn in tự trộn hai kiểu dấu (vd 'Cộng HÒA' ở quốc hiệu, 'Cộng hoà' ở căn cứ và câu kết; 'Toà án' trang 23 nhưng 'Tòa án' trang 24, 27, 34); text.md giữ đúng dạng in từng chỗ. Điểm c khoản 2 Điều 71 (trang 34) in dấu '.' và được giữ nguyên. Biên bản pdf_check trước của Grok (xAI) dựa trên OCR Tesseract (cụm 6 từ đầu/cuối, recall ≥ 0,963) gắn với bản text.md cũ; nó hết hiệu lực khi text.md đổi (ADR-0012 quyết định 5). Biên bản này do Claude (Anthropic) lập, cũng là người sửa 8 điểm trên: cần phản biện độc lập khác nhà cung cấp (L-09) trước khi Owner gộp.",
+          "text_sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
           "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50"
         }
       }
