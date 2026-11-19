@@ -210,9 +210,38 @@ def _calibration(ps, os_):
         lo, hi = k / 10, (k + 1) / 10
         idx = [i for i, p in enumerate(ps) if lo <= p < hi or (k == 9 and p == 1.0)]
         if idx:
+            yes = round(float(np.mean([os_[i] for i in idx])), 3)
             out[f"{lo:.1f}-{hi:.1f}"] = {"n": len(idx), "mean_p": round(float(np.mean([ps[i] for i in idx])), 3),
-                                              "hit_rate": round(float(np.mean([os_[i] for i in idx])), 3)}
+                                         "observed_yes_rate": yes, "hit_rate": yes}    # hit_rate: bí danh cũ, xem HIT_RATE_COMPAT
     return out
+
+
+# Tương thích: khóa hit_rate có từ v1.0 và LUÔN là mean(outcome) (tỷ lệ YES), nhưng báo cáo vòng học in nó dưới nhãn
+# "Tỷ lệ đúng". Giữ khóa với đúng giá trị cũ để người đọc/báo cáo cũ không đổi số lặng lẽ; nghĩa ghi ở hit_rate_meaning.
+# Tên đúng: observed_yes_rate. Tỷ lệ gọi đúng chiều: directional_accuracy. Không dùng hit_rate làm tỷ lệ dự báo đúng.
+HIT_RATE_COMPAT = {"hit_rate_meaning": "observed_yes_rate (mean outcome) — KHÔNG phải tỷ lệ dự báo đúng; khóa cũ giữ để "
+                                       "tương thích, dùng observed_yes_rate hoặc directional_accuracy"}
+
+
+def directional_call_stats(probabilities, outcomes):
+    """Tách tỷ lệ kết quả YES khỏi tỷ lệ dự báo đúng hướng.
+    p > 0,5 gọi YES; p < 0,5 gọi NO. |p − 0,5| ≤ 1e-12 không phải một hướng: không tính đúng, không tính sai,
+    không vào mẫu số của directional_accuracy. observed_yes_rate = mean(outcome), không phải tỷ lệ đúng.
+    hit_rate (bí danh cũ) = observed_yes_rate; xem HIT_RATE_COMPAT.
+    """
+    ps = [float(p) for p in probabilities]
+    os_ = [float(o) for o in outcomes]
+    correct = abstain = 0
+    for p, o in zip(ps, os_):
+        if abs(p - 0.5) <= 1e-12:
+            abstain += 1
+            continue
+        correct += int((p > 0.5) == (o >= 0.5))
+    called = len(ps) - abstain
+    yes = round(float(np.mean(os_)), 3) if os_ else None
+    return {"observed_yes_rate": yes, "directional_accuracy": round(correct / called, 3) if called else None,
+            "directional_n": called, "directional_correct": correct, "directional_abstain": abstain,
+            "hit_rate": yes, **HIT_RATE_COMPAT}
 
 def _binom_two_sided(k, n):
     """p hai phía của kiểm định nhị thức với p0 = 0,5 (khớp cỡ mẫu 194 ở §4.2, vốn tính cho kiểm định hai phía):
@@ -235,8 +264,12 @@ def _same_day(a, b):
     except (KeyError, TypeError, ValueError):
         return False
 
+BASELINE_NOTE = ("brier_base_rate dùng base_rate do chính người viết dự báo khai (baseline TỰ KHAI), không phải baseline độc "
+                 "lập đã ghim; thắng nó hay thắng đồng xu 0,5 không phải bằng chứng năng lực")
+
 def _seat_scores(rows, outcome):
-    """Brier, Brier xác suất nền, Brier đồng xu, mean_p, hit_rate, hiệu chuẩn cho các dòng ĐÃ có kết quả YES/NO."""
+    """Brier, Brier xác suất nền, Brier đồng xu, mean_p, tỷ lệ YES quan sát, tỷ lệ đúng hướng, hiệu chuẩn.
+    Chỉ các dòng ĐÃ có kết quả YES/NO. Công thức Brier không dùng directional_accuracy."""
     ps = [float(p["p"]) for p in rows]; os_ = [outcome[p["id"]] for p in rows]
     bs = []
     for p in rows:
@@ -245,7 +278,8 @@ def _seat_scores(rows, outcome):
     return {"n": len(rows), "brier": round(float(np.mean([(a - b) ** 2 for a, b in zip(ps, os_)])), 4),
             "brier_base_rate": round(float(np.mean([(a - b) ** 2 for a, b in zip(bs, os_)])), 4),
             "brier_coin": round(float(np.mean([(0.5 - b) ** 2 for b in os_])), 4),
-            "mean_p": round(float(np.mean(ps)), 3), "hit_rate": round(float(np.mean(os_)), 3),
+            "mean_p": round(float(np.mean(ps)), 3), **directional_call_stats(ps, os_),
+            "baseline_note": BASELINE_NOTE,
             "calibration": _calibration(ps, os_)}
 
 RAW_AUDIT_LABEL = ("SỐ LIỆU THÔ ĐỂ KIỂM TOÁN — KHÔNG PHẢI BẰNG CHỨNG NĂNG LỰC: gồm cả dự báo chưa chứng minh thời điểm "
@@ -409,6 +443,29 @@ def issue_summary(all_rows, R, pub_rows=None, calendar=None, verified=None, veri
         out["malformed"] = len(raw) - len(issue)
     return out
 
+def _freshness(as_of, issue):
+    """Độ mới của scorecard: dẫn xuất từ sổ nào (số dòng + sha256 của dự báo, phân định, bằng chứng công bố, lịch) và dữ liệu
+    giá tới ngày nào (kho cũ + tệp tháng, ADR-0006). tools/laws_checks.scorecard_freshness so các số này với sổ hiện tại:
+    lệch là STALE (không dùng kết luận năng lực). Không đổi số Brier."""
+    from datetime import datetime, timezone
+    from tools.laws_checks import price_data_as_of, scorecard_sources
+    sha = os.environ.get("GITHUB_SHA", "").strip()
+    if len(sha) < 7:
+        try:
+            import subprocess
+            r = subprocess.run(["git", "rev-parse", "HEAD"], cwd=str(REPO), capture_output=True, text=True, timeout=5)
+            sha = r.stdout.strip() if r.returncode == 0 else ""
+        except (OSError, subprocess.TimeoutExpired):
+            sha = ""
+    return {"report_as_of": as_of, "generated_at": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+            "source_commit": sha or None, "data_as_of": price_data_as_of(ROOT, as_of), "sources": scorecard_sources(ROOT),
+            "capability_scores_emitted": bool(issue.get("scores")),
+            "timing_verification_source": issue.get("timing_verification_source"),
+            "note": ("Ledger là nguồn có thẩm quyền. Tệp đã commit cũ hơn sổ (số dòng/sha256 lệch) là STALE: không dùng kết luận "
+                     "năng lực — kiểm bằng python tools/validate.py. Điểm năng lực (issue_forecasts.scores) chỉ có khi nguồn "
+                     "xác nhận xuất xứ là GitHub; raw_audit không phải điểm năng lực.")}
+
+
 def scorecard(as_of, verified=None):
     all_rows = _load(PRED)
     P = {p["id"]: p for p in all_rows if is_engine_row(p)}
@@ -441,13 +498,19 @@ def scorecard(as_of, verified=None):
             buckets = {}
             for lo in np.arange(0.0, 1.0, 0.1):
                 m = (p >= lo) & (p < lo + 0.1)
-                if m.sum(): buckets[f"{lo:.1f}-{lo+0.1:.1f}"] = {"n": int(m.sum()), "mean_p": round(float(p[m].mean()), 3),
-                                                                "hit_rate": round(float(o[m].mean()), 3)}
+                if m.sum():
+                    yes = round(float(o[m].mean()), 3)
+                    buckets[f"{lo:.1f}-{lo+0.1:.1f}"] = {"n": int(m.sum()), "mean_p": round(float(p[m].mean()), 3),
+                                                         "observed_yes_rate": yes, "hit_rate": yes}
             n = len(g)
             verdict = ("CHƯA ĐỦ MẪU" if n < CFG["ledger"]["min_n_for_verdict"] else
                        "HƠN BASELINE" if bss > 0 else "KHÔNG HƠN BASELINE")
             out["procedures"][proc] = {"n": n, "brier": round(brier, 4), "brier_base_rate": round(brier_base, 4),
-                                       "brier_skill": round(bss, 4), "best_baseline": best, "hit_rate": round(float(o.mean()), 3),
+                                       "brier_skill": round(bss, 4), "best_baseline": best,
+                                       **directional_call_stats(p.tolist(), o.tolist()),
+                                       "baseline_note": ("HƠN BASELINE chỉ so với base_rate do dòng TỰ KHAI hoặc với đồng xu 0,5; "
+                                                         "chưa phải baseline độc lập đã ghim. Công thức Brier không đổi."),
                                        "mean_p": round(float(p.mean()), 3), "calibration": buckets, "verdict": verdict}
+    out["freshness"] = _freshness(as_of, out["issue_forecasts"])
     save_json("reports/scorecard.json", out)
     return out
