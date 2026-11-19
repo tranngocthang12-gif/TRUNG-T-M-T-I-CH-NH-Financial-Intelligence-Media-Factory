@@ -30,7 +30,10 @@ def _forecast(seat="A", question="CPI tháng 11/2026 so với cùng kỳ từ 5,
         f["prompt_hash"] = B_HASH
     f.update(kw)
     if "info_lock_at" not in f:
-        f["info_lock_at"] = f["resolve_at"]
+        ra = str(f.get("resolve_at") or "")
+        # resolve_at sai dạng không được kéo info_lock_at sai theo — nếu không, contract mới từ chối thiếu lịch
+        # trước khi tới đúng luật ngày đang được kiểm.
+        f["info_lock_at"] = ra if re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}", ra) else "2026-12-10"
     return "\n\n".join(f"### {k}\n\n{v}" for k, v in f.items() if v is not None)
 
 
@@ -158,7 +161,7 @@ class IntakeRuleTests(unittest.TestCase):
         for i, ra in enumerate(("20261210", "2026-W50-4", "2026-12-10T00:00:00", "٢٠٢٦-١٢-١٠"), 1):
             c, o = self._fc(i, _forecast(resolve_at=ra))
             self.assertEqual(c, 2, o); self.assertIn("YYYY-MM-DD", o)
-        c, o = self._fc(10, _forecast(resolution_source="Thông cáo báo chí của Cục Thống kê"))
+        c, o = self._fc(10, _forecast(resolution_source="Thông cáo báo chí của Cục Thống kê", calendar_id="CAL-KHONG-MIEN"))
         self.assertEqual(c, 2, o); self.assertIn("tên miền", o)                  # lời hứa về nguồn phải máy kiểm được
         c, o = self._fc(11, _forecast(resolution_source="Cục Thống kê (nso.gov.vn) — thông cáo CPI"))
         self.assertEqual(c, 0, o)

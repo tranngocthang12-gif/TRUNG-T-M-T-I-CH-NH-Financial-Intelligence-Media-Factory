@@ -57,6 +57,8 @@ from tools.laws_checks import ATTEST_WINDOW, line_hash, nfc, recommendation_hit,
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 LEDGER = ROOT / "ledger" / "predictions.jsonl"
 SCHEMA = ROOT / "contracts" / "forecast_issue.schema.json"
+SCHEMA_NEW = ROOT / "contracts" / "forecast_issue_new.schema.json"
+NEW_FORECAST_REQUIRED = ("info_lock_at", "calendar_id")
 CONTROL_B = ROOT / "governance" / "CONTROL_B_PROMPT.md"
 CONTROL_B_VERSIONS = ROOT / "governance" / "control_b_prompts.jsonl"
 RES = ROOT / "ledger" / "resolutions.jsonl"
@@ -654,11 +656,56 @@ def load_rows(path):
     return [strict_loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()] if path.is_file() else []
 
 
-def _schema():
-    return json.loads(SCHEMA.read_text(encoding="utf-8"))
+def _schema(legacy=False):
+    """Contract cũ cho F-37–F-42 (không có info_lock_at/calendar_id). Dự báo mới dùng forecast_issue_new.schema.json.
+    Kho tạm chưa chép tệp mới vẫn bị bắt hai trường đó, để robot không nới luật khi thiếu file."""
+    schema = json.loads(SCHEMA.read_text(encoding="utf-8"))
+    if legacy:
+        return schema
+    if SCHEMA_NEW.is_file():
+        return json.loads(SCHEMA_NEW.read_text(encoding="utf-8"))
+    req = list(schema["required"])
+    for key in NEW_FORECAST_REQUIRED:
+        if key not in req:
+            req.append(key)
+    schema["required"] = req
+    return schema
 
 
-def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=True, versions=None, pub_rows=(), legacy_timing=False,
+_LOCK_FIELD_HELP = {
+    "info_lock_at": ("phải khai ngày đầu tiên thông tin phân định có thể được công bố, trước khi nhận dự báo; hạn này độc lập "
+                     "với resolve_at và không được để trống"),
+    "calendar_id": ("dự báo mới phải trích một dòng governance/release_calendar.jsonl đã ghim qua Issue [Calendar] trước khi "
+                    "mở Issue dự báo; ngày khóa tự khai không được nhận"),
+}
+
+
+def required_forecast_fields(legacy=False) -> list:
+    """Trường bắt buộc của một dự báo. legacy=True chỉ cho F-37–F-42 đã ghim: đúng danh sách của contract cũ.
+    Dự báo mới: hợp của contract cũ, contract mới và NEW_FORECAST_REQUIRED (ghi cứng) — sửa hay thiếu tệp schema mới đều không
+    bỏ được info_lock_at/calendar_id (ADR-0011 quyết định 1, 7)."""
+    old = list(json.loads(SCHEMA.read_text(encoding="utf-8")).get("required") or [])
+    if legacy:
+        return old
+    new = list(_schema(legacy=False).get("required") or [])
+    return list(dict.fromkeys(old + new + list(NEW_FORECAST_REQUIRED)))
+
+
+def missing_fields_error(data, legacy=False):
+    """Kiểm MỌI trường bắt buộc còn thiếu (vắng mặt hoặc rỗng) TRƯỚC khi bất kỳ luật nào đọc data[k]. Trả về một lời từ chối
+    liệt kê đủ các trường thiếu, hoặc None. Không nuốt lỗi rồi đi tiếp: thiếu p cùng info_lock_at không được rơi xuống KeyError."""
+    if not isinstance(data, dict):
+        return ": thân Issue không đọc được thành các trường của mẫu Forecast"
+    missing = [k for k in required_forecast_fields(legacy) if data.get(k) is None or (isinstance(data.get(k), str) and not data[k].strip())]
+    if not missing:
+        return None
+    lock = [k for k in missing if k in _LOCK_FIELD_HELP]
+    msg = (" (L-05)" if lock else "") + f": thiếu trường bắt buộc {', '.join(missing)}"
+    msg += "".join(f"; thiếu {k} — {_LOCK_FIELD_HELP[k]}" for k in lock)
+    return msg
+
+
+def forecast_error(data, created, issue_rows, res_rows=(), live=True, versions=None, pub_rows=(), legacy_timing=False,
                    calendar=None, number=None):
     """Luật nhận một dự báo. data: các trường của form; created: giờ tạo Issue (ISO); issue_rows: các dòng dự báo Issue đã
     có TRƯỚC nó; res_rows: các dòng phân định. Trả về (lỗi hoặc None, ghi chú). Hàm thuần — intake và replay() dùng chung.
@@ -669,12 +716,24 @@ def forecast_error(data, created, issue_rows, res_rows=(), schema=None, live=Tru
     - câu hỏi đã có kết quả: lúc nhận, CÓ BẤT KỲ dòng phân định nào của câu hỏi trong sổ là từ chối — kể cả khi Issue dự
       báo này mở trước Issue phân định (robot ghi theo thứ tự chạy xong, không theo thứ tự mở). Lúc kiểm lại, sổ đầy đủ
       luôn chứa cả các phân định ghi SAU dòng đang xét, nên chỉ phân định mở KHÔNG SAU dự báo mới là lỗi ở đây; trường hợp
-      còn lại (dự báo mở trước nhưng ghi sau phân định) do resolution_intake.replay bắt: phân định khi ấy không phủ nó."""
+      còn lại (dự báo mở trước nhưng ghi sau phân định) do resolution_intake.replay bắt: phân định khi ấy không phủ nó.
+    Contract: dự báo mới luôn kiểm bằng forecast_issue_new.schema.json (bắt buộc info_lock_at, calendar_id). legacy_timing=True
+    (contract cũ) chỉ nhận cho đúng số Issue của F-37–F-42 (replay truyền number và chỉ bật khi hash dòng khớp bản ghim); lúc
+    nhận Issue mới robot không bao giờ bật nó. Không có tham số nào để truyền contract khác vào."""
     import jsonschema
+    if legacy_timing and f"F-{number}" not in LEGACY_TIMING_IDS:
+        return (" (L-05): chế độ chuyển tiếp chỉ dành cho F-37–F-42 đã ghim — dự báo khác phải theo contract mới "
+                "(info_lock_at, calendar_id)"), ""
+    missing = missing_fields_error(data, legacy_timing)
+    if missing:
+        return missing, ""
+    contract = "forecast_issue.schema.json" if legacy_timing else "forecast_issue_new.schema.json"
     try:
-        jsonschema.validate(data, schema or _schema())
+        jsonschema.validate(data, _schema(legacy=legacy_timing))
+    except jsonschema.ValidationError as e:
+        return f": không khớp {contract} — {str(e).splitlines()[0]}", ""
     except Exception as e:  # noqa: BLE001
-        return f": không khớp forecast_issue.schema.json — {str(e).splitlines()[0]}", ""
+        return f": không khớp {contract} — {str(e).splitlines()[0]}", ""
     for k in NUMERIC:
         if isinstance(data[k], bool) or not isinstance(data[k], (int, float)) or not math.isfinite(data[k]):
             return f": {k} phải là số hữu hạn", ""
@@ -789,7 +848,6 @@ def replay(pred_rows, res_rows=(), versions=None, pub_rows=(), calendar=None) ->
     """Chạy lại luật nhận trên MỌI dòng dự báo đã có trong sổ, theo thứ tự. Trả về danh sách lỗi.
     versions: các phiên bản prompt ghế B (control_b_versions) của kho đang kiểm; None = kho chứa mô-đun này."""
     errs, prior, seen = [], [], set()
-    schema = _schema()
     for row in pred_rows:
         if "issue_number" not in row:
             # Không loại dòng nào được miễn. Trước vòng chấm 8, dòng "trông như của engine" (mã P-…, luật chấm có ticker)
@@ -810,7 +868,7 @@ def replay(pred_rows, res_rows=(), versions=None, pub_rows=(), calendar=None) ->
         data = {k: v for k, v in row.items() if k not in SYSTEM_FIELDS}
         legacy = is_legacy_timing_row(row)
         try:
-            msg, _ = forecast_error(data, row.get("issue_created_at"), prior, res_rows, schema, live=False, versions=versions,
+            msg, _ = forecast_error(data, row.get("issue_created_at"), prior, res_rows, live=False, versions=versions,
                                     pub_rows=pub_rows, legacy_timing=legacy, calendar=calendar, number=n)
         except Exception as e:  # noqa: BLE001
             msg = f": không đọc được ({str(e).splitlines()[0]})"
@@ -900,6 +958,8 @@ def main() -> int:
         late = None if msg else write_deadline_error(created, now_utc(), data.get("resolve_at"), data.get("info_lock_at"))
     except (TypeError, ValueError) as e:
         return reject(f": không đọc được mốc thời gian ({str(e).splitlines()[0]})")
+    except KeyError as e:                 # lưới an toàn: missing_fields_error đã chặn trước; không để traceback lọt ra Issue
+        return reject(f": thiếu trường bắt buộc {e}")
     if msg:
         return reject(msg)
     if late:

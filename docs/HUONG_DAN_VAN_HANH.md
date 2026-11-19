@@ -58,6 +58,7 @@ TTC_HOME=/tmp/ttc_demo python -m tests.demo_synthetic run 1051 1540
 3. Một Issue phân định một câu hỏi; ghế A và ghế B của câu hỏi nhận cùng kết quả. Đã phân định thì không sửa được. Nguồn đã hứa không công bố → chọn VOID và ghi lý do.
    - **Chỉ mở Issue phân định khi mọi dự báo của câu hỏi đã có bình luận ✅.** Robot nhận dự báo và robot phân định chạy riêng. Nếu một dự báo của câu hỏi được mở sau (hoặc cùng lúc với) Issue phân định, robot phân định trả ❌ và không ghi gì: mở Issue Resolution mới. Nếu Issue phân định đã được ghi trước khi robot kịp ghi một dự báo mở trước đó, dự báo ấy bị ❌ (câu hỏi đã có kết quả). Cả hai trường hợp sổ đều không hỏng và không phải sửa gì.
 4. Điểm số cập nhật ở vòng học kế tiếp: `reports/scorecard.json` mục `issue_forecasts`, và cuối tệp `reports/cycle_<ngày>.md`.
+   - Sổ đổi sau vòng học (dự báo hay phân định mới) thì `reports/scorecard.json` là **STALE**: `python tools/validate.py` in CẢNH BÁO kèm số dòng/sha256 lệch. Bản STALE không dùng để nói về năng lực; chờ vòng học kế tiếp. Điểm năng lực chỉ nằm ở `issue_forecasts.scores` và chỉ có khi xuất xứ do GitHub xác nhận; `raw_audit` không phải điểm năng lực.
 
 ## 8. Chấm và gộp một PR (L-09, L-10)
 1. PR phải có hai dòng trong mô tả: `authored_by: <ghế viết>` và `reviewed_by:` (để trống lúc mở).
