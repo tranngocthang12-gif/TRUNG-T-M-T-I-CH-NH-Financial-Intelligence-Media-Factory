@@ -228,7 +228,8 @@ class Test5MonthlyPriceStore(_Repo):
         with gzip.open(gz, "rt", encoding="utf-8") as f:
             last_frozen = max(line.split(",", 1)[0] for line in list(f)[1:] if line.strip())
         self.assertEqual(last_frozen, "2026-11-16")                         # kho cũ dừng 16/11/2026
-        self.assertEqual(laws_checks.price_data_as_of(self.repo), "2026-11-16")
+        # The monthly store may have advanced after a real weekly cycle.
+        self.assertGreaterEqual(laws_checks.price_data_as_of(self.repo), last_frozen)
         self.cycle_scorecard("2026-11-20")
         self.assertEqual(self.status()[0], "FRESH")
         self._month(["2026-11-20,VCB,90000,91000,89500,90500,1000000,2026-11-20 16:00:00,yahoo\n",
