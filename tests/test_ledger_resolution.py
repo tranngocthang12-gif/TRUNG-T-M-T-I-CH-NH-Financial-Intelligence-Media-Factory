@@ -1336,7 +1336,7 @@ class TrialRegistryTests(unittest.TestCase):
         def check(t):
             tp.write_text(t, encoding="utf-8"); return laws_checks.check_trial_registry(self.tmp)
         self.assertEqual(check(text), [])
-        self.assertEqual(check(text + "T99999,2026-11-20,x,M-x,mom_60,ridge,0,0,0,0,3.7,REJECTED,{}\n"), [])   # thêm dòng: việc của kiểm toán PR
+        self.assertEqual(check(text + "T99999,2026-11-20,x,M-x,mom_60,ridge,0,0,0,0,3.7,REJECTED,{},,,,\n"), [])   # thêm dòng: việc của kiểm toán PR
         first = text.split("\n")[1]
         num = first.split(",")[6]
         self.assertTrue(any("đã ghim" in e for e in check(text.replace(num, num[:-1] + ("1" if num[-1] != "1" else "2"), 1))))   # sửa một chữ số
