@@ -105,7 +105,8 @@
    "title": "Luật Các tổ chức tín dụng số 32/2024/QH15",
    "issuer": "Quốc hội",
    "kind": "LAW",
-   "status": "QUEUED"
+   "status": "QUEUED",
+   "note": "Pending review ADR-0014: hai PDF Công báo đã ghim. Trang PDF 94 của cb-369-370 là trang in Văn phòng Chính phủ xuất bản, không phải điều khoản, đã ghi excluded_pages; chưa có pdf_check của ghế khác. Không SOURCED."
   },
   {
    "doc_id": "tt_41_2016_car",

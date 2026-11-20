@@ -1,6 +1,6 @@
 {
   "schema": "ttc-source-manifest/v1",
-  "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day. sha256 va bytes LUON la text.md, khong phai PDF. Moi dong phai co original_sha256, original_bytes, original_path (trong library/sources/<doc_id>/, khong phai text.md), text_sha256 va text_bytes (phai trung sha256/bytes). Bo cac truong do la loi cong nguon, khong con duong vong. Hai hash khong duoc trung. Hash tung trang tinh ca bang, khong chi doan van. SOURCED va ghi chu CITED/TESTED/PROVEN can them pdf_check da doi chieu PDF; hash tu sinh khong du. Luat Ke toan 88/2015 da ghim 88.signed.pdf va SOURCED; ghi chu KN-T2 van DRAFT vi nguoi doi chieu PDF trung ghe nguoi doc. Cac truong con lai: issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08, ADR-0012).",
+  "note": "Moi tai lieu goc chep vao library/sources/<doc_id>/ ghim o day. sha256 va bytes LUON la text.md, khong phai PDF. Moi dong phai co original_sha256, original_bytes, original_path (trong library/sources/<doc_id>/, khong phai text.md), text_sha256 va text_bytes (phai trung sha256/bytes). Bo cac truong do la loi cong nguon, khong con duong vong. Hai hash khong duoc trung. Hash tung trang tinh ca bang, khong chi doan van. SOURCED va ghi chu CITED/TESTED/PROVEN can them pdf_check da doi chieu PDF; hash tu sinh khong du. Luat Ke toan 88/2015 da ghim 88.signed.pdf va SOURCED; ghi chu KN-T2 van DRAFT vi nguoi doi chieu PDF trung ghe nguoi doc. Cac truong con lai: issuer, issued_on, accessed_on, source_url, legal_status (theo governance/DATA_SOURCES.yaml), license, effective_from, effective_to, superseded_by (L-01, L-04, L-08, ADR-0012). ADR-0014: N>=2 PDF dung original_parts thay ba truong original_*; khong khai ca hai; chua co pdf_check thi khong SOURCED.",
   "files": {
     "luat_ke_toan_88_2015": {
       "sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
@@ -281,6 +281,1727 @@
           "text_sha256": "4fe0cc2c138e0cf97481a1df3908ddfe4bbd815d62c2739078b63e2d9f1d435c",
           "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50"
         }
+      }
+    },
+    "luat_tctd_32_2024": {
+      "sha256": "8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a",
+      "bytes": 406064,
+      "issuer": "Quốc hội",
+      "issued_on": "2024-01-18",
+      "accessed_on": "2026-11-20",
+      "source_url": "https://congbao.chinhphu.vn/van-ban/luat-so-32-2024-qh15-41339.htm",
+      "data_source": "Công báo / Cổng TTĐT Chính phủ",
+      "legal_status": "Văn bản quy phạm gốc: Luật số 32/2024/QH15, Quốc hội thông qua ngày 18/01/2024, đăng Công báo số 369+370 và 371+372 ngày 02-3-2024. Hiệu lực chính từ 01/07/2024 (Điều 209 khoản 1). Khoản 3 Điều 200 và khoản 15 Điều 210 hiệu lực 01/01/2025 (Điều 209 khoản 2). Bản ghim là hai PDF Công báo, không phải văn bản hợp nhất và không gồm sửa đổi sau ngày đăng Công báo này. Chưa có pdf_check.",
+      "license": "public-domain-vn-law",
+      "kind": "LAW",
+      "effective_from": "2024-07-01",
+      "effective_to": null,
+      "superseded_by": null,
+      "text_sha256": "8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a",
+      "text_bytes": 406064,
+      "original_parts": [
+        {
+          "part_id": "cb-369-370",
+          "original_path": "library/sources/luat_tctd_32_2024/cb-369-370.pdf",
+          "source_url": "https://g7.cdnchinhphu.vn/api/download/stream?Url=tm-8mq6BhNw0NbrKRhTDAQWsKg3tuqaY0aWypnY78U6M2BY68Ekp0Gvvr483flbRtICl0HLB9eVKMAY6fmJWglZdAFE53pzPMjSRr4mauvsglWSoLhCVrPIzjkJjN0XK9iE1E9GPhRevvB12NY7-lg~~&file_name=2024_369+%2b+370_32-2024-QH15.pdf",
+          "original_sha256": "b613a8f94e1955a776035be2b7cd14dc34a76c568973f8db7367324ebf50581a",
+          "original_bytes": 1188965,
+          "page_count": 94
+        },
+        {
+          "part_id": "cb-371-372",
+          "original_path": "library/sources/luat_tctd_32_2024/cb-371-372.pdf",
+          "source_url": "https://g7.cdnchinhphu.vn/api/download/stream?Url=tm-8mq6BhNw0NbrKRhTDAQWsKg3tuqaY0aWypnY78U6M2BY68Ekp0Gvvr483flbR_hq1hOoPpjWGUJKewKc2jtPOPu2Ks7ajeFoz3NAmdcVMQYCoVjm-3sPYJHrS1GpKYj-JBbwrX7dTu3g_SI2-gQ~~&file_name=2024_371+%2b+372_32-2024-QH15.pdf",
+          "original_sha256": "67852f403c7f368989ef47f98a47933d732d3d6b9d2db40cda2a9af84b969c49",
+          "original_bytes": 741096,
+          "page_count": 59
+        }
+      ],
+      "page_map": [
+        {
+          "text_page": 1,
+          "part_id": "cb-369-370",
+          "pdf_page": 1
+        },
+        {
+          "text_page": 2,
+          "part_id": "cb-369-370",
+          "pdf_page": 2
+        },
+        {
+          "text_page": 3,
+          "part_id": "cb-369-370",
+          "pdf_page": 3
+        },
+        {
+          "text_page": 4,
+          "part_id": "cb-369-370",
+          "pdf_page": 4
+        },
+        {
+          "text_page": 5,
+          "part_id": "cb-369-370",
+          "pdf_page": 5
+        },
+        {
+          "text_page": 6,
+          "part_id": "cb-369-370",
+          "pdf_page": 6
+        },
+        {
+          "text_page": 7,
+          "part_id": "cb-369-370",
+          "pdf_page": 7
+        },
+        {
+          "text_page": 8,
+          "part_id": "cb-369-370",
+          "pdf_page": 8
+        },
+        {
+          "text_page": 9,
+          "part_id": "cb-369-370",
+          "pdf_page": 9
+        },
+        {
+          "text_page": 10,
+          "part_id": "cb-369-370",
+          "pdf_page": 10
+        },
+        {
+          "text_page": 11,
+          "part_id": "cb-369-370",
+          "pdf_page": 11
+        },
+        {
+          "text_page": 12,
+          "part_id": "cb-369-370",
+          "pdf_page": 12
+        },
+        {
+          "text_page": 13,
+          "part_id": "cb-369-370",
+          "pdf_page": 13
+        },
+        {
+          "text_page": 14,
+          "part_id": "cb-369-370",
+          "pdf_page": 14
+        },
+        {
+          "text_page": 15,
+          "part_id": "cb-369-370",
+          "pdf_page": 15
+        },
+        {
+          "text_page": 16,
+          "part_id": "cb-369-370",
+          "pdf_page": 16
+        },
+        {
+          "text_page": 17,
+          "part_id": "cb-369-370",
+          "pdf_page": 17
+        },
+        {
+          "text_page": 18,
+          "part_id": "cb-369-370",
+          "pdf_page": 18
+        },
+        {
+          "text_page": 19,
+          "part_id": "cb-369-370",
+          "pdf_page": 19
+        },
+        {
+          "text_page": 20,
+          "part_id": "cb-369-370",
+          "pdf_page": 20
+        },
+        {
+          "text_page": 21,
+          "part_id": "cb-369-370",
+          "pdf_page": 21
+        },
+        {
+          "text_page": 22,
+          "part_id": "cb-369-370",
+          "pdf_page": 22
+        },
+        {
+          "text_page": 23,
+          "part_id": "cb-369-370",
+          "pdf_page": 23
+        },
+        {
+          "text_page": 24,
+          "part_id": "cb-369-370",
+          "pdf_page": 24
+        },
+        {
+          "text_page": 25,
+          "part_id": "cb-369-370",
+          "pdf_page": 25
+        },
+        {
+          "text_page": 26,
+          "part_id": "cb-369-370",
+          "pdf_page": 26
+        },
+        {
+          "text_page": 27,
+          "part_id": "cb-369-370",
+          "pdf_page": 27
+        },
+        {
+          "text_page": 28,
+          "part_id": "cb-369-370",
+          "pdf_page": 28
+        },
+        {
+          "text_page": 29,
+          "part_id": "cb-369-370",
+          "pdf_page": 29
+        },
+        {
+          "text_page": 30,
+          "part_id": "cb-369-370",
+          "pdf_page": 30
+        },
+        {
+          "text_page": 31,
+          "part_id": "cb-369-370",
+          "pdf_page": 31
+        },
+        {
+          "text_page": 32,
+          "part_id": "cb-369-370",
+          "pdf_page": 32
+        },
+        {
+          "text_page": 33,
+          "part_id": "cb-369-370",
+          "pdf_page": 33
+        },
+        {
+          "text_page": 34,
+          "part_id": "cb-369-370",
+          "pdf_page": 34
+        },
+        {
+          "text_page": 35,
+          "part_id": "cb-369-370",
+          "pdf_page": 35
+        },
+        {
+          "text_page": 36,
+          "part_id": "cb-369-370",
+          "pdf_page": 36
+        },
+        {
+          "text_page": 37,
+          "part_id": "cb-369-370",
+          "pdf_page": 37
+        },
+        {
+          "text_page": 38,
+          "part_id": "cb-369-370",
+          "pdf_page": 38
+        },
+        {
+          "text_page": 39,
+          "part_id": "cb-369-370",
+          "pdf_page": 39
+        },
+        {
+          "text_page": 40,
+          "part_id": "cb-369-370",
+          "pdf_page": 40
+        },
+        {
+          "text_page": 41,
+          "part_id": "cb-369-370",
+          "pdf_page": 41
+        },
+        {
+          "text_page": 42,
+          "part_id": "cb-369-370",
+          "pdf_page": 42
+        },
+        {
+          "text_page": 43,
+          "part_id": "cb-369-370",
+          "pdf_page": 43
+        },
+        {
+          "text_page": 44,
+          "part_id": "cb-369-370",
+          "pdf_page": 44
+        },
+        {
+          "text_page": 45,
+          "part_id": "cb-369-370",
+          "pdf_page": 45
+        },
+        {
+          "text_page": 46,
+          "part_id": "cb-369-370",
+          "pdf_page": 46
+        },
+        {
+          "text_page": 47,
+          "part_id": "cb-369-370",
+          "pdf_page": 47
+        },
+        {
+          "text_page": 48,
+          "part_id": "cb-369-370",
+          "pdf_page": 48
+        },
+        {
+          "text_page": 49,
+          "part_id": "cb-369-370",
+          "pdf_page": 49
+        },
+        {
+          "text_page": 50,
+          "part_id": "cb-369-370",
+          "pdf_page": 50
+        },
+        {
+          "text_page": 51,
+          "part_id": "cb-369-370",
+          "pdf_page": 51
+        },
+        {
+          "text_page": 52,
+          "part_id": "cb-369-370",
+          "pdf_page": 52
+        },
+        {
+          "text_page": 53,
+          "part_id": "cb-369-370",
+          "pdf_page": 53
+        },
+        {
+          "text_page": 54,
+          "part_id": "cb-369-370",
+          "pdf_page": 54
+        },
+        {
+          "text_page": 55,
+          "part_id": "cb-369-370",
+          "pdf_page": 55
+        },
+        {
+          "text_page": 56,
+          "part_id": "cb-369-370",
+          "pdf_page": 56
+        },
+        {
+          "text_page": 57,
+          "part_id": "cb-369-370",
+          "pdf_page": 57
+        },
+        {
+          "text_page": 58,
+          "part_id": "cb-369-370",
+          "pdf_page": 58
+        },
+        {
+          "text_page": 59,
+          "part_id": "cb-369-370",
+          "pdf_page": 59
+        },
+        {
+          "text_page": 60,
+          "part_id": "cb-369-370",
+          "pdf_page": 60
+        },
+        {
+          "text_page": 61,
+          "part_id": "cb-369-370",
+          "pdf_page": 61
+        },
+        {
+          "text_page": 62,
+          "part_id": "cb-369-370",
+          "pdf_page": 62
+        },
+        {
+          "text_page": 63,
+          "part_id": "cb-369-370",
+          "pdf_page": 63
+        },
+        {
+          "text_page": 64,
+          "part_id": "cb-369-370",
+          "pdf_page": 64
+        },
+        {
+          "text_page": 65,
+          "part_id": "cb-369-370",
+          "pdf_page": 65
+        },
+        {
+          "text_page": 66,
+          "part_id": "cb-369-370",
+          "pdf_page": 66
+        },
+        {
+          "text_page": 67,
+          "part_id": "cb-369-370",
+          "pdf_page": 67
+        },
+        {
+          "text_page": 68,
+          "part_id": "cb-369-370",
+          "pdf_page": 68
+        },
+        {
+          "text_page": 69,
+          "part_id": "cb-369-370",
+          "pdf_page": 69
+        },
+        {
+          "text_page": 70,
+          "part_id": "cb-369-370",
+          "pdf_page": 70
+        },
+        {
+          "text_page": 71,
+          "part_id": "cb-369-370",
+          "pdf_page": 71
+        },
+        {
+          "text_page": 72,
+          "part_id": "cb-369-370",
+          "pdf_page": 72
+        },
+        {
+          "text_page": 73,
+          "part_id": "cb-369-370",
+          "pdf_page": 73
+        },
+        {
+          "text_page": 74,
+          "part_id": "cb-369-370",
+          "pdf_page": 74
+        },
+        {
+          "text_page": 75,
+          "part_id": "cb-369-370",
+          "pdf_page": 75
+        },
+        {
+          "text_page": 76,
+          "part_id": "cb-369-370",
+          "pdf_page": 76
+        },
+        {
+          "text_page": 77,
+          "part_id": "cb-369-370",
+          "pdf_page": 77
+        },
+        {
+          "text_page": 78,
+          "part_id": "cb-369-370",
+          "pdf_page": 78
+        },
+        {
+          "text_page": 79,
+          "part_id": "cb-369-370",
+          "pdf_page": 79
+        },
+        {
+          "text_page": 80,
+          "part_id": "cb-369-370",
+          "pdf_page": 80
+        },
+        {
+          "text_page": 81,
+          "part_id": "cb-369-370",
+          "pdf_page": 81
+        },
+        {
+          "text_page": 82,
+          "part_id": "cb-369-370",
+          "pdf_page": 82
+        },
+        {
+          "text_page": 83,
+          "part_id": "cb-369-370",
+          "pdf_page": 83
+        },
+        {
+          "text_page": 84,
+          "part_id": "cb-369-370",
+          "pdf_page": 84
+        },
+        {
+          "text_page": 85,
+          "part_id": "cb-369-370",
+          "pdf_page": 85
+        },
+        {
+          "text_page": 86,
+          "part_id": "cb-369-370",
+          "pdf_page": 86
+        },
+        {
+          "text_page": 87,
+          "part_id": "cb-369-370",
+          "pdf_page": 87
+        },
+        {
+          "text_page": 88,
+          "part_id": "cb-369-370",
+          "pdf_page": 88
+        },
+        {
+          "text_page": 89,
+          "part_id": "cb-369-370",
+          "pdf_page": 89
+        },
+        {
+          "text_page": 90,
+          "part_id": "cb-369-370",
+          "pdf_page": 90
+        },
+        {
+          "text_page": 91,
+          "part_id": "cb-369-370",
+          "pdf_page": 91
+        },
+        {
+          "text_page": 92,
+          "part_id": "cb-369-370",
+          "pdf_page": 92
+        },
+        {
+          "text_page": 93,
+          "part_id": "cb-369-370",
+          "pdf_page": 93
+        },
+        {
+          "text_page": 94,
+          "part_id": "cb-371-372",
+          "pdf_page": 1
+        },
+        {
+          "text_page": 95,
+          "part_id": "cb-371-372",
+          "pdf_page": 2
+        },
+        {
+          "text_page": 96,
+          "part_id": "cb-371-372",
+          "pdf_page": 3
+        },
+        {
+          "text_page": 97,
+          "part_id": "cb-371-372",
+          "pdf_page": 4
+        },
+        {
+          "text_page": 98,
+          "part_id": "cb-371-372",
+          "pdf_page": 5
+        },
+        {
+          "text_page": 99,
+          "part_id": "cb-371-372",
+          "pdf_page": 6
+        },
+        {
+          "text_page": 100,
+          "part_id": "cb-371-372",
+          "pdf_page": 7
+        },
+        {
+          "text_page": 101,
+          "part_id": "cb-371-372",
+          "pdf_page": 8
+        },
+        {
+          "text_page": 102,
+          "part_id": "cb-371-372",
+          "pdf_page": 9
+        },
+        {
+          "text_page": 103,
+          "part_id": "cb-371-372",
+          "pdf_page": 10
+        },
+        {
+          "text_page": 104,
+          "part_id": "cb-371-372",
+          "pdf_page": 11
+        },
+        {
+          "text_page": 105,
+          "part_id": "cb-371-372",
+          "pdf_page": 12
+        },
+        {
+          "text_page": 106,
+          "part_id": "cb-371-372",
+          "pdf_page": 13
+        },
+        {
+          "text_page": 107,
+          "part_id": "cb-371-372",
+          "pdf_page": 14
+        },
+        {
+          "text_page": 108,
+          "part_id": "cb-371-372",
+          "pdf_page": 15
+        },
+        {
+          "text_page": 109,
+          "part_id": "cb-371-372",
+          "pdf_page": 16
+        },
+        {
+          "text_page": 110,
+          "part_id": "cb-371-372",
+          "pdf_page": 17
+        },
+        {
+          "text_page": 111,
+          "part_id": "cb-371-372",
+          "pdf_page": 18
+        },
+        {
+          "text_page": 112,
+          "part_id": "cb-371-372",
+          "pdf_page": 19
+        },
+        {
+          "text_page": 113,
+          "part_id": "cb-371-372",
+          "pdf_page": 20
+        },
+        {
+          "text_page": 114,
+          "part_id": "cb-371-372",
+          "pdf_page": 21
+        },
+        {
+          "text_page": 115,
+          "part_id": "cb-371-372",
+          "pdf_page": 22
+        },
+        {
+          "text_page": 116,
+          "part_id": "cb-371-372",
+          "pdf_page": 23
+        },
+        {
+          "text_page": 117,
+          "part_id": "cb-371-372",
+          "pdf_page": 24
+        },
+        {
+          "text_page": 118,
+          "part_id": "cb-371-372",
+          "pdf_page": 25
+        },
+        {
+          "text_page": 119,
+          "part_id": "cb-371-372",
+          "pdf_page": 26
+        },
+        {
+          "text_page": 120,
+          "part_id": "cb-371-372",
+          "pdf_page": 27
+        },
+        {
+          "text_page": 121,
+          "part_id": "cb-371-372",
+          "pdf_page": 28
+        },
+        {
+          "text_page": 122,
+          "part_id": "cb-371-372",
+          "pdf_page": 29
+        },
+        {
+          "text_page": 123,
+          "part_id": "cb-371-372",
+          "pdf_page": 30
+        },
+        {
+          "text_page": 124,
+          "part_id": "cb-371-372",
+          "pdf_page": 31
+        },
+        {
+          "text_page": 125,
+          "part_id": "cb-371-372",
+          "pdf_page": 32
+        },
+        {
+          "text_page": 126,
+          "part_id": "cb-371-372",
+          "pdf_page": 33
+        },
+        {
+          "text_page": 127,
+          "part_id": "cb-371-372",
+          "pdf_page": 34
+        },
+        {
+          "text_page": 128,
+          "part_id": "cb-371-372",
+          "pdf_page": 35
+        },
+        {
+          "text_page": 129,
+          "part_id": "cb-371-372",
+          "pdf_page": 36
+        },
+        {
+          "text_page": 130,
+          "part_id": "cb-371-372",
+          "pdf_page": 37
+        },
+        {
+          "text_page": 131,
+          "part_id": "cb-371-372",
+          "pdf_page": 38
+        },
+        {
+          "text_page": 132,
+          "part_id": "cb-371-372",
+          "pdf_page": 39
+        },
+        {
+          "text_page": 133,
+          "part_id": "cb-371-372",
+          "pdf_page": 40
+        },
+        {
+          "text_page": 134,
+          "part_id": "cb-371-372",
+          "pdf_page": 41
+        },
+        {
+          "text_page": 135,
+          "part_id": "cb-371-372",
+          "pdf_page": 42
+        },
+        {
+          "text_page": 136,
+          "part_id": "cb-371-372",
+          "pdf_page": 43
+        },
+        {
+          "text_page": 137,
+          "part_id": "cb-371-372",
+          "pdf_page": 44
+        },
+        {
+          "text_page": 138,
+          "part_id": "cb-371-372",
+          "pdf_page": 45
+        },
+        {
+          "text_page": 139,
+          "part_id": "cb-371-372",
+          "pdf_page": 46
+        },
+        {
+          "text_page": 140,
+          "part_id": "cb-371-372",
+          "pdf_page": 47
+        },
+        {
+          "text_page": 141,
+          "part_id": "cb-371-372",
+          "pdf_page": 48
+        },
+        {
+          "text_page": 142,
+          "part_id": "cb-371-372",
+          "pdf_page": 49
+        },
+        {
+          "text_page": 143,
+          "part_id": "cb-371-372",
+          "pdf_page": 50
+        },
+        {
+          "text_page": 144,
+          "part_id": "cb-371-372",
+          "pdf_page": 51
+        },
+        {
+          "text_page": 145,
+          "part_id": "cb-371-372",
+          "pdf_page": 52
+        },
+        {
+          "text_page": 146,
+          "part_id": "cb-371-372",
+          "pdf_page": 53
+        },
+        {
+          "text_page": 147,
+          "part_id": "cb-371-372",
+          "pdf_page": 54
+        },
+        {
+          "text_page": 148,
+          "part_id": "cb-371-372",
+          "pdf_page": 55
+        },
+        {
+          "text_page": 149,
+          "part_id": "cb-371-372",
+          "pdf_page": 56
+        },
+        {
+          "text_page": 150,
+          "part_id": "cb-371-372",
+          "pdf_page": 57
+        },
+        {
+          "text_page": 151,
+          "part_id": "cb-371-372",
+          "pdf_page": 58
+        },
+        {
+          "text_page": 152,
+          "part_id": "cb-371-372",
+          "pdf_page": 59
+        }
+      ],
+      "excluded_pages": [
+        {
+          "part_id": "cb-369-370",
+          "pdf_page": 94,
+          "reason": "Trang PDF 94 là trang in của Văn phòng Chính phủ xuất bản (địa chỉ, điện thoại, email congbao@chinhphu.vn), chữ vẽ bằng path, không có toán tử chữ. Không chứa điều khoản của Luật 32/2024/QH15. Điều 131 nằm ở PDF trang 93."
+        }
+      ],
+      "crosscheck": {
+        "method": "page-by-page",
+        "pages": [
+          {
+            "page": 1,
+            "sha256": "4305c26178507862f7827902d0b98a69130a2d57e349518318c2048dea883a27",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 3 QUỐC",
+            "tail": "sớm, giải thể, chấm dứt hoạt động của"
+          },
+          {
+            "page": 2,
+            "sha256": "5e7bf6e114f173325752dce89c2d3be85a030a833ab318f33505fcf5be6a39ec",
+            "head": "4 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 chi",
+            "tail": "và các nghiệp vụ cấp tín dụng khác."
+          },
+          {
+            "page": 3,
+            "sha256": "2c2b182f54a737a331ceee5c7d36a65f951212e0a24035d7e0b9460f587047a1",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 5 5.",
+            "tail": "ty con của tổ chức tín dụng đó."
+          },
+          {
+            "page": 4,
+            "sha256": "061a78b1d52e3215f3b08973ae958fa4e46eb4a1f43a71f4e925dfba961516db",
+            "head": "6 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 12.",
+            "tail": "tín dụng, chi nhánh ngân hàng nước ngoài."
+          },
+          {
+            "page": 5,
+            "sha256": "1fdcfd574aec2beb5e46a5654f75df2eacb85ebcb1fc8eb2bfff6d926139ca48",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 7 21.",
+            "tail": "ruột, chú ruột, cậu ruột và cháu ruột;"
+          },
+          {
+            "page": 6,
+            "sha256": "494ef9b44210c68877e70bddafbaed159d227be92b58bfda79aba856b4a69e48",
+            "head": "8 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 đ)",
+            "tail": "nhượng toàn bộ cổ phần, phần vốn góp;"
+          },
+          {
+            "page": 7,
+            "sha256": "852031a1d6150cfbd2f770595d6a09a03a275a6b80de526a9316a55340a0aeb5",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 9 c)",
+            "tail": "vi mô và quỹ tín dụng nhân dân."
+          },
+          {
+            "page": 8,
+            "sha256": "2af1b88fdc689658641b1a0fe390068b91b67d918193c96cfbe6db61d82caa39",
+            "head": "10 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 39.",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 9,
+            "sha256": "5389d1cd7622711c6fc0aa7b60f972bba2f39774bcfce39902f66004b52a07b6",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 11 Điều",
+            "tail": "phù hợp với quy định của pháp luật."
+          },
+          {
+            "page": 10,
+            "sha256": "597bc22bc219912bff6de40a510d9f2c11017b20f9c1434ae2b85558d3e895aa",
+            "head": "12 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "tín dụng, chi nhánh ngân hàng nước ngoài."
+          },
+          {
+            "page": 11,
+            "sha256": "92e21c0d550fbce0b3ae6898145fb21f265f5fb468ee0f853190ef19f43f95af",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 13 Điều",
+            "tail": "cấp thông tin, tài liệu, dữ liệu đó."
+          },
+          {
+            "page": 12,
+            "sha256": "b1bc545cf67aab02baa7cc0f5ddb40cad37e6fe7d8f5d5b42d01d62cc55bf49a",
+            "head": "14 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "dịch vụ ngân hàng dưới mọi hình thức."
+          },
+          {
+            "page": 13,
+            "sha256": "7dac0c4526ac8c987d4b54dde2f7db3bfd5a9ed04b036b43a3b5b73c16f2dca1",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 15 Chương",
+            "tail": "Thủ tướng Chính phủ bổ nhiệm, miễn nhiệm."
+          },
+          {
+            "page": 14,
+            "sha256": "928788ab268278a373be82d7104e904849552100d1c6ad103554dff4d7663afb",
+            "head": "16 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 4.",
+            "tail": "hoạt động theo quy định của pháp luật."
+          },
+          {
+            "page": 15,
+            "sha256": "96eb9b1ef20349b3cafc5eeddd75e6eaf8da3ec764c18520495c3f9840913ac1",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 17 Điều",
+            "tail": "cấp tối thiểu bằng mức vốn pháp định."
+          },
+          {
+            "page": 16,
+            "sha256": "82d62518644f7b88035d813384754f5dd222f5c9074514847ceb162692050d9f",
+            "head": "18 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 3.",
+            "tail": "tín dụng nước ngoài đặt trụ sở chính;"
+          },
+          {
+            "page": 17,
+            "sha256": "c230da66bb8de98d05fe25231e88171ca0ad409b8cdf4a3a75bc508754737ab4",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 19 d)",
+            "tail": "phép hoạt động ngân hàng ở nước ngoài;"
+          },
+          {
+            "page": 18,
+            "sha256": "912a1493aebad34e487a94dd71ae49a6a79bb3269a8353f6ee991db5e6c3e2f7",
+            "head": "20 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 b)",
+            "tail": "nước ngoài, văn phòng đại diện nước ngoài;"
+          },
+          {
+            "page": 19,
+            "sha256": "5259b80661df15a802dae881713a5abaa4b2f2dd47a2062c50e370e10ba00aef",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 21 2.",
+            "tail": "quy định tại Điều 33 của Luật này."
+          },
+          {
+            "page": 20,
+            "sha256": "f6bccdc03e6e61241685f6786e04624be753e90ebfba999837a363f4cce5e0dc",
+            "head": "22 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 3.",
+            "tail": "đảm an toàn trong hoạt động ngân hàng;"
+          },
+          {
+            "page": 21,
+            "sha256": "3d57b8cb12601448dcdba1a90b56d468ac2362dc8e876f90cfe00d8137dbfae2",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 23 e)",
+            "tail": "tại khoản 1 Điều 77 của Luật này;"
+          },
+          {
+            "page": 22,
+            "sha256": "edcd092f35831fa42debc03bac94a1d79b6d3521ce941a3f7c3228d0765189e1",
+            "head": "24 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 e)",
+            "tail": "hiện diện thương mại khác ở nước ngoài."
+          },
+          {
+            "page": 23,
+            "sha256": "e1fe13f899b85af8c0472b3773334ec8177ad62f64d900b0ad88f98639b8915d",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 25 2.",
+            "tail": "nguyên tắc giải quyết tranh chấp nội bộ;"
+          },
+          {
+            "page": 24,
+            "sha256": "ac113c6d310adc5edd60358c549c118c6d5c3acbd380b95cd3fadd04ce978a3f",
+            "head": "26 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 m)",
+            "tail": "quy định tại Điều 82 của Luật này."
+          },
+          {
+            "page": 25,
+            "sha256": "d0362289ea3aaa0bae388ba79357110b61ea0eb09eb06632cc522e646a48d94f",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 27 Điều",
+            "tail": "nào trong 05 năm liền kề trước đó."
+          },
+          {
+            "page": 26,
+            "sha256": "86f0d01d413e5aec3bc1fb6de2c079f24e96e52c7c8badaf7d4d27db0f8b020b",
+            "head": "28 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 3.",
+            "tail": "vực chuyên môn mà mình sẽ đảm nhiệm;"
+          },
+          {
+            "page": 27,
+            "sha256": "0d63877ac910d0c67d32c546a8238f87ba612b4805064aa8e3e468ff1b68dbee",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 29 c)",
+            "tail": "a khoản 2 Điều 77 của Luật này;"
+          },
+          {
+            "page": 28,
+            "sha256": "73f79b30d06803429690ad0717a0afeace6788f06e4e9d71dd41471cab848387",
+            "head": "30 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 e)",
+            "tail": "tại Điều lệ của tổ chức tín dụng."
+          },
+          {
+            "page": 29,
+            "sha256": "ec0869e96dddf037db25978ceb9b6ab2fcb0dc2c0c4aa95a8cb8be4419542f1c",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 31 3.",
+            "tail": "tổ chức tín dụng khác, doanh nghiệp khác."
+          },
+          {
+            "page": 30,
+            "sha256": "93596b11878043f82c800a03c30a1c38a2fca3a8103294742f3f568833206c73",
+            "head": "32 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 4.",
+            "tail": "danh quy định tại khoản 1 Điều này."
+          },
+          {
+            "page": 31,
+            "sha256": "3337e0e6fb81f9ea5b16b8758799576e3b573883856c7b7557b1d359eec0620b",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 33 3.",
+            "tail": "định của mình trong thời gian đương nhiệm."
+          },
+          {
+            "page": 32,
+            "sha256": "2e64be628c125d3bd5d5d524fa598472d05de1c6cc826fb6f1c87de1fe597abb",
+            "head": "34 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "của pháp luật có liên quan trong quá"
+          },
+          {
+            "page": 33,
+            "sha256": "1a4e2c368b574b18906884fd9897becf508d50d897bd6e323ec6825c509664c5",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 35 trình",
+            "tail": "trong hoạt động của tổ chức tín dụng."
+          },
+          {
+            "page": 34,
+            "sha256": "2eb2370056e039b7eaf070d92cc8b09a8b7ac56e3a4b7b9ff49f54117f9c4082",
+            "head": "36 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 7.",
+            "tail": "quan hệ với người cung cấp thông tin;"
+          },
+          {
+            "page": 35,
+            "sha256": "584d32abcbd54355097d3df6bcddcb8e29fc9f47f383a8fd022f5275dfee3a06",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 37 d)",
+            "tail": "trở lên của tổ chức tín dụng và"
+          },
+          {
+            "page": 36,
+            "sha256": "6c48d5229fdb4a6232c8c8dc09bf48094bb7975dac927b37255315796f515a4f",
+            "head": "38 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 thông",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 37,
+            "sha256": "571b482f78b136a5d8faa421a0e9472575140b99384cafb3fd01a3296cec9184",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 39 Điều",
+            "tail": "chức tín dụng về kế toán, báo cáo."
+          },
+          {
+            "page": 38,
+            "sha256": "f5b703bb4aadb0d691ee553094619923eadcd12769abac0176f2e14615ca1367",
+            "head": "40 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 3.",
+            "tail": "lệ, quy định nội bộ của tổ chức"
+          },
+          {
+            "page": 39,
+            "sha256": "a0f68f28fc37d262a97ed9944b8424f1b6055ee9f8f846aa2ed50c32e822981c",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 41 tín",
+            "tail": "trị, Hội đồng thành viên họp bất thường."
+          },
+          {
+            "page": 40,
+            "sha256": "74e4da6607e84281a8df6d1c8f8270b83403ec0497c933874f73d6bf39287362",
+            "head": "42 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 5.",
+            "tail": "quản lý, điều hành tổ chức tín dụng."
+          },
+          {
+            "page": 41,
+            "sha256": "7b87992f0cca4d8b73f4339eb11914d71a2cfd03061eedcdd3c3fea64b60ec50",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 43 6.",
+            "tail": "kinh doanh, hệ thống thông tin quản lý."
+          },
+          {
+            "page": 42,
+            "sha256": "4fbe35f67b175fd78487cd21b6be9457b40aa41178025c199b49e746a76915f5",
+            "head": "44 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 6.",
+            "tail": "chính sách, quy trình, quy định nội bộ."
+          },
+          {
+            "page": 43,
+            "sha256": "a8d2f5cd8698c14b6263d3a9f509054f7043cd511a2e827c1c5a99bf8d6001c5",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 45 3.",
+            "tail": "phần phổ thông là cổ đông phổ thông."
+          },
+          {
+            "page": 44,
+            "sha256": "5e88f06a3b5e299e714b05c0dc2fedded14af5981e3d9d84f584d841b0af2087",
+            "head": "46 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 2.",
+            "tail": "nghị quyết của Đại hội đồng cổ đông."
+          },
+          {
+            "page": 45,
+            "sha256": "11f11905acb436f7b1fc0a364e0d85982f9adb5e43b9b4ced3df30934cfe397a",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 47 6.",
+            "tail": "phải thực hiện các nghĩa vụ sau đây:"
+          },
+          {
+            "page": 46,
+            "sha256": "27a9b564de5553edf0d86442de9c0342eef444ed368e2d0e826885736b3a6021",
+            "head": "48 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 a)",
+            "tail": "điều lệ của một tổ chức tín dụng."
+          },
+          {
+            "page": 47,
+            "sha256": "5669886c194d62f0f274edc031661acb48af9d6f85b7884a404ed2c7d1bb2e64",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 49 2.",
+            "tail": "mình trong thời gian đảm nhiệm chức vụ."
+          },
+          {
+            "page": 48,
+            "sha256": "22e3d5d21780762db87dd5ea0cbba5f6c2a29daa5132fccb11736a238ea4bf83",
+            "head": "50 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Người",
+            "tail": "trong thời hạn 30 ngày kể từ ngày"
+          },
+          {
+            "page": 49,
+            "sha256": "02ab670b2a5646a098b46e09cd305fc09a8c6e80aca4829728a53815762f425d",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 51 khai",
+            "tail": "và Điều lệ của tổ chức tín dụng;"
+          },
+          {
+            "page": 50,
+            "sha256": "2baf092c7b6f65c458feddfc0fe3c7f017c91ab1aa0339296fbd2dba9d6efb37",
+            "head": "52 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 đ)",
+            "tail": "chức tín dụng giữa tổ chức tín dụng"
+          },
+          {
+            "page": 51,
+            "sha256": "01ad5cd96d03236b9a40ef3bb9560e68ab4cd7342b5795710287ce17a8d553c0",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 53 với",
+            "tail": "tại cuộc họp Đại hội đồng cổ đông."
+          },
+          {
+            "page": 52,
+            "sha256": "89f5d734c124230ea289760ac543ceccadb38ce2fbb445a336f1d47d8bf0c120",
+            "head": "54 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "vị sự nghiệp của tổ chức tín dụng."
+          },
+          {
+            "page": 53,
+            "sha256": "fd2797991fd91abfed00ccc993d7af825aadbe085aefeac5d5ce5e9dfc23f6ba",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 55 4.",
+            "tail": "làm việc của Tổng giám đốc (Giám đốc)."
+          },
+          {
+            "page": 54,
+            "sha256": "72f395ac130c1f55fa3200dec9f33736c273f839ef93a35f6f560cf4c97b4cde",
+            "head": "56 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 12.",
+            "tail": "chủ tọa cuộc họp Hội đồng quản trị."
+          },
+          {
+            "page": 55,
+            "sha256": "5ceee5fbf0c818d99bf7006b1ed4ca8f51b7632fc50cfa67a48bcdf9d10f4dcf",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 57 3.",
+            "tail": "tập họp Hội đồng quản trị bất thường."
+          },
+          {
+            "page": 56,
+            "sha256": "42514ca54b476b58206ca89dc3e537d613bf894f32e8e83819a117fc2bae48e9",
+            "head": "58 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 4.",
+            "tail": "giám đốc (Phó giám đốc), Kế toán trưởng;"
+          },
+          {
+            "page": 57,
+            "sha256": "fd74197a18fa9788d0c4abadced7684db177a8c04d6db4d2b8a85c0a8245f8cb",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 59 d)",
+            "tail": "sung Điều lệ của tổ chức tín dụng;"
+          },
+          {
+            "page": 58,
+            "sha256": "17e8e1ce7902c04bd0934099b0489de635d8c77fc60979c81dcdf81e9202068b",
+            "head": "60 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 b)",
+            "tail": "chủ sở hữu của tổ chức tín dụng;"
+          },
+          {
+            "page": 59,
+            "sha256": "9710797a26ff54e1fbc7dffd52c280469c9a2a9610cb5584b8abcc20a6336d3b",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 61 m)",
+            "tail": "và Điều lệ của tổ chức tín dụng."
+          },
+          {
+            "page": 60,
+            "sha256": "dc5fdc436140a6a650c46726237de969b478ea913db5aca05488e08ae9ff5c49",
+            "head": "62 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "Tổng số thành viên góp vốn không được"
+          },
+          {
+            "page": 61,
+            "sha256": "342966069359458ab9ed8b8c3510bceb142eae3bccaf05da4804b34f67f03199",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 63 vượt",
+            "tail": "phần vốn góp của tổ chức tín dụng."
+          },
+          {
+            "page": 62,
+            "sha256": "0e8bbf74bfc2ef85b73dd455591e7ff25209c2df728721a6963cde48dafaeebd",
+            "head": "64 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "Ban kiểm soát, Tổng giám đốc (Giám đốc);"
+          },
+          {
+            "page": 63,
+            "sha256": "ca669d3ac049d9459a8c2db2c4a4b3c0415ad11af596cbdb454a09e98907bb52",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 65 h)",
+            "tail": "và Điều lệ của tổ chức tín dụng."
+          },
+          {
+            "page": 64,
+            "sha256": "c1143ae7806dffeee0a2d43681e6985aa76fdb4d1fb38adc48cf78be9b39443c",
+            "head": "66 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Mục",
+            "tail": "nước đối với ngân hàng hợp tác xã;"
+          },
+          {
+            "page": 65,
+            "sha256": "91669b8c187011e58c1969b278836d00e0fa0cfe5cf4cfb652f48f7d15716905",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 67 c)",
+            "tail": "Điều lệ của quỹ tín dụng nhân dân."
+          },
+          {
+            "page": 66,
+            "sha256": "d0ce4d3d07ce4ab0dc0fadd03afcbcee9905c88bbe4b3cea95a61c31ec174966",
+            "head": "68 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "hợp tác xã, quỹ tín dụng nhân dân;"
+          },
+          {
+            "page": 67,
+            "sha256": "e9f8b289cfaf132e12a76fd46967a4b7bcd7d01aabd4d3dc0cdbe5b50919b2a9",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 69 b)",
+            "tail": "hợp tác xã, quỹ tín dụng nhân dân;"
+          },
+          {
+            "page": 68,
+            "sha256": "a307c31328a74492d31954a8b1c3f8263d2361ec56bc9c530a04efd3fc71a45c",
+            "head": "70 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 o)",
+            "tail": "việc do Hội đồng quản trị quy định."
+          },
+          {
+            "page": 69,
+            "sha256": "52955143c84020ad129684ff00aa20fd4da0e278dbec3139a4953e01008f54bb",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 71 6.",
+            "tail": "viên và triệu tập Đại hội thành viên."
+          },
+          {
+            "page": 70,
+            "sha256": "7a42fa816cea4ac83262e8c2054de221751cae03352aeabf157e3c5ca2d7fbf2",
+            "head": "72 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 8.",
+            "tail": "quyết, quyết định của Hội đồng quản trị."
+          },
+          {
+            "page": 71,
+            "sha256": "b59306fb2512c339c236ac28abc89e4a9b91ac5d9fd806db8215552346d0f870",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 73 9.",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 72,
+            "sha256": "4b000e5cb566904809aa329085551f52754e30dca624bd513db5d0a896f64977",
+            "head": "74 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 2.",
+            "tail": "và kiến nghị lên Đại hội thành viên."
+          },
+          {
+            "page": 73,
+            "sha256": "544efa784403722ea295ef53ae3c20757015c9f5efa49950b65b76ddcd1dcbd6",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 75 4.",
+            "tail": "Điều lệ của quỹ tín dụng nhân dân."
+          },
+          {
+            "page": 74,
+            "sha256": "453c2aa9cd037e262bf893e4d9e586d42c2efdce2da45b32270f69069d496c4d",
+            "head": "76 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "nhiệm về đánh giá, kết luận của mình."
+          },
+          {
+            "page": 75,
+            "sha256": "b8aa2f9e032be12e21bbfe1a10a4505bc61b215a1a6423adffc6ec4e3f3a8fd8",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 77 6.",
+            "tail": "kinh doanh, hệ thống thông tin quản lý."
+          },
+          {
+            "page": 76,
+            "sha256": "e782c6e205fa88f01f32b7d2f8b6373c761450b8a00301ba365e74db66de70d2",
+            "head": "78 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 7.",
+            "tail": "nhánh ngân hàng nước ngoài tại Việt Nam."
+          },
+          {
+            "page": 77,
+            "sha256": "774e0e5b92c05c97e22b95d984fdb4b38f62fca90bf2bab658baf9ddef236fa7",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 79 Điều",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 78,
+            "sha256": "4c6252cd8280b56b6003aa2caab65791f6146c8f01857a6f557a256afb10cf81",
+            "head": "80 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "hạn 10 ngày kể từ ngày ban hành."
+          },
+          {
+            "page": 79,
+            "sha256": "1dbcf013ab9aa793f2002cfb280e00306ecc0aef68195881fadabc9dce6090e5",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 81 Điều",
+            "tail": "Điều này; việc xác định khách hàng phải"
+          },
+          {
+            "page": 80,
+            "sha256": "300ed03da266155fe4dadc55c24767da8df175570b3f1544a42b3f9efd3fc52d",
+            "head": "82 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 cung",
+            "tail": "của pháp luật về giao dịch điện tử."
+          },
+          {
+            "page": 81,
+            "sha256": "a4131b6f65172874f86b3358c191488b2b4267fbb94fb5b8155e5f3d7d9b6eb0",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 83 Điều",
+            "tail": "hàng, dịch vụ thu hộ và chi hộ;"
+          },
+          {
+            "page": 82,
+            "sha256": "e119d9a77c00b0e9681b9318bf206026551192d9c21f599b103b37721faacef5",
+            "head": "84 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 b)",
+            "tail": "khoản 2, 3, 4 và 8 Điều này."
+          },
+          {
+            "page": 83,
+            "sha256": "7e23cbb22055927ec4b49e3fef164f6d13c9c9ba225eb95e49d55d6115b8ca83",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 85 2.",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 84,
+            "sha256": "a727cba975fc061b7cde1d27e7ee9f9869456f550bc97d75c8415d8785f91415",
+            "head": "86 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "này; d) Dịch vụ môi giới tiền tệ;"
+          },
+          {
+            "page": 85,
+            "sha256": "5b05369ea35a8a35a53809a53af84ef4756bdb2226fc90d35883f9f676d25a46",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 87 đ)",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 86,
+            "sha256": "f5ab7512325271671eec08f56be469e357bfdc07ee0f104ef92bc9330e2e5527",
+            "head": "88 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Điều",
+            "tail": "ty liên kết của công ty tài chính"
+          },
+          {
+            "page": 87,
+            "sha256": "ba1982528e576d957966deb723e6d5de9b6fa1457f568eeb13da2b17dd7004f8",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 89 tổng",
+            "tail": "định khác của pháp luật có liên quan."
+          },
+          {
+            "page": 88,
+            "sha256": "876848457065b57a4741a618a5093e37b27fa71105ae484da7d4b5d36b46e1cf",
+            "head": "90 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 Mục",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 89,
+            "sha256": "fe67da9e1d0affd0e0056b527342bbae63edc8daf87c08bdfdb414c5302be4e9",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 91 Điều",
+            "tail": "của công ty tài chính chuyên ngành đó;"
+          },
+          {
+            "page": 90,
+            "sha256": "164f9a59f2218be6cb50292e1cc121842e7e17396fa13bbbe59a5a63d5cb2e61",
+            "head": "92 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 c)",
+            "tail": "khác quy định tại Mục 2 Chương này;"
+          },
+          {
+            "page": 91,
+            "sha256": "a895caa00e5d295925853a4b4f0604549ba39ff8538f2004a14872d5f5c15ef7",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 93 c)",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước;"
+          },
+          {
+            "page": 92,
+            "sha256": "b6d26ba98f51c1bb9cbc45ba664e7522f210a7987589ef19eb45c0240ccf6b78",
+            "head": "94 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 h)",
+            "tail": "nước ngoài theo quy định của pháp luật."
+          },
+          {
+            "page": 93,
+            "sha256": "6d74b01f9c1140ea8a0f8baff00f7d1183bd8d0fdb9f632acf3cdeeaf4eccb8e",
+            "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 95 Điều",
+            "tail": "(Xem tiếp Công báo số 371 + 372)"
+          },
+          {
+            "page": 94,
+            "sha256": "b6f613ceae08a5775c6f3249bfe2cab2bb3111193794e0f3c01e4c74587dd903",
+            "head": "2 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 VĂN",
+            "tail": "theo quy định của pháp luật Việt Nam."
+          },
+          {
+            "page": 95,
+            "sha256": "e36ef2b5896230859dda7d312cfe86fb162013467ba1cc3f05eac93eb5c173ea",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 3 Chương",
+            "tail": "liên kết của tổ chức tín dụng đó."
+          },
+          {
+            "page": 96,
+            "sha256": "846daa6f00a635e01a079048d70f9fb1cbfc770be27d954827785a06695f7b88",
+            "head": "4 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 5.",
+            "tail": "của tổ chức tín dụng thông qua, trừ"
+          },
+          {
+            "page": 97,
+            "sha256": "95477b41145712443fd69014ed969821530b7f5b17678c1b478da0a7dd2ea45f",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 5 việc",
+            "tail": "người có liên quan của khách hàng đó."
+          },
+          {
+            "page": 98,
+            "sha256": "1ba16513742be636e3ba8a8fe6a9e127a84080f54c15f39f4a1d57f0c2184f60",
+            "head": "6 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 2.",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 99,
+            "sha256": "3956d5114763ac44f74d7f26c0751f8e14f41eab6989f42618841d1f25171a7e",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 7 Điều",
+            "tail": "tỷ lệ bảo đảm an toàn sau đây:"
+          },
+          {
+            "page": 100,
+            "sha256": "f316cc9dda0e6ea08e8bcc3ea6033a17de71a7bdb6137aa2dfa1fce157168e00",
+            "head": "8 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 a)",
+            "tail": "tại khoản 3 Điều 144 của Luật này."
+          },
+          {
+            "page": 101,
+            "sha256": "f753587b19cfe8fdc7102b3aefb85ff4b0f601b8767d5892d316e0dc4ef272c1",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 9 Điều",
+            "tail": "thương mại, chi nhánh ngân hàng nước ngoài;"
+          },
+          {
+            "page": 102,
+            "sha256": "855837f40f082879af9e3cd5e71cb2d391fd363a4a075895007d19541db0210a",
+            "head": "10 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 b)",
+            "tail": "10 ngày kể từ ngày được thông qua."
+          },
+          {
+            "page": 103,
+            "sha256": "b2c447575657a57c79e1eff54565e58ed25e3e37cc67c72643478eec363480ca",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 11 6.",
+            "tail": "chi nhánh ngân hàng nước ngoài bao gồm:"
+          },
+          {
+            "page": 104,
+            "sha256": "fdb1d270ce24f6e3aae324e1c4008305ddcec338a439bcfd71ec7bbbdd6ae5af",
+            "head": "12 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 a)",
+            "tail": "vốn, chuyển nhượng phần vốn góp, cổ phần;"
+          },
+          {
+            "page": 105,
+            "sha256": "493c42f98b352082b7856754b554b0a76fbb9c4a5a9aa52c4187abde320eb6e8",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 13 e)",
+            "tail": "thực hiện theo quy định của Chính phủ."
+          },
+          {
+            "page": 106,
+            "sha256": "58e254a2a2b4a331d4f7d6697edfe49f8f4b7d77616558ede5db5d82df2b63ab",
+            "head": "14 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 4.",
+            "tail": "ngày 31 tháng 12 cùng năm dương lịch."
+          },
+          {
+            "page": 107,
+            "sha256": "769731f9a221d24f6f07b1c297fd4426ec4c804b3411a375062b694c04a6f6be",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 15 2.",
+            "tail": "phần, phần vốn góp của cổ đông lớn;"
+          },
+          {
+            "page": 108,
+            "sha256": "f94aef532bef9275b873d5dcd2e5bf1d3a5681806d6f93f88b0392b6803b6346",
+            "head": "16 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 c)",
+            "tail": "quy định của pháp luật về kế toán."
+          },
+          {
+            "page": 109,
+            "sha256": "152453db45473877ae0beff788febfe58a31cdb25d2f82758d671f77774a3b0c",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 17 2.",
+            "tail": "một hoặc một số trường hợp sau đây:"
+          },
+          {
+            "page": 110,
+            "sha256": "36c299ddfcbbdc1ec4286f4032be17aa808e9537ba5ac3add5858f84b3e39477",
+            "head": "18 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 a)",
+            "tail": "tại khoản 2 Điều 157 của Luật này."
+          },
+          {
+            "page": 111,
+            "sha256": "e5f277cd43ee46708864fb478422f7448d9a5802460941f6e218cae5db62392e",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 19 4.",
+            "tail": "theo thẩm quyền của Ngân hàng Nhà nước."
+          },
+          {
+            "page": 112,
+            "sha256": "b6ed400de947a3e2d8e2506f17e2000089d3eb14b92b708d94be231236bae1e4",
+            "head": "20 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 Điều",
+            "tail": "Điều 136 và Điều 138 của Luật này;"
+          },
+          {
+            "page": 113,
+            "sha256": "50c90d2c2e20e36f40ed1bf966f1a098e5f5acc63ed13f8b78c2a053fab0a6aa",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 21 b)",
+            "tail": "Luật này ngay sau khi được thông qua."
+          },
+          {
+            "page": 114,
+            "sha256": "3d5be7aa26cddba8a43bc5e51f9affffb402a1d2ffcc6ba3a971bc0cf2d8df91",
+            "head": "22 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 2.",
+            "tail": "bản báo cáo gửi Ngân hàng Nhà nước;"
+          },
+          {
+            "page": 115,
+            "sha256": "9bde5b74f5c76345d7575005cd8943cf534a118974ce5d249cceed31d5e620a8",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 23 b)",
+            "tail": "trạng dẫn đến thực hiện can thiệp sớm;"
+          },
+          {
+            "page": 116,
+            "sha256": "3345533ebfddeb2d0aaaa8ada1d897f2b09e7499466d5a3599d28469ab8bc92a",
+            "head": "24 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 d)",
+            "tail": "Trưởng ban, thành viên khác của Ban kiểm"
+          },
+          {
+            "page": 117,
+            "sha256": "80fda261202a1d59b59f2bc5015164b7d88a2fab5e6edff5f44b8f0695a7b815",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 25 soát;",
+            "tail": "bắt buộc theo quy định của Luật này."
+          },
+          {
+            "page": 118,
+            "sha256": "93d2e174d03890b692204108d9c593a580b7f29e6ff79d9dd79a75deace42d4c",
+            "head": "26 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 3.",
+            "tail": "quy định tại Điều 164 của Luật này."
+          },
+          {
+            "page": 119,
+            "sha256": "d459c6cd095296a398e60dc4678458d8a27cc0371531804b81db051b7060f5ea",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 27 2.",
+            "tail": "viên, Ban kiểm soát nhiệm kỳ mới thì"
+          },
+          {
+            "page": 120,
+            "sha256": "ab34544bf6afc2154ebdac15688312ab8116f9ec9a7944dba221205165866368",
+            "head": "28 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 Hội",
+            "tail": "lỗ lũy kế của tổ chức tín dụng."
+          },
+          {
+            "page": 121,
+            "sha256": "87110395c36794cc94f2efd0c5c0a48f9bc11e47b6a3664f3bd765bc5114d48f",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 29 7.",
+            "tail": "dựng và phê duyệt phương án phục hồi"
+          },
+          {
+            "page": 122,
+            "sha256": "8dd1175426f6ba18456fa5390e1cca34df29bea33834cfd77d28fa807cc57e2b",
+            "head": "30 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 1.",
+            "tail": "cơ cấu tổ chức, quản trị, điều hành;"
+          },
+          {
+            "page": 123,
+            "sha256": "a30e9b5bb017aa3e09067e80c1a9490abc97e5030df53c017d0b629d5039f76d",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 31 d)",
+            "tail": "đó cho tổ chức tín dụng hỗ trợ;"
+          },
+          {
+            "page": 124,
+            "sha256": "9982daedd8fca579fefc98dc72a6c8f9c9866faba08f852d3f7938f38037f57c",
+            "head": "32 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 đ)",
+            "tail": "phương án phục hồi đã được phê duyệt."
+          },
+          {
+            "page": 125,
+            "sha256": "21134455f77d70a442a0994dca5493f89c0e1e9c7051136a8d7a2836227f85c5",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 33 3.",
+            "tail": "phương án phục hồi đã được phê duyệt."
+          },
+          {
+            "page": 126,
+            "sha256": "e4f10a849204e2f1bff2cbc1e57fb155ae38dc79169aeb6a8fb9cbd757acacdc",
+            "head": "34 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 4.",
+            "tail": "ứng đầy đủ các điều kiện sau đây:"
+          },
+          {
+            "page": 127,
+            "sha256": "1d05a864fa37583873a704e3e4238a4cdab73551f3902d9d5b7ce35de560240d",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 35 1.",
+            "tail": "tại khoản 3 Điều 162 của Luật này;"
+          },
+          {
+            "page": 128,
+            "sha256": "66b4d77ccb5c1972ed2c5fc2bb8a49db49659ff488421c160e801b218a5ba41d",
+            "head": "36 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 e)",
+            "tail": "mà tổ chức tín dụng được kiểm soát"
+          },
+          {
+            "page": 129,
+            "sha256": "9f15094484e11410e0285a185e0f124754ee5e8078b4a895ee5232266143026d",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 37 đặc",
+            "tail": "hàng thương mại được kiểm soát đặc biệt."
+          },
+          {
+            "page": 130,
+            "sha256": "4e421c19e73b9e72edc6e87e2c8e4e9fd78227a8fcc1afabd6098c20f99601a9",
+            "head": "38 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 5.",
+            "tail": "bản yêu cầu của Ngân hàng Nhà nước."
+          },
+          {
+            "page": 131,
+            "sha256": "91a22cdf72dbf31c529b333b90a53a58e9017dbef02427f27a15e04585175eaf",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 39 4.",
+            "tail": "cho tổ chức mua bán, xử lý nợ;"
+          },
+          {
+            "page": 132,
+            "sha256": "2b87d48d9d40d7e1d1600bb07090ac625be39ed433b22c04ec11fcc90009e461",
+            "head": "40 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 b)",
+            "tail": "hàng thương mại được chuyển giao bắt buộc;"
+          },
+          {
+            "page": 133,
+            "sha256": "d473dfa6d57c5a07184b60ccf04bdd9c5f0a45ef2c56b36a2f359ec0733e4bd9",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 41 b)",
+            "tail": "doanh nghiệp nước ngoài; c) Tổ chức khác."
+          },
+          {
+            "page": 134,
+            "sha256": "2be9f3a81a942f8681bfb7144eb6f0563c294d424c05fe0d842508b9cda75fe5",
+            "head": "42 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 2.",
+            "tail": "hàng thương mại được chuyển giao bắt buộc;"
+          },
+          {
+            "page": 135,
+            "sha256": "cb652c49df2a4dd12776672a56ccc018fd0eeabfa406912c9574f978b6e5b742",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 43 g)",
+            "tail": "chuyển giao bắt buộc hoặc theo thỏa thuận."
+          },
+          {
+            "page": 136,
+            "sha256": "63f65765f15d0c1a047624c04c92d678339b46816c20782743f3312b871d7e1f",
+            "head": "44 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 Điều",
+            "tail": "xây dựng phương án thanh lý tài sản,"
+          },
+          {
+            "page": 137,
+            "sha256": "38ebcf0c5516aa30dabbb16a9dcf3cc16da3cbe8d59dd83bd74802739f2dac93",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 45 trong",
+            "tail": "hoặc khoản 6 Điều 178 của Luật này."
+          },
+          {
+            "page": 138,
+            "sha256": "2cf17839d8d8ce598847a00231384ad4762e8f95c2a0fde9da949213d836b9c6",
+            "head": "46 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 2.",
+            "tail": "người gửi tiền theo phương án phá sản."
+          },
+          {
+            "page": 139,
+            "sha256": "c076bc8424c24b794c928fba40405f7831e5c5442f33931f06dd851cdcfdc7bb",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 47 2.",
+            "tail": "chỉnh phương án trong trường hợp cần thiết."
+          },
+          {
+            "page": 140,
+            "sha256": "fe9d27f0f8dfd77b7da24d16acc8d6e3a1e13292a4ec99e61a1ee15e302253a7",
+            "head": "48 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 2.",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 141,
+            "sha256": "5a641d537d94c3ae58c224c5d7d1f72cf05f78185be81ef633166be446abdedf",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 49 2.",
+            "tail": "hơn dư nợ gốc của khoản nợ xấu."
+          },
+          {
+            "page": 142,
+            "sha256": "73b4ce637f3d968f6ba6c3a61ff13959db7d12c1e96fcf10305cffab919016b8",
+            "head": "50 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 Điều",
+            "tail": "thực hiện theo quy định của Chính phủ."
+          },
+          {
+            "page": 143,
+            "sha256": "d5c0d82984e67a35466055d4ac822ab99ee861a60d9a379fbaaf213654d1d691",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 51 Điều",
+            "tail": "theo quy định của pháp luật về thuế."
+          },
+          {
+            "page": 144,
+            "sha256": "5bcdd481e71294aad9061499066ebee08b24deb875c84754b5591f0751a6f922",
+            "head": "52 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 3.",
+            "tail": "dụng tiếp nhận toàn bộ nghĩa vụ nợ."
+          },
+          {
+            "page": 145,
+            "sha256": "bfc60f1c58d07ba779657dfbc6ac804a5d59cf46b7cf13905b3c744b1609aef8",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 53 Điều",
+            "tail": "sản của chi nhánh ngân hàng nước ngoài."
+          },
+          {
+            "page": 146,
+            "sha256": "07b392075b3da863b3091b698ca2abfbd4887373acce629d3bb9537fe183c9ad",
+            "head": "54 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 Chương",
+            "tail": "định khác của pháp luật có liên quan;"
+          },
+          {
+            "page": 147,
+            "sha256": "9e925a8969f6cf0d59e74b0bc35891a7b1422a547d316aae172e6659b6d35f57",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 55 b)",
+            "tail": "trừ quy định tại khoản 2 Điều này."
+          },
+          {
+            "page": 148,
+            "sha256": "8b9ff99b65fbe91c80e48d5be574323e7967bf5c263b59892f2f215b87ead0e2",
+            "head": "56 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 2.",
+            "tail": "định của Thống đốc Ngân hàng Nhà nước."
+          },
+          {
+            "page": 149,
+            "sha256": "fd9f42a7357446c5fd92e5fa395733237a22274b54e55de417062297dc717f72",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 57 4.",
+            "tail": "đến hết thời hạn được bầu, bổ nhiệm."
+          },
+          {
+            "page": 150,
+            "sha256": "824f371bfe5fb485dbd126c2e22529a3ad481e1160d8fac28d84d93e06af85ca",
+            "head": "58 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 Hội",
+            "tail": "định khác của pháp luật có liên quan;"
+          },
+          {
+            "page": 151,
+            "sha256": "ae24886129ecd6edb7e09f5dd254a60e74c59fe17249d82cf076cf1c4870017e",
+            "head": "CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 59 b)",
+            "tail": "phần dự án bất động sản đã nhận"
+          },
+          {
+            "page": 152,
+            "sha256": "83148652836ad682a2e989767349cc8ec2754fb17ab1bcb899a965c04f3a4635",
+            "head": "60 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 làm",
+            "tail": "2024./. CHỦ TỊCH QUỐC HỘI Vương Đình Huệ"
+          }
+        ]
       }
     }
   }
