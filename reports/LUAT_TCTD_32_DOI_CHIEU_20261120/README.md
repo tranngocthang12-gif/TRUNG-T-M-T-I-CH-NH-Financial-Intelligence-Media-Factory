@@ -44,4 +44,4 @@ Bốn chỗ đã sửa trong text.md và trong lô: `[p9]` ngoặc kép, `[p81]`
 
 Ghế khác Grok phải mở hai PDF gốc (hash ở trên), năm lát `lo-*.pdf`, và ảnh trang 94, rồi so **152 trang text + PDF A/94**. Chưa có người đó trong phiên này. Không dùng text-vs-text để ký `pdf_check`.
 
-Phiếu trống: `PHIEU_CHAM.md`. Bản Markdown một tệp để tải: `GEMINI_FULL_MD_152_TRANG.md`. Bản MD-only cũ (HEAD `76a1ed9`, hash `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a`) là STALE; xem `GEMINI_MD_ONLY_REVIEW.md`.
+Phiếu trống: `PHIEU_CHAM.md`. Bảng 152 trang cộng PDF A/94, mọi ô để trống: `BANG_TRANG_CHO_CHAM.md`. Grok không đánh dấu đã mở. Bản Markdown một tệp để tải: `GEMINI_FULL_MD_152_TRANG.md`. Bản MD-only cũ (HEAD `76a1ed9`, hash `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a`) là STALE; xem `GEMINI_MD_ONLY_REVIEW.md`.

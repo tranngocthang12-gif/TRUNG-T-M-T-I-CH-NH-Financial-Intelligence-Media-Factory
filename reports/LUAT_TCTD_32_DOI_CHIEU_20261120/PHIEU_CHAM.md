@@ -15,3 +15,5 @@ Người lập hồ sơ: Grok (xAI). **Ô kết quả để trống.** Bản MD 
 - Ngoại lệ — trang, cụm chữ PDF, cụm chữ text.md:
 
 Không ghi MATCH và không nâng SOURCED nếu chưa xem hết ảnh PDF.
+
+Danh sách trang để người chấm tự điền nằm ở `BANG_TRANG_CHO_CHAM.md`. Bảng đó đang trống. Không chép text-vs-text vào cột đã mở.
