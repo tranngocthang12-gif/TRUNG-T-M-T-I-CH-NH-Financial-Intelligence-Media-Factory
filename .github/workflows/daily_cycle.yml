@@ -29,14 +29,21 @@ jobs:
     steps:
       # Fail closed BEFORE checkout, installs, ingestion, registry writes, or API use.
       # Scheduled weekly research remains at 6 trials; manual recovery is limited to 1.
+      # Manual runs on non-main refs fail before checkout, installs, or writes.
       - name: Xac nhan so lan thu truoc khi chay
         env:
           EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF: ${{ github.ref }}
           REQUESTED_TRIALS: ${{ github.event.inputs.trials }}
         run: |
           if [ "$EVENT_NAME" = "schedule" ]; then
             echo "effective_trials=6 (scheduled)"
           elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            # Only main can run with write-permissions / L-06 registry push.
+            if [ "$EVENT_REF" != "refs/heads/main" ]; then
+              echo "::error::Manual dispatch must use main; got ref '$EVENT_REF'."
+              exit 1
+            fi
             if [ "$REQUESTED_TRIALS" != "1" ]; then
               echo "::error::Manual dispatch chi duoc trials=1; nhan '$REQUESTED_TRIALS'. Can Owner duyet va PR policy rieng neu muon doi."
               exit 1
