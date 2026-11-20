@@ -193,6 +193,13 @@ class IntakeRuleTests(unittest.TestCase):
 
 
 class ReviewGateTests(unittest.TestCase):
+    def test_boot_required_reading_heading_is_standalone(self):
+        """The mandatory reading heading must remain real Markdown, not literal backslash-n."""
+        boot = (ROOT / "BOOT.md").read_text(encoding="utf-8")
+        self.assertEqual(boot.splitlines().count("## Thứ tự đọc bắt buộc"), 1)
+        self.assertIn("\n\n## Thứ tự đọc bắt buộc\n", boot)
+        self.assertNotIn(r"\n\n## Thứ tự đọc bắt buộc", boot)
+
     BODY = "## Ghế (L-09)\nauthored_by: Claude (Anthropic) — kiến trúc sư trưởng\nreviewed_by: ChatGPT (OpenAI)\n"
     SHA = "243eab82faad9b31b1b4171b7e8477ad015b7788"
 
