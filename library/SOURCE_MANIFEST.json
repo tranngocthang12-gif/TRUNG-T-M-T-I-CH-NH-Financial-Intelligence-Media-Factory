@@ -284,8 +284,8 @@
       }
     },
     "luat_tctd_32_2024": {
-      "sha256": "8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a",
-      "bytes": 406064,
+      "sha256": "bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44",
+      "bytes": 406070,
       "issuer": "Quốc hội",
       "issued_on": "2024-01-18",
       "accessed_on": "2026-11-20",
@@ -297,8 +297,8 @@
       "effective_from": "2024-07-01",
       "effective_to": null,
       "superseded_by": null,
-      "text_sha256": "8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a",
-      "text_bytes": 406064,
+      "text_sha256": "bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44",
+      "text_bytes": 406070,
       "original_parts": [
         {
           "part_id": "cb-369-370",
@@ -1139,7 +1139,7 @@
           },
           {
             "page": 9,
-            "sha256": "5389d1cd7622711c6fc0aa7b60f972bba2f39774bcfce39902f66004b52a07b6",
+            "sha256": "ab98d92281b518c69f7bde7af7f3e81d0650780fd8c0be87d86dcd6f60e5dea0",
             "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 11 Điều",
             "tail": "phù hợp với quy định của pháp luật."
           },
@@ -1571,7 +1571,7 @@
           },
           {
             "page": 81,
-            "sha256": "a4131b6f65172874f86b3358c191488b2b4267fbb94fb5b8155e5f3d7d9b6eb0",
+            "sha256": "89641be3ee21b7ec4516fdae130d90e438ec6dc6229fbabfa37d4fcad07d1bfc",
             "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 83 Điều",
             "tail": "hàng, dịch vụ thu hộ và chi hộ;"
           },
@@ -1583,7 +1583,7 @@
           },
           {
             "page": 83,
-            "sha256": "7e23cbb22055927ec4b49e3fef164f6d13c9c9ba225eb95e49d55d6115b8ca83",
+            "sha256": "32f1329a46869fcd45b6fbbbd567aec8295574b34ea865095e49c89d2781598f",
             "head": "CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 85 2.",
             "tail": "định của Thống đốc Ngân hàng Nhà nước."
           },
@@ -1889,7 +1889,7 @@
           },
           {
             "page": 134,
-            "sha256": "2be9f3a81a942f8681bfb7144eb6f0563c294d424c05fe0d842508b9cda75fe5",
+            "sha256": "e75d582e59258644af9d1bc7a89d8ec9946fbac662990ea7f9b160f9ba520b74",
             "head": "42 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024 2.",
             "tail": "hàng thương mại được chuyển giao bắt buộc;"
           },
