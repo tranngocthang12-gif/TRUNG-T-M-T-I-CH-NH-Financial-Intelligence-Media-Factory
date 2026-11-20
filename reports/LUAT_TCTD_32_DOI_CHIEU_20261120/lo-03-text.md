@@ -1,11 +1,13 @@
-# lo-03 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-03 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 81–93 ánh xạ `cb-369-370` PDF trang 81–93.
-Trang cuối của PDF lô này là `cb-369-370` PDF trang 94: trang in Văn phòng Chính phủ xuất bản, **không có** trong text.md, đã ghi `excluded_pages`.
+Trang cuối của PDF lô này là `cb-369-370` PDF trang 94: trang in Văn phòng Chính phủ xuất bản, **không có** trong text.md, đã ghi excluded_pages.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p81]
 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 83
 
@@ -61,9 +63,7 @@ Nhà nước.
 
 6. Cung ứng các dịch vụ thanh toán qua tài khoản sau đây:
 
-a) Th
-
-ực hiện dịch vụ thanh toán trong nước bao gồm séc, lệnh chi, ủy nhiệm
+a) Thực hiện dịch vụ thanh toán trong nước bao gồm séc, lệnh chi, ủy nhiệm
 
 chi, nhờ thu, ủy nhiệm thu, chuyển tiền, thẻ ngân hàng, dịch vụ thu hộ và chi hộ;
 
@@ -149,9 +149,7 @@ c) Bảo hiểm.
 
 3. Ngân hàng thương mại được thành lập, mua lại công ty con, công ty liên kết
 
-hoạt động trong lĩnh vực quản lý nợ và khai thác tài sản, kiều hố
-
-i, vàng, bao thanh
+hoạt động trong lĩnh vực quản lý nợ và khai thác tài sản, kiều hối, vàng, bao thanh
 
 toán, phát hành thẻ tín dụng, tín dụng tiêu dùng, dịch vụ trung gian thanh toán,
 
@@ -818,3 +816,4 @@ trên thị trường quốc tế cho khách hàng tại Việt Nam theo quy đ�
 về ngoại hối.
 
 (Xem tiếp Công báo số 371 + 372)
+

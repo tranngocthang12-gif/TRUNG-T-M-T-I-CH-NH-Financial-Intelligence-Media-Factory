@@ -1,10 +1,12 @@
-# lo-05 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-05 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 134–152 ánh xạ `cb-371-372` PDF trang 41–59.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p134]
 42 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024
 
@@ -30,9 +32,7 @@ a) Là pháp nhân;
 
 b) Điều kiện quy định tại điểm a và điểm c khoản 2 Điều này.
 
-Điều 185. Quyền, nghĩ
-
-a vụ của bên nhận chuyển giao bắt buộc
+Điều 185. Quyền, nghĩa vụ của bên nhận chuyển giao bắt buộc
 
 1. Bên nhận chuyển giao bắt buộc là tổ chức tín dụng có các quyền, nghĩa vụ
 

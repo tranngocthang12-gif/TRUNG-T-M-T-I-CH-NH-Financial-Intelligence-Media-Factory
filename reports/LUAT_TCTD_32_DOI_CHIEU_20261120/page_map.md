@@ -1,7 +1,8 @@
 # Ánh xạ text_page → part_id / pdf_page
 
-Nguồn: `library/SOURCE_MANIFEST.json` → `files.luat_tctd_32_2024.page_map` trên main `b59be0e1d937b3b329deecfc51f91dd0cf5eeab7`.
-152 dòng. Không đổi so với manifest.
+Nguồn: `library/SOURCE_MANIFEST.json` trên main `517f55024b2220b690e65191ee52c95c97d3be1c`.
+text.md SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44` (406070 byte). Hash cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` là STALE.
+152 dòng. Không đổi `page_map` so với manifest.
 
 | text_page | part_id | pdf_page |
 |---:|---|---:|

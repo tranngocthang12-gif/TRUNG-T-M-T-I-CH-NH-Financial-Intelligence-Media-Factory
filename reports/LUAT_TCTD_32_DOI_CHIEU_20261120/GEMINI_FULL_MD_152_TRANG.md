@@ -1,460 +1,55 @@
-# HỒ SƠ GEMINI — LUẬT CÁC TỔ CHỨC TÍN DỤNG 32/2024/QH15 — TOÀN BỘ 152 TRANG MARKDOWN
+# HỒ SƠ GEMINI — LUẬT 32/2024/QH15 — 152 TRANG MARKDOWN (ĐÓNG LẠI)
 
-> **Bản lưu một tệp để tải lên Gemini, không cần Gemini truy cập GitHub.** Đây là gói phản biện *MD-only*. **KHÔNG** bao gồm ảnh gốc của hai PDF, không chứng minh tính chính xác của bản chép so với PDF bằng mắt, và **không cho phép ký `pdf_check` / chuyển `SOURCED`**.
+> Một tệp để tải. **MD-only.** Không chứa ảnh 152 trang PDF. **Không được ký `pdf_check` hay chuyển SOURCED.**
 
-## THÔNG TIN CỐ ĐỊNH
-- Repository: `tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory`.
-- PR nguồn: #60 (nháp).
-- GitHub HEAD **TRƯỚC khi tạo bundle này**: `52dc72a6b5e70ac102df3806a273d6f757f30fcd`. Khi chấm, cần kiểm tra HEAD mới nhất của PR #60 và ghi SHA hiện hành; bản chấm phải gắn HEAD cuối.
-- Main nguồn lúc lập hồ sơ: `b59be0e1d937b3b329deecfc51f91dd0cf5eeab7`.
-- `luat_tctd_32_2024`: `QUEUED`, không có `crosscheck.pdf_check`. G1: **1/40 SOURCED**.
-- Do Grok (xAI) tạo bộ hồ sơ nguồn, ChatGPT (OpenAI) chỉ đóng gói các tệp Markdown từ đúng HEAD; ghế dự kiến phản biện bản MD: Gemini (Google).
-- Bản tóm tắt tổng hợp này **không thay đổi PDF gốc**, `library/sources/luat_tctd_32_2024/text.md`, manifest, ADR hoặc Ledger.
+**STALE:** mọi bản đóng từ text.md `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte), gồm HEAD PR #60 `76a1ed9d9cb4a7ebda929a08df44ff751c80c707`, không còn dùng để chấm.
 
-## KẾT QUẢ TIỀN KIỂM CẤU TRÚC
-- Có năm tệp lô text: p1–p40, p41–p80, p81–p93, p94–p133, p134–p152, hợp đủ **152 trang**, không thiếu và không lặp.
-- Lô 03 có 13 trang văn bản trong Markdown; PDF lô 03 còn bao gồm PDF A trang 94 bị loại khỏi văn bản (trang thông tin Văn phòng Chính phủ xuất bản).
-- Bảng `page_map.md` có 152 dòng; từ p1–p93 tới PDF A trang 1–93; p94–p152 tới PDF B trang 1–59.
-- Các SHA256/byte xuất hiện dưới đây là **số khai trong hồ sơ GitHub**, không phải phép đọc nhị phân độc lập của Gemini.
+## Đã tự kiểm (VERIFIED)
 
-| Dữ liệu | Số byte khai báo | SHA256 khai báo |
-|---|---:|---|
-| cb-369-370.pdf | 1.188.965 | `b613a8f94e1955a776035be2b7cd14dc34a76c568973f8db7367324ebf50581a` |
-| cb-371-372.pdf | 741.096 | `67852f403c7f368989ef47f98a47933d732d3d6b9d2db40cda2a9af84b969c49` |
-| text.md | 406.064 | `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` |
+- Repo: `tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory`
+- PR: #60 (nháp). Main nguồn: `517f55024b2220b690e65191ee52c95c97d3be1c` (merge PR #62).
+- text.md: 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`
+- cb-369-370.pdf: 1188965 byte, SHA-256 `b613a8f94e1955a776035be2b7cd14dc34a76c568973f8db7367324ebf50581a` (không đổi)
+- cb-371-372.pdf: 741096 byte, SHA-256 `67852f403c7f368989ef47f98a47933d732d3d6b9d2db40cda2a9af84b969c49` (không đổi)
+- SOURCE_MANIFEST.json: 78551 byte, SHA-256 `9669c60a9c0e4599107a06eb034929382d6fb2356960fc12f5faa5e384c3a0dc`
+- `luat_tctd_32_2024` QUEUED, không `pdf_check`. G1 1/40 SOURCED.
+- text-vs-text: năm lô dưới đây khớp từng khối `[p1]`…`[p152]` với text.md. **PASS.** Không phải mắt PDF.
+- PDF_VISUAL: **BLOCKED.** Ghế khác Grok phải mở hai PDF gốc, năm lát `lo-01.pdf`…`lo-05.pdf` và ảnh trang A/94.
 
-## YÊU CẦU PHẢN BIỆN GEMINI
-1. Đọc toàn bộ tài liệu Markdown này. Các tệp gốc được chép đầy đủ theo từng phần bên dưới.
-2. Kiểm tra cấu trúc văn bản p1–p152, Điều 1–210, các mốc ngày, sự liền mạch Điều 131→132, tính nhất quán giữa metadata / checksum **đã khai** / page_map và các lô văn bản; nêu lỗi chính xác theo `[pN]`.
-3. Ghi một trong `MD_REVIEW_PASS / MD_REVIEW_FAIL / MD_REVIEW_BLOCKED`. PASS ở đây chỉ xác nhận **phạm vi MD đã thật sự đọc**, không xác nhận trang PDF gốc.
-4. Phần `PDF_VISUAL` phải là `NOT_REVIEWED` / `BLOCKED`, vì tệp này không chứa trang PDF thực. Không suy từ báo cáo “0 dòng lệch” của Grok thành MATCH.
-5. Nếu phê duyệt **gói hồ sơ PR #60**, ghi rõ “GỘP ĐƯỢC chỉ về tài liệu bàn giao Markdown”; tuyệt đối không dùng kết luận đó để tạo `pdf_check` hoặc nâng `SOURCED`.
-6. Ghi commit HEAD hiện tại trên GitHub; nếu không thể kiểm tra HEAD mới nhất thì nói rõ chỉ đang chấm bản đã đóng gói từ `52dc72a6b5e70ac102df3806a273d6f757f30fcd`.
+HEAD Git của commit chứa tệp này là HEAD PR #60 sau khi đẩy. Người chấm ghi SHA đó. Nếu hash text.md trên nhánh khác `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44` thì tệp này STALE.
 
-## NỘI DUNG BẢN GỐC TỪ GITHUB
-**Quy tắc đọc:** Mỗi phụ lục là nguyên văn `.md`/tệp chứng cứ tương ứng lấy từ PR #60 tại `52dc72a6b5e70ac102df3806a273d6f757f30fcd`. Không dùng một phụ lục khác để chứng minh ảnh PDF. Các mốc `[pN]` trong từng lô giữ nguyên.
+## Bốn dòng đã sửa
 
+- `[p9]` có “tổ chức tín dụng” và “quỹ tín dụng nhân dân”.
+- `[p81]` có dòng `a) Thực hiện dịch vụ thanh toán trong nước bao gồm séc, lệnh chi, ủy nhiệm`.
+- `[p83]` có dòng kết `kiều hối, vàng, bao thanh`.
+- `[p134]` có dòng `Điều 185. Quyền, nghĩa vụ của bên nhận chuyển giao bắt buộc`.
 
----
+## Ánh xạ
 
-## PHỤ LỤC 1. HƯỚNG DẪN PHẠM VI PHẢN BIỆN
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/GEMINI_MD_ONLY_REVIEW.md`
+text 1–93 = PDF A trang 1–93. text 94–152 = PDF B trang 1–59. PDF A trang 94 loại trừ (trang in Văn phòng Chính phủ xuất bản).
 
-~~~~markdown
-# GEMINI — Phản biện hồ sơ Luật Các tổ chức tín dụng 32/2024 chỉ bằng Markdown
+## Mẫu phán quyết
 
-**Phạm vi: MD-ONLY / KHÔNG ĐƯỢC KÝ `pdf_check`.** Hồ sơ do Grok (xAI) lập; tệp điều phối này do ChatGPT (OpenAI) thêm ngày 20/11/2026. Ghế độc lập dự kiến: Gemini (Google). Không ai được nhận mình đã xem PDF chỉ vì đọc tệp Markdown hoặc báo cáo của máy.
+- MD_REVIEW: (trống)
+- PDF_VISUAL: BLOCKED trừ khi người chấm ghi từng trang đã mở
+- Không MATCH, không SOURCED từ riêng tệp này.
 
-- Repository: `tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory`
-- Pull request: [#60](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/60) — DRAFT.
-- **HEAD chứa bộ hồ sơ gốc đã rà cấu trúc:** `adc2d2030350d356b4e6fa18f47652266cb26861`. Tệp điều phối này là commit bổ sung sau HEAD đó; khi chấm phải dùng **HEAD mới nhất của PR**, kiểm lại SHA trên GitHub.
-- Main nguồn tại thời điểm lập hồ sơ: `b59be0e1d937b3b329deecfc51f91dd0cf5eeab7` (merge #58).
-- Trạng thái: `luat_tctd_32_2024 = QUEUED`; `crosscheck.pdf_check` chưa có; G1 = **1/40 SOURCED**. Không tự nâng trạng thái.
-
-## 1. Những tệp Markdown Gemini PHẢI đọc
-
-Các đường dẫn dưới đây trỏ đúng bản đã kiểm cấu trúc ở HEAD `adc2d2030350d356b4e6fa18f47652266cb26861`; nếu PR có commit mới, đối chiếu lại với HEAD cuối trước khi chấm.
-
-| Tệp Markdown | Phạm vi cần kiểm |
-|---|---|
-| [README.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/README.md) | Tài liệu nguồn, giới hạn, hướng dẫn |
-| [page_map.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/page_map.md) | 152 ánh xạ `text_page → part_id/pdf_page` |
-| [CHECKSUMS.txt](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/CHECKSUMS.txt) | Danh sách checksum được công bố; đây là **tuyên bố**, không phải phép kiểm byte độc lập |
-| [MAY_DOC_LAI.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/MAY_DOC_LAI.md) | Báo cáo máy 0 dòng lệch, **không phải MATCH độc lập** |
-| [lo-01-text.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-01-text.md) | p1–p40: 40 trang |
-| [lo-02-text.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-02-text.md) | p41–p80: 40 trang |
-| [lo-03-text.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-03-text.md) | p81–p93: 13 trang; còn PDF A trang 94 **bị loại**, chưa được Gemini kiểm qua MD |
-| [lo-04-text.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-04-text.md) | p94–p133: 40 trang; bắt đầu PDF B trang 1, Điều 132 |
-| [lo-05-text.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-05-text.md) | p134–p152: 19 trang |
-| [PHIEU_CHAM.md](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/adc2d2030350d356b4e6fa18f47652266cb26861/reports/LUAT_TCTD_32_DOI_CHIEU_20261120/PHIEU_CHAM.md) | Khuôn kết luận; **không điền MATCH nếu chỉ có MD** |
-| [text.md trên main](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/b59be0e1d937b3b329deecfc51f91dd0cf5eeab7/library/sources/luat_tctd_32_2024/text.md) | Văn bản toàn bộ 152 trang để đối chiếu các lô |
-| [SOURCE_MANIFEST.json trên main](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/blob/b59be0e1d937b3b329deecfc51f91dd0cf5eeab7/library/SOURCE_MANIFEST.json) | `original_parts`, `page_map`, `excluded_pages`, `crosscheck` |
-
-Nếu Gemini không thể đọc các tệp liên kết ở đây, ghi chính xác những tệp đã/không mở và kết luận BLOCKED đối với phần chưa đọc. Không dùng nội dung tóm tắt này thay nội dung gốc.
-
-## 2. Metadata cần xác minh trên Markdown và manifest
-
-| Tệp gốc | Bytes được công bố | SHA256 được công bố | Trang |
-|---|---:|---|---:|
-| `cb-369-370.pdf` | 1.188.965 | `b613a8f94e1955a776035be2b7cd14dc34a76c568973f8db7367324ebf50581a` | 94 |
-| `cb-371-372.pdf` | 741.096 | `67852f403c7f368989ef47f98a47933d732d3d6b9d2db40cda2a9af84b969c49` | 59 |
-| `text.md` | 406.064 | `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` | 152 |
-
-Phải phân biệt: **so hash viết trong hai tệp Markdown ≠ tự tính lại hash từ byte PDF**. Lô `lo-*.pdf` là PDF dẫn xuất để xem trang; hash của lô không phải hash PDF gốc.
-
-### Ánh xạ và trang loại trừ
-
-- p1–p93 → `cb-369-370` PDF 1–93.
-- p94–p152 → `cb-371-372` PDF 1–59.
-- `cb-369-370` PDF trang **94** bị loại; theo hồ sơ, là trang thông tin “VĂN PHÒNG CHÍNH PHỦ XUẤT BẢN”, không phải trang trống. Thông tin này **chưa phải xác nhận bằng byte PDF gốc của Gemini**.
-- Chỗ nối: p93 có dấu “Xem tiếp Công báo số 371 + 372” sau Điều 131; p94 mở tiếp Công báo và Điều 132. Kiểm thứ tự 210 điều, ngày có hiệu lực, chữ số, đơn vị/dấu, nội dung các trang trong **MD**.
-
-## 3. Hai kết luận phải TÁCH RIÊNG
-
-### A — Đánh giá cấu trúc / nội dung bản chép MD (Gemini có thể làm)
-
-Kiểm tệp Markdown thật, đếm trang `[pN]`, phát hiện thiếu/trùng/tráo, kiểm mọi phần liên quan đến `page_map`, metadata và tính liên tục nội dung. Báo `MD_REVIEW_PASS`, `MD_REVIEW_FAIL`, hoặc `MD_REVIEW_BLOCKED` với cụm chữ/trang cụ thể. Đây có thể dùng để phản biện **chất lượng bộ hồ sơ PR #60**, không chứng nhận nguồn đã chép đúng PDF.
-
-### B — Xác nhận gốc PDF / `pdf_check` (Gemini không thể làm chỉ qua MD)
-
-`PDF_VISUAL_MATCH` đòi người/ghế **thực sự mở và đối chiếu hình ảnh đầy đủ 152 trang PDF và trang loại trừ PDF A/94**, tự kiểm hash/byte hai PDF gốc, chữ vẽ path, bảng, dấu, số, ngày, chỗ nối Điều 131→132. Chưa kiểm đủ thì ghi `PDF_VISUAL_BLOCKED`. **Không ghi MATCH, không gắn `pdf_check`, không nâng QUEUED→SOURCED** chỉ từ kết quả A.
-
-Để đạt B, chuyển bộ PDF hiện có cho một ghế khác Grok có **quyền mở ảnh/PDF thực tế**, chẳng hạn Claude Code (Anthropic) hoặc người kiểm độc lập được Owner chỉ định. Biên bản phải ghi rõ cách truy cập, từng trang, hash và ngoại lệ. Gemini chỉ đọc MD có thể **phản biện tính nhất quán của biên bản ấy**, không trở thành người trực tiếp nhìn PDF.
-
-## 4. Khuôn trả lời Gemini (đăng bình luận GitHub / viết tệp MD phản biện)
-
-```text
-GEMINI MD-ONLY REVIEW — PR #60 — HEAD: <FULL_SHA_MOI_NHAT>
-Reviewer: Gemini (Google)
-Da mo thuc te: <cac tep .md va duong dan>
-MD_REVIEW: PASS | FAIL | BLOCKED
-Trang/lo/metadata da kiem: <chi tiet, khong nhan da kiem neu chua mo>
-Danh sach loi: <trang, doan, chu/so/dau/truong>
-PDF_VISUAL: NOT_REVIEWED (khong doc duoc PDF/anh)
-Original binary SHA rechecked: NO
-pdf_check: NOT SIGNED
-SOURCED: NOT AUTHORIZED
-L-09 packet packaging verdict: GỘP ĐƯỢC | REQUEST_CHANGES | BLOCKED
-Dieu kien con thieu: nguoi khac Grok kiem anh 152 trang + trang bi loai, SHA binary, sau do moi xet MATCH
-```
-
-**Phán quyết “GỘP ĐƯỢC” về cách đóng gói PR #60 nếu có không đồng nghĩa `MATCH` của Luật 32.** Chủ kho giữ quyền merge L-10; phải có bản chấm L-09 kèm SHA đúng HEAD theo `tools/review_gate.py`. Không sửa PDF gốc, văn bản nguồn, governance hay luật để qua cổng.
-~~~~
-
+Người lập gói: Grok (xAI). Người chấm dự kiến: Gemini (Google) hoặc Claude (Anthropic). ChatGPT đóng gói tải cho Owner theo `docs/GEMINI_REVIEW_PACKET.md`; không thay người chấm.
 
 ---
 
-## PHỤ LỤC 2. HƯỚNG DẪN GỐC CỦA GROK
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/README.md`
+## PHỤ LỤC lo-01 — text.md trang 1–40
 
-~~~~markdown
-# Hồ sơ đối chiếu `luat_tctd_32_2024` — chờ ghế khác hãng
-
-Bản trình bày để Gemini (Google) hoặc Claude (Anthropic) tự xem. **Không phải biên bản `pdf_check`. Không phải MATCH. Không nâng SOURCED.**
-
-Người lập hồ sơ: Grok (xAI). Grok không phải người chấm.
-
-## Nguồn đã ghim (không sửa byte trong hồ sơ này)
-
-Lấy từ `main` `b59be0e1d937b3b329deecfc51f91dd0cf5eeab7` (merge PR #58). CI trên main: run `44721210174` SUCCESS. Hash dưới đây là của tệp gốc, không phải của PDF lô.
-
-| Tệp | Bytes | SHA-256 |
-|---|---:|---|
-| `library/sources/luat_tctd_32_2024/cb-369-370.pdf` | 1188965 | `b613a8f94e1955a776035be2b7cd14dc34a76c568973f8db7367324ebf50581a` |
-| `library/sources/luat_tctd_32_2024/cb-371-372.pdf` | 741096 | `67852f403c7f368989ef47f98a47933d732d3d6b9d2db40cda2a9af84b969c49` |
-| `library/sources/luat_tctd_32_2024/text.md` | 406064 | `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` |
-| `library/SOURCE_MANIFEST.json` | 78551 | `fb2b045df6f498b04109dad7685db0e14aba3d557f6365daddf1939865d378c3` |
-
-`text_sha256` và `sha256` của tài liệu đều là hash `text.md` ở trên. `page_count` parser strict: PDF A **94**, PDF B **59**. `page_map` **152** dòng: text 1–93 → `cb-369-370` PDF 1–93; text 94–152 → `cb-371-372` PDF 1–59. Không thiếu, không trùng, không nhảy.
-
-## Trang loại trừ
-
-PDF A trang 94 không có trong `text.md`. Ảnh render: `trang-loai-tru-cb-369-370-p94.png`. Chữ vẽ bằng path (trang in Văn phòng Chính phủ xuất bản: Số 1 Hoàng Hoa Thám, `congbao@chinhphu.vn`). Không phải điều khoản. Điều 131 nằm ở PDF A trang 93. Lý do trong manifest giữ nguyên.
-
-## Cách xem từng trang
-
-PDF `lo-*.pdf` là **lát cắt trình bày** (pypdf thêm trang từ bản gốc). Hash của chúng khác hash gốc và không được ghi vào manifest. Mỗi lô ≤ 40 trang PDF.
-
-| Lô | text.md | PDF gốc | Tệp |
-|---|---|---|---|
-| lo-01 | 1–40 | `cb-369-370` trang 1–40 | `lo-01.pdf` + `lo-01-text.md` |
-| lo-02 | 41–80 | `cb-369-370` trang 41–80 | `lo-02.pdf` + `lo-02-text.md` |
-| lo-03 | 81–93 | `cb-369-370` trang 81–93, kèm trang 94 loại trừ ở cuối | `lo-03.pdf` + `lo-03-text.md` |
-| lo-04 | 94–133 | `cb-371-372` trang 1–40 | `lo-04.pdf` + `lo-04-text.md` |
-| lo-05 | 134–152 | `cb-371-372` trang 41–59 | `lo-05.pdf` + `lo-05-text.md` |
-
-Bảng đủ 152 dòng: `page_map.md`. Hash các tệp hồ sơ: `CHECKSUMS.txt`.
-
-## Việc ghế chấm phải làm
-
-Đọc **cả 152 trang** chữ trong `text.md` cạnh đúng trang PDF, cộng trang PDF A/94. Kiểm chữ, số, dấu âm, ngày hiệu lực, chỗ ngắt Điều 131 (hết PDF A trang 93) sang Điều 132 (PDF B trang 1). `text.md` không có mốc `[tN]`; nếu PDF có bảng thì bảng đang là từng dòng chữ — ghế chấm phải nhìn trang, không tin máy đã thấy bảng.
-
-Điền `PHIEU_CHAM.md` (hoặc bình luận PR) với tên ghế, HEAD, ba hash gốc, danh sách trang đã xem, và MATCH hoặc BLOCKED/MISMATCH kèm trang và cụm chữ. Thiếu trang thì BLOCKED. Không nhờ Grok điền hộ.
-
-## Những gì máy đã làm — không phải MATCH
-
-Xem `MAY_DOC_LAI.md`. Tóm tắt: đọc lại lớp chữ của 152 trang đã ánh xạ, 0 dòng lệch so với `text.md`; PDF A trang 94 không có toán tử chữ. Cùng họ công cụ đã tạo `text.md`, không thấy chữ vẽ bằng path. Grok chỉ mở ảnh bốn trang (text 1, text 93, text 94, PDF A/94) để kiểm hồ sơ mở được. **Chưa có ghế độc lập. G1 vẫn 1/40 SOURCED** (`luat_ke_toan_88_2015`). `luat_tctd_32_2024` vẫn QUEUED, không `pdf_check`. ADR-0014 không sửa trong hồ sơ này.
-~~~~
-
-
----
-
-## PHỤ LỤC 3. BẢNG ÁNH XẠ TRANG ĐẦY ĐỦ
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/page_map.md`
-
-~~~~markdown
-# Ánh xạ text_page → part_id / pdf_page
-
-Nguồn: `library/SOURCE_MANIFEST.json` → `files.luat_tctd_32_2024.page_map` trên main `b59be0e1d937b3b329deecfc51f91dd0cf5eeab7`.
-152 dòng. Không đổi so với manifest.
-
-| text_page | part_id | pdf_page |
-|---:|---|---:|
-| 1 | cb-369-370 | 1 |
-| 2 | cb-369-370 | 2 |
-| 3 | cb-369-370 | 3 |
-| 4 | cb-369-370 | 4 |
-| 5 | cb-369-370 | 5 |
-| 6 | cb-369-370 | 6 |
-| 7 | cb-369-370 | 7 |
-| 8 | cb-369-370 | 8 |
-| 9 | cb-369-370 | 9 |
-| 10 | cb-369-370 | 10 |
-| 11 | cb-369-370 | 11 |
-| 12 | cb-369-370 | 12 |
-| 13 | cb-369-370 | 13 |
-| 14 | cb-369-370 | 14 |
-| 15 | cb-369-370 | 15 |
-| 16 | cb-369-370 | 16 |
-| 17 | cb-369-370 | 17 |
-| 18 | cb-369-370 | 18 |
-| 19 | cb-369-370 | 19 |
-| 20 | cb-369-370 | 20 |
-| 21 | cb-369-370 | 21 |
-| 22 | cb-369-370 | 22 |
-| 23 | cb-369-370 | 23 |
-| 24 | cb-369-370 | 24 |
-| 25 | cb-369-370 | 25 |
-| 26 | cb-369-370 | 26 |
-| 27 | cb-369-370 | 27 |
-| 28 | cb-369-370 | 28 |
-| 29 | cb-369-370 | 29 |
-| 30 | cb-369-370 | 30 |
-| 31 | cb-369-370 | 31 |
-| 32 | cb-369-370 | 32 |
-| 33 | cb-369-370 | 33 |
-| 34 | cb-369-370 | 34 |
-| 35 | cb-369-370 | 35 |
-| 36 | cb-369-370 | 36 |
-| 37 | cb-369-370 | 37 |
-| 38 | cb-369-370 | 38 |
-| 39 | cb-369-370 | 39 |
-| 40 | cb-369-370 | 40 |
-| 41 | cb-369-370 | 41 |
-| 42 | cb-369-370 | 42 |
-| 43 | cb-369-370 | 43 |
-| 44 | cb-369-370 | 44 |
-| 45 | cb-369-370 | 45 |
-| 46 | cb-369-370 | 46 |
-| 47 | cb-369-370 | 47 |
-| 48 | cb-369-370 | 48 |
-| 49 | cb-369-370 | 49 |
-| 50 | cb-369-370 | 50 |
-| 51 | cb-369-370 | 51 |
-| 52 | cb-369-370 | 52 |
-| 53 | cb-369-370 | 53 |
-| 54 | cb-369-370 | 54 |
-| 55 | cb-369-370 | 55 |
-| 56 | cb-369-370 | 56 |
-| 57 | cb-369-370 | 57 |
-| 58 | cb-369-370 | 58 |
-| 59 | cb-369-370 | 59 |
-| 60 | cb-369-370 | 60 |
-| 61 | cb-369-370 | 61 |
-| 62 | cb-369-370 | 62 |
-| 63 | cb-369-370 | 63 |
-| 64 | cb-369-370 | 64 |
-| 65 | cb-369-370 | 65 |
-| 66 | cb-369-370 | 66 |
-| 67 | cb-369-370 | 67 |
-| 68 | cb-369-370 | 68 |
-| 69 | cb-369-370 | 69 |
-| 70 | cb-369-370 | 70 |
-| 71 | cb-369-370 | 71 |
-| 72 | cb-369-370 | 72 |
-| 73 | cb-369-370 | 73 |
-| 74 | cb-369-370 | 74 |
-| 75 | cb-369-370 | 75 |
-| 76 | cb-369-370 | 76 |
-| 77 | cb-369-370 | 77 |
-| 78 | cb-369-370 | 78 |
-| 79 | cb-369-370 | 79 |
-| 80 | cb-369-370 | 80 |
-| 81 | cb-369-370 | 81 |
-| 82 | cb-369-370 | 82 |
-| 83 | cb-369-370 | 83 |
-| 84 | cb-369-370 | 84 |
-| 85 | cb-369-370 | 85 |
-| 86 | cb-369-370 | 86 |
-| 87 | cb-369-370 | 87 |
-| 88 | cb-369-370 | 88 |
-| 89 | cb-369-370 | 89 |
-| 90 | cb-369-370 | 90 |
-| 91 | cb-369-370 | 91 |
-| 92 | cb-369-370 | 92 |
-| 93 | cb-369-370 | 93 |
-| 94 | cb-371-372 | 1 |
-| 95 | cb-371-372 | 2 |
-| 96 | cb-371-372 | 3 |
-| 97 | cb-371-372 | 4 |
-| 98 | cb-371-372 | 5 |
-| 99 | cb-371-372 | 6 |
-| 100 | cb-371-372 | 7 |
-| 101 | cb-371-372 | 8 |
-| 102 | cb-371-372 | 9 |
-| 103 | cb-371-372 | 10 |
-| 104 | cb-371-372 | 11 |
-| 105 | cb-371-372 | 12 |
-| 106 | cb-371-372 | 13 |
-| 107 | cb-371-372 | 14 |
-| 108 | cb-371-372 | 15 |
-| 109 | cb-371-372 | 16 |
-| 110 | cb-371-372 | 17 |
-| 111 | cb-371-372 | 18 |
-| 112 | cb-371-372 | 19 |
-| 113 | cb-371-372 | 20 |
-| 114 | cb-371-372 | 21 |
-| 115 | cb-371-372 | 22 |
-| 116 | cb-371-372 | 23 |
-| 117 | cb-371-372 | 24 |
-| 118 | cb-371-372 | 25 |
-| 119 | cb-371-372 | 26 |
-| 120 | cb-371-372 | 27 |
-| 121 | cb-371-372 | 28 |
-| 122 | cb-371-372 | 29 |
-| 123 | cb-371-372 | 30 |
-| 124 | cb-371-372 | 31 |
-| 125 | cb-371-372 | 32 |
-| 126 | cb-371-372 | 33 |
-| 127 | cb-371-372 | 34 |
-| 128 | cb-371-372 | 35 |
-| 129 | cb-371-372 | 36 |
-| 130 | cb-371-372 | 37 |
-| 131 | cb-371-372 | 38 |
-| 132 | cb-371-372 | 39 |
-| 133 | cb-371-372 | 40 |
-| 134 | cb-371-372 | 41 |
-| 135 | cb-371-372 | 42 |
-| 136 | cb-371-372 | 43 |
-| 137 | cb-371-372 | 44 |
-| 138 | cb-371-372 | 45 |
-| 139 | cb-371-372 | 46 |
-| 140 | cb-371-372 | 47 |
-| 141 | cb-371-372 | 48 |
-| 142 | cb-371-372 | 49 |
-| 143 | cb-371-372 | 50 |
-| 144 | cb-371-372 | 51 |
-| 145 | cb-371-372 | 52 |
-| 146 | cb-371-372 | 53 |
-| 147 | cb-371-372 | 54 |
-| 148 | cb-371-372 | 55 |
-| 149 | cb-371-372 | 56 |
-| 150 | cb-371-372 | 57 |
-| 151 | cb-371-372 | 58 |
-| 152 | cb-371-372 | 59 |
-
-## Trang loại trừ
-
-| part_id | pdf_page | reason |
-|---|---:|---|
-| cb-369-370 | 94 | Trang PDF 94 là trang in của Văn phòng Chính phủ xuất bản (địa chỉ, điện thoại, email congbao@chinhphu.vn), chữ vẽ bằng path, không có toán tử chữ. Không chứa điều khoản của Luật 32/2024/QH15. Điều 131 nằm ở PDF trang 93. |
-~~~~
-
-
----
-
-## PHỤ LỤC 4. CHECKSUMS TỪ HỒ SƠ
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/CHECKSUMS.txt`
-
-~~~~markdown
-5cfbeb671bc4966fd9c8aec1b4a5328b631f52f826dd82d88930ef19cc1e69d9  2072  MAY_DOC_LAI.md
-b60787123f4cc40885b2915301de7d512e37a15f46e56418c1015751f3e2d62e  820  PHIEU_CHAM.md
-6028a2119e9ff5fd55940d24f406f73256aa9963996ec3540dc20ad5e8769a6f  3820  README.md
-d26fd43a0ff1cdd9130eae6da54b113ce22a621633dd73c91524de4267dfb6bd  110565  lo-01-text.md
-0bb4db2772708ce089777b14a60fd6e6d9ef272c6e35427a86c8fdd4cecc60d4  504667  lo-01.pdf
-785b25e9fd4452026d8a5d3edb196e53a08fdc94c695d95e8bf720fa5b08e765  108565  lo-02-text.md
-c1aeb7f2ddd0f7f4864d4269f0ac4e3a7418bef7c4d859e39d506f6dd9d48f99  443795  lo-02.pdf
-36a4cfe9c504d664b50644b806bd27df4854c3a940fc5400724cc8d093b19953  30856  lo-03-text.md
-1475292d083aa76f8ef2cbc85ffa01ad856aca98f93e626403b87347743ad5c8  566921  lo-03.pdf
-baef434ee8db4c175046b6e2e77f53034e1b7166c51f135a466183e2a9f26984  107061  lo-04-text.md
-08c7aff030645edec3e54d5564b4e49848d8bb1787434a89c444e34b19d665f3  532852  lo-04.pdf
-1f31be1f443c4a3b4827bce1d31e220bd16bc2830f2a2dab2a67588ab869723d  51046  lo-05-text.md
-cf993a62a8af237222db2e0afee6a97d036ce0efd327e13164225867c0ab0994  368016  lo-05.pdf
-8d14304b25c6066ea7900cef4fd17e6f640e863927af19d599355c45463df551  4471  page_map.md
-0cdb92d698108c779d6be4ff8f76de6370017eb5f47843d925ddafe522f52bc5  82711  trang-loai-tru-cb-369-370-p94.png
-b613a8f94e1955a776035be2b7cd14dc34a76c568973f8db7367324ebf50581a  1188965  ORIGIN library/sources/luat_tctd_32_2024/cb-369-370.pdf
-67852f403c7f368989ef47f98a47933d732d3d6b9d2db40cda2a9af84b969c49  741096  ORIGIN library/sources/luat_tctd_32_2024/cb-371-372.pdf
-8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a  406064  ORIGIN library/sources/luat_tctd_32_2024/text.md
-fb2b045df6f498b04109dad7685db0e14aba3d557f6365daddf1939865d378c3  78551  ORIGIN library/SOURCE_MANIFEST.json
-~~~~
-
-
----
-
-## PHỤ LỤC 5. BÁO CÁO MÁY — CHƯA MATCH
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/MAY_DOC_LAI.md`
-
-~~~~markdown
-# Đọc lại bằng máy — không phải đối chiếu độc lập
-
-Ngày lập: 2026-11-20. Máy: ghế thi công Grok (xAI). Không ghi `pdf_check`.
-
-## Phạm vi
-
-Đối chiếu `page_surface` của `library/sources/luat_tctd_32_2024/text.md` với lớp chữ đọc lại từ hai PDF gốc (ToUnicode, cụm dòng lệch tối đa 6pt). 152 trang trong `page_map`. Không gồm PDF A trang 94 vì trang đó không có toán tử chữ.
-
-## Kết quả máy
-
-- Lệch dòng: **0** trên 152 trang đã ánh xạ.
-- PDF A: parser strict 94 trang. PDF B: 59 trang.
-- `page_map`: text 1–93 → `cb-369-370` PDF 1–93; text 94–152 → `cb-371-372` PDF 1–59. Không lỗ, không trùng.
-- Tiêu đề `Điều N.` trong text.md: 210 tiêu đề, số 1..210, không thiếu, không lặp.
-- Cụm đã thấy trong text.md: "thông qua ngày 18 tháng 01 năm 2024"; "có hiệu lực thi hành từ ngày 01 tháng 7 năm 2024".
-- Không có ký tự thay thế U+FFFD. Không có dòng nội dung dài hơn 180 ký tự.
-- Không có mốc bảng `[tN]`.
-
-Chỗ nối hai Công báo, máy đọc được (chưa phải người xem):
-
-- text 93 / PDF A trang 93 kết bằng "(Xem tiếp Công báo số 371 + 372)" sau Điều 131.
-- text 94 / PDF B trang 1 mở đầu "(Tiếp theo Công báo số 369 + 370)" rồi Điều 132, có cụm "Tại mỗi tỉnh, thành phố trực thuộc Trung ương".
-
-## Giới hạn — vì sao chưa MATCH
-
-Công cụ này không đọc chữ vẽ bằng path. PDF A trang 94 là trường hợp đó (trang in, xem ảnh `trang-loai-tru-cb-369-370-p94.png`). Nếu một trang luật có chữ chỉ vẽ bằng path, máy sẽ không báo lệch.
-
-Grok mở ảnh bốn trang để chắc hồ sơ không cắt nhầm: text 1, text 93, text 94, và PDF A/94. Bốn ảnh này khớp các dòng đầu/cuối tương ứng trong text.md hoặc lý do loại trừ. **149 trang còn lại chưa được mắt người kiểm.** Sai khác nội dung do ghế độc lập: chưa có, vì chưa có người chấm.
-~~~~
-
-
----
-
-## PHỤ LỤC 6. PHIẾU CHẤM ĐỂ TRỐNG
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/PHIEU_CHAM.md`
-
-~~~~markdown
-# Phiếu chấm — `luat_tctd_32_2024`
-
-Người lập hồ sơ: Grok (xAI). **Ô kết quả để trống cho đến khi ghế khác điền.**
-
-- Người chấm: 
-- Nhà cung cấp: (Gemini / Google, hoặc Claude / Anthropic)
-- Kết quả: (MATCH hoặc BLOCKED/MISMATCH — không điền nếu chưa xem hết)
-- HEAD commit đã mở: 
-- SHA-256 `cb-369-370.pdf`: 
-- SHA-256 `cb-371-372.pdf`: 
-- SHA-256 `text.md`: 
-- SHA-256 `SOURCE_MANIFEST.json`: 
-- Trang text.md đã xem (phải đủ 1–152, hoặc ghi trang dừng): 
-- Đã xem PDF A trang 94 (trang loại trừ): (có/không)
-- Ngoại lệ — trang, cụm chữ trên PDF, cụm chữ trong text.md: 
-
-Thiếu thời gian, thiếu quyền đọc PDF, hoặc thấy một trang lệch: ghi BLOCKED hoặc MISMATCH. Không ghi MATCH cho cả bộ.
-~~~~
-
-
----
-
-## PHỤ LỤC 7. NỘI DUNG p1–p40
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-01-text.md`
-
-~~~~markdown
-# lo-01 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-01 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 1–40 ánh xạ `cb-369-370` PDF trang 1–40.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p1]
 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 3
 
@@ -990,9 +585,9 @@ CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 11
 
 Tổ chức không phải là tổ chức tín dụng, chi nhánh ngân hàng nước ngoài
 
-không được phép sử dụng cụm từ tổ chức tín dụng, ngân hàng, công ty tài chính,
+không được phép sử dụng cụm từ “tổ chức tín dụng”, “ngân hàng”, “công ty tài chính”,
 
-công ty cho thuê tài chính, tổ chức tài chính vi mô, quỹ tín dụng nhân dân
+“công ty cho thuê tài chính”, “tổ chức tài chính vi mô”, “quỹ tín dụng nhân dân”
 
 hoặc cụm từ, từ ngữ khác trong tên của tổ chức, chức danh hoặc trong phần phụ
 
@@ -3058,22 +2653,21 @@ tài chính và kiến nghị biện pháp khắc phục.
 kinh doanh của công ty con, kế hoạch, dự án, chương trình đầu tư phát triển và
 
 quyết định khác trong quản lý, điều hành tổ chức tín dụng.
-~~~~
 
 
 ---
 
-## PHỤ LỤC 8. NỘI DUNG p41–p80
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-02-text.md`
+## PHỤ LỤC lo-02 — text.md trang 41–80
 
-~~~~markdown
-# lo-02 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-02 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 41–80 ánh xạ `cb-369-370` PDF trang 41–80.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p41]
 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 43
 
@@ -5687,23 +5281,22 @@ Hoạt động của tổ chức tín dụng được thực hiện bằng phư�
 quy định của Thống đốc Ngân hàng Nhà nước, quy định của pháp luật về giao dịch
 
 điện tử.
-~~~~
 
 
 ---
 
-## PHỤ LỤC 9. NỘI DUNG p81–p93
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-03-text.md`
+## PHỤ LỤC lo-03 — text.md trang 81–93
 
-~~~~markdown
-# lo-03 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-03 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 81–93 ánh xạ `cb-369-370` PDF trang 81–93.
-Trang cuối của PDF lô này là `cb-369-370` PDF trang 94: trang in Văn phòng Chính phủ xuất bản, **không có** trong text.md, đã ghi `excluded_pages`.
+Trang cuối của PDF lô này là `cb-369-370` PDF trang 94: trang in Văn phòng Chính phủ xuất bản, **không có** trong text.md, đã ghi excluded_pages.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p81]
 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 83
 
@@ -5759,9 +5352,7 @@ Nhà nước.
 
 6. Cung ứng các dịch vụ thanh toán qua tài khoản sau đây:
 
-a) Th
-
-ực hiện dịch vụ thanh toán trong nước bao gồm séc, lệnh chi, ủy nhiệm
+a) Thực hiện dịch vụ thanh toán trong nước bao gồm séc, lệnh chi, ủy nhiệm
 
 chi, nhờ thu, ủy nhiệm thu, chuyển tiền, thẻ ngân hàng, dịch vụ thu hộ và chi hộ;
 
@@ -5847,9 +5438,7 @@ c) Bảo hiểm.
 
 3. Ngân hàng thương mại được thành lập, mua lại công ty con, công ty liên kết
 
-hoạt động trong lĩnh vực quản lý nợ và khai thác tài sản, kiều hố
-
-i, vàng, bao thanh
+hoạt động trong lĩnh vực quản lý nợ và khai thác tài sản, kiều hối, vàng, bao thanh
 
 toán, phát hành thẻ tín dụng, tín dụng tiêu dùng, dịch vụ trung gian thanh toán,
 
@@ -6516,22 +6105,21 @@ trên thị trường quốc tế cho khách hàng tại Việt Nam theo quy đ�
 về ngoại hối.
 
 (Xem tiếp Công báo số 371 + 372)
-~~~~
 
 
 ---
 
-## PHỤ LỤC 10. NỘI DUNG p94–p133
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-04-text.md`
+## PHỤ LỤC lo-04 — text.md trang 94–133
 
-~~~~markdown
-# lo-04 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-04 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 94–133 ánh xạ `cb-371-372` PDF trang 1–40.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p94]
 2 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024
 
@@ -9099,22 +8687,21 @@ a) Tổ chức tín dụng trong nước, tổ chức tín dụng nước ngoài
 b) Doanh nghiệp trong nước, doanh nghiệp nước ngoài;
 
 c) Tổ chức khác.
-~~~~
 
 
 ---
 
-## PHỤ LỤC 11. NỘI DUNG p134–p152
-**Tên tệp GitHub:** `reports/LUAT_TCTD_32_DOI_CHIEU_20261120/lo-05-text.md`
+## PHỤ LỤC lo-05 — text.md trang 134–152
 
-~~~~markdown
-# lo-05 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-05 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 134–152 ánh xạ `cb-371-372` PDF trang 41–59.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p134]
 42 CÔNG BÁO/Số 371 + 372/Ngày 02-3-2024
 
@@ -9140,9 +8727,7 @@ a) Là pháp nhân;
 
 b) Điều kiện quy định tại điểm a và điểm c khoản 2 Điều này.
 
-Điều 185. Quyền, nghĩ
-
-a vụ của bên nhận chuyển giao bắt buộc
+Điều 185. Quyền, nghĩa vụ của bên nhận chuyển giao bắt buộc
 
 1. Bên nhận chuyển giao bắt buộc là tổ chức tín dụng có các quyền, nghĩa vụ
 
@@ -10311,25 +9896,174 @@ kỳ họp bất thường lần thứ 05 thông qua ngày 18 tháng 01 năm 202
 CHỦ TỊCH QUỐC HỘI
 
 Vương Đình Huệ
-~~~~
-
 
 ---
 
-## PHIẾU TRẢ LỜI GEMINI
+## PHỤ LỤC page_map
 
-```text
-GEMINI MD-ONLY REVIEW — PR #60 — HEAD: <SHA THỰC SỰ ĐÃ XÁC NHẬN>
-Ghế: Gemini (Google)
-Nội dung đã mở và đọc: <phụ lục, số trang, điểm đã kiểm>
-MD_REVIEW: PASS / FAIL / BLOCKED
-Lỗi / nghi vấn có địa chỉ trang: <pN, đoạn/bảng, nhận xét>
-SHA gốc PDF do Gemini tự tính từ bytes: NO
-Đã đối chiếu hình ảnh 152 trang PDF + trang loại trừ: NO
-PDF_VISUAL: NOT_REVIEWED
-pdf_check: NOT SIGNED
-SOURCED: NOT AUTHORIZED
-L-09 đối với gói Markdown: GỘP ĐƯỢC / REQUEST_CHANGES / BLOCKED (kèm phạm vi)
-```
+# Ánh xạ text_page → part_id / pdf_page
 
-**Cảnh báo cuối:** Tệp này cung cấp đủ văn bản để *kiểm Markdown offline*, không cung cấp hình ảnh PDF gốc; không thể dùng riêng tệp này để cấp `pdf_check MATCH`.
+Nguồn: `library/SOURCE_MANIFEST.json` trên main `517f55024b2220b690e65191ee52c95c97d3be1c`.
+text.md SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44` (406070 byte). Hash cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` là STALE.
+152 dòng. Không đổi `page_map` so với manifest.
+
+| text_page | part_id | pdf_page |
+|---:|---|---:|
+| 1 | cb-369-370 | 1 |
+| 2 | cb-369-370 | 2 |
+| 3 | cb-369-370 | 3 |
+| 4 | cb-369-370 | 4 |
+| 5 | cb-369-370 | 5 |
+| 6 | cb-369-370 | 6 |
+| 7 | cb-369-370 | 7 |
+| 8 | cb-369-370 | 8 |
+| 9 | cb-369-370 | 9 |
+| 10 | cb-369-370 | 10 |
+| 11 | cb-369-370 | 11 |
+| 12 | cb-369-370 | 12 |
+| 13 | cb-369-370 | 13 |
+| 14 | cb-369-370 | 14 |
+| 15 | cb-369-370 | 15 |
+| 16 | cb-369-370 | 16 |
+| 17 | cb-369-370 | 17 |
+| 18 | cb-369-370 | 18 |
+| 19 | cb-369-370 | 19 |
+| 20 | cb-369-370 | 20 |
+| 21 | cb-369-370 | 21 |
+| 22 | cb-369-370 | 22 |
+| 23 | cb-369-370 | 23 |
+| 24 | cb-369-370 | 24 |
+| 25 | cb-369-370 | 25 |
+| 26 | cb-369-370 | 26 |
+| 27 | cb-369-370 | 27 |
+| 28 | cb-369-370 | 28 |
+| 29 | cb-369-370 | 29 |
+| 30 | cb-369-370 | 30 |
+| 31 | cb-369-370 | 31 |
+| 32 | cb-369-370 | 32 |
+| 33 | cb-369-370 | 33 |
+| 34 | cb-369-370 | 34 |
+| 35 | cb-369-370 | 35 |
+| 36 | cb-369-370 | 36 |
+| 37 | cb-369-370 | 37 |
+| 38 | cb-369-370 | 38 |
+| 39 | cb-369-370 | 39 |
+| 40 | cb-369-370 | 40 |
+| 41 | cb-369-370 | 41 |
+| 42 | cb-369-370 | 42 |
+| 43 | cb-369-370 | 43 |
+| 44 | cb-369-370 | 44 |
+| 45 | cb-369-370 | 45 |
+| 46 | cb-369-370 | 46 |
+| 47 | cb-369-370 | 47 |
+| 48 | cb-369-370 | 48 |
+| 49 | cb-369-370 | 49 |
+| 50 | cb-369-370 | 50 |
+| 51 | cb-369-370 | 51 |
+| 52 | cb-369-370 | 52 |
+| 53 | cb-369-370 | 53 |
+| 54 | cb-369-370 | 54 |
+| 55 | cb-369-370 | 55 |
+| 56 | cb-369-370 | 56 |
+| 57 | cb-369-370 | 57 |
+| 58 | cb-369-370 | 58 |
+| 59 | cb-369-370 | 59 |
+| 60 | cb-369-370 | 60 |
+| 61 | cb-369-370 | 61 |
+| 62 | cb-369-370 | 62 |
+| 63 | cb-369-370 | 63 |
+| 64 | cb-369-370 | 64 |
+| 65 | cb-369-370 | 65 |
+| 66 | cb-369-370 | 66 |
+| 67 | cb-369-370 | 67 |
+| 68 | cb-369-370 | 68 |
+| 69 | cb-369-370 | 69 |
+| 70 | cb-369-370 | 70 |
+| 71 | cb-369-370 | 71 |
+| 72 | cb-369-370 | 72 |
+| 73 | cb-369-370 | 73 |
+| 74 | cb-369-370 | 74 |
+| 75 | cb-369-370 | 75 |
+| 76 | cb-369-370 | 76 |
+| 77 | cb-369-370 | 77 |
+| 78 | cb-369-370 | 78 |
+| 79 | cb-369-370 | 79 |
+| 80 | cb-369-370 | 80 |
+| 81 | cb-369-370 | 81 |
+| 82 | cb-369-370 | 82 |
+| 83 | cb-369-370 | 83 |
+| 84 | cb-369-370 | 84 |
+| 85 | cb-369-370 | 85 |
+| 86 | cb-369-370 | 86 |
+| 87 | cb-369-370 | 87 |
+| 88 | cb-369-370 | 88 |
+| 89 | cb-369-370 | 89 |
+| 90 | cb-369-370 | 90 |
+| 91 | cb-369-370 | 91 |
+| 92 | cb-369-370 | 92 |
+| 93 | cb-369-370 | 93 |
+| 94 | cb-371-372 | 1 |
+| 95 | cb-371-372 | 2 |
+| 96 | cb-371-372 | 3 |
+| 97 | cb-371-372 | 4 |
+| 98 | cb-371-372 | 5 |
+| 99 | cb-371-372 | 6 |
+| 100 | cb-371-372 | 7 |
+| 101 | cb-371-372 | 8 |
+| 102 | cb-371-372 | 9 |
+| 103 | cb-371-372 | 10 |
+| 104 | cb-371-372 | 11 |
+| 105 | cb-371-372 | 12 |
+| 106 | cb-371-372 | 13 |
+| 107 | cb-371-372 | 14 |
+| 108 | cb-371-372 | 15 |
+| 109 | cb-371-372 | 16 |
+| 110 | cb-371-372 | 17 |
+| 111 | cb-371-372 | 18 |
+| 112 | cb-371-372 | 19 |
+| 113 | cb-371-372 | 20 |
+| 114 | cb-371-372 | 21 |
+| 115 | cb-371-372 | 22 |
+| 116 | cb-371-372 | 23 |
+| 117 | cb-371-372 | 24 |
+| 118 | cb-371-372 | 25 |
+| 119 | cb-371-372 | 26 |
+| 120 | cb-371-372 | 27 |
+| 121 | cb-371-372 | 28 |
+| 122 | cb-371-372 | 29 |
+| 123 | cb-371-372 | 30 |
+| 124 | cb-371-372 | 31 |
+| 125 | cb-371-372 | 32 |
+| 126 | cb-371-372 | 33 |
+| 127 | cb-371-372 | 34 |
+| 128 | cb-371-372 | 35 |
+| 129 | cb-371-372 | 36 |
+| 130 | cb-371-372 | 37 |
+| 131 | cb-371-372 | 38 |
+| 132 | cb-371-372 | 39 |
+| 133 | cb-371-372 | 40 |
+| 134 | cb-371-372 | 41 |
+| 135 | cb-371-372 | 42 |
+| 136 | cb-371-372 | 43 |
+| 137 | cb-371-372 | 44 |
+| 138 | cb-371-372 | 45 |
+| 139 | cb-371-372 | 46 |
+| 140 | cb-371-372 | 47 |
+| 141 | cb-371-372 | 48 |
+| 142 | cb-371-372 | 49 |
+| 143 | cb-371-372 | 50 |
+| 144 | cb-371-372 | 51 |
+| 145 | cb-371-372 | 52 |
+| 146 | cb-371-372 | 53 |
+| 147 | cb-371-372 | 54 |
+| 148 | cb-371-372 | 55 |
+| 149 | cb-371-372 | 56 |
+| 150 | cb-371-372 | 57 |
+| 151 | cb-371-372 | 58 |
+| 152 | cb-371-372 | 59 |
+
+## Trang loại trừ
+
+| part_id | pdf_page | reason |
+|---|---:|---|
+| cb-369-370 | 94 | Trang PDF 94 là trang in của Văn phòng Chính phủ xuất bản (địa chỉ, điện thoại, email congbao@chinhphu.vn), chữ vẽ bằng path, không có toán tử chữ. Không chứa điều khoản của Luật 32/2024/QH15. Điều 131 nằm ở PDF trang 93. |

@@ -1,10 +1,12 @@
-# lo-01 — bản trình bày để đối chiếu, không phải tệp gốc
+# lo-01 — bản trình bày từ text.md mới, không phải tệp gốc
 
 Text.md trang 1–40 ánh xạ `cb-369-370` PDF trang 1–40.
+Nguồn: main `517f55024b2220b690e65191ee52c95c97d3be1c`, text.md 406070 byte, SHA-256 `bd639d7951f68b6d41d502cb84a7fca53fe0490706c2aa8b84dd7b2b21961d44`.
+Hash text.md cũ `8c69c6a2b0c516e8093a22dc2bdba68a0f62944cd25d5fa83789f0863f95aa5a` (406064 byte, hồ sơ trước PR #62) là **STALE**.
 
-Mở PDF cùng tên cạnh từng khối `[pN]`. Không dùng hash của PDF lô này làm hash gốc.
-Ghế chấm (Gemini hoặc Claude) ghi MATCH hoặc BLOCKED/MISMATCH vào `PHIEU_CHAM.md`. Grok không điền kết quả.
-
+Khối `[pN]` bên dưới là đúng lát cắt `text.md`, kể cả dòng trống. Không sửa chữ ở đây.
+Mở PDF cùng tên cạnh từng khối. Hash PDF lô không phải hash PDF gốc.
+Ghế khác Grok mới được ghi MATCH sau khi xem ảnh PDF. Grok không điền kết quả.
 [p1]
 CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 3
 
@@ -540,9 +542,9 @@ CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 11
 
 Tổ chức không phải là tổ chức tín dụng, chi nhánh ngân hàng nước ngoài
 
-không được phép sử dụng cụm từ tổ chức tín dụng, ngân hàng, công ty tài chính,
+không được phép sử dụng cụm từ “tổ chức tín dụng”, “ngân hàng”, “công ty tài chính”,
 
-công ty cho thuê tài chính, tổ chức tài chính vi mô, quỹ tín dụng nhân dân
+“công ty cho thuê tài chính”, “tổ chức tài chính vi mô”, “quỹ tín dụng nhân dân”
 
 hoặc cụm từ, từ ngữ khác trong tên của tổ chức, chức danh hoặc trong phần phụ
 
@@ -2608,3 +2610,4 @@ tài chính và kiến nghị biện pháp khắc phục.
 kinh doanh của công ty con, kế hoạch, dự án, chương trình đầu tư phát triển và
 
 quyết định khác trong quản lý, điều hành tổ chức tín dụng.
+
