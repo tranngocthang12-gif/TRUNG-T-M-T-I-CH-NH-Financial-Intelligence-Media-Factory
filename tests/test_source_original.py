@@ -364,12 +364,35 @@ class TableAndPdfWitnessTests(unittest.TestCase):
         self.assertEqual(self._errs(), [])
 
 
-def _tiny_pdf(n, extra=b""):
-    body = b"%PDF-1.4\n" + extra
+def _valid_pdf(n, marker):
+    """PDF thật (catalog, cây trang, xref, trailer, %%EOF) do pypdf ghi. Không phải chuỗi giả."""
+    import io
+    from pypdf import PdfWriter
+    writer = PdfWriter()
+    for _ in range(n):
+        writer.add_blank_page(width=300, height=400)
+    writer.add_metadata({"/Marker": marker})
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def _pseudo_pdf(n):
+    """Chuỗi có vài token PDF nhưng không có catalog, xref, trailer hay %%EOF. Phải bị từ chối."""
+    body = b"%PDF-1.4\n"
     for _ in range(n):
         body += b"<< /Type /Page >>\n"
     body += f"<< /Type /Pages /Count {n} >>\n".encode()
     return body
+
+
+def _bad_page_tree_pdf():
+    """PDF hợp lệ bị sửa /Count cùng độ dài byte. Parser vẫn đọc được số trang thật; /Count thì không khớp."""
+    raw = _valid_pdf(2, "bad-tree")
+    old, new = b"/Count 2", b"/Count 9"
+    if raw.count(old) != 1:
+        raise AssertionError("fixture không còn đúng một /Count 2")
+    return raw.replace(old, new, 1)
 
 
 MULTI_TEXT = textwrap.dedent("""\
@@ -400,8 +423,8 @@ class MultiPartOriginalTests(unittest.TestCase):
         self.dir = self.host.dir
         (self.dir / "text.md").write_text(MULTI_TEXT, encoding="utf-8")
         self.text_b = (self.dir / "text.md").read_bytes()
-        self.pdf_a = _tiny_pdf(2, b"part-a\n")
-        self.pdf_b = _tiny_pdf(2, b"part-b\n")
+        self.pdf_a = _valid_pdf(2, "part-a")
+        self.pdf_b = _valid_pdf(2, "part-b")
         (self.dir / "a.pdf").write_bytes(self.pdf_a)
         (self.dir / "b.pdf").write_bytes(self.pdf_b)
         self.entry = self._entry()
@@ -442,7 +465,8 @@ class MultiPartOriginalTests(unittest.TestCase):
     def _errs(self):
         return self.host._errs()
 
-    def _witness(self, entry, text, checker="Owner", originals=None, page_map=None, single_hash=False):
+    def _witness(self, entry, text, checker="Owner", originals=None, page_map=None, single_hash=False,
+                 excluded=None):
         digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
         cc = json.loads(json.dumps(entry["crosscheck"]))
         check = {"checker": checker, "result": "MATCH",
@@ -452,7 +476,8 @@ class MultiPartOriginalTests(unittest.TestCase):
                  "originals": originals if originals is not None else [
                      {"part_id": p["part_id"], "original_sha256": p["original_sha256"]}
                      for p in entry["original_parts"]],
-                 "page_map": entry["page_map"] if page_map is None else page_map}
+                 "page_map": entry["page_map"] if page_map is None else page_map,
+                 "excluded_pages": json.loads(json.dumps(entry.get("excluded_pages", []))) if excluded is None else excluded}
         if single_hash:
             check["original_sha256"] = entry["original_parts"][0]["original_sha256"]
         cc["pdf_check"] = check
@@ -560,8 +585,63 @@ class MultiPartOriginalTests(unittest.TestCase):
         self.assertTrue(any("từ 2 phần" in e for e in self._errs()), self._errs())
         self.assertIsNone(kn.pdf_page_count(b"not a pdf"))
         self.assertIsNone(kn.pdf_page_count(b"%PDF-1.4\n<< /Type /Pages /Count 1 >>\n"))
-        self.assertEqual(kn.pdf_page_count(_tiny_pdf(2)), 2)
-        self.assertIsNone(kn.pdf_page_count(_tiny_pdf(2) + b"<< /Count 9 >>\n"))
+        self.assertIsNone(kn.pdf_page_count(_pseudo_pdf(2)))
+
+    def test_real_pdf_passes_and_pseudo_or_bad_page_tree_is_rejected(self):
+        good = _valid_pdf(2, "ok")
+        self.assertEqual(kn.pdf_page_count(good), 2)
+        self.assertIsNone(kn.pdf_page_count(_pseudo_pdf(2)), "pseudo-PDF không được đếm trang bằng regex")
+        self.assertIsNone(kn.pdf_page_count(_bad_page_tree_pdf()), "cây trang /Count lệch phải bị từ chối")
+        (self.dir / "a.pdf").write_bytes(_pseudo_pdf(2))
+        forged = json.loads(json.dumps(self.entry))
+        forged["original_parts"][0]["original_sha256"] = hashlib.sha256(_pseudo_pdf(2)).hexdigest()
+        forged["original_parts"][0]["original_bytes"] = len(_pseudo_pdf(2))
+        self.host._manifest({self.doc: forged})
+        self.assertTrue(any("fail closed" in e for e in self._errs()), self._errs())
+        real_a = (ROOT / "library/sources/luat_tctd_32_2024/cb-369-370.pdf").read_bytes()
+        real_b = (ROOT / "library/sources/luat_tctd_32_2024/cb-371-372.pdf").read_bytes()
+        self.assertEqual(kn.pdf_page_count(real_a), 94)
+        self.assertEqual(kn.pdf_page_count(real_b), 59)
+
+    def test_excluded_pages_change_after_witness_is_rejected(self):
+        pages, _ = kn.parse_text(MULTI_TEXT)
+        witnessed = self._witness(self.entry, MULTI_TEXT)
+        self.assertEqual(kn.pdf_witness_errors(witnessed, MULTI_TEXT), [])
+        self.assertEqual(witnessed["crosscheck"]["pdf_check"]["excluded_pages"], self.entry["excluded_pages"])
+        changed = json.loads(json.dumps(witnessed))
+        changed["excluded_pages"][0]["reason"] = "Lý do bị sửa sau khi đã có pdf_check; PDF và page_map giữ nguyên."
+        self.assertTrue(any("excluded_pages" in e and "hết hiệu lực" in e for e in kn.pdf_witness_errors(changed, MULTI_TEXT)))
+        self.assertFalse(kn.may_mark_sourced(changed, pages, self.doc, MULTI_TEXT))
+        self.host._manifest({self.doc: changed})
+        self.host._queue("SOURCED")
+        self.assertTrue(any("SOURCED" in e for e in self._errs()), self._errs())
+        dropped = json.loads(json.dumps(witnessed))
+        dropped["excluded_pages"] = []
+        self.assertTrue(any("excluded_pages" in e for e in kn.pdf_witness_errors(dropped, MULTI_TEXT)))
+        bare = json.loads(json.dumps(witnessed))
+        del bare["crosscheck"]["pdf_check"]["excluded_pages"]
+        self.assertTrue(any("excluded_pages" in e for e in kn.pdf_witness_errors(bare, MULTI_TEXT)))
+        reordered = json.loads(json.dumps(witnessed))
+        reordered["excluded_pages"] = list(reversed(reordered["excluded_pages"] + [
+            {"part_id": "phan-a", "pdf_page": 1, "reason": "Thêm trang loại trừ sau khi đã chấm để thử thứ tự."}]))
+        self.assertTrue(any("excluded_pages" in e for e in kn.pdf_witness_errors(reordered, MULTI_TEXT)))
+
+    def test_part_url_must_be_on_the_approved_source_host(self):
+        for url in ("https://evil.example/a.pdf", "https://chinhphu.vn.evil.example/a.pdf",
+                    "https://evilcdnchinhphu.vn/a.pdf", "https://g7.cdnchinhphu.vn.evil.example/a.pdf",
+                    "https://user:secret@congbao.chinhphu.vn/a.pdf", "http://congbao.chinhphu.vn/a.pdf"):
+            bad = json.loads(json.dumps(self.entry))
+            bad["original_parts"][0]["source_url"] = url
+            self.host._manifest({self.doc: bad})
+            errs = self._errs()
+            self.assertTrue(any("source_url" in e for e in errs), (url, errs))
+            self.assertFalse(any("SOURCED" in e for e in errs), errs)
+        listing = json.loads(json.dumps(self.entry))
+        listing["source_url"] = "https://evil.example/van-ban"
+        self.host._manifest({self.doc: listing})
+        self.assertTrue(any("không thuộc miền" in e for e in self._errs()), self._errs())
+        self.host._manifest({self.doc: self.entry})
+        self.assertEqual(kn.origin_binding_errors(self.host.tmp, self.doc, self.entry, self.text_b), [])
 
     def test_known_single_file_law_cannot_be_declared_multipart(self):
         doc = "luat_ke_toan_88_2015"
@@ -605,6 +685,11 @@ class MultiPartOriginalTests(unittest.TestCase):
         self.assertEqual(entry["page_map"][-1], {"text_page": 152, "part_id": "cb-371-372", "pdf_page": 59})
         self.assertEqual(entry["excluded_pages"][0]["part_id"], "cb-369-370")
         self.assertEqual(entry["excluded_pages"][0]["pdf_page"], 94)
+        reason = entry["excluded_pages"][0]["reason"]
+        self.assertIn("Văn phòng Chính phủ xuất bản", reason)
+        self.assertNotIn("không có content stream", reason)
+        self.assertEqual(kn.pdf_page_count((ROOT / parts[0]["original_path"]).read_bytes()), 94)
+        self.assertEqual(kn.pdf_page_count((ROOT / parts[1]["original_path"]).read_bytes()), 59)
         text = (ROOT / "library/sources/luat_tctd_32_2024/text.md").read_text(encoding="utf-8")
         surface = kn.page_surface(text)
         self.assertEqual(set(surface), set(range(1, 153)))

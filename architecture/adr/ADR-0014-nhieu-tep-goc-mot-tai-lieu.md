@@ -12,12 +12,12 @@ ADR-0012 vẫn đúng với một PDF: ba trường `original_sha256`, `original
 1. Một `doc_id` vẫn là một đơn vị. N PDF không phải N tài liệu và không được đếm N lần khi xét G1.
 2. Manifest là union, không phải bản ghi vừa đơn vừa nhiều phần:
    - Một bản gốc: đúng ba trường `original_*` như ADR-0012. Không có `original_parts`.
-   - N≥2: có `original_parts`, không có ba trường `original_*` ở cấp tài liệu. Mỗi phần có `part_id`, `original_path` trong `library/sources/<doc_id>/`, `source_url` https, `original_sha256`, `original_bytes`, `page_count`.
+   - N≥2: có `original_parts`, không có ba trường `original_*` ở cấp tài liệu. Mỗi phần có `part_id`, `original_path` trong `library/sources/<doc_id>/`, `source_url` https thuộc miền đã gắn với `data_source` (Công báo: `chinhphu.vn` và miền con, kể cả `g7.cdnchinhphu.vn` trên miền `cdnchinhphu.vn`), `original_sha256`, `original_bytes`, `page_count`. URL bên thứ ba không qua cổng chỉ vì nhãn `data_source` đúng.
    - Thiếu cả hai schema, hoặc có cả hai, hoặc để trống trường, hoặc N<2: lỗi cổng. Không ghép các PDF thành một tệp rồi gọi là original.
 3. `sha256`/`bytes` và `text_sha256`/`text_bytes` vẫn là `text.md`. Hash từng phần phải khác hash `text.md` và khác nhau.
 4. `page_map` gắn mỗi `[pN]` của `text.md` với `part_id` và trang PDF vật lý, đúng thứ tự 1..N, không trùng, không nhảy, không tráo phần. Trong một phần, `pdf_page` tăng nghiêm ngặt. Trang PDF không vào `text.md` chỉ được khi có `excluded_pages` và lý do reviewer kiểm được. Mọi trang vật lý 1..`page_count` phải nằm ở một trong hai chỗ đó.
-5. `page_count` được đối chiếu với PDF bằng stdlib (`/Type /Page` không phải `/Pages`, khớp `/Count`). Không khớp hoặc không đếm được thì lỗi, không đoán. Không thêm gói OCR vào `requirements.txt`.
-6. Hash từng trang `text.md` (kể cả bảng) giữ nguyên. Máy không tự nhận đã nhìn PDF. `pdf_check` của nhiều phần, do ghế khác Grok, phải có `originals` đúng `part_id` và hash theo thứ tự `original_parts`, `text_sha256`, `page_map` trùng bản đang ghim, và `pages_checked` = 1..N. Một `original_sha256` đơn không thay tập hash. Đổi byte hoặc thứ tự thì biên bản hết hiệu lực. Chưa có biên bản đó thì hàng đợi ở `QUEUED`, không `SOURCED`.
+5. `page_count` được đối chiếu bằng parser PDF (`pypdf==7.1.1`, chế độ strict): trailer, catalog, cây `/Pages`, và `/Count` phải khớp số trang parser đọc được. Không đếm regex trên byte. PDF giả hoặc cây trang lệch thì lỗi, không đoán. Gói này không dùng để OCR.
+6. Hash từng trang `text.md` (kể cả bảng) giữ nguyên. Máy không tự nhận đã nhìn PDF. `pdf_check` của nhiều phần, do ghế khác Grok, phải có `originals` đúng `part_id` và hash theo thứ tự `original_parts`, `text_sha256`, `page_map` trùng bản đang ghim, `excluded_pages` trùng đúng thứ tự (kể cả danh sách rỗng), và `pages_checked` = 1..N. Một `original_sha256` đơn không thay tập hash. Đổi byte, thứ tự, lý do loại trang hoặc tập trang loại trừ thì biên bản cũ hết hiệu lực. Chưa có biên bản đó thì hàng đợi ở `QUEUED`, không `SOURCED`.
 7. `luat_ke_toan_88_2015` giữ một tệp, hash và `pdf_check` đã có. Khai tài liệu đó thành `original_parts` là lỗi.
 
 ## Lý do
@@ -30,7 +30,7 @@ Mỗi phần giữ nguyên byte đã tải, URL Công báo của chính phần �
 Đường một tệp, `KNOWN_ORIGINALS` của Luật Kế toán 88/2015, và các test hiện có không đổi hành vi. `may_mark_sourced` vẫn từ chối khi thiếu `pdf_check`.
 
 ## Giới hạn
-- Chưa chứng nhận nội dung Luật 32 đã khớp PDF. Pilot chỉ ghim byte và bản chép máy; trạng thái `QUEUED`.
+- Chưa chứng nhận nội dung Luật 32 đã khớp PDF. Pilot chỉ ghim byte và bản chép máy; trạng thái `QUEUED`. Trang PDF 94 của phần `cb-369-370` không trống: ảnh trang là ấn phẩm Văn phòng Chính phủ xuất bản (chữ vẽ bằng path). Trang đó bị loại, có lý do; không có `pdf_check`.
 - `tt_99_2025` không nằm trong PR này. Luật 54/2019 là bản scan, không OCR bỏ dấu ở đây. BCTC VCB 2025 chưa ghim.
 - ADR này chưa được chấm và chưa được Owner gộp. Không tự nhận ACCEPTED bằng comment Issue.
 

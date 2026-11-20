@@ -1083,7 +1083,7 @@
         {
           "part_id": "cb-369-370",
           "pdf_page": 94,
-          "reason": "Trang cuối PDF Công báo 369+370 không có content stream, không có chữ và không chứa điều khoản của Luật 32/2024/QH15."
+          "reason": "Trang PDF 94 là trang in của Văn phòng Chính phủ xuất bản (địa chỉ, điện thoại, email congbao@chinhphu.vn), chữ vẽ bằng path, không có toán tử chữ. Không chứa điều khoản của Luật 32/2024/QH15. Điều 131 nằm ở PDF trang 93."
         }
       ],
       "crosscheck": {

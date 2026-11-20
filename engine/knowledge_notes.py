@@ -13,8 +13,8 @@ Quy ước trên đĩa (library/sources/README.md):
   không được khai cả hai schema; mỗi phần có hash/byte/URL/page_count riêng và page_map tới [pN]. Bỏ cả hai schema
   không qua cổng nguồn. Hash từng trang tính
   trên cả trang, gồm bảng. Hash đó không phải biên bản đã đối chiếu PDF: SOURCED và ghi chú CITED/TESTED/PROVEN
-  cần thêm pdf_check của một ghế. Nhiều phần: pdf_check phải gắn đủ hash từng phần theo thứ tự, text_sha256 và
-  page_map. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
+  cần thêm pdf_check của một ghế. Nhiều phần: pdf_check phải gắn đủ hash từng phần theo thứ tự, text_sha256,
+  page_map và excluded_pages đúng thứ tự. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
   sổ của kỳ) và published_on (ngày CÔNG BỐ công khai — ngày đầu tiên thị trường biết số liệu); số liệu chỉ được dùng từ
   published_on (usable_on), không phải từ period_end.
 - library/notes/<KN-id>.json: KNOWLEDGE_NOTE theo contracts/knowledge_note.schema.json.
@@ -30,10 +30,11 @@ khoảng trắng) trong ít nhất một chỗ được trỏ tới.
 Dùng: python -m engine.knowledge_notes          kiểm toàn thư viện, in lỗi/cảnh báo
       run_cycle gọi mark_outdated() để tự chuyển OUTDATED (L-08).
 """
-import hashlib, json, pathlib, re, sys
+import hashlib, io, json, pathlib, re, sys, urllib.parse
 from datetime import date, datetime
 
 import yaml
+from pypdf import PdfReader
 
 from .config import REPO
 
@@ -58,8 +59,11 @@ ORIGINAL_KEYS = ("original_sha256", "original_bytes", "original_path", "text_sha
 SINGLE_ORIGINAL_KEYS = ("original_sha256", "original_bytes", "original_path")
 PART_FIELDS = ("part_id", "original_path", "source_url", "original_sha256", "original_bytes", "page_count")
 _PART_ID_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
-_PDF_PAGE_RE = re.compile(br"/Type\s*/Page(?!s)")
-_PDF_COUNT_RE = re.compile(br"/Count\s+(\d+)")
+# Miền https được phép cho source_url của tài liệu nhiều phần. Nhãn data_source không thay kiểm host.
+# Không sửa DATA_SOURCES.yaml. Chỉ các tên đã có trong tệp đó.
+OFFICIAL_SOURCE_HOSTS = {
+    "Công báo / Cổng TTĐT Chính phủ": ("chinhphu.vn", "cdnchinhphu.vn"),
+}
 KNOWN_ORIGINALS = {
     "luat_ke_toan_88_2015": {
         "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50",
@@ -181,18 +185,70 @@ def _declares_multi(entry) -> bool:
 
 
 def pdf_page_count(raw) -> int | None:
-    """Số trang PDF bằng stdlib. None nếu không xác nhận được (đóng khi không chắc).
-    Đếm `/Type /Page` không phải `/Type /Pages`, đối chiếu `/Count`. Không dùng pypdf."""
+    """Số trang của một PDF cấu trúc hợp lệ. None nếu parser lỗi hoặc cây trang lệch (đóng khi không chắc).
+    pypdf ở chế độ strict: trailer, catalog, /Pages, /Count phải khớp số trang đọc được. Không đếm regex.
+    Hàm không chứng nhận text.md đã khớp nội dung PDF."""
     if not isinstance(raw, (bytes, bytearray)):
         return None
     raw = bytes(raw)
     if not raw.startswith(b"%PDF"):
         return None
-    n_pages = len(_PDF_PAGE_RE.findall(raw))
-    counts = [int(x) for x in _PDF_COUNT_RE.findall(raw)]
-    if n_pages < 1 or not counts or max(counts) != n_pages:
+    try:
+        reader = PdfReader(io.BytesIO(raw), strict=True)
+        if reader.is_encrypted:
+            return None
+        root = reader.trailer["/Root"]
+        if hasattr(root, "get_object"):
+            root = root.get_object()
+        pages = root["/Pages"]
+        if hasattr(pages, "get_object"):
+            pages = pages.get_object()
+        if str(pages.get("/Type")) != "/Pages":
+            return None
+        declared = pages.get("/Count")
+        if isinstance(declared, bool) or not isinstance(declared, int):
+            return None
+        resolved = reader.pages
+        if int(declared) != len(resolved) or int(declared) < 1:
+            return None
+        for page in resolved:
+            ptype = page.get("/Type")
+            if hasattr(ptype, "get_object"):
+                ptype = ptype.get_object()
+            if str(ptype) != "/Page":
+                return None
+    except Exception:
         return None
-    return n_pages
+    return len(resolved)
+
+
+def _https_host(url):
+    """Hostname chữ thường của URL https, hoặc None. Có userinfo, khác https, hoặc host rỗng thì None."""
+    if not isinstance(url, str) or any(c.isspace() for c in url):
+        return None
+    try:
+        parsed = urllib.parse.urlsplit(url)
+    except ValueError:
+        return None
+    if parsed.scheme != "https" or parsed.username or parsed.password or parsed.hostname is None:
+        return None
+    return parsed.hostname.lower().rstrip(".")
+
+
+def _host_allowed(host, suffixes) -> bool:
+    return any(host == suffix or host.endswith("." + suffix) for suffix in suffixes)
+
+
+def _source_url_error(url, data_source, where):
+    """None nếu URL https thuộc miền đã gắn với data_source. Ngược lại một câu lỗi."""
+    host = _https_host(url)
+    if host is None:
+        return f"{where}source_url phải là URL https chính thức, không để trống"
+    suffixes = OFFICIAL_SOURCE_HOSTS.get(data_source)
+    if not suffixes or not _host_allowed(host, suffixes):
+        return (f"{where}source_url không thuộc miền của data_source đã duyệt; "
+                "nhãn nguồn không thay kiểm URL")
+    return None
 
 
 def original_file(root, doc_id, rel):
@@ -287,7 +343,8 @@ def _page_hash_errors(entry, text, doc_id=None) -> list[str]:
 def pdf_witness_errors(entry, text) -> list[str]:
     """Tầng 2: một ghế khai đã đối chiếu text.md với PDF. Máy không đọc ảnh trang.
     Thiếu biên bản này thì hash tự sinh không được dùng làm chứng nhận.
-    Nhiều phần: phải gắn đủ hash từng phần theo thứ tự và đúng page_map. Một original_sha256 không thay được."""
+    Nhiều phần: phải gắn đủ hash từng phần theo thứ tự, đúng page_map và đúng excluded_pages.
+    Một original_sha256 không thay được. Đổi lý do hoặc tập trang loại trừ thì biên bản cũ hết hiệu lực."""
     cc = entry.get("crosscheck") if isinstance(entry, dict) else None
     w = cc.get("pdf_check") if isinstance(cc, dict) else None
     if not isinstance(w, dict):
@@ -320,6 +377,10 @@ def pdf_witness_errors(entry, text) -> list[str]:
                 return ["pdf_check.originals lệch part_id hoặc hash — đổi byte hoặc thứ tự thì biên bản hết hiệu lực"]
         if w.get("page_map") != entry.get("page_map"):
             return ["pdf_check.page_map phải trùng page_map đang ghim"]
+        declared_excluded = entry.get("excluded_pages", [])
+        if not isinstance(declared_excluded, list) or w.get("excluded_pages") != declared_excluded:
+            return ["pdf_check.excluded_pages phải trùng danh sách trang loại trừ đang ghim, đúng thứ tự — "
+                    "đổi lý do hoặc tập trang thì biên bản hết hiệu lực"]
         return []
     if w.get("original_sha256") != entry.get("original_sha256"):
         return ["pdf_check không gắn với đúng tệp PDF đã ghim"]
@@ -354,9 +415,12 @@ def _page_map_errors(entry, surface) -> list[str]:
             errs.append("hash text.md không được dùng làm hash tệp gốc")
         if not _pos_int(part.get("page_count")):
             errs.append(f"phần {pid}: page_count phải là số nguyên dương")
-        url = part.get("source_url")
-        if not isinstance(url, str) or not url.startswith("https://") or any(c.isspace() for c in url):
-            errs.append(f"phần {pid}: source_url phải là URL https chính thức, không để trống")
+        why = _source_url_error(part.get("source_url"), entry.get("data_source"), f"phần {pid}: ")
+        if why:
+            errs.append(why)
+    doc_why = _source_url_error(entry.get("source_url"), entry.get("data_source"), "")
+    if doc_why:
+        errs.append(doc_why)
     if errs:
         return errs
     if len({p.get("original_sha256") for p in parts}) != len(parts):
