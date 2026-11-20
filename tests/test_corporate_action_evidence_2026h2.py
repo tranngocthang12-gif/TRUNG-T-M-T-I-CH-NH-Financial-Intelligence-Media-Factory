@@ -1,62 +1,70 @@
-"""Bằng chứng quyền cổ phiếu 11/2025–11/2026. Không mạng. Không ghi kho."""
+"""Bằng chứng quyền cổ phiếu 11/2025–11/2026. Không mạng. Không ghi kho.
+
+Ngày ký trên văn bản không phải ngày HOSE đăng. Khi chưa ghim metadata tin đã kiểm nội dung,
+published_at phải null. Nguyên văn loại sự kiện giữ riêng; không gán mã kỹ thuật của engine và
+không đưa văn bản vào chuỗi verified-adjusted chỉ vì có PDF hoặc ngày/hệ số trùng.
+"""
+import functools
 import hashlib
 import json
 import pathlib
+import re
 import shutil
 import subprocess
 import tempfile
 import unittest
-from datetime import date
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "data" / "evidence" / "corporate_actions" / "EVIDENCE_MANIFEST_2026H2.json"
 REPORT = ROOT / "reports" / "CORPORATE_ACTION_EVIDENCE_2026H2_20261119.md"
 
-# Ngày và hệ số engine trong lệnh. Không phải bằng chứng.
+# 17 sự kiện cần ghim, nhận diện bằng mã và ngày không hưởng quyền trên văn bản.
+# Không phải hệ số engine và không phải ngày công bố.
 EVENTS = (
-    ("TPB", "2026-10-02", 1.15),
-    ("HDB", "2026-10-09", 1.30),
-    ("TCB", "2026-10-29", 1.50),
-    ("VIC", "2025-12-05", 2.0),
-    ("POW", "2025-12-10", 1.19),
-    ("CTG", "2025-12-17", 1.446366),
-    ("HDB", "2025-12-18", 1.2969),
-    ("HPG", "2026-05-25", 1.10),
-    ("SSB", "2026-05-28", 1.205202),
-    ("ACB", "2026-06-15", 1.13),
-    ("VJC", "2026-06-16", 1.30),
-    ("VHM", "2026-08-06", 2.0),
-    ("MBB", "2026-08-11", 1.15),
-    ("SSI", "2026-08-17", 1.20),
-    ("BID", "2026-08-17", 1.068433),
-    ("VIB", "2026-09-10", 1.095),
-    ("VPB", "2026-09-24", 1.260410),
+    ("TPB", "2026-10-02"),
+    ("HDB", "2026-10-09"),
+    ("TCB", "2026-10-29"),
+    ("VIC", "2025-12-05"),
+    ("POW", "2025-12-10"),
+    ("CTG", "2025-12-17"),
+    ("HDB", "2025-12-18"),
+    ("HPG", "2026-05-25"),
+    ("SSB", "2026-05-28"),
+    ("ACB", "2026-06-15"),
+    ("VJC", "2026-06-16"),
+    ("VHM", "2026-08-06"),
+    ("MBB", "2026-08-11"),
+    ("SSI", "2026-08-17"),
+    ("BID", "2026-08-17"),
+    ("VIB", "2026-09-10"),
+    ("VPB", "2026-09-24"),
 )
+TECHNICAL = {"stock_split", "stock_dividend"}
+DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 REQUIRED = (
-    "source_id", "url", "issuer", "published_at", "accessed_at", "effective_date",
-    "path", "sha256", "bytes", "ticker", "event_type", "official_ex_date",
-    "official_record_date", "official_ratio", "official_ratio_text", "note",
+    "source_id", "url", "issuer", "signed_date", "published_at", "published_at_status",
+    "published_at_note", "publication_evidence", "accessed_at", "effective_date",
+    "path", "sha256", "bytes", "ticker", "event_type", "event_type_status",
+    "event_type_verbatim", "event_type_note", "official_ex_date", "official_record_date",
+    "official_ratio", "official_ratio_text", "note",
 )
-NEAR_DAYS = 21
 
 
 def _docs(path=MANIFEST):
     return json.loads(path.read_text(encoding="utf-8"))["source_documents"]
 
 
-def _day(value):
-    return str(value)[:10]
+def fmt(value):
+    """Số thập phân ngắn, dấu phẩy, đúng giá trị float đã đọc — không làm tròn thêm về 6 chữ số."""
+    text = format(float(value), ".12f").rstrip("0").rstrip(".")
+    return text.replace(".", ",")
 
 
-def _match(doc):
-    official = date.fromisoformat(_day(doc["official_ex_date"]))
-    hits = []
-    for ticker, day, _ratio in EVENTS:
-        if doc["ticker"] != ticker:
-            continue
-        if abs((official - date.fromisoformat(day)).days) <= NEAR_DAYS:
-            hits.append((ticker, day))
-    return hits
+def ratio_cell(official, engine):
+    left, right = fmt(official), fmt(engine)
+    if abs(float(official) - float(engine)) <= 1e-12:
+        return f"{left} = {right}"
+    return f"{left} khác {right}"
 
 
 def check_bytes(root, docs):
@@ -78,40 +86,183 @@ def check_bytes(root, docs):
     return errors
 
 
+def publication_errors(docs, root=ROOT):
+    """published_at chỉ hợp lệ khi có metadata đã ghim, và không được là ngày ký."""
+    errors = []
+    for doc in docs:
+        sid = doc.get("source_id")
+        signed = doc.get("signed_date")
+        if not isinstance(signed, str) or not DATE.fullmatch(signed):
+            errors.append(f"{sid} thiếu signed_date")
+            signed = None
+        pub = doc.get("published_at")
+        status = doc.get("published_at_status")
+        evidence = doc.get("publication_evidence")
+        if pub is None:
+            if status != "CHUA_XAC_MINH":
+                errors.append(f"{sid} published_at null nhưng không ghi CHUA_XAC_MINH")
+            if evidence not in (None, ""):
+                errors.append(f"{sid} có publication_evidence trong khi published_at null")
+            continue
+        day = str(pub)[:10]
+        if signed and day == signed:
+            errors.append(f"{sid} nhập ngày ký thay ngày công bố")
+        ev_path = evidence if isinstance(evidence, str) else ""
+        pinned = bool(ev_path) and ev_path != doc.get("path") and (pathlib.Path(root) / ev_path).is_file()
+        if not pinned:
+            errors.append(f"{sid} published_at không có metadata chính thức đã ghim và kiểm nội dung")
+        if status == "CHUA_XAC_MINH":
+            errors.append(f"{sid} vừa có published_at vừa ghi CHUA_XAC_MINH")
+    return errors
+
+
+def classification_errors(docs):
+    """Nguyên văn HOSE không được ghi vào trường loại kỹ thuật mà cổng verified-adjusted đọc."""
+    errors = []
+    for doc in docs:
+        sid = doc.get("source_id")
+        kind = doc.get("event_type")
+        if kind is not None:
+            errors.append(f"{sid} event_type phải để trống; nguyên văn nằm ở event_type_verbatim")
+        if kind in TECHNICAL:
+            errors.append(f"{sid} gán loại kỹ thuật chưa xác minh")
+        if doc.get("event_type_status") != "CHUA_XAC_MINH":
+            errors.append(f"{sid} event_type_status phải là CHUA_XAC_MINH")
+        text = doc.get("event_type_verbatim")
+        if not isinstance(text, str) or not text.strip() or text.strip() in TECHNICAL:
+            errors.append(f"{sid} mất nguyên văn loại sự kiện HOSE")
+    return errors
+
+
+@functools.lru_cache(maxsize=1)
+def _market():
+    """Đọc kho và dựng sự kiện engine trong bộ nhớ. Không ghi đĩa."""
+    import pandas as pd
+
+    from engine import adjust, data
+
+    store = data.load_store()
+    raw = store.pivot(index="date", columns="ticker", values="close").sort_index()
+    observed = store.pivot(index="date", columns="ticker", values="observed_at").sort_index()
+    events = adjust.build_events(raw, observed, adjust.load_manual(), adjust.load_yahoo())
+    return raw, events
+
+
+def engine_rows():
+    """Một dòng cổ phiếu của engine cho đúng ngày không hưởng quyền của từng văn bản."""
+    import pandas as pd
+
+    from engine import adjust
+
+    raw, events = _market()
+    stock = events[events["type"].isin(adjust.STOCK)]
+    found = {}
+    for doc in _docs():
+        key = (doc["ticker"], doc["official_ex_date"])
+        hit = stock[(stock.ticker == key[0]) & (stock.ex_date == pd.Timestamp(key[1]))]
+        if len(hit) != 1:
+            found[key] = None
+            continue
+        row = hit.iloc[0]
+        sessions = raw[key[0]].dropna().index
+        pos = int(sessions.searchsorted(pd.Timestamp(key[1])))
+        trade = row.trade_date
+        offset = int(sessions.get_loc(trade)) - pos
+        found[key] = {
+            "type": str(row.type),
+            "ratio": float(row.ratio),
+            "status": str(row.status),
+            "source": str(row.source),
+            "trade_date": str(trade.date()),
+            "offset": offset,
+        }
+    return found
+
+
 class CorporateActionEvidence2026H2Tests(unittest.TestCase):
     def test_manifest_files_hash_and_keys(self):
         docs = _docs()
-        self.assertGreaterEqual(len(docs), 1)
+        self.assertEqual(len(docs), 17)
         self.assertEqual(check_bytes(ROOT, docs), [])
         for doc in docs:
             self.assertTrue(doc["url"])
             self.assertTrue(doc["issuer"])
-            self.assertRegex(_day(doc["published_at"]), r"^\d{4}-\d{2}-\d{2}$")
+            self.assertRegex(doc["signed_date"], r"^\d{4}-\d{2}-\d{2}$")
+            self.assertLess(doc["signed_date"], doc["official_ex_date"], doc["source_id"])
             self.assertRegex(doc["official_ex_date"], r"^\d{4}-\d{2}-\d{2}$")
             self.assertIsInstance(doc["official_ratio"], (int, float))
+            self.assertIsNone(doc["published_at"])
+            self.assertIsNone(doc["event_type"])
 
-    def test_published_on_or_before_ex_date(self):
-        for doc in _docs():
-            self.assertLessEqual(_day(doc["published_at"]), doc["official_ex_date"], doc["source_id"])
+    def test_published_at_is_unverified_and_not_the_signed_date(self):
+        docs = _docs()
+        self.assertEqual(publication_errors(docs), [])
+        signed_as_published = [dict(doc) for doc in docs]
+        signed_as_published[0]["published_at"] = signed_as_published[0]["signed_date"]
+        signed_errors = publication_errors(signed_as_published)
+        self.assertTrue(any("nhập ngày ký thay ngày công bố" in err for err in signed_errors))
+        other_day = [dict(doc) for doc in docs]
+        other_day[0]["published_at"] = "2020-01-01"
+        other_errors = publication_errors(other_day)
+        self.assertTrue(any("không có metadata chính thức đã ghim" in err for err in other_errors))
+        vpb = next(doc for doc in docs if doc["source_id"] == "hose-2497757")
+        self.assertEqual(vpb["signed_date"], "2026-09-16")
+        self.assertIsNone(vpb["published_at"])
+        self.assertIn("2026-09-16", vpb["published_at_note"])
+        self.assertIn("2026-09-17", vpb["published_at_note"])
+        self.assertIn("Không chọn", vpb["published_at_note"])
 
-    def test_each_document_matches_exactly_one_ordered_event(self):
-        seen = []
-        for doc in _docs():
-            hits = _match(doc)
-            self.assertEqual(len(hits), 1, (doc["source_id"], hits))
-            seen.append(hits[0])
-        self.assertEqual(len(seen), len(set(seen)))
+    def test_verbatim_type_is_not_a_verified_technical_type(self):
+        docs = _docs()
+        self.assertEqual(classification_errors(docs), [])
+        forged = [dict(doc) for doc in docs]
+        forged[0]["event_type"] = "stock_dividend"
+        errors = classification_errors(forged)
+        self.assertTrue(any("loại kỹ thuật" in err for err in errors))
+        for doc in docs:
+            self.assertNotIn(doc["event_type_verbatim"], TECHNICAL)
 
-    def test_report_has_seventeen_rows(self):
+    def test_each_document_is_exactly_one_of_seventeen_events(self):
+        docs = _docs()
+        got = [(doc["ticker"], doc["official_ex_date"]) for doc in docs]
+        self.assertEqual(sorted(got), sorted(EVENTS))
+        self.assertEqual(len(got), len(set(got)))
+
+    def test_report_quotes_the_engine_read_not_the_order_list(self):
         text = REPORT.read_text(encoding="utf-8")
+        self.assertNotIn("1,446366", text)
+        rows = engine_rows()
         ids = {doc["source_id"] for doc in _docs()}
-        for ticker, day, _ratio in EVENTS:
-            key = f"{ticker} {day}"
-            self.assertIn(key, text, key)
-            line = next(row for row in text.splitlines() if key in row)
-            pinned = any(source_id in line for source_id in ids)
-            missing = "CHƯA ĐỦ BẰNG CHỨNG" in line and len(line.split("CHƯA ĐỦ BẰNG CHỨNG", 1)[1].strip(" |")) > 8
-            self.assertTrue(pinned or missing, line)
+        self.assertEqual(len(rows), 17)
+        for doc in _docs():
+            key = (doc["ticker"], doc["official_ex_date"])
+            info = rows[key]
+            self.assertIsNotNone(info, key)
+            line = next(row for row in text.splitlines() if f"{key[0]} {key[1]}" in row)
+            self.assertIn(doc["source_id"], line)
+            self.assertIn("CHƯA XÁC MINH", line)
+            self.assertIn(info["trade_date"], line)
+            self.assertIn(f"lệch {info['offset']}", line)
+            self.assertIn(ratio_cell(doc["official_ratio"], info["ratio"]), line)
+            self.assertIn(info["status"], line)
+            self.assertNotIn("DA_KIEM_CHUNG", line)
+            self.assertIn(doc["source_id"], ids)
+
+    def test_pdf_and_matching_numbers_do_not_enter_verified_chain(self):
+        import pandas as pd
+
+        from engine import verified_adjust as va
+
+        raw, events = _market()
+        checked = va.verify_events(events, raw, _docs(), evidence_root=ROOT, as_of=raw.index.max())
+        ids = {doc["source_id"] for doc in _docs()}
+        self.assertFalse(set(checked["evidence_id"]) & ids)
+        self.assertEqual(int(checked["in_verified_chain"].sum()), 0)
+        for ticker, day in EVENTS:
+            hit = checked[(checked.ticker == ticker) & (checked.ex_date == pd.Timestamp(day))
+                          & checked.type.isin(va.STOCK)]
+            self.assertEqual(len(hit), 1, (ticker, day))
+            self.assertFalse(bool(hit.iloc[0].in_verified_chain))
 
     def test_flipping_one_byte_in_a_temp_copy_fails_and_repo_untouched(self):
         before = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)
