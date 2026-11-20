@@ -7,11 +7,14 @@ Quy ước trên đĩa (library/sources/README.md):
   dòng đầu là tiêu đề, dòng "|---" bỏ qua, dòng dữ liệu đánh số 1, 2, … Bảng không tính là đoạn.
 - library/SOURCE_MANIFEST.json "files"[<doc_id>]: sha256 + bytes của text.md (không phải của PDF), issuer, issued_on, accessed_on, source_url,
   data_source (tên trong governance/DATA_SOURCES.yaml, không được là nguồn "forbidden"), legal_status, license,
-  kind, effective_from, effective_to, superseded_by. Mọi dòng phải ghim original_sha256, original_bytes,
+  kind, effective_from, effective_to, superseded_by. Một tệp gốc: original_sha256, original_bytes,
   original_path, text_sha256, text_bytes — text_* phải trùng sha256/bytes, original_* phải khác và trỏ tới tệp
-  trong cùng thư mục, không phải text.md. Bỏ các trường đó không qua cổng nguồn (ADR-0012). Hash từng trang tính
+  trong cùng thư mục, không phải text.md. N≥2 PDF gốc (ADR-0014): original_parts thay cho ba trường original_*,
+  không được khai cả hai schema; mỗi phần có hash/byte/URL/page_count riêng và page_map tới [pN]. Bỏ cả hai schema
+  không qua cổng nguồn. Hash từng trang tính
   trên cả trang, gồm bảng. Hash đó không phải biên bản đã đối chiếu PDF: SOURCED và ghi chú CITED/TESTED/PROVEN
-  cần thêm pdf_check của một ghế. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
+  cần thêm pdf_check của một ghế. Nhiều phần: pdf_check phải gắn đủ hash từng phần theo thứ tự, text_sha256 và
+  page_map. BCTC (kind FINANCIAL_STATEMENT, ADR-0008) thêm period_end (ngày khóa
   sổ của kỳ) và published_on (ngày CÔNG BỐ công khai — ngày đầu tiên thị trường biết số liệu); số liệu chỉ được dùng từ
   published_on (usable_on), không phải từ period_end.
 - library/notes/<KN-id>.json: KNOWLEDGE_NOTE theo contracts/knowledge_note.schema.json.
@@ -52,6 +55,11 @@ MANIFEST_KEYS = ["sha256", "bytes", "issuer", "issued_on", "accessed_on", "sourc
 # sha256/bytes luôn là text.md. Mọi dòng manifest phải ghim tệp gốc (ADR-0012, sửa sau phản biện).
 # Không còn đường vòng "bỏ original_* thì qua cổng". Manifest trên main đang rỗng nên không có dòng cũ cần miễn.
 ORIGINAL_KEYS = ("original_sha256", "original_bytes", "original_path", "text_sha256", "text_bytes")
+SINGLE_ORIGINAL_KEYS = ("original_sha256", "original_bytes", "original_path")
+PART_FIELDS = ("part_id", "original_path", "source_url", "original_sha256", "original_bytes", "page_count")
+_PART_ID_RE = re.compile(r"[a-z0-9]+(?:-[a-z0-9]+)*")
+_PDF_PAGE_RE = re.compile(br"/Type\s*/Page(?!s)")
+_PDF_COUNT_RE = re.compile(br"/Count\s+(\d+)")
 KNOWN_ORIGINALS = {
     "luat_ke_toan_88_2015": {
         "original_sha256": "1fd9336a3a6f4d90676db5889bdb409af9c75c96c9c256143197908a7bfcca50",
@@ -152,7 +160,8 @@ def claims_original(entry) -> bool:
     """True khi dòng manifest khai bất kỳ trường tệp gốc hoặc biên bản đối chiếu trang."""
     if not isinstance(entry, dict):
         return False
-    return any(k in entry for k in ORIGINAL_KEYS) or "crosscheck" in entry
+    return (any(k in entry for k in ORIGINAL_KEYS) or "crosscheck" in entry
+            or _declares_multi(entry) or "page_map" in entry or "excluded_pages" in entry)
 
 
 def _sha256_hex(v) -> bool:
@@ -161,6 +170,29 @@ def _sha256_hex(v) -> bool:
 
 def _pos_int(v) -> bool:
     return isinstance(v, int) and not isinstance(v, bool) and v > 0
+
+
+def _declares_single(entry) -> bool:
+    return isinstance(entry, dict) and any(k in entry for k in SINGLE_ORIGINAL_KEYS)
+
+
+def _declares_multi(entry) -> bool:
+    return isinstance(entry, dict) and "original_parts" in entry
+
+
+def pdf_page_count(raw) -> int | None:
+    """Số trang PDF bằng stdlib. None nếu không xác nhận được (đóng khi không chắc).
+    Đếm `/Type /Page` không phải `/Type /Pages`, đối chiếu `/Count`. Không dùng pypdf."""
+    if not isinstance(raw, (bytes, bytearray)):
+        return None
+    raw = bytes(raw)
+    if not raw.startswith(b"%PDF"):
+        return None
+    n_pages = len(_PDF_PAGE_RE.findall(raw))
+    counts = [int(x) for x in _PDF_COUNT_RE.findall(raw)]
+    if n_pages < 1 or not counts or max(counts) != n_pages:
+        return None
+    return n_pages
 
 
 def original_file(root, doc_id, rel):
@@ -254,7 +286,8 @@ def _page_hash_errors(entry, text, doc_id=None) -> list[str]:
 
 def pdf_witness_errors(entry, text) -> list[str]:
     """Tầng 2: một ghế khai đã đối chiếu text.md với PDF. Máy không đọc ảnh trang.
-    Thiếu biên bản này thì hash tự sinh không được dùng làm chứng nhận."""
+    Thiếu biên bản này thì hash tự sinh không được dùng làm chứng nhận.
+    Nhiều phần: phải gắn đủ hash từng phần theo thứ tự và đúng page_map. Một original_sha256 không thay được."""
     cc = entry.get("crosscheck") if isinstance(entry, dict) else None
     w = cc.get("pdf_check") if isinstance(cc, dict) else None
     if not isinstance(w, dict):
@@ -270,12 +303,142 @@ def pdf_witness_errors(entry, text) -> list[str]:
     text_hash = hashlib.sha256(text.encode("utf-8")).hexdigest()
     if w.get("text_sha256") != text_hash or w.get("text_sha256") != entry.get("text_sha256"):
         return ["pdf_check không gắn với đúng bản text.md hiện tại — biên bản cũ không còn hiệu lực khi bản chép đổi"]
-    if w.get("original_sha256") != entry.get("original_sha256"):
-        return ["pdf_check không gắn với đúng tệp PDF đã ghim"]
     n = len(page_surface(text))
     if w.get("pages_checked") != list(range(1, n + 1)):
         return ["pdf_check.pages_checked phải là danh sách đủ trang 1..N đã đối chiếu, không phải một số đếm"]
+    if _declares_multi(entry) and not _declares_single(entry):
+        if "original_sha256" in w:
+            return ["pdf_check của nhiều phần không được thay tập hash bằng một original_sha256"]
+        parts = entry.get("original_parts") if isinstance(entry.get("original_parts"), list) else []
+        originals = w.get("originals")
+        if not isinstance(originals, list) or len(originals) != len(parts) or len(parts) < 2:
+            return ["pdf_check.originals phải gắn đủ hash từng phần theo đúng thứ tự"]
+        for got, part in zip(originals, parts):
+            if (not isinstance(got, dict) or not isinstance(part, dict)
+                    or got.get("part_id") != part.get("part_id")
+                    or got.get("original_sha256") != part.get("original_sha256")):
+                return ["pdf_check.originals lệch part_id hoặc hash — đổi byte hoặc thứ tự thì biên bản hết hiệu lực"]
+        if w.get("page_map") != entry.get("page_map"):
+            return ["pdf_check.page_map phải trùng page_map đang ghim"]
+        return []
+    if w.get("original_sha256") != entry.get("original_sha256"):
+        return ["pdf_check không gắn với đúng tệp PDF đã ghim"]
     return []
+
+
+def _page_map_errors(entry, surface) -> list[str]:
+    """Ánh xạ [pN] → part_id + trang PDF. Không đọc đĩa. surface là page_surface hoặc None."""
+    parts = entry.get("original_parts")
+    if not isinstance(parts, list) or len(parts) < 2:
+        return ["original_parts phải là mảng có từ 2 phần; một PDF dùng ba trường original_*, không dùng mảng một phần"]
+    errs = []
+    ids = []
+    for i, part in enumerate(parts):
+        if not isinstance(part, dict):
+            errs.append(f"phần gốc thứ {i + 1} không phải đối tượng")
+            continue
+        missing = [k for k in PART_FIELDS if part.get(k) in (None, "")]
+        if missing:
+            errs.append(f"phần gốc thứ {i + 1} thiếu trường hoặc để trống {missing}")
+            continue
+        pid = part.get("part_id")
+        if not isinstance(pid, str) or _PART_ID_RE.fullmatch(pid) is None:
+            errs.append(f"part_id không hợp lệ: {pid}")
+        elif pid in ids:
+            errs.append(f"lặp part_id {pid}")
+        else:
+            ids.append(pid)
+        if not _sha256_hex(part.get("original_sha256")) or not _pos_int(part.get("original_bytes")):
+            errs.append(f"phần {pid}: original_sha256 phải là 64 hex thường và original_bytes là số nguyên dương")
+        if part.get("original_sha256") in (entry.get("sha256"), entry.get("text_sha256")):
+            errs.append("hash text.md không được dùng làm hash tệp gốc")
+        if not _pos_int(part.get("page_count")):
+            errs.append(f"phần {pid}: page_count phải là số nguyên dương")
+        url = part.get("source_url")
+        if not isinstance(url, str) or not url.startswith("https://") or any(c.isspace() for c in url):
+            errs.append(f"phần {pid}: source_url phải là URL https chính thức, không để trống")
+    if errs:
+        return errs
+    if len({p.get("original_sha256") for p in parts}) != len(parts):
+        errs.append("hash các phần gốc bị trùng nhau")
+    page_map = entry.get("page_map")
+    if not isinstance(page_map, list) or not page_map:
+        return errs + ["thiếu page_map: mỗi [pN] phải trỏ tới part_id và trang PDF vật lý"]
+    order = []
+    mapped = {pid: [] for pid in ids}
+    for row in page_map:
+        if not isinstance(row, dict):
+            errs.append("một dòng page_map không phải đối tượng")
+            continue
+        tp, pid, pp = row.get("text_page"), row.get("part_id"), row.get("pdf_page")
+        order.append(tp)
+        if pid not in mapped:
+            errs.append(f"ánh xạ trang {tp} trỏ tới part_id không có trong original_parts")
+            continue
+        part = next(p for p in parts if p.get("part_id") == pid)
+        if not _pos_int(pp) or pp > part.get("page_count"):
+            errs.append(f"pdf_page {pp} của phần {pid} nằm ngoài 1..page_count")
+        else:
+            mapped[pid].append(pp)
+    if order != list(range(1, len(page_map) + 1)):
+        errs.append("ánh xạ trang không đi đủ 1..N theo thứ tự, bị thiếu, trùng hoặc nhảy")
+    seen_idx = -1
+    last_pdf = {}
+    for row in page_map:
+        if not isinstance(row, dict) or row.get("part_id") not in ids:
+            continue
+        idx = ids.index(row["part_id"])
+        if idx < seen_idx:
+            errs.append("thứ tự phần trong page_map bị tráo hoặc nhảy lùi")
+            break
+        seen_idx = idx
+        prev = last_pdf.get(row["part_id"], 0)
+        pp = row.get("pdf_page")
+        if _pos_int(pp) and pp <= prev:
+            errs.append(f"pdf_page trong phần {row['part_id']} không tăng nghiêm ngặt")
+            break
+        if _pos_int(pp):
+            last_pdf[row["part_id"]] = pp
+    for pid in ids:
+        if not mapped[pid]:
+            errs.append(f"phần {pid} không có trang nào trong text.md")
+    excluded = entry.get("excluded_pages", [])
+    if "excluded_pages" in entry and not isinstance(excluded, list):
+        errs.append("excluded_pages phải là danh sách")
+        excluded = []
+    excluded_by = {pid: set() for pid in ids}
+    if isinstance(excluded, list):
+        for row in excluded:
+            if not isinstance(row, dict):
+                errs.append("một dòng excluded_pages không phải đối tượng")
+                continue
+            pid, pp = row.get("part_id"), row.get("pdf_page")
+            reason = str(row.get("reason") or "").strip()
+            if pid not in excluded_by:
+                errs.append(f"excluded_pages trỏ tới part_id không có trong original_parts: {pid}")
+                continue
+            if len(reason) < 15:
+                errs.append(f"excluded_pages trang {pp} của {pid} thiếu lý do để reviewer kiểm")
+            part = next(p for p in parts if p.get("part_id") == pid)
+            if not _pos_int(pp) or pp > part.get("page_count"):
+                errs.append(f"excluded_pages pdf_page {pp} của {pid} nằm ngoài 1..page_count")
+                continue
+            if pp in mapped.get(pid, []):
+                errs.append(f"excluded_pages trùng trang PDF đã ánh xạ: {pid} trang {pp}")
+            elif pp in excluded_by[pid]:
+                errs.append(f"excluded_pages lặp {pid} trang {pp}")
+            else:
+                excluded_by[pid].add(pp)
+    for part in parts:
+        pid = part["part_id"]
+        covered = set(mapped.get(pid, [])) | excluded_by.get(pid, set())
+        want = set(range(1, part["page_count"] + 1))
+        if covered != want:
+            errs.append(f"PDF phần {pid} còn trang chưa ánh xạ và chưa ghi excluded_pages, hoặc ánh xạ nhảy trang")
+    if isinstance(surface, dict):
+        if set(surface) != set(range(1, len(page_map) + 1)):
+            errs.append("page_map không khớp các trang [pN] của text.md")
+    return errs
 
 
 def transcription_errors(entry, pages, doc_id=None, text=None, require_witness=True) -> list[str]:
@@ -283,6 +446,24 @@ def transcription_errors(entry, pages, doc_id=None, text=None, require_witness=T
     require_witness=False: chỉ tầng hash máy (cổng ghim). True: thêm pdf_check (SOURCED và ghi chú dùng được)."""
     if not isinstance(entry, dict) or not claims_original(entry):
         return ["thiếu ghim tệp gốc"]
+    if _declares_single(entry) and _declares_multi(entry):
+        return ["không được khai đồng thời schema một tệp gốc và original_parts"]
+    if _declares_multi(entry):
+        for part in entry.get("original_parts") or []:
+            if isinstance(part, dict) and part.get("original_sha256") in (entry.get("sha256"), entry.get("text_sha256")):
+                return ["hash text.md không được dùng làm hash tệp gốc"]
+        errs = _page_hash_errors(entry, text, doc_id)
+        surface = page_surface(text) if isinstance(text, str) else None
+        for msg in _page_map_errors(entry, surface):
+            if msg not in errs:
+                errs.append(msg)
+        if pages is not None and isinstance(text, str) and set(pages) != set(page_surface(text)) and not errs:
+            errs.append("tập trang đã tách không khớp các trang dùng để tính hash")
+        if require_witness:
+            for msg in pdf_witness_errors(entry, text):
+                if msg not in errs:
+                    errs.append(msg)
+        return errs
     if entry.get("original_sha256") in (entry.get("sha256"), entry.get("text_sha256")):
         return ["hash text.md không được dùng làm hash tệp gốc"]
     errs = _page_hash_errors(entry, text, doc_id)
@@ -309,9 +490,108 @@ def may_mark_sourced(entry, pages, doc_id=None, text=None) -> bool:
     if not isinstance(text, str) or not transcription_verified(entry, pages, doc_id, text):
         return False
     known = KNOWN_ORIGINALS.get(doc_id or "")
-    if known and (entry.get("original_sha256") != known["original_sha256"] or entry.get("original_bytes") != known["original_bytes"]):
+    if known and (_declares_multi(entry) or entry.get("original_sha256") != known["original_sha256"]
+                  or entry.get("original_bytes") != known["original_bytes"]):
         return False
     return True
+
+
+def _append_crosscheck(errs, prefix, doc_id, entry, text_bytes, known):
+    """Tầng hash máy trên text.md. Không chứng nhận PDF. Dùng chung schema một tệp và nhiều phần."""
+    if "crosscheck" not in entry:
+        return
+    cc = entry.get("crosscheck", None)
+    if not isinstance(cc, dict):
+        errs.append(f"{prefix}: crosscheck phải là đối tượng method, pages_checked, pages_total")
+        return
+    checked, total = cc.get("pages_checked"), cc.get("pages_total")
+    if cc.get("method") not in (None, "page-by-page"):
+        errs.append(f"{prefix}: crosscheck.method chỉ được là page-by-page")
+    if checked is not None and not _pos_int(checked):
+        errs.append(f"{prefix}: crosscheck.pages_checked phải là số nguyên dương")
+    if total is not None and not _pos_int(total):
+        errs.append(f"{prefix}: crosscheck.pages_total phải là số nguyên dương")
+    if _pos_int(checked) and _pos_int(total) and checked != total:
+        errs.append(f"{prefix}: pages_checked {checked} khác pages_total {total} — chưa đối chiếu đủ trang")
+    if known and total not in (None, known["pages"]):
+        errs.append(f"{prefix}: pages_total phải là {known['pages']} — chưa đối chiếu đủ {known['pages']} trang thì không ghi nhận")
+    if _pos_int(total):
+        try:
+            decoded = text_bytes.decode("utf-8")
+            pages, _tables = parse_text(decoded)
+        except UnicodeError:
+            decoded, pages = None, {}
+        if not _page_set_ok(pages, total):
+            errs.append(f"{prefix}: text.md không có đủ trang 1..{total} để đối chiếu")
+    else:
+        try:
+            decoded = text_bytes.decode("utf-8")
+            pages, _tables = parse_text(decoded)
+        except UnicodeError:
+            decoded, pages = None, {}
+    for msg in transcription_errors(entry, pages, doc_id, decoded, require_witness=False):
+        if msg == "thiếu ghim tệp gốc":
+            continue
+        line = f"{prefix}: {msg}"
+        if line not in errs:
+            errs.append(line)
+
+
+def _multi_binding_errors(root, doc_id, entry, text_bytes) -> list[str]:
+    """N≥2 PDF gốc. Không ghép byte. Không đọc ảnh trang. page_count sai hoặc không đếm được thì lỗi."""
+    prefix = f"L-01: {doc_id}"
+    errs = []
+    missing_text = [k for k in ("text_sha256", "text_bytes") if entry.get(k) in (None, "")]
+    if missing_text:
+        return [f"{prefix}: nhiều phần vẫn phải có text_sha256, text_bytes của text.md; đang thiếu {missing_text}"]
+    if not _sha256_hex(entry.get("text_sha256")) or not _pos_int(entry.get("text_bytes")):
+        errs.append(f"{prefix}: text_sha256 phải là 64 hex thường và text_bytes là số nguyên dương — hash của text.md, không phải PDF")
+    elif entry.get("text_sha256") != entry.get("sha256") or entry.get("text_bytes") != entry.get("bytes"):
+        errs.append(f"{prefix}: text_sha256/text_bytes phải trùng sha256/bytes của text.md")
+    text_hash = hashlib.sha256(text_bytes).hexdigest()
+    if entry.get("text_sha256") != text_hash or entry.get("text_bytes") != len(text_bytes):
+        errs.append(f"{prefix}: text.md lệch text_sha256/text_bytes (không dùng hash này cho tệp gốc)")
+    known = KNOWN_ORIGINALS.get(doc_id)
+    if known:
+        errs.append(f"{prefix}: bản gốc đã công bố là một tệp; không khai original_parts")
+    try:
+        surface = page_surface(text_bytes.decode("utf-8"))
+    except UnicodeError:
+        surface = None
+        errs.append(f"{prefix}: text.md không phải UTF-8")
+    for msg in _page_map_errors(entry, surface):
+        line = f"{prefix}: {msg}"
+        if line not in errs:
+            errs.append(line)
+    parts = entry.get("original_parts") if isinstance(entry.get("original_parts"), list) else []
+    seen_paths = set()
+    for part in parts:
+        if not isinstance(part, dict):
+            continue
+        pid = part.get("part_id")
+        rel = part.get("original_path")
+        path, why = original_file(root, doc_id, rel)
+        if why:
+            errs.append(f"{prefix}: phần {pid}: {why}")
+            continue
+        if rel in seen_paths:
+            errs.append(f"{prefix}: lặp đường dẫn phần gốc {rel}")
+        seen_paths.add(rel)
+        if not path.is_file():
+            errs.append(f"{prefix}: thiếu tệp gốc {rel}")
+            continue
+        raw = path.read_bytes()
+        if hashlib.sha256(raw).hexdigest() != part.get("original_sha256") or len(raw) != part.get("original_bytes"):
+            errs.append(f"{prefix}: tệp gốc lệch original_sha256/original_bytes (đã đổi nội dung hoặc sửa metadata)")
+        if raw == text_bytes:
+            errs.append(f"{prefix}: tệp gốc trùng byte text.md — không phải hai ghim riêng")
+        counted = pdf_page_count(raw)
+        if counted is None:
+            errs.append(f"{prefix}: phần {pid}: không xác nhận được số trang PDF (fail closed)")
+        elif counted != part.get("page_count"):
+            errs.append(f"{prefix}: phần {pid}: page_count lệch số trang đọc được từ PDF ({counted})")
+    _append_crosscheck(errs, prefix, doc_id, entry, text_bytes, known)
+    return errs
 
 
 def origin_binding_errors(root, doc_id, entry, text_bytes) -> list[str]:
@@ -320,6 +600,10 @@ def origin_binding_errors(root, doc_id, entry, text_bytes) -> list[str]:
     if not claims_original(entry):
         return [f"{prefix}: thiếu ghim tệp gốc (original_sha256, original_bytes, original_path, text_sha256, text_bytes); "
                 "bỏ các trường này không còn được coi là qua cổng nguồn"]
+    if _declares_single(entry) and _declares_multi(entry):
+        return [f"{prefix}: không được khai đồng thời schema một tệp gốc và original_parts"]
+    if _declares_multi(entry):
+        return _multi_binding_errors(root, doc_id, entry, text_bytes)
     errs = []
     missing = [k for k in ORIGINAL_KEYS if entry.get(k) in (None, "")]
     if missing:
@@ -351,42 +635,7 @@ def origin_binding_errors(root, doc_id, entry, text_bytes) -> list[str]:
             errs.append(f"{prefix}: tệp gốc lệch original_sha256/original_bytes (đã đổi nội dung hoặc sửa metadata)")
         if raw == text_bytes:
             errs.append(f"{prefix}: tệp gốc trùng byte text.md — không phải hai ghim riêng")
-    cc = entry.get("crosscheck", None)
-    if "crosscheck" in entry:
-        if not isinstance(cc, dict):
-            errs.append(f"{prefix}: crosscheck phải là đối tượng method, pages_checked, pages_total")
-        else:
-            checked, total = cc.get("pages_checked"), cc.get("pages_total")
-            if cc.get("method") not in (None, "page-by-page"):
-                errs.append(f"{prefix}: crosscheck.method chỉ được là page-by-page")
-            if checked is not None and not _pos_int(checked):
-                errs.append(f"{prefix}: crosscheck.pages_checked phải là số nguyên dương")
-            if total is not None and not _pos_int(total):
-                errs.append(f"{prefix}: crosscheck.pages_total phải là số nguyên dương")
-            if _pos_int(checked) and _pos_int(total) and checked != total:
-                errs.append(f"{prefix}: pages_checked {checked} khác pages_total {total} — chưa đối chiếu đủ trang")
-            if known and total not in (None, known["pages"]):
-                errs.append(f"{prefix}: pages_total phải là {known['pages']} — chưa đối chiếu đủ {known['pages']} trang thì không ghi nhận")
-            if _pos_int(total):
-                try:
-                    decoded = text_bytes.decode("utf-8")
-                    pages, _tables = parse_text(decoded)
-                except UnicodeError:
-                    decoded, pages = None, {}
-                if not _page_set_ok(pages, total):
-                    errs.append(f"{prefix}: text.md không có đủ trang 1..{total} để đối chiếu")
-            else:
-                try:
-                    decoded = text_bytes.decode("utf-8")
-                    pages, _tables = parse_text(decoded)
-                except UnicodeError:
-                    decoded, pages = None, {}
-            for msg in transcription_errors(entry, pages, doc_id, decoded, require_witness=False):
-                if msg == "thiếu ghim tệp gốc":
-                    continue
-                line = f"{prefix}: {msg}"
-                if line not in errs:
-                    errs.append(line)
+    _append_crosscheck(errs, prefix, doc_id, entry, text_bytes, known)
     return errs
 
 

@@ -364,5 +364,266 @@ class TableAndPdfWitnessTests(unittest.TestCase):
         self.assertEqual(self._errs(), [])
 
 
+def _tiny_pdf(n, extra=b""):
+    body = b"%PDF-1.4\n" + extra
+    for _ in range(n):
+        body += b"<< /Type /Page >>\n"
+    body += f"<< /Type /Pages /Count {n} >>\n".encode()
+    return body
+
+
+MULTI_TEXT = textwrap.dedent("""\
+    [p1]
+    Điều 1. Phần đầu trang một
+
+    Nội dung được giữ nguyên trên trang một.
+
+    [p2]
+    Điều 2. Phần đầu trang hai
+
+    Nội dung được giữ nguyên trên trang hai.
+
+    [p3]
+    Điều 3. Phần sau trang một
+
+    Nội dung được giữ nguyên trên trang sau.
+    """)
+
+
+class MultiPartOriginalTests(unittest.TestCase):
+    """ADR-0014: N≥2 PDF gốc. Không nối tệp. Không SOURCED khi chưa có pdf_check đủ phần."""
+
+    def setUp(self):
+        self.host = OriginalBindingTests()
+        self.host.setUp()
+        self.doc = self.host.doc
+        self.dir = self.host.dir
+        (self.dir / "text.md").write_text(MULTI_TEXT, encoding="utf-8")
+        self.text_b = (self.dir / "text.md").read_bytes()
+        self.pdf_a = _tiny_pdf(2, b"part-a\n")
+        self.pdf_b = _tiny_pdf(2, b"part-b\n")
+        (self.dir / "a.pdf").write_bytes(self.pdf_a)
+        (self.dir / "b.pdf").write_bytes(self.pdf_b)
+        self.entry = self._entry()
+        self.host._manifest({self.doc: self.entry})
+
+    def tearDown(self):
+        self.host.tearDown()
+
+    def _part(self, pid, name, raw, pages):
+        return {"part_id": pid, "original_path": f"library/sources/{self.doc}/{name}",
+                "source_url": f"https://congbao.chinhphu.vn/{pid}",
+                "original_sha256": hashlib.sha256(raw).hexdigest(), "original_bytes": len(raw),
+                "page_count": pages}
+
+    def _entry(self, text_b=None, pdf_a=None, pdf_b=None):
+        text_b = self.text_b if text_b is None else text_b
+        pdf_a = self.pdf_a if pdf_a is None else pdf_a
+        pdf_b = self.pdf_b if pdf_b is None else pdf_b
+        text = text_b.decode("utf-8")
+        e = {"sha256": hashlib.sha256(text_b).hexdigest(), "bytes": len(text_b), "issuer": "Quốc hội",
+             "issued_on": "2024-01-18", "accessed_on": "2026-11-20",
+             "source_url": "https://congbao.chinhphu.vn/van-ban/luat-so-32-2024-qh15-41339.htm",
+             "data_source": "Công báo / Cổng TTĐT Chính phủ", "legal_status": "văn bản quy phạm, không bảo hộ",
+             "license": "public-domain-vn-law", "kind": "LAW", "effective_from": "2024-07-01",
+             "effective_to": None, "superseded_by": None,
+             "text_sha256": hashlib.sha256(text_b).hexdigest(), "text_bytes": len(text_b),
+             "original_parts": [self._part("phan-a", "a.pdf", pdf_a, 2), self._part("phan-b", "b.pdf", pdf_b, 2)],
+             "page_map": [
+                 {"text_page": 1, "part_id": "phan-a", "pdf_page": 1},
+                 {"text_page": 2, "part_id": "phan-a", "pdf_page": 2},
+                 {"text_page": 3, "part_id": "phan-b", "pdf_page": 1},
+             ],
+             "excluded_pages": [{"part_id": "phan-b", "pdf_page": 2,
+                                 "reason": "Trang trống cuối phần, không chứa điều khoản của văn bản."}],
+             "crosscheck": kn.page_crosscheck(text)}
+        return e
+
+    def _errs(self):
+        return self.host._errs()
+
+    def _witness(self, entry, text, checker="Owner", originals=None, page_map=None, single_hash=False):
+        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()
+        cc = json.loads(json.dumps(entry["crosscheck"]))
+        check = {"checker": checker, "result": "MATCH",
+                 "pages_checked": [p["page"] for p in cc["pages"]],
+                 "evidence": "Đối chiếu từng trang text.md với từng PDF gốc theo page_map.",
+                 "text_sha256": digest,
+                 "originals": originals if originals is not None else [
+                     {"part_id": p["part_id"], "original_sha256": p["original_sha256"]}
+                     for p in entry["original_parts"]],
+                 "page_map": entry["page_map"] if page_map is None else page_map}
+        if single_hash:
+            check["original_sha256"] = entry["original_parts"][0]["original_sha256"]
+        cc["pdf_check"] = check
+        return dict(entry, sha256=digest, bytes=len(text.encode("utf-8")), text_sha256=digest,
+                    text_bytes=len(text.encode("utf-8")), crosscheck=cc)
+
+    def test_two_parts_pass_gate_but_not_sourced_without_witness(self):
+        self.assertEqual(kn.origin_binding_errors(self.host.tmp, self.doc, self.entry, self.text_b), [])
+        self.assertNotIn("pdf_check", self.entry["crosscheck"])
+        pages, _ = kn.parse_text(MULTI_TEXT)
+        self.assertFalse(kn.may_mark_sourced(self.entry, pages, self.doc, MULTI_TEXT))
+        self.host._queue("SOURCED")
+        self.assertTrue(any("SOURCED" in e for e in self._errs()), self._errs())
+        witnessed = self._witness(self.entry, MULTI_TEXT)
+        self.assertTrue(kn.may_mark_sourced(witnessed, pages, self.doc, MULTI_TEXT))
+        self.host._manifest({self.doc: witnessed})
+        self.assertEqual(self._errs(), [])
+
+    def test_flip_delete_swap_duplicate_path_and_reused_text_hash(self):
+        (self.dir / "a.pdf").write_bytes(self.pdf_a + b"X")
+        self.assertTrue(any("tệp gốc lệch" in e for e in self._errs()), self._errs())
+        (self.dir / "a.pdf").write_bytes(self.pdf_a)
+        (self.dir / "b.pdf").unlink()
+        self.assertTrue(any("thiếu tệp gốc" in e for e in self._errs()), self._errs())
+        (self.dir / "b.pdf").write_bytes(self.pdf_b)
+        swapped = json.loads(json.dumps(self.entry))
+        swapped["original_parts"] = list(reversed(swapped["original_parts"]))
+        self.host._manifest({self.doc: swapped})
+        self.assertTrue(any("tráo" in e for e in self._errs()), self._errs())
+        dup = json.loads(json.dumps(self.entry))
+        dup["original_parts"][1]["part_id"] = "phan-a"
+        self.host._manifest({self.doc: dup})
+        self.assertTrue(any("lặp part_id" in e for e in self._errs()), self._errs())
+        for path in (f"library/sources/{self.doc}/../../etc/passwd", "/tmp/x.pdf"):
+            bad = json.loads(json.dumps(self.entry))
+            bad["original_parts"][0]["original_path"] = path
+            self.host._manifest({self.doc: bad})
+            self.assertTrue(self._errs(), path)
+        reused = json.loads(json.dumps(self.entry))
+        reused["original_parts"][0]["original_sha256"] = reused["text_sha256"]
+        self.host._manifest({self.doc: reused})
+        self.assertTrue(any("không được dùng làm hash tệp gốc" in e for e in self._errs()), self._errs())
+
+    def test_missing_middle_page_wrong_map_and_bad_page_count(self):
+        short = textwrap.dedent("""\
+            [p1]
+            Điều 1. Trang đầu của phần một.
+
+            [p2]
+            Điều 2. Trang đầu của phần hai.
+            """)
+        (self.dir / "text.md").write_text(short, encoding="utf-8")
+        raw = (self.dir / "text.md").read_bytes()
+        gap = self._entry(text_b=raw)
+        gap["page_map"] = [
+            {"text_page": 1, "part_id": "phan-a", "pdf_page": 1},
+            {"text_page": 2, "part_id": "phan-b", "pdf_page": 1},
+        ]
+        gap["crosscheck"] = kn.page_crosscheck(short)
+        self.host._manifest({self.doc: gap})
+        self.assertTrue(any("chưa ánh xạ" in e for e in self._errs()), self._errs())
+        wrong = json.loads(json.dumps(self.entry))
+        wrong["page_map"][0]["pdf_page"] = 9
+        self.host._manifest({self.doc: wrong})
+        (self.dir / "text.md").write_bytes(self.text_b)
+        self.assertTrue(any("nằm ngoài" in e or "không khớp" in e for e in self._errs()), self._errs())
+        counted = json.loads(json.dumps(self.entry))
+        counted["original_parts"][1]["page_count"] = 3
+        counted["excluded_pages"] = [
+            {"part_id": "phan-b", "pdf_page": 2, "reason": "Trang trống cuối phần, không chứa điều khoản."},
+            {"part_id": "phan-b", "pdf_page": 3, "reason": "Khai thêm trang mà PDF không có để thử page_count."},
+        ]
+        self.host._manifest({self.doc: counted})
+        self.assertTrue(any("page_count lệch" in e for e in self._errs()), self._errs())
+        blank = b"%PDF-1.4\nno page markers\n"
+        (self.dir / "a.pdf").write_bytes(blank)
+        blind = json.loads(json.dumps(self.entry))
+        blind["original_parts"][0]["original_sha256"] = hashlib.sha256(blank).hexdigest()
+        blind["original_parts"][0]["original_bytes"] = len(blank)
+        self.host._manifest({self.doc: blind})
+        self.assertTrue(any("fail closed" in e for e in self._errs()), self._errs())
+
+    def test_fake_witness_and_sourced_before_reviewer(self):
+        pages, _ = kn.parse_text(MULTI_TEXT)
+        fake = self._witness(self.entry, MULTI_TEXT, single_hash=True)
+        self.assertFalse(kn.may_mark_sourced(fake, pages, self.doc, MULTI_TEXT))
+        self.assertTrue(any("một original_sha256" in e for e in kn.pdf_witness_errors(fake, MULTI_TEXT)))
+        swapped = self._witness(self.entry, MULTI_TEXT, originals=list(reversed([
+            {"part_id": p["part_id"], "original_sha256": p["original_sha256"]} for p in self.entry["original_parts"]])))
+        self.assertTrue(any("lệch" in e for e in kn.pdf_witness_errors(swapped, MULTI_TEXT)))
+        moved = self._witness(self.entry, MULTI_TEXT, page_map=list(reversed(self.entry["page_map"])))
+        self.assertTrue(any("page_map" in e for e in kn.pdf_witness_errors(moved, MULTI_TEXT)))
+        self.host._manifest({self.doc: fake})
+        self.host._queue("SOURCED")
+        self.assertTrue(any("SOURCED" in e for e in self._errs()), self._errs())
+
+    def test_both_schemas_and_single_part_are_rejected(self):
+        both = dict(self.entry, original_sha256="ab" * 32, original_bytes=4,
+                    original_path=f"library/sources/{self.doc}/a.pdf")
+        self.host._manifest({self.doc: both})
+        self.assertTrue(any("đồng thời" in e for e in self._errs()), self._errs())
+        one = json.loads(json.dumps(self.entry))
+        one["original_parts"] = one["original_parts"][:1]
+        self.host._manifest({self.doc: one})
+        self.assertTrue(any("từ 2 phần" in e for e in self._errs()), self._errs())
+        self.assertIsNone(kn.pdf_page_count(b"not a pdf"))
+        self.assertIsNone(kn.pdf_page_count(b"%PDF-1.4\n<< /Type /Pages /Count 1 >>\n"))
+        self.assertEqual(kn.pdf_page_count(_tiny_pdf(2)), 2)
+        self.assertIsNone(kn.pdf_page_count(_tiny_pdf(2) + b"<< /Count 9 >>\n"))
+
+    def test_known_single_file_law_cannot_be_declared_multipart(self):
+        doc = "luat_ke_toan_88_2015"
+        d = self.host.tmp / "library" / "sources" / doc
+        d.mkdir(parents=True)
+        (d / "text.md").write_bytes(self.text_b)
+        (d / "a.pdf").write_bytes(self.pdf_a)
+        (d / "b.pdf").write_bytes(self.pdf_b)
+        self.doc = doc
+        entry = self._entry()
+        self.doc = self.host.doc
+        self.host._manifest({doc: entry})
+        errs = kn.origin_binding_errors(self.host.tmp, doc, entry, self.text_b)
+        self.assertTrue(any("một tệp" in e for e in errs), errs)
+        pages, _ = kn.parse_text(MULTI_TEXT)
+        self.assertFalse(kn.may_mark_sourced(self._witness(entry, MULTI_TEXT), pages, doc, MULTI_TEXT))
+
+    def test_repo_keeps_accounting_law_and_queues_credit_institutions_law(self):
+        man = json.loads((ROOT / "library" / "SOURCE_MANIFEST.json").read_text(encoding="utf-8"))
+        law88 = man["files"]["luat_ke_toan_88_2015"]
+        self.assertNotIn("original_parts", law88)
+        self.assertEqual(law88["original_sha256"], KNOWN["original_sha256"])
+        text88 = (ROOT / "library/sources/luat_ke_toan_88_2015/text.md").read_text(encoding="utf-8")
+        pages88, _ = kn.parse_text(text88)
+        self.assertTrue(kn.may_mark_sourced(law88, pages88, "luat_ke_toan_88_2015", text88))
+        entry = man["files"]["luat_tctd_32_2024"]
+        for key in ("original_sha256", "original_bytes", "original_path"):
+            self.assertNotIn(key, entry)
+        self.assertNotIn("pdf_check", entry.get("crosscheck") or {})
+        parts = entry["original_parts"]
+        self.assertEqual([p["part_id"] for p in parts], ["cb-369-370", "cb-371-372"])
+        self.assertEqual(parts[0]["original_sha256"], "b613a8f94e1955a776035be2b7cd14dc34a76c568973f8db7367324ebf50581a")
+        self.assertEqual(parts[0]["original_bytes"], 1188965)
+        self.assertEqual(parts[0]["page_count"], 94)
+        self.assertEqual(parts[1]["original_sha256"], "67852f403c7f368989ef47f98a47933d732d3d6b9d2db40cda2a9af84b969c49")
+        self.assertEqual(parts[1]["original_bytes"], 741096)
+        self.assertEqual(parts[1]["page_count"], 59)
+        self.assertEqual(entry["page_map"][0], {"text_page": 1, "part_id": "cb-369-370", "pdf_page": 1})
+        self.assertEqual(entry["page_map"][92], {"text_page": 93, "part_id": "cb-369-370", "pdf_page": 93})
+        self.assertEqual(entry["page_map"][93], {"text_page": 94, "part_id": "cb-371-372", "pdf_page": 1})
+        self.assertEqual(entry["page_map"][-1], {"text_page": 152, "part_id": "cb-371-372", "pdf_page": 59})
+        self.assertEqual(entry["excluded_pages"][0]["part_id"], "cb-369-370")
+        self.assertEqual(entry["excluded_pages"][0]["pdf_page"], 94)
+        text = (ROOT / "library/sources/luat_tctd_32_2024/text.md").read_text(encoding="utf-8")
+        surface = kn.page_surface(text)
+        self.assertEqual(set(surface), set(range(1, 153)))
+        self.assertIn("Điều 115. Hoạt động ngân hàng của công ty tài chính tổng hợp", surface[85])
+        self.assertTrue(any("Tại mỗi tỉnh, thành phố trực thuộc Trung ương" in line for line in surface[94]))
+        self.assertTrue(any("Điều 131." in line for line in surface[93]))
+        self.assertTrue(any(line.startswith("Điều 132.") for line in surface[94]))
+        self.assertIn("có hiệu lực thi hành từ ngày 01 tháng 7 năm 2024", text)
+        self.assertIn("thông qua ngày 18 tháng 01 năm 2024", text)
+        pages, _ = kn.parse_text(text)
+        self.assertFalse(kn.may_mark_sourced(entry, pages, "luat_tctd_32_2024", text))
+        self.assertEqual(kn.origin_binding_errors(ROOT, "luat_tctd_32_2024", entry, text.encode("utf-8")), [])
+        import yaml
+        items = (yaml.safe_load((ROOT / "library/reading_queue.yaml").read_text(encoding="utf-8")) or {}).get("items") or []
+        row = next(i for i in items if i.get("doc_id") == "luat_tctd_32_2024")
+        self.assertEqual(row.get("status"), "QUEUED")
+        errs, _warns = kn.check_library(ROOT)
+        self.assertFalse(any(e.startswith("LỖI") or "luat_tctd_32_2024" in e or "luat_ke_toan_88_2015" in e for e in errs), errs)
+
+
 if __name__ == "__main__":
     unittest.main()
