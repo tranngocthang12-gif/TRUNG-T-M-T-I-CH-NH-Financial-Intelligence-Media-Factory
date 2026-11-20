@@ -106,7 +106,7 @@
    "issuer": "Quốc hội",
    "kind": "LAW",
    "status": "QUEUED",
-   "note": "Pending review ADR-0014: hai PDF Công báo đã ghim. Trang PDF 94 của cb-369-370 là trang in Văn phòng Chính phủ xuất bản, không phải điều khoản, đã ghi excluded_pages; chưa có pdf_check của ghế khác. Không SOURCED."
+   "note": "Pending review ADR-0014: hai PDF Công báo đã ghim. Trang PDF 94 của cb-369-370 là trang in Văn phòng Chính phủ xuất bản, không phải điều khoản, đã ghi excluded_pages; chưa có pdf_check của ghế khác. Không SOURCED. 2026-11-20: sửa 4 lỗi bản chép (ngoặc kép [p9], tách Thực [p81], kiều hối [p83], nghĩa vụ [p134]); hash text.md cũ 8c69c6a2… là STALE."
   },
   {
    "doc_id": "tt_41_2016_car",

@@ -533,9 +533,9 @@ CÔNG BÁO/Số 369 + 370/Ngày 02-3-2024 11
 
 Tổ chức không phải là tổ chức tín dụng, chi nhánh ngân hàng nước ngoài
 
-không được phép sử dụng cụm từ tổ chức tín dụng, ngân hàng, công ty tài chính,
+không được phép sử dụng cụm từ “tổ chức tín dụng”, “ngân hàng”, “công ty tài chính”,
 
-công ty cho thuê tài chính, tổ chức tài chính vi mô, quỹ tín dụng nhân dân
+“công ty cho thuê tài chính”, “tổ chức tài chính vi mô”, “quỹ tín dụng nhân dân”
 
 hoặc cụm từ, từ ngữ khác trong tên của tổ chức, chức danh hoặc trong phần phụ
 
@@ -5271,9 +5271,7 @@ Nhà nước.
 
 6. Cung ứng các dịch vụ thanh toán qua tài khoản sau đây:
 
-a) Th
-
-ực hiện dịch vụ thanh toán trong nước bao gồm séc, lệnh chi, ủy nhiệm
+a) Thực hiện dịch vụ thanh toán trong nước bao gồm séc, lệnh chi, ủy nhiệm
 
 chi, nhờ thu, ủy nhiệm thu, chuyển tiền, thẻ ngân hàng, dịch vụ thu hộ và chi hộ;
 
@@ -5359,9 +5357,7 @@ c) Bảo hiểm.
 
 3. Ngân hàng thương mại được thành lập, mua lại công ty con, công ty liên kết
 
-hoạt động trong lĩnh vực quản lý nợ và khai thác tài sản, kiều hố
-
-i, vàng, bao thanh
+hoạt động trong lĩnh vực quản lý nợ và khai thác tài sản, kiều hối, vàng, bao thanh
 
 toán, phát hành thẻ tín dụng, tín dụng tiêu dùng, dịch vụ trung gian thanh toán,
 
@@ -8622,9 +8618,7 @@ a) Là pháp nhân;
 
 b) Điều kiện quy định tại điểm a và điểm c khoản 2 Điều này.
 
-Điều 185. Quyền, nghĩ
-
-a vụ của bên nhận chuyển giao bắt buộc
+Điều 185. Quyền, nghĩa vụ của bên nhận chuyển giao bắt buộc
 
 1. Bên nhận chuyển giao bắt buộc là tổ chức tín dụng có các quyền, nghĩa vụ
 
