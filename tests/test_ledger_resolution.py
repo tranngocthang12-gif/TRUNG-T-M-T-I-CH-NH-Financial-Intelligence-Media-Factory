@@ -1320,12 +1320,17 @@ class TrialRegistryTests(unittest.TestCase):
         """Vòng 7 điểm 2: 210 kết quả thử đầu tiên được ghim sha256 ngay trong config.yaml — có hiệu lực cả khi chưa có sổ đăng ký."""
         import yaml
         pin = yaml.safe_load((ROOT / "config.yaml").read_text(encoding="utf-8"))["research"]["legacy_pin"]
-        text = (ROOT / "research" / "trials.csv").read_text(encoding="utf-8")
-        _, rows = laws_checks.read_trials(text)
+        full_text = (ROOT / "research" / "trials.csv").read_text(encoding="utf-8")
+        _, rows = laws_checks.read_trials(full_text)
         self.assertGreaterEqual(len(rows), 210)
         self.assertEqual((pin["results"], pin["last_trial_id"]), (210, rows[209]["trial_id"]))
         self.assertEqual(pin["sha256"], laws_checks.trials_digest(rows[:210]))  # kho thật khớp ghim
         self.assertEqual(laws_checks.check_trial_registry(ROOT), [])
+        # Test the pre-registry legacy contract in isolation: post-anchor rows
+        # now legitimately contain L-06 hashes and cannot be called legacy.
+        anchor_count = 216
+        self.assertGreaterEqual(len(rows), anchor_count)
+        text = "\n".join(full_text.splitlines()[:anchor_count + 1]) + "\n"
         shutil.copy(ROOT / "config.yaml", self.tmp / "config.yaml")           # config thật, có ghim
         tp = self.tmp / "research" / "trials.csv"
         def check(t):
