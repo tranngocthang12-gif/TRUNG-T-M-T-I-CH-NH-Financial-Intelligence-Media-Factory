@@ -15,3 +15,11 @@ Phạm vi tệp này: chỉ mục. Toàn bộ 152 trang nằm trong `GEMINI_FULL
 - PDF 152 trang + A/94: BLOCKED cho đến khi ghế khác Grok xem ảnh.
 
 Người chấm ghi HEAD PR #60 lúc mở tệp. Nếu `text.md` trên nhánh không còn đúng hash trên thì hồ sơ STALE.
+
+## Cập nhật 2026-11-20 — không viết lại đoạn trên
+
+- `MD_REVIEW: PASS` theo bản Owner chuyển tiếp từ Gemini, bình luận 7040130725, HEAD `70f195c`. Đủ 152 mốc; lô 05 đủ 19 trang `[p134]`–`[p152]`; `[p145]` không cắt; đủ bảy trang cuối. Không sửa byte nguồn. Không yêu cầu Gemini đọc lại Markdown khi byte không đổi.
+- `PDF_VISUAL: CLAUDE_REPORTED_MATCH`. Đây không phải `PDF_VISUAL_MATCH` của L-09.
+- `INDEPENDENT_PDF_VISUAL_L09: PENDING`.
+- `pdf_check: NOT_COMMITTED`. `luat_tctd_32_2024: QUEUED`. `SOURCED: 1/40`.
+- Bốn tệp Claude: `EVIDENCE_PENDING` trong kho này. Lệch 11/12: `DISCREPANCY_OPEN`. Xem `TRANG_THAI_CHUNG_CU.md`.

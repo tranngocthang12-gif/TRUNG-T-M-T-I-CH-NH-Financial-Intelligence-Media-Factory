@@ -17,3 +17,5 @@ Người lập hồ sơ: Grok (xAI). **Ô kết quả để trống.** Bản MD 
 Không ghi MATCH và không nâng SOURCED nếu chưa xem hết ảnh PDF.
 
 Danh sách trang để người chấm tự điền nằm ở `BANG_TRANG_CHO_CHAM.md`. Bảng đó đang trống. Không chép text-vs-text vào cột đã mở.
+
+Mẫu này vẫn trống. Grok không điền MATCH. Bảng Claude, nếu có, là tệp khác và hiện `EVIDENCE_PENDING`. Nhãn hiện hành nằm ở `TRANG_THAI_CHUNG_CU.md`: `MD_REVIEW: PASS`; `PDF_VISUAL: CLAUDE_REPORTED_MATCH`; `INDEPENDENT_PDF_VISUAL_L09: PENDING`; `pdf_check: NOT_COMMITTED`.
