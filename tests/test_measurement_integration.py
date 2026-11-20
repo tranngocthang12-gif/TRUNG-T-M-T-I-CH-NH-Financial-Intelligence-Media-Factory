@@ -230,7 +230,9 @@ class Test5MonthlyPriceStore(_Repo):
         self.assertEqual(last_frozen, "2026-11-16")                         # kho cũ dừng 16/11/2026
         # The monthly store may have advanced after a real weekly cycle.
         self.assertGreaterEqual(laws_checks.price_data_as_of(self.repo), last_frozen)
-        self.cycle_scorecard("2026-11-20")
+        # Scorecard is deliberately evaluated through 27/11, so appending
+        # that observation must invalidate the previously fresh report.
+        self.cycle_scorecard("2026-11-27")
         self.assertEqual(self.status()[0], "FRESH")
         self._month(["2026-11-20,VCB,90000,91000,89500,90500,1000000,2026-11-20 16:00:00,yahoo\n",
                      "khong-phai-ngay,VCB,1,1,1,1,1,2026-11-20 16:00:00,yahoo\n",            # dòng hỏng bị bỏ qua
@@ -239,12 +241,12 @@ class Test5MonthlyPriceStore(_Repo):
         self.assertEqual(laws_checks.price_data_as_of(self.repo), "2026-11-27")
         st, why = self.status()
         self.assertEqual(st, "STALE")
-        self.assertTrue(any("data_as_of" in w and "2026-11-20" in w for w in why), why)
+        self.assertTrue(any("data_as_of" in w and "2026-11-27" in w for w in why), why)
         # Engine chỉ ghi dòng hợp lệ (save_store); gỡ dòng hỏng của test trước khi chạy pipeline thật
         f = self.repo / "data" / "store" / "prices" / "2026-11.csv"
         f.write_text("".join(l for l in f.read_text(encoding="utf-8").splitlines(True) if not l.startswith("khong")), encoding="utf-8")
-        sc = self.cycle_scorecard("2026-11-20")
-        self.assertEqual(sc["freshness"]["data_as_of"], "2026-11-20")      # ngày quan sát, không phải giờ sinh báo cáo
+        sc = self.cycle_scorecard("2026-11-27")
+        self.assertEqual(sc["freshness"]["data_as_of"], "2026-11-27")      # ngày quan sát, không phải giờ sinh báo cáo
         self.assertEqual(self.status(), ("FRESH", []))
         self.assertEqual(gz.read_bytes(), frozen)                           # không viết lại kho cũ
         # Pipeline đọc cùng hai nguồn (engine.data.load_store, ADR-0006)
