@@ -661,6 +661,36 @@ class WorkflowLintTests(unittest.TestCase):
         on = d.get("on", d.get(True))
         self.assertEqual(on["schedule"][0]["cron"], "30 9 * * 5")            # hằng tuần, thứ Sáu (ARCHITECTURE §4.3)
 
+    def test_manual_cycle_requires_main_before_checkout(self):
+        """L-06: manual từ nhánh phụ phải dừng trước checkout và trước mọi bước ghi sổ."""
+        _, d = self.wf["daily_cycle.yml"]
+        steps = d["jobs"]["cycle"]["steps"]
+        guard = steps[0]
+        self.assertNotIn("uses", guard)
+        self.assertIn("EVENT_REF", guard["env"])
+        self.assertEqual(guard["env"]["EVENT_REF"], "${{ github.ref }}")
+        self.assertIn("refs/heads/main", guard["run"])
+        self.assertIn('"$EVENT_REF" != "refs/heads/main"', guard["run"])
+        self.assertEqual(steps[1]["uses"], "actions/checkout@v4")
+        # Chạy đúng script trích từ YAML với env giả lập; không cần GitHub token/API.
+        cases = [
+            ("workflow_dispatch", "refs/heads/main", "1", True),
+            ("workflow_dispatch", "refs/heads/feature", "1", False),
+            ("workflow_dispatch", "refs/heads/feature", "6", False),
+            ("workflow_dispatch", "refs/heads/main", "6", False),
+            ("workflow_dispatch", "refs/heads/main", "", False),
+            ("schedule", "refs/heads/main", "", True),
+            ("push", "refs/heads/main", "1", False),
+        ]
+        for event, ref, trials, allowed in cases:
+            with self.subTest(event=event, ref=ref, trials=trials):
+                env = {**os.environ, "EVENT_NAME": event, "EVENT_REF": ref, "REQUESTED_TRIALS": trials}
+                result = subprocess.run(["bash", "-e", "-c", guard["run"]], env=env,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode == 0, allowed, result.stdout + result.stderr)
+                if not allowed:
+                    self.assertNotIn("effective_trials=", result.stdout)
+
     def test_review_gate_uses_base_branch_code_and_api(self):
         text, d = self.wf["review_gate.yml"]
         on = d.get("on", d.get(True))
