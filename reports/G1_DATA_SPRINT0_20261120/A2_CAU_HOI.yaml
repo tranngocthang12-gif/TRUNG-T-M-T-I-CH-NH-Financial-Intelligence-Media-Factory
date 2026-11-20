@@ -1,0 +1,238 @@
+schema: ttc-forecast-candidates/v0
+as_of: 2026-11-20
+author_seat: Grok (xAI)
+status: KHONG_GHI_SO
+note: >
+  27 câu ứng viên cho 54 dự báo A và B còn thiếu. Không có xác suất.
+  Không câu nào hợp lệ với robot hôm nay: chưa có Issue Calendar do Owner mở,
+  và chưa có ngày info_lock lấy từ lịch chính thức còn hiệu lực.
+  F-37–F-42 giữ nguyên, không giải sớm, resolve_at 2026-12-20.
+  Ghế B không được đọc hồ sơ ghế A. Danh sách này không phải hồ sơ của A hay B.
+excluded_because_already_ledger:
+  - id: F-37/F-38
+    topic: CPI tháng 11/2026 so với tháng 11/2025, ngưỡng 3,50%
+  - id: F-39/F-40
+    topic: IIP tháng 11/2026 so với tháng 11/2025, ngưỡng 8,00%
+  - id: F-41/F-42
+    topic: bán lẻ tháng 11/2026 so với tháng 11/2025, ngưỡng 10,00%
+verified_calendar_seen:
+  - page: https://www.nso.gov.vn/en/thematic-data/
+    fact: "IIP tháng 10/2026 phát hành 03/11/2026, next release 03/12/2026."
+    not_reused_because: "Mốc 2026-12-03 là công bố IIP tháng 11/2026, đã là F-39/F-40. Không mở câu trùng."
+questions:
+  - id: Q-01
+    calendar_id: CAL-NSO-CPI-2026-12
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Theo công bố đầu tiên trên nso.gov.vn, CPI cả nước tháng 12/2026 có tăng từ 3,50% trở lên so với tháng 12/2025 không?"
+    yes_if: "Số công bố đầu tiên của tốc độ tăng CPI tháng 12/2026 so với cùng kỳ lớn hơn hoặc bằng 3,50%."
+    no_if: "Số đó nhỏ hơn 3,50%."
+    void_if: "Không có công bố đầu tiên trên nso.gov.vn, hoặc đổi năm gốc hay định nghĩa chỉ tiêu."
+  - id: Q-02
+    calendar_id: CAL-NSO-IIP-2026-12
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Theo công bố đầu tiên trên nso.gov.vn, IIP tháng 12/2026 có tăng từ 8,00% trở lên so với tháng 12/2025 không?"
+    yes_if: "Số công bố đầu tiên lớn hơn hoặc bằng 8,00%."
+    no_if: "Số đó nhỏ hơn 8,00%."
+    void_if: "Không có công bố đầu tiên trên nso.gov.vn, hoặc đổi phương pháp."
+  - id: Q-03
+    calendar_id: CAL-NSO-BANLE-2026-12
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Theo công bố đầu tiên trên nso.gov.vn, tổng mức bán lẻ và doanh thu dịch vụ tiêu dùng tháng 12/2026 có tăng từ 10,00% trở lên so với tháng 12/2025, theo giá hiện hành, không?"
+    yes_if: "Số công bố đầu tiên lớn hơn hoặc bằng 10,00%."
+    no_if: "Số đó nhỏ hơn 10,00%."
+    void_if: "Không có công bố đầu tiên trên nso.gov.vn, hoặc đổi giá so sánh."
+  - id: Q-04
+    calendar_id: CAL-NSO-XUATKHAU-2026-11
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Kim ngạch xuất khẩu hàng hóa tháng 11/2026 trong công bố đầu tiên trên nso.gov.vn có cao hơn tháng 11/2025 không?"
+    yes_if: "Kim ngạch xuất khẩu tháng 11/2026 cao hơn cùng kỳ."
+    no_if: "Thấp hơn hoặc bằng cùng kỳ."
+    void_if: "Công bố không tách tháng 11, hoặc chỉ có số ước đã bị thay trước khi chấm."
+  - id: Q-05
+    calendar_id: CAL-NSO-NHAPKHAU-2026-11
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Kim ngạch nhập khẩu hàng hóa tháng 11/2026 trong công bố đầu tiên trên nso.gov.vn có cao hơn tháng 11/2025 không?"
+    yes_if: "Kim ngạch nhập khẩu tháng 11/2026 cao hơn cùng kỳ."
+    no_if: "Thấp hơn hoặc bằng cùng kỳ."
+    void_if: "Công bố không tách tháng 11."
+  - id: Q-06
+    calendar_id: CAL-NSO-CPI-LOI-2026-12
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Lạm phát cơ bản bình quân cả năm 2026, trong công bố đầu tiên trên nso.gov.vn, có từ 4,00% trở lên so với năm 2025 không?"
+    yes_if: "Số bình quân cả năm 2026 lớn hơn hoặc bằng 4,00%."
+    no_if: "Số đó nhỏ hơn 4,00%."
+    void_if: "Chưa có số cả năm, chỉ có số tháng."
+  - id: Q-07
+    calendar_id: CAL-NSO-GDP-2026-Q4
+    agency: NSO
+    domain: nso.gov.vn
+    question: "GDP quý IV/2026, trong công bố đầu tiên trên nso.gov.vn, có tăng từ 7,00% trở lên so với quý IV/2025 không?"
+    yes_if: "Tốc độ tăng công bố đầu tiên lớn hơn hoặc bằng 7,00%."
+    no_if: "Nhỏ hơn 7,00%."
+    void_if: "Chưa công bố quý IV hoặc đổi năm gốc."
+  - id: Q-08
+    calendar_id: CAL-NSO-CPI-2027-01
+    agency: NSO
+    domain: nso.gov.vn
+    question: "CPI tháng 01/2027 so với tháng 01/2026, công bố đầu tiên trên nso.gov.vn, có từ 3,50% trở lên không?"
+    yes_if: "Số lớn hơn hoặc bằng 3,50%."
+    no_if: "Số nhỏ hơn 3,50%."
+    void_if: "Không có công bố tháng 01/2027 trên nso.gov.vn."
+  - id: Q-09
+    calendar_id: CAL-NSO-IIP-2027-01
+    agency: NSO
+    domain: nso.gov.vn
+    question: "IIP tháng 01/2027 so với tháng 01/2026, công bố đầu tiên trên nso.gov.vn, có từ 8,00% trở lên không?"
+    yes_if: "Số lớn hơn hoặc bằng 8,00%."
+    no_if: "Số nhỏ hơn 8,00%."
+    void_if: "Không có công bố hoặc có yếu tố Tết làm NSO không ra số so sánh cùng kỳ."
+  - id: Q-10
+    calendar_id: CAL-NSO-BANLE-2027-01
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Tổng mức bán lẻ tháng 01/2027 so với tháng 01/2026, giá hiện hành, công bố đầu tiên trên nso.gov.vn, có từ 8,00% trở lên không?"
+    yes_if: "Số lớn hơn hoặc bằng 8,00%."
+    no_if: "Số nhỏ hơn 8,00%."
+    void_if: "Không có công bố tháng."
+  - id: Q-11
+    calendar_id: CAL-SBV-TINDUNG-2026
+    agency: NHNN
+    domain: sbv.gov.vn
+    question: "Thông cáo NHNN trên sbv.gov.vn về tăng trưởng tín dụng cả năm 2026 có ghi mức từ 15% trở lên so với cuối 2025 không?"
+    yes_if: "Thông cáo cả năm ghi mức lớn hơn hoặc bằng 15%."
+    no_if: "Mức ghi nhỏ hơn 15%."
+    void_if: "Không có thông cáo cả năm trên sbv.gov.vn, chỉ có tin báo."
+  - id: Q-12
+    calendar_id: CAL-SBV-LAISUAT-2026-12
+    agency: NHNN
+    domain: sbv.gov.vn
+    question: "Trong tháng 12/2026, NHNN có ban hành quyết định mới trên sbv.gov.vn hạ lãi suất điều hành so với mức đang áp dụng ngày 20/11/2026 không?"
+    yes_if: "Có quyết định hạ ít nhất một lãi suất điều hành trong tháng 12/2026."
+    no_if: "Không có quyết định hạ trong tháng đó."
+    void_if: "Trang sbv.gov.vn không truy cập được để xác định ngày đăng."
+  - id: Q-13
+    calendar_id: CAL-SBV-TYGIA-2026-12-31
+    agency: NHNN
+    domain: sbv.gov.vn
+    question: "Tỷ giá trung tâm USD/VND do NHNN công bố cho ngày làm việc cuối cùng của năm 2026 có cao hơn tỷ giá trung tâm ngày 20/11/2026 không?"
+    yes_if: "Số ngày làm việc cuối năm cao hơn số ngày 20/11/2026 trên cùng trang sbv.gov.vn."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Không chốt được hai số cùng loại trên sbv.gov.vn."
+  - id: Q-14
+    calendar_id: CAL-MOF-THUNGAN-2026
+    agency: Bộ Tài chính
+    domain: mof.gov.vn
+    question: "Báo cáo thu ngân sách nhà nước năm 2026 trên mof.gov.vn có ghi tổng thu vượt dự toán Quốc hội giao không?"
+    yes_if: "Bản chính thức ghi vượt dự toán."
+    no_if: "Bản chính thức ghi không vượt."
+    void_if: "Chỉ có ước, chưa có báo cáo quyết toán hoặc tổng kết năm."
+  - id: Q-15
+    calendar_id: CAL-NSO-FDI-2026
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Vốn FDI thực hiện năm 2026, công bố đầu tiên trên nso.gov.vn, có cao hơn năm 2025 không?"
+    yes_if: "Số thực hiện cả năm 2026 cao hơn cả năm 2025."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa có số cả năm."
+  - id: Q-16
+    calendar_id: CAL-NSO-KHACH-2026
+    agency: NSO
+    domain: nso.gov.vn
+    question: "Khách quốc tế đến Việt Nam năm 2026, công bố đầu tiên trên nso.gov.vn, có cao hơn năm 2025 không?"
+    yes_if: "Số cả năm 2026 cao hơn năm 2025."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa có số cả năm."
+  - id: Q-17
+    calendar_id: CAL-HOSE-VN30-KY-SAU-202608
+    agency: HOSE
+    domain: hsx.vn
+    question: "Kỳ rà soát thành phần chỉ số HOSE công bố sau kỳ hiệu lực 2026-08-03 có đưa TCX ra khỏi VN30 không?"
+    yes_if: "Văn bản HOSE của kỳ sau ghi TCX không còn trong VN30."
+    no_if: "Văn bản đó vẫn có TCX trong VN30."
+    void_if: "Chưa có văn bản kỳ sau, hoặc tệp 02/11/2026 là VNAllshare chứ không phải VN30."
+  - id: Q-18
+    calendar_id: CAL-HOSE-BCTC-VCB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của VCB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng BCTC quý 4/2026 trên hsx.vn, hoặc chỉ có bản soát xét khác kỳ."
+  - id: Q-19
+    calendar_id: CAL-HOSE-BCTC-BID-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của BID đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-20
+    calendar_id: CAL-HOSE-BCTC-CTG-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của CTG đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-21
+    calendar_id: CAL-HOSE-BCTC-TCB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của TCB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-22
+    calendar_id: CAL-HOSE-BCTC-MBB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của MBB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-23
+    calendar_id: CAL-HOSE-BCTC-VPB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của VPB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-24
+    calendar_id: CAL-HOSE-BCTC-ACB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của ACB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-25
+    calendar_id: CAL-HOSE-BCTC-HDB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của HDB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-26
+    calendar_id: CAL-HOSE-BCTC-STB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của STB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
+  - id: Q-27
+    calendar_id: CAL-HOSE-BCTC-TPB-2026Q4
+    agency: HOSE
+    domain: hsx.vn
+    question: "BCTC hợp nhất quý 4/2026 của TPB đăng trên HOSE có lợi nhuận sau thuế cổ đông công ty mẹ cao hơn cùng kỳ 2025 không?"
+    yes_if: "Số quý 4/2026 cao hơn quý 4/2025 trong bản đăng đầu tiên."
+    no_if: "Thấp hơn hoặc bằng."
+    void_if: "Chưa đăng đúng bản trên hsx.vn."
