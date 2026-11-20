@@ -191,6 +191,9 @@ class ScorecardRefreshTests(unittest.TestCase):
 
     def test_no_github_provenance_emits_no_capability_scores_and_invalid_blocks(self):
         as_of = self._as_of()
+        # The copied production scorecard can already be FRESH. Force a
+        # genuine offline refresh rather than returning the cached report.
+        (self.repo / "reports" / "scorecard.json").unlink(missing_ok=True)
         c, o = self._py(
             """
             import os
@@ -233,6 +236,9 @@ class ScorecardRefreshTests(unittest.TestCase):
 
     def test_scores_without_github_source_are_not_released_by_refresh(self):
         as_of = self._as_of()
+        # A fresh copied scorecard would short-circuit before the injected
+        # invalid scorer runs. Remove only the disposable fixture report.
+        (self.repo / "reports" / "scorecard.json").unlink(missing_ok=True)
         code = """
             import json
             from engine import ledger

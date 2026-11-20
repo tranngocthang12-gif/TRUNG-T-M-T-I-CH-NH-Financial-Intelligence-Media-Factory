@@ -228,6 +228,10 @@ class Test5MonthlyPriceStore(_Repo):
         with gzip.open(gz, "rt", encoding="utf-8") as f:
             last_frozen = max(line.split(",", 1)[0] for line in list(f)[1:] if line.strip())
         self.assertEqual(last_frozen, "2026-11-16")                         # kho cũ dừng 16/11/2026
+        # Co lap fixture: bo monthly CSV chi trong ban sao kiem thu.
+        # Kho gia that co the tien den 27/11, thang 12 hoac xa hon.
+        for m in (self.repo / "data" / "store" / "prices").glob("*.csv"):
+            m.unlink()
         self.assertEqual(laws_checks.price_data_as_of(self.repo), "2026-11-16")
         self.cycle_scorecard("2026-11-20")
         self.assertEqual(self.status()[0], "FRESH")
