@@ -11,7 +11,8 @@ on:
     inputs:
       trials:
         description: "So thu nghiem nghien cuu"
-        default: "6"
+        required: true
+        default: "1"
 
 permissions:
   contents: write
@@ -26,6 +27,25 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      # Fail closed BEFORE checkout, installs, ingestion, registry writes, or API use.
+      # Scheduled weekly research remains at 6 trials; manual recovery is limited to 1.
+      - name: Xac nhan so lan thu truoc khi chay
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REQUESTED_TRIALS: ${{ github.event.inputs.trials }}
+        run: |
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            echo "effective_trials=6 (scheduled)"
+          elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$REQUESTED_TRIALS" != "1" ]; then
+              echo "::error::Manual dispatch chi duoc trials=1; nhan '$REQUESTED_TRIALS'. Can Owner duyet va PR policy rieng neu muon doi."
+              exit 1
+            fi
+            echo "effective_trials=1 (manual)"
+          else
+            echo "::error::Unexpected event: $EVENT_NAME"
+            exit 1
+          fi
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
@@ -47,7 +67,7 @@ jobs:
           TTC_REGISTRY_PUSH: "1"
           TTC_PROVENANCE_ONLINE: "1"
           GITHUB_TOKEN: ${{ github.token }}
-          TRIALS: ${{ github.event.inputs.trials || '6' }}
+          TRIALS: ${{ github.event_name == 'schedule' && '6' || github.event.inputs.trials }}
         run: |
           case "$TRIALS" in ''|*[!0-9]*) echo "trials phai la so nguyen khong am: '$TRIALS'"; exit 1;; esac
           python -m engine.run_cycle --source live --trials "$TRIALS"
