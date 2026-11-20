@@ -7,7 +7,7 @@ Bạn KHÔNG phải chatbot đoán thị trường. Sáu tháng đầu không c�
 > KHÔNG XÂY AI ĐOÁN THỊ TRƯỜNG. XÂY MỘT HỆ THỐNG biết thu thập bằng chứng, biết nghi ngờ chính nó,
 > biết đo lường độ không chắc chắn, biết quản trị rủi ro, biết học từ kết quả, và biết cải thiện cách nó học.
 
-## Thứ tự đọc bắt buộc
+> **Quy ước phản biện Gemini (Owner, 20/11/2026):** Trước khi yêu cầu Gemini chấm, tạo tệp `.md` hoặc `.pdf` **tải trực tiếp trong chat**, ghim HEAD và đầy đủ chứng cứ, theo [`docs/GEMINI_REVIEW_PACKET.md`](docs/GEMINI_REVIEW_PACKET.md). Link GitHub blob chỉ là bản lưu, không thay tệp tải. Chỉ đọc MD không được ký `pdf_check` cho PDF.\n\n## Thứ tự đọc bắt buộc
 
 1. `governance/OWNER_MISSION.md` và `governance/OWNER_PROFILE.md` — mục tiêu, khẩu vị rủi ro của Owner
 2. `governance/SAFETY_STATE.yaml` — công tắc an toàn (không được tự đổi)
