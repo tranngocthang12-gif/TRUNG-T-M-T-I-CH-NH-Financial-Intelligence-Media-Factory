@@ -5,6 +5,7 @@
   2822,
   30
  ],
+ "session_definition": "Phiên suy từ dữ liệu: ngày trên trục ngày của panel, bỏ ngày mà mọi mã có dòng đều có khối lượng 0. Số suy từ dữ liệu nguồn, KHÔNG phải lịch giao dịch HOSE (lịch gốc chưa ghim trong kho).",
  "inputs_sha256": {
   "data/store/prices.csv.gz": "8ffa5e46b1f4d85ba96bc954636160ad2d2efb37154fc8d093c05f723f607251",
   "data/corporate_actions.csv": "8726a09aefefc07f5691e3a1e9b3b28915e7625cf62a48285d53a2f5860a894e",
@@ -202,7 +203,7 @@
      "from": "2024-06-04",
      "to": "2024-06-26",
      "panel_steps": 16,
-     "trading_sessions": 16,
+     "sessions_inferred_from_data": 16,
      "return": 0.0084
     },
     {
@@ -210,7 +211,7 @@
      "from": "2025-02-25",
      "to": "2025-03-17",
      "panel_steps": 14,
-     "trading_sessions": 14,
+     "sessions_inferred_from_data": 14,
      "return": 0.0865
     }
    ]
@@ -234,7 +235,7 @@
      "from": "2024-06-04",
      "to": "2024-06-26",
      "panel_steps": 16,
-     "trading_sessions": 16,
+     "sessions_inferred_from_data": 16,
      "return": -0.4958
     },
     {
@@ -242,7 +243,7 @@
      "from": "2025-02-25",
      "to": "2025-03-17",
      "panel_steps": 14,
-     "trading_sessions": 14,
+     "sessions_inferred_from_data": 14,
      "return": -0.2732
     }
    ],
@@ -274,7 +275,7 @@
      "from": "2024-06-04",
      "to": "2024-06-26",
      "panel_steps": 16,
-     "trading_sessions": 16,
+     "sessions_inferred_from_data": 16,
      "return": -0.4958
     },
     {
@@ -282,7 +283,7 @@
      "from": "2025-02-25",
      "to": "2025-03-17",
      "panel_steps": 14,
-     "trading_sessions": 14,
+     "sessions_inferred_from_data": 14,
      "return": -0.2732
     }
    ],
@@ -314,7 +315,7 @@
      "from": "2024-06-04",
      "to": "2024-06-26",
      "panel_steps": 16,
-     "trading_sessions": 16,
+     "sessions_inferred_from_data": 16,
      "return": -0.4958
     },
     {
@@ -322,7 +323,7 @@
      "from": "2025-02-25",
      "to": "2025-03-17",
      "panel_steps": 14,
-     "trading_sessions": 14,
+     "sessions_inferred_from_data": 14,
      "return": -0.2732
     }
    ],
@@ -366,7 +367,7 @@
      "from": "2024-06-04",
      "to": "2024-06-26",
      "panel_steps": 16,
-     "trading_sessions": 16,
+     "sessions_inferred_from_data": 16,
      "return": -0.4958
     },
     {
@@ -374,7 +375,7 @@
      "from": "2025-02-25",
      "to": "2025-03-17",
      "panel_steps": 14,
-     "trading_sessions": 14,
+     "sessions_inferred_from_data": 14,
      "return": -0.2732
     }
    ],
@@ -402,7 +403,7 @@
    "from": "2025-02-25",
    "to": "2025-03-17",
    "panel_steps": 14,
-   "trading_sessions": 14
+   "sessions_inferred_from_data": 14
   },
   "rows": [
    {
@@ -443,9 +444,9 @@
   "label_windows": {
    "horizon_steps": 20,
    "windows": 2801,
-   "windows_with_fewer_real_sessions": 1118,
-   "min_real_sessions": 13,
-   "real_sessions_distribution_when_short": {
+   "windows_with_fewer_inferred_sessions": 1118,
+   "min_inferred_sessions": 13,
+   "inferred_sessions_distribution_when_short": {
     "13": 6,
     "14": 20,
     "15": 133,

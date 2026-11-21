@@ -88,6 +88,20 @@
 
 ## 6. Thước đo
 
+**Ba mốc thời gian, mỗi câu hỏi hoặc mỗi kỳ có đủ ba, ghim trước:**
+
+| Mốc | Nghĩa | Dùng cho |
+|---|---|---|
+| `decision_time` | Mốc chốt thông tin; dự báo hoặc quyết định niêm phong trước mốc này | Mọi đầu vào (gói thông tin, giá, thành phần rổ, sự kiện quyền, nhãn chế độ thị trường) chỉ gồm thông tin có `published_at` trước `decision_time` |
+| `target_end_at` | Hết kỳ nắm giữ hoặc hết kỳ mà câu hỏi đo | Định nghĩa phạm vi của kết quả; không phải lúc có dữ liệu |
+| `label_available_at` | Lúc dữ liệu kết quả được công bố và quan sát được (ví dụ giá đóng cửa của `target_end_at` đã có trong kho, hoặc nguồn phân định đã công bố) | Nhãn kết quả chỉ được tính và chấm **sau** mốc này |
+
+Quy tắc:
+
+- `decision_time` < `target_end_at` ≤ `label_available_at`.
+- Không đầu vào nào có `published_at` từ `decision_time` trở đi.
+- Không nhãn nào được tính, xem hay chấm trước `label_available_at`.
+
 - **Track E:**
   - Brier là chỉ số chính.
   - Log loss, với p kẹp [0,05; 0,95] như Ledger.
@@ -98,7 +112,7 @@
 - **Track P:**
   - lợi suất vượt rổ bình quân đều **sau** phí, thuế, trượt giá và lệnh không khớp ở khóa trần/sàn (như giấy ADR-0008), có giới hạn tham gia khối lượng;
   - sụt giảm lớn nhất, vòng quay, tỷ lệ lệnh không khớp;
-  - độ ổn định theo chế độ thị trường, nhãn tính bằng dữ liệu có tại `decision_time`.
+  - độ ổn định theo chế độ thị trường. Nhãn chế độ thị trường (dùng để phân nhóm) chỉ dùng thông tin công bố trước `decision_time`; nhãn kết quả chỉ tính và chấm sau `label_available_at`.
 
 ## 7. Thống kê, cỡ mẫu, dừng
 

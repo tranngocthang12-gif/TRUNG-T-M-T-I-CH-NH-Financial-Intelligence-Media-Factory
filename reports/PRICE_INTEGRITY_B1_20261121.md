@@ -2,8 +2,8 @@
 
 - Ngày: 2026-11-21. Người viết: Claude (Anthropic), vai Validation & Research Engineer. Người chấm L-09: **chưa có**. Owner L-10: **chưa**.
 - Cây đọc: `main` `20f5d924bbf52c34b68baeaff9df8d022a0af363` (merge PR #69). CI `Tests` trên SHA đó: run 44878828447 SUCCESS.
-- Đo bằng: `python tools/price_integrity_b1.py` (chỉ đọc, chạy hai lần cho cùng byte). Bản máy đọc: [PRICE_INTEGRITY_B1_20261121.json](PRICE_INTEGRITY_B1_20261121.json), sinh bằng công cụ tại HEAD `84f28739bb5c04f28fa83aa5b10cf1dd37abfef1` của PR #71.
-- Tái lập trên fixture độc lập: `tests/test_price_integrity_b1.py` (16 test: 10 pass, 6 xfail strict), cũng ở PR #71.
+- Đo bằng: `python tools/price_integrity_b1.py` (chỉ đọc, chạy hai lần cho cùng byte). Bản máy đọc: [PRICE_INTEGRITY_B1_20261121.json](PRICE_INTEGRITY_B1_20261121.json), sinh bằng công cụ tại HEAD `1fce4c313ab792ad00e0d9242240b705339a837a` của PR #71. "Phiên" trong các số đo cửa sổ là **phiên suy từ dữ liệu** (bỏ ngày mọi mã có khối lượng 0), không phải lịch HOSE (khóa `session_definition` trong JSON).
+- Tái lập trên fixture độc lập: `tests/test_price_integrity_b1.py` (18 test: 12 pass, 6 xfail strict), cũng ở PR #71.
 - Báo cáo này và mã đi hai PR riêng theo LỆNH K0: mã ở PR #71, báo cáo ở PR này. Cả hai tách từ PR #70.
 - Không giao dịch, không đổi `SAFETY_STATE`, `config.yaml`, `engine/adjust.py`, `engine/data.py`, kho raw, Ledger, sổ thử hay NAV giấy. Không chạy lần thử mới, không fit mô hình trên dữ liệu thật.
 
@@ -15,7 +15,7 @@
    Muốn VERIFIED phải đối chiếu với giá đóng cửa chính thức của HOSE/VSD cho 2024-06-11..19 và 2025-03-03..11. Kho chưa có nguồn đó.
 4. **Vì vậy sự kiện tay hiện đang vá một lỗi nguồn, không mô tả một sự kiện quyền.** Trên fixture, cặp "sự kiện tay ở ngày gãy + sự kiện Yahoo ở ngày HOSE" dựng lại đúng chuỗi lợi suất thật (sai số < 1e-12). Chỉ chặn `CAN_DOI_CHIEU` (P1a) hoặc dời ngày sang ngày HOSE (P2) đều làm lộ bước gãy −49,5% / −33,1%. Cổng chất lượng che được bước gãy đó nhưng mất 141 dòng đủ feature+nhãn mỗi mã.
 5. **Rủi ro im lặng thật nằm ở tỷ lệ.** Một tỷ lệ chưa xác minh sai tới khoảng ±7% vẫn `APPLIED` và không bị cờ. Thử với VCB: tỷ lệ 1,40 thay cho 1,495 làm lợi suất qua sự kiện (2025-02-25→03-17, 14 phiên) còn +1,75% thay vì +8,65%. Cổng chất lượng không bắt được loại lỗi này.
-6. **Tìm thêm một lỗ hổng trong `engine/verified_adjust.py`, đã sửa ở PR #71.** Trước bản vá, một sự kiện `DA_NAM_TRONG_GIA_NGUON` được chứng nhận `DA_KIEM_CHUNG` và không nhiễm ô, dù chuỗi còn bước gãy −50% ngay 7 phiên trước ngày GDKHQ. Đó đúng là kiểu lỗi của TCB/VCB. Bản vá cách ly ca này bằng trạng thái `CACH_LY_GIA_GAY_TRUOC_NGAY_HUONG_QUYEN`. Module này chưa nối vào vòng học, nên số liệu nghiên cứu hiện hành không đổi.
+6. **Tìm thêm một lỗ hổng trong `engine/verified_adjust.py`, đã sửa ở PR #71.** Trước bản vá, một sự kiện `DA_NAM_TRONG_GIA_NGUON` được chứng nhận `DA_KIEM_CHUNG` và không nhiễm ô, dù chuỗi còn bước gãy −50% ngay 7 phiên trước ngày GDKHQ. Đó đúng là kiểu lỗi của TCB/VCB. Bản vá cách ly ca này bằng trạng thái `CACH_LY_GIA_GAY_TRUOC_NGAY_HUONG_QUYEN`. Vòng chấm 2 thêm điều kiện 9: mã thiếu giá ở bất kỳ phiên nào trong 45 ngày trước sự kiện thì cách ly `CACH_LY_THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN`, vì chỗ trống làm bước gãy lọt qua biên đã nới. Module này chưa nối vào vòng học, nên số liệu nghiên cứu hiện hành không đổi.
 7. **Ngoài TCB/VCB, kho Yahoo còn có 123 ngày mọi dòng có khối lượng 0 và giá đóng cửa không đổi.** Đó là 4.954 trên 73.402 dòng. Phần lớn rơi vào các kỳ nghỉ Tết, Giỗ Tổ, 30/4–1/5, 2/9, 1/1; hai ngày năm 2026 (09-09, 10-05) không khớp lịch nghỉ phổ biến. Engine tính các ngày đó là phiên giao dịch trong cửa sổ feature và nhãn.
 8. **Engine định lượng: NO_EDGE trên dữ liệu hiện có.** Có 222 lần thử, đều REJECTED. IC-t lớn nhất từ đầu là 1,06, ngưỡng hiện hành 3,69. DSR của 6 lần thử mới ≤ 2,2e-5. Không có mô hình ACTIVE. Dữ liệu đó còn thiên lệch sống sót và chưa kiểm chứng sự kiện quyền, nên kết luận NO_EDGE cũng không phải kết luận alpha.
 
@@ -50,6 +50,8 @@
 | B3 | Lỗi −30% 4 phiên trước sự kiện, không khớp tỷ lệ | cách ly, lý do "nhân tỷ lệ vẫn ngoài biên" |
 | B4 | Bước gãy cách sự kiện hơn 45 ngày lịch | sự kiện vẫn `DA_KIEM_CHUNG`; lớp chất lượng cờ bước gãy trên chuỗi kiểm chứng (phòng thủ hai lớp; phạm vi cổng được ghi rõ) |
 | B5 | Cặp tay + Yahoo cùng một bản gốc | không bên nào vào chuỗi; mọi ô AAA trước ngày chính thức nhiễm |
+| B6 | Như B1, xóa giá AAA 19 phiên (OFF−20…OFF−2), giữ phiên liền trước và phiên sự kiện | bước −50% đo qua chỗ trống nằm trong biên đã nới; trước điều kiện 9: `DA_KIEM_CHUNG` (**lỗi**); sau: `CACH_LY_THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN`, không vào chuỗi |
+| B7 | Xóa cả phiên liền trước (OFF−20…OFF−1) | `CACH_LY_THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN`, không vào chuỗi |
 
 Không có bản vá thì B1 và B3 đỏ. Có bản vá thì toàn bộ `tests/test_verified_adjust.py` (104 test sau tham số hóa) vẫn xanh. Khi một bước gãy trước sự kiện do chính một ngày engine khác của cùng bản gốc gây ra, chẩn đoán `XUNG_DOT_NGAY` được giữ ưu tiên.
 
@@ -100,7 +102,7 @@ SSB 2021 và TPB 2025 là **UNKNOWN**, không kết luận. Các ô đó đã b�
 
 Ảnh hưởng: `features` và `labels_wide` đếm phiên theo dòng.
 
-- 1.118/2.801 cửa sổ nhãn "20 phiên" chỉ có 13–19 phiên có giao dịch (13: 6 cửa sổ; 14: 20; 15: 133; 16: 62; 17: 130; 18: 228; 19: 539).
+- 1.118/2.801 cửa sổ nhãn "20 phiên" chỉ có 13–19 phiên suy từ dữ liệu, tức sau khi bỏ ngày mọi mã khối lượng 0; đây không phải lịch HOSE (13: 6 cửa sổ; 14: 20; 15: 133; 16: 62; 17: 130; 18: 228; 19: 539).
 - `lowvol_*` nhận các ngày lợi suất 0 giả.
 - `volu_*` nhận khối lượng 0.
 - Phiên mở lại sau kỳ nghỉ bị so với giá "ngày nghỉ".
@@ -151,14 +153,16 @@ Chi tiết:
 4. **Điều kiện để mở (C):**
    - Có nguồn giá đóng cửa chính thức cho các cửa sổ nghi chia một phần.
    - `published_at` của bản HOSE được xác minh.
-   - `event_type` của bản gốc được ánh xạ có kiểm (hiện mọi bản 2026H2 và TCB 2024 để `null`).
+   - `event_type` của bản gốc được ánh xạ có kiểm (hiện 19 bản để trống: 17 bản ở `EVIDENCE_MANIFEST_2026H2.json`, cộng TCB 2024 và FPT 2026 ở `EVIDENCE_MANIFEST.json`).
    - Có quyết định cách biểu diễn "sửa giá nguồn" như một bản dẫn xuất có chứng cứ (ADR-0009 điều 1), không như một sự kiện quyền giả ngày.
 
 Không đổi `ex_date` trong CSV sang ngày HOSE: P2 cho thấy dời ngày một mình không sửa được lỗi nguồn. Không nâng `source_status`: chưa có nguồn giá độc lập.
 
 ## 6. Bản vá mã (PR #71, tách từ PR #70)
 
-- `engine/verified_adjust.py`: thêm điều kiện 8. Với `DA_NAM_TRONG_GIA_NGUON`, không được có bước giá gốc ngoài biên trong 45 ngày lịch trước phiên sự kiện; có thì cách ly `CACH_LY_GIA_GAY_TRUOC_NGAY_HUONG_QUYEN`. Nếu bước gãy đó chính là một ngày engine khác của cùng bản gốc, chẩn đoán `XUNG_DOT_NGAY` được ưu tiên. Không suy ngày, không suy hệ số. Module chưa nối vào vòng học; đầu ra trên dữ liệu thật không đổi (0 sự kiện vào chuỗi trước và sau).
+- `engine/verified_adjust.py`: thêm điều kiện 8. Với `DA_NAM_TRONG_GIA_NGUON`, không được có bước giá gốc ngoài biên trong 45 ngày lịch trước phiên sự kiện; có thì cách ly `CACH_LY_GIA_GAY_TRUOC_NGAY_HUONG_QUYEN`. Nếu bước gãy đó chính là một ngày engine khác của cùng bản gốc, chẩn đoán `XUNG_DOT_NGAY` được ưu tiên. Không suy ngày, không suy hệ số.
+- Cũng trong tệp đó, điều kiện 9 (vòng chấm 2): mọi phiên trên trục ngày của panel trong [phiên sự kiện − 45 ngày lịch, phiên sự kiện] phải có giá của mã; thiếu thì cách ly `CACH_LY_THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN`, kiểm trước điều kiện 7 và 8.
+- Trên kho thật: 0 sự kiện rơi vào trạng thái mới; vào chuỗi 0 trước và 0 sau; `verify_state` và `taints` giống hệt. Chẩn đoán: 4/126 sự kiện cổ phiếu `APPLIED`/`DA_NAM_TRONG_GIA_NGUON` có cửa sổ 45 ngày thiếu giá (SSI 2020-04-09, TCB 2018-07-05, TCB 2024-06-11, VIB 2020-11-19). Chúng đã bị cách ly ở bước bằng chứng trước đó. Module chưa nối vào vòng học.
 - `tools/price_integrity_b1.py`: công cụ đo chỉ đọc cho báo cáo này.
 - `tests/test_price_integrity_b1.py`, `.github/workflows/tests.yml` (thêm tên test vào danh sách bắt buộc). Test c1, c2 kiểm chế độ `research_input="verified"` chạy song song; không đòi đổi đường mặc định và không ngầm chọn phương án (C).
 - Không sửa `engine/adjust.py`, `engine/data.py`, `config.yaml`, `data/`, `state/`, `ledger/`, `research/`, `paper/`.
@@ -170,6 +174,6 @@ Không đổi `ex_date` trong CSV sang ngày HOSE: P2 cho thấy dời ngày m�
 | VERIFIED nguyên nhân TCB/VCB | Thiếu giá đóng cửa chính thức HOSE/VSD cho hai cửa sổ; thiếu `published_at` |
 | Cổng `source_status` trên đường nghiên cứu | ADR-0009 điều 7, L-09, Owner L-10; và cách biểu diễn "sửa giá nguồn" chưa có quyết định |
 | Lịch phiên chính thức | Chưa ghim lịch giao dịch HOSE gốc; Issue #57 (ghế thi công thu nguồn) |
-| Ánh xạ `event_type` cho 18 bản gốc 2026H2 / TCB 2024 | Cần ghế khác đọc đối chiếu bản gốc (đang `CHUA_XAC_MINH`) |
+| Ánh xạ `event_type` cho 19 bản gốc để trống: 17 ở `EVIDENCE_MANIFEST_2026H2.json`; TCB 2024 và FPT 2026 ở `EVIDENCE_MANIFEST.json` (VCB 2025 đã có `stock_dividend`) | Cần ghế khác đọc đối chiếu bản gốc (đang `CHUA_XAC_MINH`) |
 
 Ghi chú phụ (không sửa): khi bản gốc có `event_type: null`, `verified_adjust._match` bỏ qua bản gốc đó. Lý do vì vậy hiện `CACH_LY_THIEU_BANG_CHUNG` ("không có bản gốc") dù đã có bản ghim. Kết quả vẫn đóng khi nghi ngờ; chỉ chữ chẩn đoán chưa chính xác.
