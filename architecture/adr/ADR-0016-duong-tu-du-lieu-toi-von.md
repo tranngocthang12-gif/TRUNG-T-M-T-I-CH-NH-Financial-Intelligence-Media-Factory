@@ -25,7 +25,7 @@
 | QĐ-5 | Tham số FWD-001: 12 kỳ cố định; 3 sổ đối chứng; tối đa 2 sổ bóng chọn bằng quy tắc cơ học (S1 là đặc tả của lần thử có `ic_t` cao nhất trong `research/trials.csv` tại ngày đăng ký; S2 là `signed_sum` trên đủ 13 đặc trưng); giới hạn rủi ro danh nghĩa như lệnh R1. |
 | QĐ-6 | Mô hình chỉ lên ACTIVE khi Owner ghi mô hình đó vào `state/MODEL_REGISTRY.yaml` qua PR. |
 | QĐ-7 | Tiêu chí số của thang vốn theo mục "Thang vốn: tiêu chí số" bên dưới. |
-| QĐ-8 | Người chấm L-09 cho từng PR: ChatGPT hoặc Gemini. |
+| QĐ-8 | Người chấm L-09 cho từng PR phải khác nhà cung cấp người viết: PR của Claude do ChatGPT hoặc Gemini chấm; PR của ChatGPT do Gemini hoặc Grok chấm. |
 
 Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVERNOR_POLICY`; nguồn giá chính thức; bảo vệ `main` (P5).
 
