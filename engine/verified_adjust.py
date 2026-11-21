@@ -27,6 +27,8 @@ Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ v�
        - DA_NAM_TRONG_GIA_NGUON (không áp hệ số) chỉ nhận khi giá chứng minh "đã điều chỉnh"; không thì CÁCH LY
          GIA_CHUA_LIEN_TUC.
      Mơ hồ (cả hai bước giá trong biên) hoặc sai cả hai (cả hai ngoài biên) đều bị cách ly và nhiễm ô.
+  8. Với DA_NAM_TRONG_GIA_NGUON: KHÔNG có bước giá gốc ngoài biên nào trong WINDOW_DAYS ngày lịch trước phiên sự kiện; có thì
+     CÁCH LY GIA_GAY_TRUOC_NGAY_HUONG_QUYEN (nguồn có thể chỉ điều chỉnh vài phiên liền trước, như TCB/VCB trong kho thật).
 Không đạt thì CÁCH LY: không đưa vào hệ số của chuỗi kiểm chứng, và mọi ô giá của mã đó TRƯỚC ngày giao dịch của sự kiện bị
 đánh dấu TAINTED (không bảo đảm so sánh được qua sự kiện). Cổng KHÔNG đổi ngày hộ và KHÔNG suy ngày đúng từ bước nhảy giá.
 Sự kiện tiền mặt chưa có bằng chứng ghim nên chưa được xét; chuỗi kiểm chứng là chuỗi giá gốc cộng các sự kiện cổ phiếu
@@ -58,7 +60,8 @@ Q = "CACH_LY_"
 STATES = (OK, NA_NODATA, NA_CASH, Q + "THIEU_BANG_CHUNG", Q + "BANG_CHUNG_HONG", Q + "THIEU_NGAY_CONG_BO",
           Q + "CONG_BO_SAU_NGAY_CAT", Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", Q + "TY_LE_LECH", Q + "LECH_NGAY",
           Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE", Q + "LOAI_SU_KIEN_LECH",
-          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC", Q + "GIA_KHONG_CHUNG_MINH_HE_SO")
+          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC", Q + "GIA_KHONG_CHUNG_MINH_HE_SO",
+          Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN")
 # trạng thái engine → giả thuyết giá phải được chứng minh; trạng thái cách ly khi không chứng minh được
 EXPECTED_HYPOTHESIS = {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}
 HYPOTHESIS_FAIL_STATE = {"CAN_HE_SO": Q + "GIA_KHONG_CHUNG_MINH_HE_SO", "DA_DIEU_CHINH": Q + "GIA_CHUA_LIEN_TUC"}
@@ -218,7 +221,41 @@ def _judge(r, d, close, base, as_of):
     bad_price = _price_problem(r, close, td)
     if bad_price:
         return bad_price[0], bad_price[1], otd, 0.0
+    if r["status"] == "DA_NAM_TRONG_GIA_NGUON":
+        pre = _pre_event_break(r, close, td)
+        if pre:
+            return Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN", pre, otd, 0.0
     return OK, "bản gốc ghim hợp lệ, ngày công bố hợp lệ, tỷ lệ và ngày áp dụng khớp", otd, 0.0
+
+
+def _pre_event_break(r, close, td):
+    """Lý do cách ly nếu giá gốc có bước ngoài biên trong WINDOW_DAYS ngày lịch TRƯỚC phiên sự kiện, hoặc None.
+
+    DA_NAM_TRONG_GIA_NGUON khẳng định MỌI giá trước ngày không hưởng quyền đã được nguồn điều chỉnh. Bước giá liên tục tại
+    phiên sự kiện chưa chứng minh điều đó: nguồn có thể chỉ chia lại vài phiên liền trước (kho thật: TCB 2024-06-11..19 và
+    VCB 2025-03-03..11, 7 phiên trước ngày không hưởng quyền HOSE — reports/PRICE_INTEGRITY_B1_20261121.md). Khi đó chuỗi
+    còn bước gãy ngoài biên vài phiên trước sự kiện. Cổng không suy ngày hay hệ số từ bước đó; chỉ từ chối chứng nhận."""
+    t = r["ticker"]
+    ret, K = adjust.obs_returns(close[[t]])
+    L = adjust.limits(close.index, [t])
+    s = close[t].dropna()
+    win = s.index[(s.index >= td - pd.Timedelta(days=WINDOW_DAYS)) & (s.index < td)]
+    for d in win:
+        x = ret.at[d, t]
+        if pd.isna(x):
+            continue
+        k = K.at[d, t]
+        up, dn = adjust.bands(L.at[d, t], k if pd.notna(k) else 1.0)
+        if -dn <= x <= up:
+            continue
+        adj = (1 + x) * float(r["ratio"]) - 1
+        n = int(((s.index >= d) & (s.index < td)).sum())
+        hint = ("nhân tỷ lệ thì trong biên: dấu hiệu nguồn chỉ điều chỉnh một phần" if -dn <= adj <= up
+                else "nhân tỷ lệ vẫn ngoài biên")
+        return (f"engine báo giá nguồn đã chứa điều chỉnh, nhưng giá gốc có bước {x:+.2%} ngoài biên −{dn:.2%}/+{up:.2%} tại "
+                f"{d.date()}, {n} phiên trước phiên sự kiện {td.date()} ({hint}); chưa chứng minh mọi giá trước sự kiện đã được "
+                "nguồn điều chỉnh")
+    return None
 
 
 def verify_events(events, close, docs, *, evidence_root, as_of) -> pd.DataFrame:
@@ -258,7 +295,8 @@ def verify_events(events, close, docs, *, evidence_root, as_of) -> pd.DataFrame:
                 by_doc.setdefault(k, set()).add(r["trade_date"])
     for r, d in zip(recs, matched):
         dates = set().union(*[by_doc.get(k, set()) for k in _keys(d)]) if d is not None else set()
-        if r["verify_state"] == OK and len(dates) > 1:
+        # Bước gãy trước sự kiện mà chính một ngày engine khác của cùng bản gốc gây ra thì chẩn đoán đúng là xung đột ngày.
+        if r["verify_state"] in (OK, Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN") and len(dates) > 1:
             r["verify_state"] = Q + "XUNG_DOT_NGAY"
             r["verify_reason"] = ("cùng bản gốc nhưng engine áp ở nhiều ngày: "
                                   + ", ".join(sorted(str(x.date()) for x in dates)))
