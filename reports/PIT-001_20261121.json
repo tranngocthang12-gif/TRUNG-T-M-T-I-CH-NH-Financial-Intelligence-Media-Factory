@@ -1,7 +1,7 @@
 {
   "alpha_claim": false,
   "conclusion": "NOT_READY",
-  "conclusion_reason": "Có lỗi đã xác nhận ở hash, độ phủ rổ, cách engine chọn mã, giá, hoặc sự kiện quyền chưa xác minh.",
+  "conclusion_reason": "Kiểm tra bắt buộc FAIL/không hợp lệ: ADR0008_SCHEMA, CONFIG_VS_EVIDENCED_BASKET, CORPORATE_ACTION_VERIFICATION, ENGINE_UNIVERSE_MODE, PRICE_WINDOW_COVERAGE, TICKER_PRESENCE, UNIVERSE_COVERAGE, UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN",
   "eligible_window": null,
   "findings": [
     {
@@ -74,6 +74,14 @@
       "id": "PUBLICATION_BEFORE_USE",
       "status": "PASS",
       "summary": "Với mọi tài liệu có đủ hai ngày, ngày công bố theo giờ Việt Nam không sau ngày hiệu lực."
+    },
+    {
+      "evidence": {
+        "decision_time_local": null
+      },
+      "id": "DECISION_TIME_OF_KNOWLEDGE",
+      "status": "INCONCLUSIVE",
+      "summary": "Chưa đăng ký giờ ra quyết định theo ngày giao dịch (research.decision_time_local). So published_on <= effective_date không chứng minh có thể dùng ngay trong phiên."
     },
     {
       "evidence": {
@@ -262,7 +270,7 @@
       },
       "id": "MEMBERSHIP_BEFORE_FIRST_EVIDENCE",
       "status": "UNKNOWN",
-      "summary": "Trước ngày hiệu lực của bản gốc đầu tiên, thành phần VN30 là UNKNOWN. Không suy từ rổ hiện tại."
+      "summary": "Trước ngày hiệu lực của bản gốc đầu tiên, thành phần VN30 là UNKNOWN."
     },
     {
       "evidence": {
@@ -317,13 +325,11 @@
     },
     {
       "evidence": {
-        "data_py_mentions_vn30_history": false,
-        "ingest_uses_config_universe": true,
         "universe_basis": "CURRENT"
       },
       "id": "ENGINE_UNIVERSE_MODE",
       "status": "FAIL",
-      "summary": "Engine không chọn thành phần theo từng ngày. Ingest đi theo danh sách cố định trong config; load_market không đọc data/vn30_history.csv. universe_basis CURRENT gắn nhãn thiên lệch sống sót (ADR-0008)."
+      "summary": "Cấu hình khai CURRENT: không thể chứng nhận chọn universe theo từng ngày."
     },
     {
       "evidence": {
@@ -439,9 +445,186 @@
           "POW"
         ]
       },
-      "id": "PRICE_COVERAGE",
+      "id": "TICKER_PRESENCE",
       "status": "FAIL",
-      "summary": "Có mã đã nằm trong rổ VN30 được ghim nhưng kho giá không có dòng nào của mã đó. Không suy giá từ mã khác."
+      "summary": "Có mã từng nằm trong rổ ghim nhưng không có dòng giá."
+    },
+    {
+      "evidence": {
+        "feature_lookback": 121,
+        "horizon_days": 20,
+        "min_distinct_sessions_for_individual_ticker": 122,
+        "missing_dates_on_observed_market_calendar": [
+          {
+            "effective_date": "2025-08-04",
+            "examples": [
+              "2025-08-04",
+              "2025-08-05",
+              "2025-08-06"
+            ],
+            "missing_session_count": 130,
+            "ticker": "DGC"
+          },
+          {
+            "effective_date": "2025-08-04",
+            "examples": [
+              "2025-08-04",
+              "2025-08-05",
+              "2025-08-06"
+            ],
+            "missing_session_count": 130,
+            "ticker": "LPB"
+          },
+          {
+            "effective_date": "2026-02-02",
+            "examples": [
+              "2026-02-02",
+              "2026-02-03",
+              "2026-02-04"
+            ],
+            "missing_session_count": 72,
+            "ticker": "DGC"
+          },
+          {
+            "effective_date": "2026-02-02",
+            "examples": [
+              "2026-02-02",
+              "2026-02-03",
+              "2026-02-04"
+            ],
+            "missing_session_count": 72,
+            "ticker": "LPB"
+          },
+          {
+            "effective_date": "2026-02-02",
+            "examples": [
+              "2026-02-02",
+              "2026-02-03",
+              "2026-02-04"
+            ],
+            "missing_session_count": 72,
+            "ticker": "VPL"
+          },
+          {
+            "effective_date": "2026-05-13",
+            "examples": [
+              "2026-05-13",
+              "2026-05-14",
+              "2026-05-15"
+            ],
+            "missing_session_count": 58,
+            "ticker": "BSR"
+          },
+          {
+            "effective_date": "2026-05-13",
+            "examples": [
+              "2026-05-13",
+              "2026-05-14",
+              "2026-05-15"
+            ],
+            "missing_session_count": 58,
+            "ticker": "LPB"
+          },
+          {
+            "effective_date": "2026-05-13",
+            "examples": [
+              "2026-05-13",
+              "2026-05-14",
+              "2026-05-15"
+            ],
+            "missing_session_count": 58,
+            "ticker": "VPL"
+          },
+          {
+            "effective_date": "2026-08-03",
+            "examples": [
+              "2026-08-03",
+              "2026-08-04",
+              "2026-08-05"
+            ],
+            "missing_session_count": 80,
+            "ticker": "BSR"
+          },
+          {
+            "effective_date": "2026-08-03",
+            "examples": [
+              "2026-08-03",
+              "2026-08-04",
+              "2026-08-05"
+            ],
+            "missing_session_count": 80,
+            "ticker": "LPB"
+          },
+          {
+            "effective_date": "2026-08-03",
+            "examples": [
+              "2026-08-03",
+              "2026-08-04",
+              "2026-08-05"
+            ],
+            "missing_session_count": 80,
+            "ticker": "MCH"
+          },
+          {
+            "effective_date": "2026-08-03",
+            "examples": [
+              "2026-08-03",
+              "2026-08-04",
+              "2026-08-05"
+            ],
+            "missing_session_count": 80,
+            "ticker": "TCX"
+          },
+          {
+            "effective_date": "2026-08-03",
+            "examples": [
+              "2026-08-03",
+              "2026-08-04",
+              "2026-08-05"
+            ],
+            "missing_session_count": 80,
+            "ticker": "VPL"
+          }
+        ],
+        "missing_tickers": [
+          "BSR",
+          "DGC",
+          "LPB",
+          "MCH",
+          "TCX",
+          "VPL"
+        ],
+        "official_exchange_calendar_verified": false,
+        "short_series": [
+          {
+            "distinct_sessions": 0,
+            "ticker": "BSR"
+          },
+          {
+            "distinct_sessions": 0,
+            "ticker": "DGC"
+          },
+          {
+            "distinct_sessions": 0,
+            "ticker": "LPB"
+          },
+          {
+            "distinct_sessions": 0,
+            "ticker": "MCH"
+          },
+          {
+            "distinct_sessions": 0,
+            "ticker": "TCX"
+          },
+          {
+            "distinct_sessions": 0,
+            "ticker": "VPL"
+          }
+        ]
+      },
+      "id": "PRICE_WINDOW_COVERAGE",
+      "status": "FAIL",
+      "summary": "Thiếu mã, chuỗi quá ngắn hoặc thiếu ngày giá trong phiên có dữ liệu cho mã khác. Chưa xét liệu lịch phiên suy từ kho có đầy đủ hay không."
     },
     {
       "evidence": {
@@ -478,13 +661,15 @@
     },
     {
       "evidence": {
-        "build_events_mentions_source_status": false,
-        "load_market_uses_verified_chain": false,
+        "behavioral_proof_verified_gate": false,
+        "build_events_ast_mentions_source_status": false,
+        "load_market_ast_mentions_verified_function": false,
+        "load_market_calls_adjust_build_events": true,
         "unverified_manual_rows": 2
       },
       "id": "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN",
       "status": "FAIL",
-      "summary": "load_market gọi adjust.build_events. Hàm đó không đọc source_status trước khi có thể gán APPLIED. Sự kiện CAN_DOI_CHIEU vẫn có thể vào giá điều chỉnh dùng cho nghiên cứu nếu tỷ lệ khớp bước giá. PIT-001 không sửa engine/adjust.py."
+      "summary": "Có sự kiện chưa xác minh, load_market gọi build_events, nhưng hàm build_events không đọc source_status. Không được cho vào verified-adjusted khi chưa có cổng hành vi."
     },
     {
       "evidence": {
@@ -792,7 +977,7 @@
           {
             "effective_date": "2025-08-04",
             "path": "data/evidence/vn30_reviews/hose-2388633/news.json",
-            "present": true,
+            "present_in_announcement_summary": true,
             "source_id": "hose-2388633-news",
             "status": "PASS",
             "token": "04/08/2025"
@@ -800,7 +985,7 @@
           {
             "effective_date": "2026-02-02",
             "path": "data/evidence/vn30_reviews/hose-2432828/news.json",
-            "present": true,
+            "present_in_announcement_summary": true,
             "source_id": "hose-2432828-news",
             "status": "PASS",
             "token": "02/02/2026"
@@ -808,7 +993,7 @@
           {
             "effective_date": "2026-05-13",
             "path": "data/evidence/vn30_reviews/hose-2460387/news.json",
-            "present": true,
+            "present_in_announcement_summary": true,
             "source_id": "hose-2460387",
             "status": "PASS",
             "token": "13/05/2026"
@@ -816,7 +1001,7 @@
           {
             "effective_date": "2026-08-03",
             "path": "data/evidence/vn30_reviews/hose-2479382/news.json",
-            "present": true,
+            "present_in_announcement_summary": true,
             "source_id": "hose-2479382-news",
             "status": "PASS",
             "token": "03/08/2026"
@@ -824,7 +1009,7 @@
           {
             "effective_date": "2026-11-16",
             "path": "data/evidence/vn30_reviews/hose-2510691/news.json",
-            "present": true,
+            "present_in_announcement_summary": true,
             "source_id": "hose-2510691-news",
             "status": "PASS",
             "token": "16/11/2026"
@@ -833,7 +1018,7 @@
       },
       "id": "NEWS_EFFECTIVE_DATE_TEXT",
       "status": "PASS",
-      "summary": "Mỗi tin JSON đã ghim chứa đúng chuỗi ngày hiệu lực mà manifest ghi. PDF có thể không in lại ngày này."
+      "summary": "Các bản tin đã ghim có ngày hiệu lực trong phần summary, không chỉ metadata."
     },
     {
       "evidence": {
