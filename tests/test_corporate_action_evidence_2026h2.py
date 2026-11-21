@@ -254,15 +254,20 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
         from engine import verified_adjust as va
 
         raw, events = _market()
-        checked = va.verify_events(events, raw, _docs(), evidence_root=ROOT, as_of=raw.index.max())
-        ids = {doc["source_id"] for doc in _docs()}
-        self.assertFalse(set(checked["evidence_id"]) & ids)
-        self.assertEqual(int(checked["in_verified_chain"].sum()), 0)
+        docs = _docs()
+        checked = va.verify_events(events, raw, docs, evidence_root=ROOT, as_of=raw.index.max())
+        # Có PDF, ngày và hệ số trùng chưa đủ: bản gốc chưa có published_at thì dòng ghép với nó luôn bị cách ly.
+        unpublished = {doc["source_id"] for doc in docs if doc["published_at"] is None}
+        for row in checked[checked["evidence_id"].isin(unpublished)].itertuples(index=False):
+            self.assertFalse(bool(row.in_verified_chain), (row.ticker, row.evidence_id))
+            self.assertTrue(row.verify_state.startswith("CACH_LY_"), (row.ticker, row.verify_state))
+        by_event = {(doc["ticker"], doc["official_ex_date"]): doc for doc in docs}
         for ticker, day in EVENTS:
             hit = checked[(checked.ticker == ticker) & (checked.ex_date == pd.Timestamp(day))
                           & checked.type.isin(va.STOCK)]
             self.assertEqual(len(hit), 1, (ticker, day))
-            self.assertFalse(bool(hit.iloc[0].in_verified_chain))
+            if by_event[(ticker, day)]["published_at"] is None:
+                self.assertFalse(bool(hit.iloc[0].in_verified_chain), (ticker, day))
 
     def test_flipping_one_byte_in_a_temp_copy_fails_and_repo_untouched(self):
         before = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)

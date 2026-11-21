@@ -693,7 +693,7 @@ def test_mc_applied_and_already_in_price_share_one_hypothesis_check():
     assert va.EXPECTED_HYPOTHESIS == {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}
 
 
-# ---------- 8. LỆNH E1 (QĐ-2, ADR-0016): xếp lớp bản gốc bằng bảng ánh xạ đóng, tỷ lệ 7 chữ số thập phân -----------------
+# ---------- 8. LỆNH E1 (QĐ-2, QĐ-2a, ADR-0016): xếp lớp bản gốc bằng bảng ánh xạ đóng, tỷ lệ 7 chữ số thập phân ----------
 
 MAPPED = ["trả cổ tức bằng cổ phiếu", "Chi trả cổ tức bằng cổ phiếu", "  phát hành   cổ phiếu để trả cổ tức ",
           unicodedata.normalize("NFD", "trả cổ tức bằng cổ phiếu")]
@@ -709,20 +709,39 @@ def test_e1_empty_event_type_with_mapped_verbatim_verifies(tmp_path, field, text
     assert ev.in_verified_chain.all() and ev.evidence_id.tolist() == ["hose-test-1"]
 
 
+# QĐ-2a: đúng bốn nguyên văn cổ phiếu thưởng và câu gộp đang có trong hai manifest, chép nguyên chữ hoa/thường như manifest.
+QD2A = [
+    ("event_type_verbatim", "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu"),  # 2026H2: VIC, SSI, BID, VIB
+    ("source_event_text", "Thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu"),  # TCB 2024
+    ("source_event_text", "Phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu"),  # FPT 2026
+    ("event_type_verbatim", "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu"),  # 2026H2: HDB×2, POW
+]
+
+
+@pytest.mark.parametrize("field,text", QD2A, ids=["thuong_2026h2", "thuong_tcb_2024", "thuong_fpt", "gop"])
+def test_e1_qd2a_bonus_and_combined_verbatims_verify(tmp_path, field, text):
+    """QĐ-2a: cổ phiếu thưởng (tăng vốn từ nguồn vốn chủ sở hữu) và câu gộp với cổ tức bằng cổ phiếu cùng lớp STOCK."""
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path, typ=None, **{field: text})])
+    assert ev.verify_state.tolist() == [va.OK], ev.verify_reason.tolist()
+    assert ev.in_verified_chain.all() and ev.evidence_id.tolist() == ["hose-test-1"]
+
+
 UNMAPPED = [
     ("co_tuc_tien", "trả cổ tức bằng tiền"),
     ("quyen_mua", "phát hành cổ phiếu cho cổ đông hiện hữu theo phương thức thực hiện quyền mua"),
-    ("co_phieu_thuong", "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu"),
-    ("gop_co_tuc_tang_von", "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu"),
-    ("tcb_2024", "Thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu"),
+    ("esop", "phát hành cổ phiếu theo chương trình lựa chọn cho người lao động (ESOP)"),
+    ("rieng_le", "chào bán cổ phiếu riêng lẻ"),
+    ("thuong_kem_quyen_mua", "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu và phát hành quyền mua"),
+    ("tang_von_khong_ro_nguon", "phát hành cổ phiếu để tăng vốn cổ phần"),
     ("rong", None),
 ]
 
 
 @pytest.mark.parametrize("name,text", UNMAPPED, ids=[x[0] for x in UNMAPPED])
 def test_e1_unmapped_verbatim_is_quarantined_and_taints(tmp_path, name, text):
-    """QĐ-2: cổ tức tiền, phát hành quyền mua và mọi nguyên văn ngoài bảng ánh xạ ra LOAI_CHUA_ANH_XA. Ngày, tỷ lệ, bản gốc
-    đều hợp lệ; chỉ loại không xếp được. Bản gốc vẫn được ghép (evidence_id) và nhiễm ô."""
+    """QĐ-2, QĐ-2a: cổ tức tiền, phát hành quyền mua, ESOP, chào bán riêng lẻ và mọi nguyên văn ngoài bảng ánh xạ (kể cả
+    câu chỉ gần giống một dòng của bảng) ra LOAI_CHUA_ANH_XA. Ngày, tỷ lệ, bản gốc đều hợp lệ; chỉ loại không xếp được. Bản
+    gốc vẫn được ghép (evidence_id) và nhiễm ô."""
     close, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path, typ=None, event_type_verbatim=text)])
     r = ev.iloc[0]
     assert r.verify_state == va.Q + "LOAI_CHUA_ANH_XA", r.verify_reason
@@ -783,11 +802,25 @@ def test_e1_manifest_documents_are_not_modified(tmp_path):
 
 
 def test_e1_mapping_table_is_closed_and_normalised():
-    """Bảng ánh xạ ghim cứng: đổi bảng phải sửa test này, nên đi qua PR và L-09 (QĐ-2)."""
-    assert va.STOCK_VERBATIM == frozenset({"trả cổ tức bằng cổ phiếu", "chi trả cổ tức bằng cổ phiếu",
-                                           "phát hành cổ phiếu để trả cổ tức"})
+    """Bảng ánh xạ ghim cứng: đổi bảng phải sửa test này, nên đi qua PR và L-09 (QĐ-2, QĐ-2a)."""
+    assert va.STOCK_VERBATIM == frozenset({
+        "trả cổ tức bằng cổ phiếu", "chi trả cổ tức bằng cổ phiếu", "phát hành cổ phiếu để trả cổ tức",
+        "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+        "thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+        "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu",
+        "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu"})
     assert all(t == va._norm_text(t) for t in va.STOCK_VERBATIM)
     assert va.RATIO_DECIMALS == 7 and va.Q + "LOAI_CHUA_ANH_XA" in va.STATES
+
+
+def test_e1_mapping_table_rows_are_exactly_verbatims_from_the_two_manifests():
+    """Bảng chỉ chứa nguyên văn đang có trong hai manifest (không tự đặt câu), và sau QĐ-2a mọi bản gốc của hai manifest
+    xếp được lớp STOCK."""
+    docs = va.load_evidence([REPO / "data/evidence/corporate_actions/EVIDENCE_MANIFEST.json",
+                             REPO / "data/evidence/corporate_actions/EVIDENCE_MANIFEST_2026H2.json"])
+    seen = {va._norm_text(d.get(f)) for d in docs for f in va.VERBATIM_FIELDS if isinstance(d.get(f), str)}
+    assert va.STOCK_VERBATIM <= seen
+    assert [d["source_id"] for d in docs if va._doc_class(d)[0] != "STOCK"] == []
 
 
 def test_e1_real_repo_nothing_enters_chain_without_publication_date():

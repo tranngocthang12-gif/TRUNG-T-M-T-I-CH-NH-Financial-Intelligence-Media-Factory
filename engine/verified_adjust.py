@@ -8,10 +8,11 @@ biên độ giá sau điều chỉnh nằm trong sàn. Đó là nguyên nhân m�
 
 Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ vào chuỗi đó khi đủ cả chín điều kiện:
   1. có bản gốc đã ghim trong manifest (source_id, url, issuer, path, sha256 đều là chuỗi không rỗng), tệp tồn tại, đúng
-     sha256 và số byte; bản gốc thuộc lớp STOCK như sự kiện engine (QĐ-2, ADR-0016: chia tách và trả cổ tức bằng cổ phiếu
-     cùng một lớp vì engine tính hệ số như nhau). Bản gốc thuộc lớp STOCK khi `event_type` thuộc `adjust.STOCK`, hoặc khi
-     `event_type` trống và nguyên văn loại (`event_type_verbatim`, không có thì `source_event_text`) nằm trong bảng ánh xạ
-     đóng STOCK_VERBATIM; nguyên văn ngoài bảng thì CÁCH LY LOAI_CHUA_ANH_XA. Nguyên văn trong manifest không bị sửa;
+     sha256 và số byte; bản gốc thuộc lớp STOCK như sự kiện engine (QĐ-2 và QĐ-2a, ADR-0016: chia tách, trả cổ tức bằng cổ
+     phiếu và cổ phiếu thưởng cùng một lớp vì engine tính hệ số như nhau). Bản gốc thuộc lớp STOCK khi `event_type` thuộc
+     `adjust.STOCK`, hoặc khi `event_type` trống và nguyên văn loại (`event_type_verbatim`, không có thì `source_event_text`)
+     nằm trong bảng ánh xạ đóng STOCK_VERBATIM; nguyên văn ngoài bảng thì CÁCH LY LOAI_CHUA_ANH_XA. Nguyên văn trong manifest
+     không bị sửa;
   2. có ngày công bố (`published_at`) hợp lệ: có mặt, không muộn hơn ngày cắt `as_of`, sớm hơn ngày không hưởng quyền;
   3. tỷ lệ in trên văn bản (`official_ratio`) là số hữu hạn dương và trùng tỷ lệ của sự kiện khi làm tròn tới RATIO_DECIMALS
      = 7 chữ số thập phân;
@@ -62,14 +63,22 @@ WINDOW_DAYS = 45          # bản gốc phải có ngày không hưởng quyền
 # Tỷ lệ so ở 7 chữ số thập phân: đó là độ chính xác của data/derived/yahoo_actions.csv (ví dụ CTG 2025: Yahoo 1.4463658,
 # văn bản 1,4463658403). So chặt hơn thì một sự kiện đúng bị loại chỉ vì nguồn làm tròn; so lỏng hơn thì tỷ lệ sai lọt qua.
 RATIO_DECIMALS = 7
-# QĐ-2 (ADR-0016): bảng ánh xạ ĐÓNG từ nguyên văn loại sự kiện trên bản gốc sang lớp STOCK. Chỉ gồm nguyên văn "trả cổ tức
-# bằng cổ phiếu" đã gặp trong manifest. Không có: cổ tức tiền, phát hành quyền mua, phát hành tăng vốn từ nguồn vốn chủ sở
-# hữu (cổ phiếu thưởng), loại gộp cổ tức và tăng vốn. Những nguyên văn đó ra LOAI_CHUA_ANH_XA. Đổi bảng phải qua PR và L-09.
-# So sau khi chuẩn hóa: Unicode NFC, chữ thường (casefold), gộp khoảng trắng.
+# QĐ-2 và QĐ-2a (ADR-0016): bảng ánh xạ ĐÓNG từ nguyên văn loại sự kiện trên bản gốc sang lớp STOCK. Chỉ gồm đúng các nguyên
+# văn đã gặp trong hai manifest của ba loại: trả cổ tức bằng cổ phiếu (QĐ-2); phát hành cổ phiếu để tăng vốn từ nguồn vốn
+# chủ sở hữu, tức cổ phiếu thưởng (QĐ-2a); câu gộp cổ tức bằng cổ phiếu với tăng vốn từ nguồn vốn chủ sở hữu (QĐ-2a). Không
+# có: cổ tức tiền, phát hành quyền mua, ESOP, chào bán riêng lẻ. Mọi nguyên văn ngoài bảng ra LOAI_CHUA_ANH_XA. Đổi bảng phải
+# qua PR và L-09. So sau khi chuẩn hóa: Unicode NFC, chữ thường (casefold), gộp khoảng trắng.
 STOCK_VERBATIM = frozenset({
+    # QĐ-2: trả cổ tức bằng cổ phiếu
     "trả cổ tức bằng cổ phiếu",
     "chi trả cổ tức bằng cổ phiếu",
     "phát hành cổ phiếu để trả cổ tức",
+    # QĐ-2a: cổ phiếu thưởng (tăng vốn từ nguồn vốn chủ sở hữu)
+    "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+    "thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+    "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu",
+    # QĐ-2a: câu gộp cổ tức bằng cổ phiếu với tăng vốn từ nguồn vốn chủ sở hữu
+    "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu",
 })
 VERBATIM_FIELDS = ("event_type_verbatim", "source_event_text")
 
@@ -235,7 +244,7 @@ def _judge(r, d, close, base, as_of):
         return Q + "BANG_CHUNG_HONG", bad, pd.NaT, np.nan
     cls, cdesc = _doc_class(d)
     if cls == "UNMAPPED":
-        return Q + "LOAI_CHUA_ANH_XA", f"{cdesc}; không xếp được bản gốc vào lớp STOCK (QĐ-2)", pd.NaT, np.nan
+        return Q + "LOAI_CHUA_ANH_XA", f"{cdesc}; không xếp được bản gốc vào lớp STOCK (QĐ-2, QĐ-2a)", pd.NaT, np.nan
     if cls != "STOCK" or r["type"] not in STOCK:
         return (Q + "LOAI_SU_KIEN_LECH", f"bản gốc ({cdesc}) và sự kiện engine ({r['type']}) không cùng lớp STOCK",
                 pd.NaT, np.nan)
