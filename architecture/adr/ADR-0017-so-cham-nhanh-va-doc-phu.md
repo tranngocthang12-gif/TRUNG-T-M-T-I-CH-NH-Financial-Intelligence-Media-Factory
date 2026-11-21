@@ -1,10 +1,10 @@
 # ADR-0017: Sổ chấm nhanh SCN-001 — dự báo chỉ tiêu doanh nghiệp tự chấm theo bản gốc, lớp đọc phủ, cổng cấp tín hiệu
 
 - Ngày: 2026-11-21
-- Trạng thái: **PROPOSED — chưa hiệu lực.** Gộp tệp này không tự duyệt quyết định nào; xem mục "Trạng thái từng quyết định".
+- Trạng thái: **ACCEPTED 21/11/2026, hiệu lực khi Owner gộp PR này** (PR #75, cập nhật trạng thái theo lệnh Owner ngày 21/11/2026). Văn bản đã gộp vào `main` (PR #74). Chỉ quyết định được ghi ACCEPTED trong bảng "Trạng thái từng quyết định" mới có hiệu lực.
 - Người đề xuất: Claude Project TTC (Anthropic), ghế kiến trúc sư trưởng. Chép vào kho: phiên Claude Code (Anthropic). Vòng 2: phiên Claude Code sửa QĐ-S2, QĐ-S3, QĐ-S6, QĐ-S9 và mục Lý do theo bản chấm L-09 của ChatGPT (OpenAI) trên `5ba61b4`.
-- Người chấm: chưa có. Phải là ChatGPT (OpenAI) hoặc Gemini (Google), chấm đúng commit.
-- Owner duyệt: chưa.
+- Người chấm: ChatGPT (OpenAI), `GỘP ĐƯỢC` trên commit `fe9b7cadabd8fd97f9959eb65026a9420b73544a` ([bình luận L-09, PR #74](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/74#issuecomment-7062394688)).
+- Owner duyệt: văn bản gộp ngày 21/11/2026 (giờ Việt Nam), PR #74, merge `c1ca046dc7bc8e8f51b7e08bb7cbc08ccb0ba9b3`. Hiệu lực từng quyết định theo bảng "Trạng thái từng quyết định".
 - Số: 0015 (PR #68) và 0016 (PR #73) đã dùng.
 
 ## Bối cảnh
@@ -209,17 +209,17 @@
 
 ## Trạng thái từng quyết định
 
-| Mã | Owner | Ngày |
-|---|---|---|
-| QĐ-S1 | PROPOSED | |
-| QĐ-S2 | PROPOSED | |
-| QĐ-S3 | PROPOSED | |
-| QĐ-S4 | PROPOSED | |
-| QĐ-S5 | PROPOSED | |
-| QĐ-S6 | PROPOSED | |
-| QĐ-S7 | PROPOSED | |
-| QĐ-S8 | PROPOSED | |
-| QĐ-S9 | PROPOSED | |
+| Mã | Trạng thái | Owner | Ngày |
+|---|---|---|---|
+| QĐ-S1 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S2 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S3 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S4 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S5 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S6 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S7 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S8 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-S9 | ACCEPTED | Owner | 21/11/2026 |
 
 - Gộp ADR này chỉ ghi nhận văn bản, không tự duyệt quyết định nào.
 - Một quyết định chỉ có hiệu lực khi Owner ghi ACCEPTED kèm ngày trong bảng này, bằng PR do Owner gộp.

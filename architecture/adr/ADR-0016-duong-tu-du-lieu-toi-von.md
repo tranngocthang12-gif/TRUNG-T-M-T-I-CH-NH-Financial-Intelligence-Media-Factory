@@ -1,10 +1,10 @@
 # ADR-0016: Đường từ dữ liệu tới vốn — quyết định Owner, tiêu chí số của thang vốn, điều kiện dừng
 
 - Ngày: 2026-11-21
-- Trạng thái: **PROPOSED — chưa hiệu lực.** Chỉ có hiệu lực khi ghế khác nhà cung cấp chấm (L-09) và Owner gộp (L-10). Owner có thể duyệt từng quyết định QĐ-1…QĐ-8 riêng.
+- Trạng thái: **ACCEPTED 21/11/2026, hiệu lực khi Owner gộp PR này** (PR #75, cập nhật trạng thái theo lệnh Owner ngày 21/11/2026). Văn bản đã gộp vào `main` (PR #73). Chỉ quyết định được ghi ACCEPTED trong bảng "Trạng thái từng quyết định" mới có hiệu lực.
 - Người đề xuất: Claude Project TTC (Anthropic), ghế kiến trúc sư trưởng. Chép chữ vào kho: phiên Claude Code (Anthropic).
-- Người chấm: chưa có. Phải là ChatGPT (OpenAI) hoặc Gemini (Google), chấm đúng commit.
-- Owner duyệt: chưa.
+- Người chấm: ChatGPT (OpenAI), `GỘP ĐƯỢC` trên commit `cee8e98d7ff92c724260c79e7c6526f115219702` ([bình luận L-09, PR #73](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/73#issuecomment-7061811768)).
+- Owner duyệt: văn bản gộp ngày 21/11/2026 (giờ Việt Nam), PR #73, merge `b75250184b553560a0ea31c909766a1f11f1a6f3`. Hiệu lực từng quyết định theo bảng "Trạng thái từng quyết định".
 
 ## Nguồn chữ và phạm vi
 
@@ -34,14 +34,14 @@ Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVE
 
 | QĐ | Trạng thái | Owner | Ngày |
 |---|---|---|---|
-| QĐ-1 | PROPOSED | | |
-| QĐ-2 | PROPOSED | | |
-| QĐ-3 | PROPOSED | | |
-| QĐ-4 | PROPOSED | | |
-| QĐ-5 | PROPOSED | | |
-| QĐ-6 | PROPOSED | | |
-| QĐ-7 | PROPOSED | | |
-| QĐ-8 | PROPOSED | | |
+| QĐ-1 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-2 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-3 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-4 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-5 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-6 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-7 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-8 | ACCEPTED | Owner | 21/11/2026 |
 
 Quy tắc:
 
