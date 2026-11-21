@@ -3,7 +3,7 @@
 Không mạng. Không ghi kho giá, config, engine, ledger, luật hay manifest.
 Kết quả in JSON ra stdout. Hash khớp chỉ chứng minh byte không đổi, không chứng minh nội dung đúng.
 """
-import csv, gzip, hashlib, json, re, unicodedata
+import ast, csv, gzip, hashlib, json, re, unicodedata
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -195,6 +195,47 @@ def check_publication_order(docs):
         checked=len(ok))
 
 
+def check_decision_cutoff(docs, cfg):
+    """Kiểm tra chính xác phút công bố so với phút ra quyết định theo giờ VN.
+    Thiếu lịch quyết định đã đăng ký => INCONCLUSIVE, không lấy ngày hiệu lực thay thế.
+    """
+    if not docs:
+        return finding("DECISION_TIME_OF_KNOWLEDGE", "UNKNOWN",
+                       "Không có nguồn để đối chiếu thời điểm công bố.")
+    cutoff = ((cfg or {}).get("research") or {}).get("decision_time_local")
+    if not isinstance(cutoff, str) or not re.fullmatch(r"(?:[01]\d|2[0-3]):[0-5]\d", cutoff):
+        return finding("DECISION_TIME_OF_KNOWLEDGE", "INCONCLUSIVE",
+                       "Chưa đăng ký giờ ra quyết định theo ngày giao dịch (research.decision_time_local). "
+                       "So published_on <= effective_date không chứng minh có thể dùng ngay trong phiên.",
+                       decision_time_local=None)
+    bad, unknown, ok = [], [], []
+    for doc in docs:
+        published, effective = doc.get("published_at"), doc.get("effective_date")
+        row = {"source_id": doc.get("source_id"), "published_at": published,
+               "effective_date": effective}
+        try:
+            pub = datetime.fromisoformat(str(published).replace("Z", "+00:00"))
+            if pub.tzinfo is None:
+                raise ValueError("published_at thiếu timezone")
+            decision = datetime.fromisoformat(f"{effective}T{cutoff}:00").replace(tzinfo=VN_TZ)
+            row["decision_at_local"] = decision.isoformat()
+            row["publication_at_local"] = pub.astimezone(VN_TZ).isoformat()
+            (bad if pub > decision else ok).append(row)
+        except (ValueError, TypeError):
+            unknown.append(row)
+    if bad:
+        return finding("DECISION_TIME_OF_KNOWLEDGE", "FAIL",
+                       "Có nguồn được công bố sau giờ ra quyết định; không thể dùng trong cùng phiên.",
+                       late_publications=bad, undated=unknown, verified_before=len(ok))
+    if unknown:
+        return finding("DECISION_TIME_OF_KNOWLEDGE", "UNKNOWN",
+                       "Ngày/giờ nguồn chưa đủ để so với giờ ra quyết định.",
+                       undated=unknown, verified_before=len(ok))
+    return finding("DECISION_TIME_OF_KNOWLEDGE", "PASS",
+                   "Các bản tin trong manifest được công bố trước giờ quyết định giả định đã khai; "
+                   "không xác nhận vintage cho toàn bộ giá và BCTC.",
+                   checked=len(ok), decision_time_local=cutoff)
+
 def check_csv(rows):
     if rows is None:
         return finding("CSV_INTERNAL", "UNKNOWN", "Không có data/vn30_history.csv."), None
@@ -248,16 +289,21 @@ def check_coverage(cfg, states):
 
 
 def check_before_first(cfg, states):
-    if states is None:
+    if states is None or not states:
         return finding("MEMBERSHIP_BEFORE_FIRST_EVIDENCE", "UNKNOWN", "Chưa có mốc thành phần.")
     first = states[0][0]
     start = ((cfg or {}).get("data") or {}).get("start")
-    return finding(
-        "MEMBERSHIP_BEFORE_FIRST_EVIDENCE", "UNKNOWN",
-        "Trước ngày hiệu lực của bản gốc đầu tiên, thành phần VN30 là UNKNOWN. Không suy từ rổ hiện tại.",
-        first_evidence_date=first, research_start=start,
-        applies=bool(start and start < first))
-
+    if not start:
+        return finding("MEMBERSHIP_BEFORE_FIRST_EVIDENCE", "UNKNOWN",
+                       "Không có ngày đầu nghiên cứu để so với mốc bản gốc.")
+    if start < first:
+        return finding("MEMBERSHIP_BEFORE_FIRST_EVIDENCE", "UNKNOWN",
+                       "Trước ngày hiệu lực của bản gốc đầu tiên, thành phần VN30 là UNKNOWN.",
+                       first_evidence_date=first, research_start=start, applies=True)
+    return finding("MEMBERSHIP_BEFORE_FIRST_EVIDENCE", "PASS",
+                   "Khoảng nghiên cứu không yêu cầu thành phần trước mốc gốc đầu tiên. "
+                   "Điều này chưa chứng minh tính liên tục giữa các kỳ.",
+                   first_evidence_date=first, research_start=start, applies=False)
 
 def check_continuity(docs, states):
     if not states or len(states) < 2:
@@ -281,52 +327,69 @@ def check_continuity(docs, states):
         gaps=gaps, names_copied_from_other_document=copied)
 
 
-def _function_body(src, name):
-    m = re.search(rf"^def {name}\(.*?(?=^def |\Z)", src, re.S | re.M)
-    return m.group(0) if m else None
+def _function_ast(src, name):
+    """Chỉ xét AST thật; comment hoặc string literal không được tính là hành vi."""
+    try:
+        module = ast.parse(src)
+    except SyntaxError:
+        return None
+    return next((n for n in module.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+                 and n.name == name), None)
+
+
+def _calls_adjust_build_events(fn):
+    return any(
+        isinstance(n, ast.Call)
+        and isinstance(n.func, ast.Attribute)
+        and n.func.attr == "build_events"
+        and isinstance(n.func.value, ast.Name)
+        and n.func.value.id == "adjust"
+        for n in ast.walk(fn)
+    )
 
 
 def research_chain_requires_verified_status(src: str):
-    """True nếu build_events có nhắc source_status. None nếu không thấy hàm."""
-    body = _function_body(src, "build_events")
-    if body is None:
+    """Dấu hiệu cú pháp, KHÔNG phải chứng minh đã chặn các event chưa xác minh."""
+    fn = _function_ast(src, "build_events")
+    if fn is None:
         return None
-    return "source_status" in body
+    return any(isinstance(n, ast.Name) and n.id == "source_status"
+               for n in ast.walk(fn))
 
 
 def load_market_uses_verified_chain(src: str):
-    body = _function_body(src, "load_market")
-    if body is None:
+    """Trả về dấu hiệu gọi hàm verified; không bao giờ tự cấp PASS từ dấu hiệu này."""
+    fn = _function_ast(src, "load_market")
+    if fn is None:
         return None
-    return "verified_adjust" in body or "verified_factors" in body
+    return any(isinstance(n, ast.Call) and (
+        (isinstance(n.func, ast.Name) and n.func.id in ("verified_adjust", "verified_factors"))
+        or (isinstance(n.func, ast.Attribute)
+            and n.func.attr in ("verified_adjust", "verified_factors"))
+    ) for n in ast.walk(fn))
 
 
 def check_engine_mode(root, cfg):
     data_py = root / "engine" / "data.py"
     if not data_py.is_file():
-        return finding("ENGINE_UNIVERSE_MODE", "UNKNOWN", "Không có engine/data.py để xem cách chọn universe.")
-    src = data_py.read_text(encoding="utf-8")
+        return finding("ENGINE_UNIVERSE_MODE", "UNKNOWN", "Không có engine/data.py để kiểm tra.")
     basis = (cfg or {}).get("universe_basis")
-    uses_history_file = "vn30_history" in src
-    ingest = _function_body(src, "ingest") or ""
-    uses_config_list = 'CFG["universe"]' in ingest or "CFG['universe']" in ingest
-    if basis == "HISTORICAL" and uses_history_file:
-        return finding(
-            "ENGINE_UNIVERSE_MODE", "PASS",
-            "Config khai HISTORICAL và data.py có nhắc tệp lịch sử thành phần.",
-            universe_basis=basis)
-    if basis == "CURRENT" or (basis is None and uses_config_list and not uses_history_file):
-        return finding(
-            "ENGINE_UNIVERSE_MODE", "FAIL",
-            "Engine không chọn thành phần theo từng ngày. Ingest đi theo danh sách cố định trong config; "
-            "load_market không đọc data/vn30_history.csv. universe_basis CURRENT gắn nhãn thiên lệch sống sót (ADR-0008).",
-            universe_basis=basis, ingest_uses_config_universe=uses_config_list,
-            data_py_mentions_vn30_history=uses_history_file)
-    return finding(
-        "ENGINE_UNIVERSE_MODE", "INCONCLUSIVE",
-        "Không đủ dấu hiệu để kết luận engine đang chọn rổ theo ngày hay theo danh sách cố định.",
-        universe_basis=basis, data_py_mentions_vn30_history=uses_history_file)
-
+    fn = _function_ast(data_py.read_text(encoding="utf-8"), "load_market")
+    if basis == "CURRENT":
+        return finding("ENGINE_UNIVERSE_MODE", "FAIL",
+                       "Cấu hình khai CURRENT: không thể chứng nhận chọn universe theo từng ngày.",
+                       universe_basis=basis)
+    if fn is None:
+        return finding("ENGINE_UNIVERSE_MODE", "INCONCLUSIVE",
+                       "Không phân tích được hàm load_market; không được tự chứng nhận HISTORICAL.",
+                       universe_basis=basis)
+    if basis == "HISTORICAL":
+        return finding("ENGINE_UNIVERSE_MODE", "INCONCLUSIVE",
+                       "HISTORICAL là một khai báo, không chứng minh engine dùng đúng tập thành viên "
+                       "từng phiên. Cần kiểm thử hành vi replay với ngày vào/ra và thiếu nguồn.",
+                       universe_basis=basis, behavioral_membership_test_verified=False)
+    return finding("ENGINE_UNIVERSE_MODE", "INCONCLUSIVE",
+                   "Không có bằng chứng hành vi chọn universe theo ngày.", universe_basis=basis)
 
 def check_config_vs_basket(cfg, states):
     if not states:
@@ -354,11 +417,10 @@ def check_config_vs_basket(cfg, states):
 
 
 def _price_tickers(root: Path):
-    """Tập mã và khoảng ngày trong kho giá. Không ghi."""
-    tickers = set()
+    """Tập mã, các ngày thực có giá và khoảng ngày của kho (chỉ đọc)."""
+    tickers, dates_by_ticker, market_dates = set(), {}, set()
     first = last = None
-    rows = 0
-    paths = []
+    rows, paths = 0, []
     legacy = root / "data" / "store" / "prices.csv.gz"
     monthly = root / "data" / "store" / "prices"
     candidates = []
@@ -380,10 +442,13 @@ def _price_tickers(root: Path):
                 continue
             tickers.add(ticker)
             rows += 1
-            if date and (first is None or date < first):
-                first = date
-            if date and (last is None or date > last):
-                last = date
+            if date:
+                dates_by_ticker.setdefault(ticker, set()).add(date)
+                market_dates.add(date)
+                if first is None or date < first:
+                    first = date
+                if last is None or date > last:
+                    last = date
 
     for path in candidates:
         paths.append(str(path.relative_to(root)))
@@ -393,39 +458,69 @@ def _price_tickers(root: Path):
         else:
             with path.open(encoding="utf-8", newline="") as f:
                 consume(f)
-    return {"tickers": tickers, "first": first, "last": last, "rows": rows, "paths": paths}
+    return {"tickers": tickers, "dates_by_ticker": dates_by_ticker, "market_dates": market_dates,
+            "first": first, "last": last, "rows": rows, "paths": paths}
 
 
-def check_prices(root, states):
-    info = _price_tickers(root)
+def check_ticker_presence(info, states):
     if info is None:
-        return finding("PRICE_COVERAGE", "UNKNOWN", "Không thấy kho giá data/store.")
+        return finding("TICKER_PRESENCE", "UNKNOWN", "Không thấy kho giá data/store.")
     if not states:
-        return finding(
-            "PRICE_COVERAGE", "INCONCLUSIVE",
-            "Có kho giá nhưng chưa có rổ lịch sử để biết mã nào phải có dữ liệu.",
-            price_tickers=sorted(info["tickers"]), first=info["first"], last=info["last"], rows=info["rows"])
-    needed = set()
-    for _, members in states:
-        needed |= members
+        return finding("TICKER_PRESENCE", "INCONCLUSIVE",
+                       "Có kho giá nhưng thiếu rổ lịch sử để kiểm tra đủ mã.")
+    needed = set().union(*(members for _, members in states))
     missing = sorted(needed - info["tickers"])
     extra = sorted(info["tickers"] - needed)
-    evidence = {"price_first": info["first"], "price_last": info["last"], "price_rows": info["rows"],
-                "price_tickers": sorted(info["tickers"]), "members_ever_in_csv": sorted(needed),
-                "members_without_any_price_row": missing, "priced_but_never_in_pinned_baskets": extra,
-                "paths": info["paths"]}
+    details = {"price_first": info["first"], "price_last": info["last"],
+               "price_rows": info["rows"], "price_tickers": sorted(info["tickers"]),
+               "members_ever_in_csv": sorted(needed), "members_without_any_price_row": missing,
+               "priced_but_never_in_pinned_baskets": extra, "paths": info["paths"]}
     if missing:
-        return finding(
-            "PRICE_COVERAGE", "FAIL",
-            "Có mã đã nằm trong rổ VN30 được ghim nhưng kho giá không có dòng nào của mã đó. "
-            "Không suy giá từ mã khác.",
-            **evidence)
-    return finding(
-        "PRICE_COVERAGE", "PASS",
-        "Mọi mã từng xuất hiện trong CSV thành phần đều có ít nhất một dòng giá. "
-        "Chưa chứng minh chuỗi giá là đúng thời điểm hay đã xác minh sự kiện quyền.",
-        **evidence)
+        return finding("TICKER_PRESENCE", "FAIL",
+                       "Có mã từng nằm trong rổ ghim nhưng không có dòng giá.", **details)
+    return finding("TICKER_PRESENCE", "PASS",
+                   "Mỗi mã trong rổ đã ghim có ít nhất một dòng. KHÔNG chứng nhận đủ chuỗi giá.",
+                   **details)
 
+
+def check_price_window_coverage(info, states, cfg):
+    """Độ phủ theo PHIÊN. Không có lịch phiên chính thức/vintage thì không thể PASS."""
+    if info is None:
+        return finding("PRICE_WINDOW_COVERAGE", "UNKNOWN", "Không thấy kho giá.")
+    if not states:
+        return finding("PRICE_WINDOW_COVERAGE", "INCONCLUSIVE",
+                       "Chưa có thành phần lịch sử để ghép với chuỗi giá từng phiên.")
+    horizon = int((cfg or {}).get("horizon_days") or 20)
+    lookback = int(((cfg or {}).get("quality") or {}).get("feature_lookback") or 0)
+    required = max(2, horizon + 1, lookback + 1)
+    needed = set().union(*(m for _, m in states))
+    absent = sorted(needed - info["tickers"])
+    short = [{"ticker": t, "distinct_sessions": len(info["dates_by_ticker"].get(t, set()))}
+             for t in sorted(needed)
+             if len(info["dates_by_ticker"].get(t, set())) < required]
+    # Các ngày được suy từ GIÁ ĐÃ CÓ, không phải lịch giao dịch chính thức.
+    market_days = sorted(info["market_dates"])
+    missing_by_period = []
+    for k, (effective, members) in enumerate(states):
+        end = states[k + 1][0] if k + 1 < len(states) else None
+        dates = [d for d in market_days if d >= effective and (end is None or d < end)]
+        for ticker in sorted(members):
+            gaps = [d for d in dates if d not in info["dates_by_ticker"].get(ticker, set())]
+            if gaps and len(missing_by_period) < 40:
+                missing_by_period.append({"ticker": ticker, "effective_date": effective,
+                                          "missing_session_count": len(gaps), "examples": gaps[:3]})
+    details = {"horizon_days": horizon, "feature_lookback": lookback,
+               "min_distinct_sessions_for_individual_ticker": required,
+               "missing_tickers": absent, "short_series": short[:40],
+               "missing_dates_on_observed_market_calendar": missing_by_period,
+               "official_exchange_calendar_verified": False}
+    if absent or short or missing_by_period:
+        return finding("PRICE_WINDOW_COVERAGE", "FAIL",
+                       "Thiếu mã, chuỗi quá ngắn hoặc thiếu ngày giá trong phiên có dữ liệu cho mã khác. "
+                       "Chưa xét liệu lịch phiên suy từ kho có đầy đủ hay không.", **details)
+    return finding("PRICE_WINDOW_COVERAGE", "INCONCLUSIVE",
+                   "Các mã có đủ số phiên tối thiểu trong kho quan sát, nhưng chưa có lịch phiên "
+                   "chính thức và dữ liệu giá/vintage được xác minh để kết luận độ phủ PIT.", **details)
 
 def _manual_events(root: Path):
     path = root / "data" / "corporate_actions.csv"
@@ -491,39 +586,35 @@ def check_corporate_actions(root):
 
 
 def check_unverified_chain(root, ca_finding):
-    adjust = root / "engine" / "adjust.py"
-    data_py = root / "engine" / "data.py"
-    if not adjust.is_file() or not data_py.is_file():
-        return finding(
-            "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "UNKNOWN",
-            "Thiếu engine/adjust.py hoặc engine/data.py nên không biết sự kiện chưa xác minh có đi vào giá nghiên cứu không.")
-    adjust_src = adjust.read_text(encoding="utf-8")
-    data_src = data_py.read_text(encoding="utf-8")
-    gated = research_chain_requires_verified_status(adjust_src)
-    verified_path = load_market_uses_verified_chain(data_src)
+    adjust_path, data_path = root / "engine" / "adjust.py", root / "engine" / "data.py"
+    if not adjust_path.is_file() or not data_path.is_file():
+        return finding("UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "UNKNOWN",
+                       "Thiếu engine/adjust.py hoặc engine/data.py.")
+    adjust_src = adjust_path.read_text(encoding="utf-8")
+    data_src = data_path.read_text(encoding="utf-8")
+    build_fn = _function_ast(adjust_src, "build_events")
+    market_fn = _function_ast(data_src, "load_market")
+    if build_fn is None or market_fn is None:
+        return finding("UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "INCONCLUSIVE",
+                       "Không thể đọc AST hàm build_events/load_market; không tự xác nhận cổng.")
+    call = _calls_adjust_build_events(market_fn)
+    mention = research_chain_requires_verified_status(adjust_src)
+    verified_hint = load_market_uses_verified_chain(data_src)
     unverified_rows = (ca_finding.get("evidence") or {}).get("unverified") or []
-    if gated is None or verified_path is None:
-        return finding(
-            "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "INCONCLUSIVE",
-            "Không tách được hàm build_events hoặc load_market để xét cổng xác minh.")
-    if verified_path or gated:
-        return finding(
-            "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "PASS",
-            "Đường giá nghiên cứu đọc được có cổng source_status hoặc đi qua chuỗi verified.",
-            build_events_mentions_source_status=gated, load_market_uses_verified_chain=verified_path)
-    if unverified_rows or ca_finding["status"] == "FAIL":
-        return finding(
-            "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "FAIL",
-            "load_market gọi adjust.build_events. Hàm đó không đọc source_status trước khi có thể gán APPLIED. "
-            "Sự kiện CAN_DOI_CHIEU vẫn có thể vào giá điều chỉnh dùng cho nghiên cứu nếu tỷ lệ khớp bước giá. "
-            "PIT-001 không sửa engine/adjust.py.",
-            build_events_mentions_source_status=False, load_market_uses_verified_chain=False,
-            unverified_manual_rows=len(unverified_rows))
-    return finding(
-        "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "INCONCLUSIVE",
-        "Đường adjust không xét source_status, nhưng không thấy dòng nhập tay chưa xác minh trong CSV của cây này.",
-        build_events_mentions_source_status=False, load_market_uses_verified_chain=False)
-
+    details = {"load_market_calls_adjust_build_events": call,
+               "build_events_ast_mentions_source_status": mention,
+               "load_market_ast_mentions_verified_function": verified_hint,
+               "unverified_manual_rows": len(unverified_rows),
+               "behavioral_proof_verified_gate": False}
+    if call and not mention and unverified_rows:
+        return finding("UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "FAIL",
+                       "Có sự kiện chưa xác minh, load_market gọi build_events, "
+                       "nhưng hàm build_events không đọc source_status. "
+                       "Không được cho vào verified-adjusted khi chưa có cổng hành vi.", **details)
+    return finding("UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN", "INCONCLUSIVE",
+                   "Phân tích AST chỉ là dấu hiệu cú pháp; ngay cả khi source_status/verified_factors "
+                   "xuất hiện trong mã, vẫn cần thử hành vi loại CAN_DOI_CHIEU trước khi cấp PASS.",
+                   **details)
 
 def _pdf_pages_text(path: Path):
     try:
@@ -667,7 +758,7 @@ def check_2510691_effective_date(root, docs, content_finding):
     if news and (root / news.get("path", "")).is_file():
         raw = (root / news["path"]).read_text(encoding="utf-8")
         token = _dmy(news["effective_date"]) if news.get("effective_date") else ""
-        news_has_date = bool(token and token in raw)
+        news_has_date = bool(token and _news_effective_statement(raw, news["effective_date"]))
         try:
             news_title = (_load_json(root / news["path"]).get("data") or {}).get("title")
         except json.JSONDecodeError:
@@ -700,10 +791,24 @@ def check_2510691_effective_date(root, docs, content_finding):
         other_index_headings=other)
 
 
+def _news_effective_statement(raw: str, effective_date: str):
+    """Chỉ đọc lời công bố trong summary, không tìm ngày ở metadata/comment ngoài."""
+    try:
+        payload = json.loads(raw)
+    except json.JSONDecodeError:
+        return False
+    data = payload.get("data")
+    if not isinstance(data, dict) or not isinstance(data.get("summary"), str):
+        return False
+    summary = re.sub(r"<[^>]+>", " ", data["summary"])
+    summary = summary.replace("&nbsp;", " ")
+    token = _dmy(effective_date)
+    return token in summary and "hiệu lực" in summary.lower()
+
+
 def check_news_effective_dates(root, docs):
-    """Ngày hiệu lực phải xuất hiện trong chữ tin đã ghim. Không lấy ngày từ tên tệp PDF."""
     if not docs:
-        return finding("NEWS_EFFECTIVE_DATE_TEXT", "UNKNOWN", "Không có manifest để đọc tin.")
+        return finding("NEWS_EFFECTIVE_DATE_TEXT", "UNKNOWN", "Không có manifest.")
     checked = []
     for doc in docs:
         rel = doc.get("path") or ""
@@ -715,25 +820,23 @@ def check_news_effective_dates(root, docs):
         if not effective or not path.is_file():
             row["status"] = "UNKNOWN"
         else:
-            raw = path.read_text(encoding="utf-8")
-            token = _dmy(effective)
-            row["token"] = token
-            row["present"] = token in raw
-            row["status"] = "PASS" if token in raw else "FAIL"
+            present = _news_effective_statement(path.read_text(encoding="utf-8"), effective)
+            row["token"] = _dmy(effective)
+            row["present_in_announcement_summary"] = present
+            row["status"] = "PASS" if present else "FAIL"
         checked.append(row)
     if not checked:
-        return finding("NEWS_EFFECTIVE_DATE_TEXT", "UNKNOWN", "Manifest không có tệp tin JSON.")
+        return finding("NEWS_EFFECTIVE_DATE_TEXT", "UNKNOWN", "Manifest không có JSON tin.")
     if any(row["status"] == "FAIL" for row in checked):
-        status = "FAIL"
-        summary = "Có tin đã ghim không chứa ngày hiệu lực dạng DD/MM/YYYY mà manifest gán cho nó."
-    elif any(row["status"] == "UNKNOWN" for row in checked):
-        status = "UNKNOWN"
-        summary = "Có tin JSON thiếu ngày hoặc không đọc được."
-    else:
-        status = "PASS"
-        summary = "Mỗi tin JSON đã ghim chứa đúng chuỗi ngày hiệu lực mà manifest ghi. PDF có thể không in lại ngày này."
-    return finding("NEWS_EFFECTIVE_DATE_TEXT", status, summary, documents=checked)
-
+        return finding("NEWS_EFFECTIVE_DATE_TEXT", "FAIL",
+                       "Có bản tin không chứng minh ngày hiệu lực trong lời công bố (summary).",
+                       documents=checked)
+    if any(row["status"] == "UNKNOWN" for row in checked):
+        return finding("NEWS_EFFECTIVE_DATE_TEXT", "UNKNOWN",
+                       "Có tin thiếu ngày hoặc không mở được.", documents=checked)
+    return finding("NEWS_EFFECTIVE_DATE_TEXT", "PASS",
+                   "Các bản tin đã ghim có ngày hiệu lực trong phần summary, không chỉ metadata.",
+                   documents=checked)
 
 def check_microstructure(root, cfg):
     costs = (cfg or {}).get("costs") or {}
@@ -756,37 +859,43 @@ def _status_map(findings):
 
 
 def conclude(findings):
+    """Cổng fail-closed: thiếu bất kỳ kiểm tra bắt buộc nào => không READY."""
     st = _status_map(findings)
     critical = (
-        "PROVENANCE_HASH", "UNIVERSE_COVERAGE", "ENGINE_UNIVERSE_MODE",
-        "CONFIG_VS_EVIDENCED_BASKET", "PRICE_COVERAGE", "CORPORATE_ACTION_VERIFICATION",
-        "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN",
+        "PROVENANCE_HASH", "PUBLICATION_BEFORE_USE", "DECISION_TIME_OF_KNOWLEDGE",
+        "CSV_INTERNAL", "ADR0008_SCHEMA", "UNIVERSE_COVERAGE",
+        "MEMBERSHIP_BEFORE_FIRST_EVIDENCE", "CONTINUITY_BETWEEN_REVIEWS",
+        "ENGINE_UNIVERSE_MODE", "CONFIG_VS_EVIDENCED_BASKET",
+        "TICKER_PRESENCE", "PRICE_WINDOW_COVERAGE",
+        "CORPORATE_ACTION_VERIFICATION", "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN",
+        "PDF_VN30_CONTENT", "HOSE_2510691_SCOPE", "NEWS_EFFECTIVE_DATE_TEXT",
+        "MARKET_MICROSTRUCTURE_ASSUMPTIONS",
     )
-    if any(st.get(i) == "FAIL" for i in critical) or st.get("PDF_VN30_CONTENT") == "FAIL" or st.get("HOSE_2510691_SCOPE") == "FAIL":
-        conclusion = "NOT_READY"
-        reason = "Có lỗi đã xác nhận ở hash, độ phủ rổ, cách engine chọn mã, giá, hoặc sự kiện quyền chưa xác minh."
-    elif any(st.get(i) in ("UNKNOWN", "INCONCLUSIVE", None) for i in critical):
-        conclusion = "INCONCLUSIVE"
-        reason = "Chưa có lỗi khẳng định trên các hạng mục chặn, nhưng còn hạng mục chưa đủ chứng cứ."
-    elif all(st.get(i) == "PASS" for i in critical):
-        conclusion = "READY"
-        reason = "Các hạng mục chặn đều PASS trên cây được chỉ định. Vẫn không phải tuyên bố alpha."
-    else:
-        conclusion = "INCONCLUSIVE"
-        reason = "Không gom được trạng thái các hạng mục chặn."
-    return conclusion, reason
-
+    blocked = {k: st.get(k) for k in critical if st.get(k) == "FAIL"}
+    unknown = {k: st.get(k) for k in critical
+               if st.get(k) in ("INCONCLUSIVE", "UNKNOWN", None)}
+    invalid = {k: st.get(k) for k in critical if st.get(k) not in (
+        "PASS", "FAIL", "INCONCLUSIVE", "UNKNOWN")}
+    if blocked or invalid:
+        return "NOT_READY", ("Kiểm tra bắt buộc FAIL/không hợp lệ: "
+                             + ", ".join(sorted(set(blocked) | set(invalid))))
+    if unknown:
+        return "INCONCLUSIVE", ("Chưa đủ chứng cứ để cấp READY: "
+                                + ", ".join(sorted(unknown)))
+    return "READY", "Tất cả kiểm tra bắt buộc đều PASS; không phải xác nhận alpha."
 
 def audit(root) -> dict:
-    """Đọc cây root. Không mở tệp để ghi."""
+    """Đọc cây root; không mở tệp để ghi hay nâng chứng cứ."""
     root = Path(root)
     cfg = _load_config(root)
     docs, _ = load_manifest_docs(root)
     rows, _ = load_vn30_rows(root)
     csv_finding, states = check_csv(rows)
+    price_info = _price_tickers(root)
     findings = [
         check_provenance(root, docs),
         check_publication_order(docs),
+        check_decision_cutoff(docs, cfg),
         csv_finding,
         check_adr_schema(rows),
         check_coverage(cfg, states),
@@ -794,7 +903,8 @@ def audit(root) -> dict:
         check_continuity(docs, states),
         check_engine_mode(root, cfg),
         check_config_vs_basket(cfg, states),
-        check_prices(root, states),
+        check_ticker_presence(price_info, states),
+        check_price_window_coverage(price_info, states, cfg),
         check_corporate_actions(root),
     ]
     findings.append(check_unverified_chain(root, findings[-1]))
@@ -815,11 +925,10 @@ def audit(root) -> dict:
         "first_pinned_membership_date": first,
         "eligible_window": None if conclusion != "READY" else {
             "from": ((cfg or {}).get("data") or {}).get("start"),
-            "note": "Chỉ cây fixture/cây đã PASS mọi hạng mục chặn. Không áp vào main khi conclusion khác READY.",
+            "note": "Kiểm tra trên cây chỉ định; không phải bằng chứng alpha.",
         },
         "findings": findings,
     }
-
 
 def main(argv=None) -> int:
     import argparse, sys
