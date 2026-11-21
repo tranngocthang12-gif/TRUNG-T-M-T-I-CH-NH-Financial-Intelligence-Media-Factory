@@ -191,7 +191,7 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
             self.assertLess(doc["signed_date"], doc["official_ex_date"], doc["source_id"])
             self.assertRegex(doc["official_ex_date"], r"^\d{4}-\d{2}-\d{2}$")
             self.assertIsInstance(doc["official_ratio"], (int, float))
-            self.assertIsNone(doc["published_at"])
+            self.assertEqual(publication_errors([doc]), [], doc["source_id"])
             self.assertIsNone(doc["event_type"])
 
     def test_published_at_is_unverified_and_not_the_signed_date(self):
@@ -203,11 +203,12 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
         self.assertTrue(any("nhập ngày ký thay ngày công bố" in err for err in signed_errors))
         other_day = [dict(doc) for doc in docs]
         other_day[0]["published_at"] = "2020-01-01"
+        other_day[0]["publication_evidence"] = None  # một ngày không kèm metadata đã ghim, dù bản gốc có hay chưa có
         other_errors = publication_errors(other_day)
         self.assertTrue(any("không có metadata chính thức đã ghim" in err for err in other_errors))
         vpb = next(doc for doc in docs if doc["source_id"] == "hose-2497757")
         self.assertEqual(vpb["signed_date"], "2026-09-16")
-        self.assertIsNone(vpb["published_at"])
+        self.assertEqual(publication_errors([vpb]), [])
         self.assertIn("2026-09-16", vpb["published_at_note"])
         self.assertIn("2026-09-17", vpb["published_at_note"])
         self.assertIn("Không chọn", vpb["published_at_note"])
@@ -240,12 +241,15 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
             self.assertIsNotNone(info, key)
             line = next(row for row in text.splitlines() if f"{key[0]} {key[1]}" in row)
             self.assertIn(doc["source_id"], line)
-            self.assertIn("CHƯA XÁC MINH", line)
+            if doc["published_at"] is None:
+                self.assertIn("CHƯA XÁC MINH", line)
+                self.assertNotIn("DA_KIEM_CHUNG", line)
+            else:
+                self.assertIn(doc["published_at"], line)
             self.assertIn(info["trade_date"], line)
             self.assertIn(f"lệch {info['offset']}", line)
             self.assertIn(ratio_cell(doc["official_ratio"], info["ratio"]), line)
             self.assertIn(info["status"], line)
-            self.assertNotIn("DA_KIEM_CHUNG", line)
             self.assertIn(doc["source_id"], ids)
 
     def test_pdf_and_matching_numbers_do_not_enter_verified_chain(self):
