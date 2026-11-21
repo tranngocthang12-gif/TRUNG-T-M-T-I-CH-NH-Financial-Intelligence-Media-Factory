@@ -10,6 +10,9 @@ không đăng ký lần thử (L-06 không áp vì không có giả thuyết đ�
      kiện tay chưa đối chiếu, P1b bỏ mọi sự kiện chưa DA_KIEM_CHUNG, P2 dời ngày sang ngày HOSE, P3 chuỗi kiểm chứng + nhiễm ô);
      và độ nhạy khi tỷ lệ VCB sai trong biên.
   4. calendar: các ngày mà MỌI dòng có khối lượng 0 (giá thường giữ nguyên) — dòng của nguồn vào ngày không giao dịch.
+"Phiên suy từ dữ liệu" (khóa JSON `sessions_inferred_from_data`, `*_inferred_sessions*`) là số ngày trên trục ngày của panel
+SAU KHI bỏ các ngày mọi mã có dòng đều có khối lượng 0. Đó là số suy từ dữ liệu nguồn, KHÔNG phải lịch giao dịch HOSE (lịch
+gốc chưa ghim trong kho); ngày nghỉ mà nguồn không có dòng, hay ngày giao dịch mà nguồn mất dữ liệu, đều không được nhận ra.
 Dùng: python tools/price_integrity_b1.py [--as-of YYYY-MM-DD]"""
 from __future__ import annotations
 
@@ -31,7 +34,9 @@ MANIFESTS = ["data/evidence/corporate_actions/EVIDENCE_MANIFEST.json",
              "data/evidence/corporate_actions/EVIDENCE_MANIFEST_2026H2.json"]
 WINDOWS = [("TCB", 2.0, "2024-06-11", "2024-06-20"), ("VCB", 1.495, "2025-03-03", "2025-03-12")]
 # Cửa sổ lợi suất qua sự kiện dùng để so các phương án. Độ dài là số bước giữa hai ngày trên trục ngày của panel; công cụ
-# in ra số đó cùng số phiên có giao dịch (bỏ ngày mọi dòng khối lượng 0), không gọi chung là "20 phiên".
+# in ra số đó cùng số phiên suy từ dữ liệu (bỏ ngày mọi mã khối lượng 0; không phải lịch HOSE), không gọi chung là "20 phiên".
+SESSION_DEFINITION = ("Phiên suy từ dữ liệu: ngày trên trục ngày của panel, bỏ ngày mà mọi mã có dòng đều có khối lượng 0. "
+                      "Số suy từ dữ liệu nguồn, KHÔNG phải lịch giao dịch HOSE (lịch gốc chưa ghim trong kho).")
 RETURN_WINDOWS = [("TCB", "2024-06-04", "2024-06-26"), ("VCB", "2025-02-25", "2025-03-17")]
 
 
@@ -42,7 +47,7 @@ def _all_zero_volume_days(raw, vol):
 
 
 def window_len(index, a, b, skip=()):
-    """(số bước trên trục ngày, số phiên có giao dịch) từ ngày a tới ngày b, không tính a."""
+    """(số bước trên trục ngày, số phiên suy từ dữ liệu — không phải lịch HOSE) từ ngày a tới ngày b, không tính a."""
     a, b = pd.Timestamp(a), pd.Timestamp(b)
     days = index[(index > a) & (index <= b)]
     return int(len(days)), int(sum(d not in skip for d in days))
@@ -131,7 +136,7 @@ def _summary(name, ev, adj, flags, ds, base=None, chain_events=None, skip=()):
     r["returns_across_event"] = []
     for t, a, b in RETURN_WINDOWS:
         steps, real = window_len(adj.index, a, b, skip)
-        r["returns_across_event"].append({"ticker": t, "from": a, "to": b, "panel_steps": steps, "trading_sessions": real,
+        r["returns_across_event"].append({"ticker": t, "from": a, "to": b, "panel_steps": steps, "sessions_inferred_from_data": real,
                                           "return": round(float(adj.at[pd.Timestamp(b), t] / adj.at[pd.Timestamp(a), t] - 1), 4)})
     if base is not None:
         both = base["y"].notna() & lab.notna()
@@ -176,7 +181,7 @@ def policies(raw, vol, obs, as_of):
     out.append(s3)
     steps, real = window_len(raw.index, "2025-02-25", "2025-03-17", skip)
     sens = {"window": {"ticker": "VCB", "from": "2025-02-25", "to": "2025-03-17", "panel_steps": steps,
-                       "trading_sessions": real}, "rows": []}
+                       "sessions_inferred_from_data": real}, "rows": []}
     for rr in (1.40, 1.45, 1.495, 1.54, 1.60):
         mm = man.copy()
         mm.loc[mm.ticker == "VCB", "ratio"] = rr
@@ -194,15 +199,15 @@ def calendar(raw, vol):
     zero = (vol == 0) & present
     days = _all_zero_volume_days(raw, vol)
     same = (raw == raw.ffill().shift(1)) & present
-    # Nhãn tại t đo lợi suất từ đóng cửa t+1 tới t+1+h (features.labels_wide): h bước trên trục ngày. Đếm số bước là phiên có
-    # giao dịch, để thấy nhãn "h phiên" thực ra dài bao nhiêu phiên khi trục ngày chứa ngày mọi dòng khối lượng 0.
+    # Nhãn tại t đo lợi suất từ đóng cửa t+1 tới t+1+h (features.labels_wide): h bước trên trục ngày. Đếm số bước là phiên suy
+    # từ dữ liệu (SESSION_DEFINITION; không phải lịch HOSE), để thấy nhãn "h phiên" dài bao nhiêu phiên như vậy.
     h = int(CFG["horizon_days"])
-    real = (~raw.index.isin(days)).astype(int)
-    steps = pd.Series(real, index=raw.index).rolling(h).sum().shift(-(1 + h)).dropna().astype(int)
+    inferred = (~raw.index.isin(days)).astype(int)
+    steps = pd.Series(inferred, index=raw.index).rolling(h).sum().shift(-(1 + h)).dropna().astype(int)
     short = steps[steps < h]
-    label_windows = {"horizon_steps": h, "windows": int(len(steps)), "windows_with_fewer_real_sessions": int(len(short)),
-                     "min_real_sessions": int(steps.min()) if len(steps) else None,
-                     "real_sessions_distribution_when_short": {str(k): int(v) for k, v in short.value_counts().sort_index().items()}}
+    label_windows = {"horizon_steps": h, "windows": int(len(steps)), "windows_with_fewer_inferred_sessions": int(len(short)),
+                     "min_inferred_sessions": int(steps.min()) if len(steps) else None,
+                     "inferred_sessions_distribution_when_short": {str(k): int(v) for k, v in short.value_counts().sort_index().items()}}
     return {"sessions_in_store": int(len(raw)), "all_zero_volume_days": len(days), "label_windows": label_windows,
             "all_zero_volume_days_with_unchanged_close": int(sum(bool(same.loc[d][present.loc[d]].all()) for d in days)),
             "by_year": {str(k): int(v) for k, v in pd.Series([d.year for d in days]).value_counts().sort_index().items()},
@@ -220,6 +225,7 @@ def main() -> int:
     pol, sens = policies(raw, vol, obs, as_of)
     rels = [CFG["data"]["store"], CFG["corporate_actions"]["manual"], CFG["corporate_actions"]["yahoo_cache"], *MANIFESTS]
     out = {"tool": "tools/price_integrity_b1.py", "as_of": str(as_of.date()), "panel_sessions_x_tickers": list(raw.shape),
+           "session_definition": SESSION_DEFINITION,
            "inputs_sha256": {r: _sha(r) for r in rels},
            "note": "Chỉ đọc. data/derived/yahoo_actions.csv được tải lại mỗi vòng học; số đo P0-P3 phụ thuộc bản tại sha256 trên.",
            "partial_window_candidates": hits, "tick_lot_grid": grid, "policies": pol, "vcb_ratio_sensitivity": sens,

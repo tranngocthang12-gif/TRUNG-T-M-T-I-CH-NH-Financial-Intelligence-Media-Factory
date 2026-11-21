@@ -6,7 +6,7 @@ CHUỖI GIÁ GỐC GÃY trong kho, chưa chắc là ngày giao dịch không hư
 (ví dụ CAN_DOI_CHIEU) chỉ được chép sang kết quả, KHÔNG tham gia quyết định APPLIED. Quyết định APPLIED chỉ dựa vào việc
 biên độ giá sau điều chỉnh nằm trong sàn. Đó là nguyên nhân một sự kiện chưa đối chiếu vẫn thành APPLIED.
 
-Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ vào chuỗi đó khi đủ cả sáu điều kiện:
+Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ vào chuỗi đó khi đủ cả chín điều kiện:
   1. có bản gốc đã ghim trong manifest (source_id, url, issuer, path, sha256 đều là chuỗi không rỗng), tệp tồn tại, đúng
      sha256 và số byte; loại sự kiện in trên văn bản (`event_type`) TRÙNG ĐÚNG loại của sự kiện engine (không coi
      `stock_split` và `stock_dividend` là một);
@@ -29,6 +29,9 @@ Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ v�
      Mơ hồ (cả hai bước giá trong biên) hoặc sai cả hai (cả hai ngoài biên) đều bị cách ly và nhiễm ô.
   8. Với DA_NAM_TRONG_GIA_NGUON: KHÔNG có bước giá gốc ngoài biên nào trong WINDOW_DAYS ngày lịch trước phiên sự kiện; có thì
      CÁCH LY GIA_GAY_TRUOC_NGAY_HUONG_QUYEN (nguồn có thể chỉ điều chỉnh vài phiên liền trước, như TCB/VCB trong kho thật).
+  9. Mọi phiên trên trục ngày của panel (`close.index`) trong [phiên sự kiện − WINDOW_DAYS ngày lịch, phiên sự kiện] đều có
+     giá của mã; thiếu bất kỳ phiên nào thì CÁCH LY THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN. Kiểm TRƯỚC điều kiện 7 và 8: khi thiếu
+     phiên, bước giá đo qua chỗ trống có biên nới theo số phiên (`adjust.bands`), nên một bước gãy có thể lọt qua cả hai.
 Không đạt thì CÁCH LY: không đưa vào hệ số của chuỗi kiểm chứng, và mọi ô giá của mã đó TRƯỚC ngày giao dịch của sự kiện bị
 đánh dấu TAINTED (không bảo đảm so sánh được qua sự kiện). Cổng KHÔNG đổi ngày hộ và KHÔNG suy ngày đúng từ bước nhảy giá.
 Sự kiện tiền mặt chưa có bằng chứng ghim nên chưa được xét; chuỗi kiểm chứng là chuỗi giá gốc cộng các sự kiện cổ phiếu
@@ -61,7 +64,7 @@ STATES = (OK, NA_NODATA, NA_CASH, Q + "THIEU_BANG_CHUNG", Q + "BANG_CHUNG_HONG",
           Q + "CONG_BO_SAU_NGAY_CAT", Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", Q + "TY_LE_LECH", Q + "LECH_NGAY",
           Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE", Q + "LOAI_SU_KIEN_LECH",
           Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC", Q + "GIA_KHONG_CHUNG_MINH_HE_SO",
-          Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN")
+          Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN", Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN")
 # trạng thái engine → giả thuyết giá phải được chứng minh; trạng thái cách ly khi không chứng minh được
 EXPECTED_HYPOTHESIS = {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}
 HYPOTHESIS_FAIL_STATE = {"CAN_HE_SO": Q + "GIA_KHONG_CHUNG_MINH_HE_SO", "DA_DIEU_CHINH": Q + "GIA_CHUA_LIEN_TUC"}
@@ -218,6 +221,9 @@ def _judge(r, d, close, base, as_of):
     if r["status"] not in VERIFIABLE:
         return (Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", f"trạng thái engine {r['status']} không nằm trong danh sách cho phép "
                 f"{', '.join(VERIFIABLE)}", otd, 0.0)
+    gap = _missing_sessions(r, close, td)
+    if gap:
+        return Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN", gap, otd, 0.0
     bad_price = _price_problem(r, close, td)
     if bad_price:
         return bad_price[0], bad_price[1], otd, 0.0
@@ -226,6 +232,18 @@ def _judge(r, d, close, base, as_of):
         if pre:
             return Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN", pre, otd, 0.0
     return OK, "bản gốc ghim hợp lệ, ngày công bố hợp lệ, tỷ lệ và ngày áp dụng khớp", otd, 0.0
+
+
+def _missing_sessions(r, close, td):
+    """Lý do cách ly nếu mã thiếu giá ở một phiên bất kỳ của trục ngày panel trong [td − WINDOW_DAYS ngày lịch, td], hoặc None.
+
+    Trục ngày là `close.index` (mọi ngày có ít nhất một mã có giá). Không lấp chỗ trống, không suy giá; chỉ từ chối chứng nhận."""
+    win = close.index[(close.index >= td - pd.Timedelta(days=WINDOW_DAYS)) & (close.index <= td)]
+    miss = win[close.loc[win, r["ticker"]].isna().to_numpy()]
+    if not len(miss):
+        return None
+    return (f"thiếu giá {len(miss)}/{len(win)} phiên trên trục ngày của panel trong [{win[0].date()}, {td.date()}] "
+            f"(phiên thiếu đầu {miss[0].date()}, cuối {miss[-1].date()}); không đo được bước giá quanh sự kiện")
 
 
 def _pre_event_break(r, close, td):

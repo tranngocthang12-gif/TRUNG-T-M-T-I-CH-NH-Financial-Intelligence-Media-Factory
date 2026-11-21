@@ -215,6 +215,41 @@ def test_b5_real_pair_manual_plus_yahoo_never_enters_verified_chain(tmp_path):
     assert va.taint_mask(close.index, close.columns, v)["AAA"].iloc[:OFF].all()
 
 
+def _gap_verdict(tmp_path, drop):
+    close = _partial()
+    close.iloc[drop, 0] = np.nan                                          # chỉ AAA; các mã khác giữ trục ngày của panel
+    ev = adjust.build_events(close, _obs(close), NONE, _yahoo())
+    return close, ev, va.verify_events(ev, close, [_doc(tmp_path)], evidence_root=tmp_path, as_of=IDX[-1])
+
+
+def test_b6_missing_prices_before_event_hide_partial_window_and_are_quarantined(tmp_path):
+    """Phản biện ChatGPT (PR #71): xóa giá AAA ở 19 phiên trước sự kiện (OFF−20 … OFF−2), giữ phiên liền trước và phiên sự
+    kiện. Bước gãy −50% của cửa sổ chia một phần giờ đo qua chỗ trống 20 phiên, biên nới theo số phiên nên lọt điều kiện 8;
+    giá tại phiên sự kiện liên tục nên lọt điều kiện 7. Không có điều kiện 9 thì sự kiện được chứng nhận."""
+    close, ev, v = _gap_verdict(tmp_path, slice(OFF - 20, OFF - 1))
+    assert close["AAA"].iloc[OFF - 1:OFF + 1].notna().all() and close["AAA"].iloc[OFF - 20:OFF - 1].isna().all()
+    _, K = adjust.obs_returns(close[["AAA"]])
+    up, dn = adjust.bands(0.07, K["AAA"].iloc[OFF - 1])
+    step = close["AAA"].iloc[OFF - 1] / close["AAA"].iloc[OFF - 21] - 1
+    assert -dn <= step <= up and step == pytest.approx(-0.5, abs=0.1)     # tiền đề: bước gãy nằm trong biên nới
+    r = v.iloc[0]
+    assert ev.status.tolist() == ["DA_NAM_TRONG_GIA_NGUON"]
+    assert r.verify_state == va.Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN", r.verify_reason
+    assert "thiếu giá 19/" in r.verify_reason
+    assert not r.in_verified_chain and r.taints
+    assert va.taint_mask(close.index, close.columns, v)["AAA"].iloc[:OFF].all()
+
+
+def test_b7_missing_prices_including_previous_session_are_quarantined(tmp_path):
+    """Xóa cả phiên liền trước (OFF−20 … OFF−1). Không có điều kiện 9 thì lý do sẽ là giả thuyết giá mơ hồ; có điều kiện 9
+    thì chẩn đoán là thiếu giá, và vẫn không vào chuỗi."""
+    close, ev, v = _gap_verdict(tmp_path, slice(OFF - 20, OFF))
+    r = v.iloc[0]
+    assert r.verify_state == va.Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN", r.verify_reason
+    assert "thiếu giá 20/" in r.verify_reason
+    assert not r.in_verified_chain and r.taints
+
+
 # ---------- C. điều kiện PASS của PIT-001 dưới dạng test hành vi (engine chưa đạt) -------------------------------------
 
 def _rows(close, vol=None, observed=OBS):
