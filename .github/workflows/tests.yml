@@ -38,7 +38,7 @@ jobs:
           python tools/pit001_audit.py > /tmp/pit001_a.json
           python tools/pit001_audit.py > /tmp/pit001_b.json
           cmp /tmp/pit001_a.json /tmp/pit001_b.json
-          python -c 'import json; x=json.load(open("/tmp/pit001_a.json")); print("PIT001_JSON="+json.dumps(x, sort_keys=True, ensure_ascii=False, separators=(",",":")))'
+          python -c 'import json; x=json.load(open("/tmp/pit001_a.json")); print("PIT-001:",x["conclusion"],"findings=",len(x["findings"]))'
       - name: Test dang unittest (luat, Ledger, phan dinh, so thu L-06)
         run: python -m pytest -q $(for n in $UNITTEST; do printf "tests/%s.py " "$n"; done)
       - name: Test dang script cu cua engine (moi tep mot tien trinh rieng, khong dung chung TTC_HOME)
