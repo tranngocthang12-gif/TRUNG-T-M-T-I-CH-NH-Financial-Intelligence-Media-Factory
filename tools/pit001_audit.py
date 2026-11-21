@@ -874,7 +874,7 @@ def conclude(findings):
     blocked = {k: st.get(k) for k in critical if st.get(k) == "FAIL"}
     unknown = {k: st.get(k) for k in critical
                if st.get(k) in ("INCONCLUSIVE", "UNKNOWN", None)}
-    invalid = {k: st.get(k) for k in critical if st.get(k) not in (
+    invalid = {k: st.get(k) for k in critical if st.get(k) is not None and st.get(k) not in (
         "PASS", "FAIL", "INCONCLUSIVE", "UNKNOWN")}
     if blocked or invalid:
         return "NOT_READY", ("Kiểm tra bắt buộc FAIL/không hợp lệ: "
