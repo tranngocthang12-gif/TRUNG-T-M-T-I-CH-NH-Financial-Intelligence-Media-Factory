@@ -42,12 +42,12 @@
 ## 3. Thông tin, thời điểm và niêm phong
 
 1. **Gói thông tin:**
-   - Mỗi câu hỏi có một gói tài liệu, gồm danh sách tệp, sha256 và `published_at` ≤ `decision_time`, ghim trước `decision_time`.
+   - Mỗi câu hỏi có một gói tài liệu, gồm danh sách tệp, sha256 và `published_at` < `decision_time` (công bố đúng tại `decision_time` không được dùng), ghim trước `decision_time`.
    - Ba nhánh dùng cùng gói, theo một trong hai chế độ đăng ký trước:
      - "sách đóng": chỉ gói;
      - "sách mở": gói cộng tìm kiếm, và ghi nhật ký truy vấn.
    - Không trộn hai chế độ trong một phép thử.
-2. **`decision_time` cố định theo giờ Việt Nam**, ví dụ 16:30 ngày làm việc. Mọi dự báo nộp sau `decision_time` thì loại.
+2. **`decision_time` cố định theo giờ Việt Nam**, ví dụ 16:30 ngày làm việc. Mọi dự báo nộp từ `decision_time` trở đi (thời điểm nộp ≥ `decision_time`) thì loại.
 3. **Niêm phong kiểu commit–reveal:**
    - Mỗi nhánh nộp `sha256(dự báo ‖ muối)` lên kênh công khai có dấu thời gian của máy chủ (Issue, dấu nhận robot như Ledger) trước `decision_time`.
    - Lộ nội dung sau khi khóa.
@@ -99,7 +99,7 @@
 Quy tắc:
 
 - `decision_time` < `target_end_at` ≤ `label_available_at`.
-- Không đầu vào nào có `published_at` từ `decision_time` trở đi.
+- Không đầu vào nào có `published_at` từ `decision_time` trở đi: đầu vào hợp lệ khi `published_at` < `decision_time`. Đúng tại `decision_time` tính là sau mốc khóa (đóng khi nghi ngờ).
 - Không nhãn nào được tính, xem hay chấm trước `label_available_at`.
 
 - **Track E:**
@@ -134,7 +134,7 @@ Quy tắc:
 | Khoảng tin cậy hiệu Brier (AI − baseline) chứa 0 hoặc nghiêng về baseline | H1 thất bại: NO_EDGE |
 | ECE của AI_ONLY > 0,10 | AI không hiệu chuẩn: H4 thất bại dù Brier tốt |
 | HUMAN_AI không tốt hơn **cả** HUMAN_ONLY lẫn AI_ONLY | Không tuyên bố kết hợp |
-| Dự báo niêm phong sau khóa, sai hash gói, tài liệu `published_at` > `decision_time` | Câu đó VOID, tính bất lợi |
+| Dự báo niêm phong từ lúc khóa trở đi (≥ `decision_time`), sai hash gói, tài liệu `published_at` ≥ `decision_time` | Câu đó VOID, tính bất lợi |
 | VOID > 10% số câu, hoặc một vi phạm quy trình có chủ đích | Hủy phép thử, giữ toàn bộ dữ liệu, báo cáo âm |
 | Track P: tỷ lệ lệnh không khớp > 5% (ngưỡng ADR-0008) | Xét lại mô hình khớp trước mọi kết luận |
 
