@@ -1,0 +1,860 @@
+{
+  "alpha_claim": false,
+  "conclusion": "NOT_READY",
+  "conclusion_reason": "Có lỗi đã xác nhận ở hash, độ phủ rổ, cách engine chọn mã, giá, hoặc sự kiện quyền chưa xác minh.",
+  "eligible_window": null,
+  "findings": [
+    {
+      "evidence": {
+        "matched": [
+          {
+            "bytes": 1045,
+            "path": "data/evidence/vn30_reviews/hose-2388633/news.json",
+            "sha256": "76d1b776e0fc92199cf9249e0cb1a69e5aa9e7d724db15462d75e0f05ff6956a",
+            "source_id": "hose-2388633-news"
+          },
+          {
+            "bytes": 687177,
+            "path": "data/evidence/vn30_reviews/hose-2388633/20250716 CBTT-Danh muc thanh phan HOSE-Index thang 7.2025.pdf",
+            "sha256": "8573aaed26f2f087ac30567b1c943e4112a85f6c3efc6a57faa80b7b3f020eae",
+            "source_id": "hose-2388633"
+          },
+          {
+            "bytes": 1061,
+            "path": "data/evidence/vn30_reviews/hose-2432828/news.json",
+            "sha256": "90e46883d3b0ef72c0ebba8ba0165ba338cea3c7735ed92ad0b9e832c5558ba3",
+            "source_id": "hose-2432828-news"
+          },
+          {
+            "bytes": 710524,
+            "path": "data/evidence/vn30_reviews/hose-2432828/21012026 CBTT Danh sach thanh phan HOSE-Index thang 1.2026 update.pdf",
+            "sha256": "67f0087e74cd21c1f24b364403bf176db8a39732ef65847d56ea85b316fb6f7f",
+            "source_id": "hose-2432828"
+          },
+          {
+            "bytes": 11616,
+            "path": "data/evidence/vn30_reviews/hose-2460387/news.json",
+            "sha256": "d883018f2f93fc26fec2aa70bff8e9e06338c335ae49ba66fda0cdccad796e90",
+            "source_id": "hose-2460387"
+          },
+          {
+            "bytes": 1052,
+            "path": "data/evidence/vn30_reviews/hose-2479382/news.json",
+            "sha256": "cf574c5e63143d5b74bc062f03bbf91ca276164f9c8d7d5e15f4c242f93f675b",
+            "source_id": "hose-2479382-news"
+          },
+          {
+            "bytes": 737357,
+            "path": "data/evidence/vn30_reviews/hose-2479382/15072026 CBTT - Danh muc thanh phan HOSE-Index thang 7.2026.pdf",
+            "sha256": "441799b3afbc4f29f8b53ce6ef3b500b9121a4d032ca4cfeb1d4aa6e14407879",
+            "source_id": "hose-2479382"
+          },
+          {
+            "bytes": 1092,
+            "path": "data/evidence/vn30_reviews/hose-2510691/news.json",
+            "sha256": "fe6d4d88fd6285f799bedd33f9f31535e5d40051cf283790ed05d8d0e6937ed3",
+            "source_id": "hose-2510691-news"
+          },
+          {
+            "bytes": 416988,
+            "path": "data/evidence/vn30_reviews/hose-2510691/II.2. 20261102 QUY MO VNAllshare ky 10.2026.pdf",
+            "sha256": "ca0c5ee6fc20234ea7c0dff93f0b0a5eac4bb16df93f9b36268c0ffadaa567d4",
+            "source_id": "hose-2510691"
+          }
+        ]
+      },
+      "id": "PROVENANCE_HASH",
+      "status": "PASS",
+      "summary": "Mọi tệp kê trong manifest VN30 khớp SHA-256 và số byte. Việc này không xác minh nội dung."
+    },
+    {
+      "evidence": {
+        "checked": 9
+      },
+      "id": "PUBLICATION_BEFORE_USE",
+      "status": "PASS",
+      "summary": "Với mọi tài liệu có đủ hai ngày, ngày công bố theo giờ Việt Nam không sau ngày hiệu lực."
+    },
+    {
+      "evidence": {
+        "states": [
+          {
+            "effective_date": "2025-08-04",
+            "members": [
+              "ACB",
+              "BCM",
+              "BID",
+              "CTG",
+              "DGC",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MSN",
+              "MWG",
+              "PLX",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TPB",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VRE"
+            ]
+          },
+          {
+            "effective_date": "2026-02-02",
+            "members": [
+              "ACB",
+              "BID",
+              "CTG",
+              "DGC",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MSN",
+              "MWG",
+              "PLX",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TPB",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VPL",
+              "VRE"
+            ]
+          },
+          {
+            "effective_date": "2026-05-13",
+            "members": [
+              "ACB",
+              "BID",
+              "BSR",
+              "CTG",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MSN",
+              "MWG",
+              "PLX",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TPB",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VPL",
+              "VRE"
+            ]
+          },
+          {
+            "effective_date": "2026-08-03",
+            "members": [
+              "ACB",
+              "BID",
+              "BSR",
+              "CTG",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MCH",
+              "MSN",
+              "MWG",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TCX",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VPL",
+              "VRE"
+            ]
+          }
+        ]
+      },
+      "id": "CSV_INTERNAL",
+      "status": "PASS",
+      "summary": "CSV dựng lại được các mốc, mỗi mốc đúng 30 mã. Không suy ra thành phần trước mốc đầu tiên."
+    },
+    {
+      "evidence": {
+        "actual_columns": [
+          "effective_date",
+          "ticker",
+          "action",
+          "source_id"
+        ],
+        "adr0008_columns": [
+          "effective_date",
+          "ticker",
+          "change",
+          "source_url",
+          "source_status"
+        ]
+      },
+      "id": "ADR0008_SCHEMA",
+      "status": "FAIL",
+      "summary": "CSV không theo khuôn ADR-0008 (effective_date,ticker,change,source_url,source_status). Không được tự ghi đè CSV trong PIT-001. Khuôn đang khóa bởi test là cột action/source_id."
+    },
+    {
+      "evidence": {
+        "first_evidence_date": "2025-08-04",
+        "research_start": "2016-01-01",
+        "uncovered_until_exclusive": "2025-08-04"
+      },
+      "id": "UNIVERSE_COVERAGE",
+      "status": "FAIL",
+      "summary": "Lịch sử thành phần đã ghim không phủ từ ngày đầu cửa sổ nghiên cứu. Không tự điền các kỳ thiếu."
+    },
+    {
+      "evidence": {
+        "applies": true,
+        "first_evidence_date": "2025-08-04",
+        "research_start": "2016-01-01"
+      },
+      "id": "MEMBERSHIP_BEFORE_FIRST_EVIDENCE",
+      "status": "UNKNOWN",
+      "summary": "Trước ngày hiệu lực của bản gốc đầu tiên, thành phần VN30 là UNKNOWN. Không suy từ rổ hiện tại."
+    },
+    {
+      "evidence": {
+        "gaps": [
+          {
+            "after": "2025-08-04",
+            "before": "2026-02-02",
+            "note": "Không có bản gốc nào khác được ghim trong khoảng mở (after, before). Việc không thấy tệp không chứng minh rổ không đổi."
+          },
+          {
+            "after": "2026-02-02",
+            "before": "2026-05-13",
+            "note": "Không có bản gốc nào khác được ghim trong khoảng mở (after, before). Việc không thấy tệp không chứng minh rổ không đổi."
+          },
+          {
+            "after": "2026-05-13",
+            "before": "2026-08-03",
+            "note": "Không có bản gốc nào khác được ghim trong khoảng mở (after, before). Việc không thấy tệp không chứng minh rổ không đổi."
+          }
+        ],
+        "names_copied_from_other_document": [
+          {
+            "effective_date": "2025-08-04",
+            "names_copied_from": "hose-2388633",
+            "source_id": "hose-2388633-news"
+          },
+          {
+            "effective_date": "2026-02-02",
+            "names_copied_from": "hose-2432828",
+            "source_id": "hose-2432828-news"
+          },
+          {
+            "effective_date": "2026-05-13",
+            "names_copied_from": "hose-2432828",
+            "source_id": "hose-2460387"
+          },
+          {
+            "effective_date": "2026-08-03",
+            "names_copied_from": "hose-2479382",
+            "source_id": "hose-2479382-news"
+          },
+          {
+            "effective_date": "2026-11-16",
+            "names_copied_from": "hose-2510691",
+            "source_id": "hose-2510691-news"
+          }
+        ]
+      },
+      "id": "CONTINUITY_BETWEEN_REVIEWS",
+      "status": "UNKNOWN",
+      "summary": "Khoảng giữa các mốc đã ghim không được coi là đã chứng minh liên tục. Bản tin chép danh sách từ PDF kỳ trước không phải là in lại đủ 30 mã."
+    },
+    {
+      "evidence": {
+        "data_py_mentions_vn30_history": false,
+        "ingest_uses_config_universe": true,
+        "universe_basis": "CURRENT"
+      },
+      "id": "ENGINE_UNIVERSE_MODE",
+      "status": "FAIL",
+      "summary": "Engine không chọn thành phần theo từng ngày. Ingest đi theo danh sách cố định trong config; load_market không đọc data/vn30_history.csv. universe_basis CURRENT gắn nhãn thiên lệch sống sót (ADR-0008)."
+    },
+    {
+      "evidence": {
+        "config_count": 30,
+        "csv_state_as_of": "2026-08-03",
+        "evidence_count": 30,
+        "in_config_not_in_csv_state": [
+          "BCM",
+          "BVH",
+          "PLX",
+          "POW",
+          "TPB"
+        ],
+        "in_csv_state_not_in_config": [
+          "BSR",
+          "LPB",
+          "MCH",
+          "TCX",
+          "VPL"
+        ]
+      },
+      "id": "CONFIG_VS_EVIDENCED_BASKET",
+      "status": "FAIL",
+      "summary": "Danh sách cố định trong config không trùng rổ dựng từ CSV tại mốc cuối. Đây là lệch thành phần, không phải khuyến nghị giao dịch."
+    },
+    {
+      "evidence": {
+        "members_ever_in_csv": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BSR",
+          "CTG",
+          "DGC",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "LPB",
+          "MBB",
+          "MCH",
+          "MSN",
+          "MWG",
+          "PLX",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TCX",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VPL",
+          "VRE"
+        ],
+        "members_without_any_price_row": [
+          "BSR",
+          "DGC",
+          "LPB",
+          "MCH",
+          "TCX",
+          "VPL"
+        ],
+        "paths": [
+          "data/store/prices.csv.gz",
+          "data/store/prices/2026-11.csv"
+        ],
+        "price_first": "2016-01-04",
+        "price_last": "2026-11-20",
+        "price_rows": 73402,
+        "price_tickers": [
+          "ACB",
+          "BCM",
+          "BID",
+          "BVH",
+          "CTG",
+          "FPT",
+          "GAS",
+          "GVR",
+          "HDB",
+          "HPG",
+          "MBB",
+          "MSN",
+          "MWG",
+          "PLX",
+          "POW",
+          "SAB",
+          "SHB",
+          "SSB",
+          "SSI",
+          "STB",
+          "TCB",
+          "TPB",
+          "VCB",
+          "VHM",
+          "VIB",
+          "VIC",
+          "VJC",
+          "VNM",
+          "VPB",
+          "VRE"
+        ],
+        "priced_but_never_in_pinned_baskets": [
+          "BVH",
+          "POW"
+        ]
+      },
+      "id": "PRICE_COVERAGE",
+      "status": "FAIL",
+      "summary": "Có mã đã nằm trong rổ VN30 được ghim nhưng kho giá không có dòng nào của mã đó. Không suy giá từ mã khác."
+    },
+    {
+      "evidence": {
+        "unverified": [
+          {
+            "csv_ex_date": "2024-06-11",
+            "csv_ratio": "2.0",
+            "csv_source_status": "CAN_DOI_CHIEU",
+            "csv_type": "stock_dividend",
+            "dates_match": false,
+            "evidence_source_id": "hose-1705374",
+            "official_ex_date": "2024-06-20",
+            "published_at": null,
+            "published_at_status": "CHUA_XAC_MINH",
+            "ticker": "TCB"
+          },
+          {
+            "csv_ex_date": "2025-03-03",
+            "csv_ratio": "1.495",
+            "csv_source_status": "CAN_DOI_CHIEU",
+            "csv_type": "stock_dividend",
+            "dates_match": false,
+            "evidence_source_id": "hose-1753594",
+            "official_ex_date": "2025-03-12",
+            "published_at": null,
+            "published_at_status": "CHUA_XAC_MINH",
+            "ticker": "VCB"
+          }
+        ]
+      },
+      "id": "CORPORATE_ACTION_VERIFICATION",
+      "status": "FAIL",
+      "summary": "Có sự kiện quyền nhập tay chưa ở trạng thái DA_DOI_CHIEU. Không xác nhận sự kiện từ bước nhảy giá. Ngày trên CSV lệch ngày official_ex_date của bản HOSE đã ghim thì vẫn là chưa xác minh, kể cả khi hash PDF khớp."
+    },
+    {
+      "evidence": {
+        "build_events_mentions_source_status": false,
+        "load_market_uses_verified_chain": false,
+        "unverified_manual_rows": 2
+      },
+      "id": "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN",
+      "status": "FAIL",
+      "summary": "load_market gọi adjust.build_events. Hàm đó không đọc source_status trước khi có thể gán APPLIED. Sự kiện CAN_DOI_CHIEU vẫn có thể vào giá điều chỉnh dùng cho nghiên cứu nếu tỷ lệ khớp bước giá. PIT-001 không sửa engine/adjust.py."
+    },
+    {
+      "evidence": {
+        "documents": [
+          {
+            "content_status": "PASS",
+            "effective_date": "2025-08-04",
+            "expected_count": 30,
+            "other_index_headings": [],
+            "parsed_count": 30,
+            "parsed_tickers": [
+              "ACB",
+              "BCM",
+              "BID",
+              "CTG",
+              "DGC",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MSN",
+              "MWG",
+              "PLX",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TPB",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VRE"
+            ],
+            "path": "data/evidence/vn30_reviews/hose-2388633/20250716 CBTT-Danh muc thanh phan HOSE-Index thang 7.2025.pdf",
+            "pdf_contains_effective_date_dmy": false,
+            "source_id": "hose-2388633",
+            "vn30_heading_pages": [
+              {
+                "heading": "CÔNG BỐ THÔNG TIN DANH MỤC CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VN30",
+                "page": 1
+              }
+            ]
+          },
+          {
+            "content_status": "PASS",
+            "effective_date": "2026-02-02",
+            "expected_count": 30,
+            "other_index_headings": [],
+            "parsed_count": 30,
+            "parsed_tickers": [
+              "ACB",
+              "BID",
+              "CTG",
+              "DGC",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MSN",
+              "MWG",
+              "PLX",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TPB",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VPL",
+              "VRE"
+            ],
+            "path": "data/evidence/vn30_reviews/hose-2432828/21012026 CBTT Danh sach thanh phan HOSE-Index thang 1.2026 update.pdf",
+            "pdf_contains_effective_date_dmy": false,
+            "source_id": "hose-2432828",
+            "vn30_heading_pages": [
+              {
+                "heading": "CÔNG BỐ THÔNG TIN DANH MỤC CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VN30",
+                "page": 1
+              }
+            ]
+          },
+          {
+            "content_status": "PASS",
+            "effective_date": "2026-08-03",
+            "expected_count": 30,
+            "other_index_headings": [],
+            "parsed_count": 30,
+            "parsed_tickers": [
+              "ACB",
+              "BID",
+              "BSR",
+              "CTG",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MCH",
+              "MSN",
+              "MWG",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TCX",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VPL",
+              "VRE"
+            ],
+            "path": "data/evidence/vn30_reviews/hose-2479382/15072026 CBTT - Danh muc thanh phan HOSE-Index thang 7.2026.pdf",
+            "pdf_contains_effective_date_dmy": false,
+            "source_id": "hose-2479382",
+            "vn30_heading_pages": [
+              {
+                "heading": "CÔNG BỐ THÔNG TIN DANH MỤC CỔ PHIẾU THÀNH PHẦN CHỈ SỐ VN30",
+                "page": 1
+              }
+            ]
+          },
+          {
+            "content_status": "PASS",
+            "effective_date": "2026-11-16",
+            "expected_count": 30,
+            "other_index_headings": [
+              {
+                "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VNMIDCAP",
+                "page": 2
+              },
+              {
+                "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CHỈ SỐ VN100",
+                "page": 4
+              },
+              {
+                "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VNSMALLCAP",
+                "page": 6
+              }
+            ],
+            "parsed_count": 30,
+            "parsed_tickers": [
+              "ACB",
+              "BID",
+              "BSR",
+              "CTG",
+              "FPT",
+              "GAS",
+              "GVR",
+              "HDB",
+              "HPG",
+              "LPB",
+              "MBB",
+              "MCH",
+              "MSN",
+              "MWG",
+              "SAB",
+              "SHB",
+              "SSB",
+              "SSI",
+              "STB",
+              "TCB",
+              "TCX",
+              "VCB",
+              "VHM",
+              "VIB",
+              "VIC",
+              "VJC",
+              "VNM",
+              "VPB",
+              "VPL",
+              "VRE"
+            ],
+            "path": "data/evidence/vn30_reviews/hose-2510691/II.2. 20261102 QUY MO VNAllshare ky 10.2026.pdf",
+            "pdf_contains_effective_date_dmy": false,
+            "source_id": "hose-2510691",
+            "vn30_heading_pages": [
+              {
+                "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VN30",
+                "page": 1
+              }
+            ]
+          }
+        ],
+        "hose_2510691": {
+          "content_status": "PASS",
+          "effective_date": "2026-11-16",
+          "expected_count": 30,
+          "other_index_headings": [
+            {
+              "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VNMIDCAP",
+              "page": 2
+            },
+            {
+              "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CHỈ SỐ VN100",
+              "page": 4
+            },
+            {
+              "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VNSMALLCAP",
+              "page": 6
+            }
+          ],
+          "parsed_count": 30,
+          "parsed_tickers": [
+            "ACB",
+            "BID",
+            "BSR",
+            "CTG",
+            "FPT",
+            "GAS",
+            "GVR",
+            "HDB",
+            "HPG",
+            "LPB",
+            "MBB",
+            "MCH",
+            "MSN",
+            "MWG",
+            "SAB",
+            "SHB",
+            "SSB",
+            "SSI",
+            "STB",
+            "TCB",
+            "TCX",
+            "VCB",
+            "VHM",
+            "VIB",
+            "VIC",
+            "VJC",
+            "VNM",
+            "VPB",
+            "VPL",
+            "VRE"
+          ],
+          "path": "data/evidence/vn30_reviews/hose-2510691/II.2. 20261102 QUY MO VNAllshare ky 10.2026.pdf",
+          "pdf_contains_effective_date_dmy": false,
+          "source_id": "hose-2510691",
+          "vn30_heading_pages": [
+            {
+              "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VN30",
+              "page": 1
+            }
+          ]
+        }
+      },
+      "id": "PDF_VN30_CONTENT",
+      "status": "PASS",
+      "summary": "Mỗi PDF đã ghim có mục VN30 và danh sách đọc được trùng members_after. Ngày hiệu lực có thể nằm ở tin, không nằm trong PDF."
+    },
+    {
+      "evidence": {
+        "news_contains_effective_date": true,
+        "news_title": "HOSE: Cập nhật danh mục cổ phiếu thành phần của Chỉ số quy mô VNAllshare  kỳ tháng 10/2026",
+        "other_index_headings": [
+          {
+            "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VNMIDCAP",
+            "page": 2
+          },
+          {
+            "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CHỈ SỐ VN100",
+            "page": 4
+          },
+          {
+            "heading": "CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VNSMALLCAP",
+            "page": 6
+          }
+        ],
+        "pdf_contains_effective_date": false,
+        "pdf_membership_matches": true
+      },
+      "id": "HOSE_2510691_SCOPE",
+      "status": "PASS",
+      "summary": "hose-2510691 là PDF tên VNAllshare kỳ 10/2026 và có mục «CẬP NHẬT THÔNG TIN CỔ PHIẾU THÀNH PHẦN CỦA CHỈ SỐ VN30» in đủ 30 mã, trùng members_after. Ngày hiệu lực 16/11/2026 đọc từ tin HOSE đã ghim, không thấy dạng 16/11/2026 trong chữ PDF. Các mục chỉ số khác trong cùng tệp không phải rổ VN30."
+    },
+    {
+      "evidence": {
+        "documents": [
+          {
+            "effective_date": "2025-08-04",
+            "path": "data/evidence/vn30_reviews/hose-2388633/news.json",
+            "present": true,
+            "source_id": "hose-2388633-news",
+            "status": "PASS",
+            "token": "04/08/2025"
+          },
+          {
+            "effective_date": "2026-02-02",
+            "path": "data/evidence/vn30_reviews/hose-2432828/news.json",
+            "present": true,
+            "source_id": "hose-2432828-news",
+            "status": "PASS",
+            "token": "02/02/2026"
+          },
+          {
+            "effective_date": "2026-05-13",
+            "path": "data/evidence/vn30_reviews/hose-2460387/news.json",
+            "present": true,
+            "source_id": "hose-2460387",
+            "status": "PASS",
+            "token": "13/05/2026"
+          },
+          {
+            "effective_date": "2026-08-03",
+            "path": "data/evidence/vn30_reviews/hose-2479382/news.json",
+            "present": true,
+            "source_id": "hose-2479382-news",
+            "status": "PASS",
+            "token": "03/08/2026"
+          },
+          {
+            "effective_date": "2026-11-16",
+            "path": "data/evidence/vn30_reviews/hose-2510691/news.json",
+            "present": true,
+            "source_id": "hose-2510691-news",
+            "status": "PASS",
+            "token": "16/11/2026"
+          }
+        ]
+      },
+      "id": "NEWS_EFFECTIVE_DATE_TEXT",
+      "status": "PASS",
+      "summary": "Mỗi tin JSON đã ghim chứa đúng chuỗi ngày hiệu lực mà manifest ghi. PDF có thể không in lại ngày này."
+    },
+    {
+      "evidence": {
+        "costs": {
+          "buy_fee": 0.0015,
+          "dividend_tax": 0.05,
+          "sell_fee": 0.0015,
+          "sell_tax": 0.001,
+          "slippage": 0.001
+        },
+        "lot_size": 100,
+        "paper_trade_rows": null,
+        "price_limit": 0.07
+      },
+      "id": "MARKET_MICROSTRUCTURE_ASSUMPTIONS",
+      "status": "INCONCLUSIVE",
+      "summary": "Phí, thuế, trượt giá, lô và biên độ là giả định trong config hoặc hằng số giấy. Chưa có đối chiếu lệnh khớp thật. Không chứng minh được khả năng khớp."
+    }
+  ],
+  "first_pinned_membership_date": "2025-08-04",
+  "read_only": true,
+  "research_start": "2016-01-01",
+  "tool": "pit001_audit"
+}
