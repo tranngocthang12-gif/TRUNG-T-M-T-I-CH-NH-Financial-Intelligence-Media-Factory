@@ -124,6 +124,19 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
             target = []
             decision = {"date": d, "action": "NO_ACTION_CASH", "targets": "",
                         "models": "không có mô hình ACTIVE — giữ tiền mặt là quyết định mặc định"}
+        if target:      # R1 (QĐ-5, ADR-0016): cổng rủi ro trước khi ghi quyết định. FAIL thì không mở vị thế mới.
+            from . import risk_gate
+            lim = P.get("risk_limits")
+            g = risk_gate.check(target, {"nav": nav, "positions": st["positions"]},
+                                {**risk_gate.market_snapshot(as_of, target, lim, root=ROOT, frozen=frozen, nav_now=nav),
+                                 "price": {t: float(px[t]) for t in px.index if pd.notna(px[t])}}, lim)
+            if g["verdict"] == "FAIL" or g["excluded"]:
+                fail = g["verdict"] == "FAIL"
+                target = ([] if g["cash_wait_owner"] else [t for t in g["targets"] if t in st["positions"]]) if fail \
+                    else g["targets"]
+                decision = {"date": d, "action": ("RISK_CASH_WAIT_OWNER" if g["cash_wait_owner"] else "RISK_GATE_FAIL")
+                            if fail else decision["action"], "targets": ";".join(target),
+                            "models": f"{decision['models']} | cổng rủi ro {g['verdict']}: " + "; ".join(g["reasons"])}
         if sorted(target) != sorted(st["positions"]):
             st["pending"] = target
         else:

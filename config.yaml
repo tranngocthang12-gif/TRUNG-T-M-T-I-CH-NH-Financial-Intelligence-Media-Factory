@@ -66,6 +66,15 @@ paper:
   initial_cash: 1000000000
   top_k: 5
   rebalance_days: 20
+  # R1 (QĐ-5, ADR-0016): cổng rủi ro của sổ giấy (engine/risk_gate.py). Tham số thí nghiệm DANH NGHĨA, không phải khẩu vị rủi
+  # ro của Owner. Thiếu khóa hoặc còn TODO thì cổng FAIL, sổ không mở vị thế mới.
+  risk_limits:
+    max_weight: 0.20            # tỷ trọng một mã tại lúc quyết định
+    max_participation: 0.10     # phần giá trị giao dịch bình quân được dùng mỗi phiên khi thoát vị thế
+    max_exit_days: 3            # số phiên tối đa để thoát vị thế
+    max_drawdown: 0.15          # sụt giảm NAV từ đỉnh: chạm ngưỡng thì về tiền mặt và chờ Owner
+    adv_sessions: 20            # số phiên tính giá trị giao dịch bình quân
+    quarantine_window_days: 45  # sự kiện quyền bị cách ly trong ngần này ngày lịch trước lúc quyết định thì loại mã
 llm_review:
   enabled: true
   model: claude-sonnet-5
