@@ -2,7 +2,7 @@
 
 - Ngày: 2026-11-21
 - Trạng thái: **PROPOSED — chưa hiệu lực.** Gộp tệp này không tự duyệt quyết định nào; xem mục "Trạng thái từng quyết định".
-- Người đề xuất: Claude Project TTC (Anthropic), ghế kiến trúc sư trưởng. Chép vào kho: phiên Claude Code (Anthropic).
+- Người đề xuất: Claude Project TTC (Anthropic), ghế kiến trúc sư trưởng. Chép vào kho: phiên Claude Code (Anthropic). Vòng 2: phiên Claude Code sửa QĐ-S2, QĐ-S3, QĐ-S6, QĐ-S9 và mục Lý do theo bản chấm L-09 của ChatGPT (OpenAI) trên `5ba61b4`.
 - Người chấm: chưa có. Phải là ChatGPT (OpenAI) hoặc Gemini (Google), chấm đúng commit.
 - Owner duyệt: chưa.
 - Số: 0015 (PR #68) và 0016 (PR #73) đã dùng.
@@ -35,10 +35,26 @@
 - `resolve_at`:
   - SCN-LN: hạn công bố BCTC quý theo văn bản đang hiệu lực tại giờ niêm phong, cộng 10 ngày. Văn bản đó được ghim ở pha 0 kèm `effective_from` (L-08).
   - SCN-CT, SCN-PH: ngày cuối quý Q+1, cộng 3 ngày làm việc.
-- Loại trước khi chấm, theo luật cơ học, áp như nhau cho mọi nhánh:
-  - câu có tài liệu phân định mang `published_at` trước giờ niêm phong;
-  - câu có tài liệu phân định không công bố tới `resolve_at` (VOID).
-- VOID quá 10% số câu của lô thì lô không hợp lệ.
+- Loại trước khi chấm, theo luật cơ học, áp như nhau cho mọi nhánh: câu có tài liệu phân định mang `published_at` trước giờ niêm phong.
+- **Chỉ mục đầy đủ** cho một khoảng ngày nghĩa là:
+  - bộ thu (QĐ-S4) có bản chụp chỉ mục thành công, đã ghim hash, cho mọi ngày của khoảng đó;
+  - mỗi bản chụp chồng lấn bản liền trước: bản sau còn chứa mục mới nhất của bản trước, nên không có khe giữa hai bản.
+
+  Thiếu một ngày, hoặc hai bản liền nhau không chồng lấn, thì chỉ mục không đầy đủ.
+- **SCN-CT, SCN-PH.** Khoảng tính sự kiện là [00:00 ngày đầu quý Q+1, 23:59 ngày cuối quý Q+1] giờ Việt Nam, theo `published_at` trong metadata của sở. Tài liệu công bố ngoài khoảng này không tính là YES.
+  - YES: có ít nhất một tài liệu khớp quy tắc, có `published_at` trong khoảng tính, bản gốc đã ghim đúng hash.
+  - NO: không có tài liệu khớp quy tắc trong khoảng tính, **và** chỉ mục đầy đủ từ ngày đầu khoảng tính tới `resolve_at`.
+  - VOID (`VOID_CHI_MUC`): chỉ mục không đầy đủ, nguồn không truy cập được, hoặc chưa chứng minh được tính đầy đủ. Không suy ra NO từ việc không thấy tài liệu.
+- **SCN-LN.**
+  - Chấm theo bản đầu tiên của BCTC quý Q có `published_at` trước `resolve_at`, kể cả khi công bố sau hạn luật định. Bản đó được ghi cờ `CONG_BO_TRE` và chấm bình thường.
+  - VOID (`VOID_KHONG_NOP`): chỉ mục đầy đủ tới `resolve_at` nhưng chưa có BCTC quý Q.
+  - VOID (`VOID_NGUON`): chỉ mục không đầy đủ, hoặc bản gốc không tải được, hoặc bản gốc lệch hash.
+  - Máy không trích được hai con số thì theo QĐ-S5 mục 2 (`CAN_NGUOI_PHAN_DINH`), không VOID ngay.
+- **Câu VOID.**
+  - Phân tích chính loại câu VOID khỏi d̄.
+  - Phân tích độ nhạy là bắt buộc: mỗi câu VOID được chấm với kết quả (YES hoặc NO) làm d lớn nhất, tức bất lợi nhất cho SCN. PASS phải đạt ở cả hai phân tích (QĐ-S6 mục 5).
+  - Số câu theo từng loại VOID và số cờ `CONG_BO_TRE` được báo riêng.
+  - VOID (mọi loại) quá 10% số câu của lô thì lô không hợp lệ.
 - Họ "vào hoặc ra rổ VN30" không vào pha 1: mỗi năm chỉ khoảng 2 kỳ xét, không đủ cỡ mẫu của QĐ-S6 trong thời hạn xét.
 
 ### QĐ-S3. Niêm phong và công bố (cơ chế bằng chứng xuất xứ)
@@ -46,7 +62,7 @@
 1. **Danh sách câu.** Công cụ sinh danh sách câu của lô từ chỉ mục đã ghim. Nếu lô nhỏ hơn tập mã đủ điều kiện, công cụ chọn N mã theo thứ tự `sha256(batch_id ‖ mã)`. Danh sách được commit lên `main` ít nhất 30 ngày trước giờ niêm phong. Danh sách không chứa dự báo.
 2. **Giờ niêm phong.** 23:59 giờ Việt Nam ngày cuối quý Q, chung cho cả ba họ của lô.
 3. **Niêm phong kiểu commit–reveal.**
-   - Ghế dự báo đẩy lên `main` một dòng `{batch_id, family, sha256(tệp lô ‖ muối), n_rows}` vào `experiments/SCN-001/seals.jsonl`, bằng cơ chế ghi một tệp như `tools/registry_push.py`.
+   - Ghế dự báo đẩy lên `main` một dòng `{batch_id, family, sha256(tệp lô ‖ muối), n_rows, protocol_hash}` vào `experiments/SCN-001/seals.jsonl` (`protocol_hash` theo QĐ-S6 mục 9), bằng cơ chế ghi một tệp như `tools/registry_push.py`.
    - Workflow đăng dấu nhận dưới tên `github-actions[bot]` trên Issue theo dõi của SCN-001.
    - Giờ niêm phong được tính là giờ máy chủ của dấu nhận. Dấu nhận sau giờ niêm phong thì lô VOID và tính thất bại.
 4. **Mỗi (họ, lô) đúng một dòng niêm phong.** Dòng thứ hai bị từ chối. Luật này chặn việc niêm nhiều lô rồi chỉ công bố lô đẹp.
@@ -60,6 +76,11 @@
    - chỉ một tệp, chỉ ghi thêm;
    - kiểm toán bắt mọi lần viết lại;
    - không phải quyền sửa luật, mã hay `SAFETY_STATE`.
+
+   Đây là một đường ghi **mới**. ADR-0013 không tự bao đường này. Gộp ADR-0017 **không** cho quyền kích hoạt workflow ghi `seals.jsonl`. Trước khi chạy lần đầu phải có đủ:
+   - Owner ghi ACCEPTED cho QĐ-S3 trong bảng trạng thái, và chấp thuận riêng, bằng chữ, ngoại lệ ghi `main` cho đúng tệp `experiments/SCN-001/seals.jsonl` và đúng workflow đó;
+   - PR S0f có test cho: chỉ-ghi-thêm; dấu nhận của `github-actions[bot]`; từ chối dòng trùng (họ, lô); kiểm toán trực tuyến trong `tools/ledger_audit.py`; khôi phục khi workflow lỗi giữa chừng mà không tạo dòng thứ hai hay dấu nhận giả;
+   - L-09 và Owner gộp PR S0f.
 
 ### QĐ-S4. Lớp đọc phủ
 
@@ -97,17 +118,39 @@
    - n = ((z₁₋₀,₀₅/₆ + z₀,₈₀) · σ_d / Δ)², với Δ = 0,02 (hai phía 5%, hiệu chỉnh cho 3 họ, độ mạnh 80%);
    - với σ_d = 0,10 thì n ≈ 262 câu mỗi họ;
    - sàn là 300 câu mỗi họ cho tổng 4 lô xác nhận.
+   - **262 và 300 là ước lượng sơ bộ**, giả định các hiệu d độc lập. Đó không phải bảo đảm độ mạnh 80%. Câu cùng quý, cùng ngành hay cùng doanh nghiệp tương quan với nhau, nên số đơn vị độc lập hiệu dụng nhỏ hơn số câu.
+   - Sau lô sơ bộ, ước lượng hệ số tương quan nội cụm (ICC) của d theo hai cách gom cụm ở mục 5: theo doanh nghiệp, và theo quý × ngành cấp 1.
+   - N yêu cầu = n × DEFF lớn nhất của hai cách, với DEFF = 1 + (m̄ − 1) · ICC, m̄ là cỡ cụm trung bình dự kiến.
+   - Thông lượng không đủ N yêu cầu thì bỏ họ đó (QĐ-S8 mục 3), không hạ N.
 5. **Phán quyết** chỉ ra một lần, trên đúng 4 lô xác nhận kế tiếp (đủ 4 quý). Một họ PASS khi đạt đồng thời:
-   - khoảng tin cậy 95% của d̄ nằm hẳn dưới 0, tính bằng bootstrap theo cụm (quý × ngành cấp 1, phân ngành ghim ở pha 0), sau hiệu chỉnh Holm cho 3 họ;
+   - khoảng tin cậy 95% của d̄ nằm hẳn dưới 0 dưới **mỗi** cách gom cụm đăng ký trước, sau hiệu chỉnh Holm cho 3 họ:
+     - (i) bootstrap theo doanh nghiệp: lấy lại cả doanh nghiệp với mọi câu của nó qua 4 lô, phân tầng theo lô;
+     - (ii) bootstrap theo quý × ngành cấp 1 (phân ngành ghim ở pha 0);
+   - kết luận không đổi khi đổi cách gom cụm: một cách cho khoảng chứa 0 thì không PASS. Báo cả hai khoảng;
+   - đạt ở cả phân tích chính và phân tích độ nhạy VOID (QĐ-S2);
    - d̄ < 0 ở ít nhất 3 trong 4 lô;
    - ECE ≤ 0,10 (5 nhóm);
    - không lô nào không hợp lệ.
 6. **Không đạt** thì ghi NO_EDGE hoặc INCONCLUSIVE.
-   - Không xem kết quả giữa chừng.
+   - Không dùng kết quả giữa chừng để đổi giao thức (mục 9, 10).
    - Không đổi baseline hay thước đo sau khi thấy số.
    - Lần phán quyết sau phải dùng lô mới và đăng ký thử mới.
 7. **Phần đo phụ.** Chọn 20% số câu theo hash ghim trước. Một phiên Claude trần dự báo các câu đó trước giờ niêm phong, với prompt riêng có hash; không dùng `CONTROL_B_PROMPT`. Báo cáo hiệu SCN trừ Claude trần để đo phần đóng góp của lớp đọc. Đây không phải điều kiện PASS.
 8. **Tập VN30** được báo riêng. Nếu d̄ của tập VN30 ≥ 0 thì họ đó không được dùng cho sổ trên rổ VN30, dù đã PASS.
+9. **Khóa giao thức.**
+   - Trước giờ niêm phong của lô xác nhận đầu tiên, ghim vào sổ đăng ký thử (L-06) `protocol_hash`. Đó là hash của: prompt, `model_id`, khuôn THẺ ĐỌC, bảng ánh xạ chỉ tiêu, bảng cụm từ, công thức baseline, mã máy chấm, mã phân tích phán quyết, N, các cách gom cụm và ngưỡng của mục 11.
+   - Mỗi dòng niêm phong mang `protocol_hash` (QĐ-S3 mục 3). CI từ chối dòng có hash khác hash đã đăng ký.
+   - Đổi bất kỳ thành phần nào sau đó thì các lô xác nhận đã niêm không vào phán quyết. Các lô đó vẫn được công bố và chấm. Muốn phán quyết phải đăng ký mới và chạy lại đủ 4 lô mới.
+   - Ngày niêm phong của 4 lô xác nhận được ấn định từ trước.
+   - Không có quy tắc nào cho dừng sớm, bỏ lô, kéo dài, đổi N hay đổi thước đo dựa vào kết quả.
+10. **Điểm trung gian và giới hạn.**
+    - Tệp lô và muối được công bố từng lô (QĐ-S3 mục 5), nên điểm từng lô tính được từ dữ liệu công khai, kể cả bởi ghế dự báo. ADR này thừa nhận không bảo đảm được việc không ai xem điểm trung gian.
+    - Cơ chế ngăn chọn kết quả thuận lợi là khóa giao thức ở mục 9, cùng các luật đã có: mỗi (họ, lô) đúng một dòng niêm phong, không bỏ câu.
+    - Xem điểm không đổi được phán quyết. Công cụ phân tích không xuất d̄ gộp trước khi đủ 4 lô.
+11. **Đơn vị độc lập không đủ thì INCONCLUSIVE**, kể cả khi đủ 300 câu. Một họ là INCONCLUSIVE khi có bất kỳ điều sau:
+    - một trong hai cách gom cụm có dưới 30 cụm;
+    - cỡ mẫu hiệu dụng n_eff = (số câu đã chấm) / DEFF, với DEFF đo lại trên 4 lô xác nhận, nhỏ hơn n của công thức ở mục 4.
+12. **Bốn quý là số cụm thời gian rất nhỏ.** Biến thiên giữa quý không ước lượng tin cậy được từ 4 lô. Điều kiện "d̄ < 0 ở ít nhất 3 trong 4 lô" chỉ là kiểm tính nhất quán, không thay ước lượng đó. Báo d̄ và khoảng tin cậy của từng lô.
 
 ### QĐ-S7. Cổng cấp tín hiệu
 
@@ -135,6 +178,19 @@
 4. Ghim và có test cho bảng ánh xạ chỉ tiêu theo mẫu BCTC của từng ngành (doanh nghiệp, ngân hàng, chứng khoán, bảo hiểm) và bảng cụm từ tiêu đề của SCN-CT, SCN-PH.
 5. Ghim phân ngành dùng làm cụm bootstrap, từ nguồn gốc.
 6. Test niêm phong và công bố phải bắt được: niêm hai lần, công bố sai muối, công bố trễ, bỏ câu. Có kiểm đột biến.
+7. Test máy chấm (QĐ-S2) phải có đủ các ca sau, kèm kiểm đột biến:
+   - không có sự kiện, chỉ mục đầy đủ: ra NO;
+   - có sự kiện: ra YES;
+   - chỉ mục thiếu ngày hoặc hai bản chụp liền nhau không chồng lấn: ra `VOID_CHI_MUC`;
+   - tài liệu công bố ngoài khoảng tính: không tính là YES;
+   - BCTC công bố trễ nhưng trước `resolve_at`: chấm bình thường, có cờ `CONG_BO_TRE`;
+   - không nộp tới `resolve_at`, chỉ mục đầy đủ: ra `VOID_KHONG_NOP`;
+   - bản gốc lệch hash: ra `VOID_NGUON`.
+8. Test phân tích phán quyết phải bắt được:
+   - dòng niêm phong có `protocol_hash` khác hash đã đăng ký;
+   - dưới 30 cụm;
+   - n_eff dưới mức yêu cầu;
+   - hai cách gom cụm cho kết luận khác nhau.
 
 ## Trạng thái từng quyết định
 
@@ -180,9 +236,11 @@ Mốc kế hoạch, không phải cam kết:
 
 ## Lý do (bằng chứng, số đo)
 
-- **Số điểm chấm.** Mỗi họ có ít nhất 300 câu đã chấm trên 4 lô, so với khoảng 12,6 điểm mỗi năm của sổ giấy. Phép tính cỡ mẫu ở QĐ-S6 mục 4 là ước lượng lập kế hoạch; σ_d được đo lại ở lô sơ bộ.
+- **Số điểm chấm.** Mỗi họ có ít nhất 300 câu đã chấm trên 4 lô, so với khoảng 12,6 điểm mỗi năm của sổ giấy.
+  - Phép tính cỡ mẫu ở QĐ-S6 mục 4 là ước lượng sơ bộ, giả định câu độc lập; σ_d được đo lại ở lô sơ bộ.
+  - Số đơn vị độc lập hiệu dụng nhỏ hơn số câu vì các câu tương quan theo quý, ngành và doanh nghiệp. QĐ-S6 mục 4 và mục 11 xử lý phần này.
 - **Vì sao vẫn cần 4 quý.** Các câu cùng quý cùng chịu một cú sốc vĩ mô và ngành, nên tăng số câu không thay được tăng số quý; 4 lô cũng phủ đủ mùa vụ. Phán quyết đầu tiên (khoảng quý 3/2028) vì vậy không sớm hơn phán quyết của FWD-001. Cái được là:
-  - phán quyết dựa trên hàng trăm tới hàng nghìn câu thay vì 12 kỳ;
+  - phán quyết dựa trên nhiều câu hơn 12 kỳ. Tuy vậy, sức mạnh thống kê bị giới hạn bởi số cụm độc lập và chỉ có 4 quý, không phải bởi số câu;
   - đo một giả thuyết mà engine giá không đo được: lợi thế đến từ việc đọc văn bản.
 - **Tập mã toàn HOSE.** Tới 30/6/2025, nhà đầu tư cá nhân đóng góp hơn 80% giá trị giao dịch ([Nhân Dân](https://nhandan.vn/chuyen-nghiep-hoa-nha-dau-tu-ca-nhan-truoc-them-nang-hang-post898192.html)). Nếu có lợi thế đọc, nó nhiều khả năng nằm ở nhóm mã ít được phân tích chứ không ở VN30.
 - **Dùng lại, không thay.** Kiến trúc đã có niêm phong và dấu nhận (ADR-0003), khóa thông tin (ADR-0011), sổ thử (L-06), ghim tệp gốc (ADR-0012) và máy kiểm trích nguyên văn (§5). ADR này dùng lại các phần đó.
