@@ -61,11 +61,12 @@ Quy tắc:
 | 4 → 5, 5 → 6 | Theo `GATES.md` | Ngoài phạm vi ADR này | — |
 
 - 12 kỳ trùng ngưỡng mẫu tối thiểu đã có trong `engine/attribution.py` (dưới 12 lần tái cơ cấu thì không kết luận về kỹ năng).
-- 12 kỳ không chứng minh được lợi thế nhỏ hơn khoảng 2,37% mỗi kỳ.
-  - Công thức: Δ = (z0,975 + z0,80) × σ / √n = 2,80 × 2,93% / √12 ≈ 2,37%, với n = 12 kỳ.
-  - σ = 2,93% là độ lệch chuẩn mỗi kỳ của lợi suất danh mục 5 mã chọn ngẫu nhiên trừ bình quân rổ. Số này đo trên 137 kỳ 20 phiên không chồng lấn, 400 lần chọn mỗi kỳ, trên bảng giá `data.load_market()` tại `main` `20f5d92`, as_of 2026-11-20.
-  - Giả định: các kỳ độc lập; kiểm định hai phía 5%; độ mạnh 80%; không hiệu chỉnh nhiều phép thử.
-  - Đây là ước lượng để lập kế hoạch, không phải tiêu chí và không phải bằng chứng.
+- Minh họa độ mạnh thống kê của 12 kỳ, **hoàn toàn giả định, không phải số đo của TTC**:
+  - Giả định độ lệch chuẩn mỗi kỳ của lợi suất danh mục trừ bình quân rổ là σ = 3%.
+  - Công thức: Δ = (z0,975 + z0,80) × σ / √n = 2,80 × 3% / √12 ≈ 2,42%, với n = 12 kỳ.
+  - Đọc là: với σ giả định đó, 12 kỳ chỉ phát hiện được mức vượt trội từ khoảng 2,42% mỗi kỳ trở lên; lợi thế nhỏ hơn thì 12 kỳ không chứng minh được.
+  - Giả định thống kê: các kỳ độc lập; kiểm định hai phía 5%; độ mạnh 80%; không hiệu chỉnh nhiều phép thử.
+  - Con số này chỉ minh họa. Nó không phải tiêu chí, không phải bằng chứng, và không được dùng để mở cổng vốn.
 - Qua bước 3 → 4 nghĩa là hệ thống vận hành đúng và không có dấu hiệu xấu, không phải lợi thế đã được xác nhận.
 - Ở bậc 4, Owner tự đặt lệnh trong tài khoản của mình. Hệ thống không gửi lệnh (`autonomous_order_execution: false` giữ nguyên). Vị thế thật không vào kho (L-03).
 
