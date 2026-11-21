@@ -36,11 +36,14 @@
   - SCN-LN: hạn công bố BCTC quý theo văn bản đang hiệu lực tại giờ niêm phong, cộng 10 ngày. Văn bản đó được ghim ở pha 0 kèm `effective_from` (L-08).
   - SCN-CT, SCN-PH: ngày cuối quý Q+1, cộng 3 ngày làm việc.
 - Loại trước khi chấm, theo luật cơ học, áp như nhau cho mọi nhánh: câu có tài liệu phân định mang `published_at` trước giờ niêm phong.
-- **Chỉ mục đầy đủ** cho một khoảng ngày nghĩa là:
-  - bộ thu (QĐ-S4) có bản chụp chỉ mục thành công, đã ghim hash, cho mọi ngày của khoảng đó;
-  - mỗi bản chụp chồng lấn bản liền trước: bản sau còn chứa mục mới nhất của bản trước, nên không có khe giữa hai bản.
-
-  Thiếu một ngày, hoặc hai bản liền nhau không chồng lấn, thì chỉ mục không đầy đủ.
+- **Chỉ mục đầy đủ** cho một khoảng ngày phải được chứng minh bằng hai lớp, và cả hai cùng đạt:
+  1. *Chuỗi bản chụp liền mạch.* Mỗi ngày có đúng một bản chụp thành công, đã ghim hash. Một bản chụp chỉ thành công khi bộ thu đã tải theo thứ tự mọi trang (hoặc mọi bước cursor), từ trang mới nhất tới trang đầu tiên chứa mục mới nhất của bản chụp trước. Ngoài ra: mọi trang phải trả mã 200 và có hash riêng; các mục phải theo đúng thứ tự `published_at` giảm dần, không trùng, không đảo; nếu nguồn báo tổng số mục hoặc số trang thì số đã tải phải khớp. Thiếu một trang, thiếu một ngày, hoặc hai bản liền nhau không chồng lấn thì chỉ mục không đầy đủ.
+  2. *Đối chiếu theo mã.* Trước khi ghi NO cho một câu SCN-CT hoặc SCN-PH, hoặc ghi `VOID_KHONG_NOP`, hoặc xác định "bản đầu tiên" của BCTC cho SCN-LN, máy chấm tải danh sách công bố riêng của mã đó trên trang của sở, phủ trọn khoảng tính, với cùng các điều kiện về trang và cursor như lớp 1. Hai lớp phải cho cùng một kết quả. Nếu lệch nhau thì ghi `VOID_CHI_MUC`.
+- Nếu ở S0a trang của sở không cho kiểm được trang hoặc cursor như trên, thì không chứng minh được câu NO của SCN-CT, SCN-PH, cũng như `VOID_KHONG_NOP` và "bản đầu tiên" của SCN-LN. Khi đó các họ đó không chạy (QĐ-S8 mục 3).
+- Test bắt buộc ở S0b:
+  - chỉ mục thiếu một trang ở giữa nhưng hai bản chụp vẫn chồng lấn → không đầy đủ;
+  - danh sách theo mã có tài liệu mà chỉ mục chung không có → `VOID_CHI_MUC`;
+  - mục đảo thứ tự hoặc trùng → không đầy đủ.
 - **SCN-CT, SCN-PH.** Khoảng tính sự kiện là [00:00 ngày đầu quý Q+1, 23:59 ngày cuối quý Q+1] giờ Việt Nam, theo `published_at` trong metadata của sở. Tài liệu công bố ngoài khoảng này không tính là YES.
   - YES: có ít nhất một tài liệu khớp quy tắc, có `published_at` trong khoảng tính, bản gốc đã ghim đúng hash.
   - NO: không có tài liệu khớp quy tắc trong khoảng tính, **và** chỉ mục đầy đủ từ ngày đầu khoảng tính tới `resolve_at`.
@@ -124,8 +127,9 @@
    - Thông lượng không đủ N yêu cầu thì bỏ họ đó (QĐ-S8 mục 3), không hạ N.
 5. **Phán quyết** chỉ ra một lần, trên đúng 4 lô xác nhận kế tiếp (đủ 4 quý). Một họ PASS khi đạt đồng thời:
    - khoảng tin cậy 95% của d̄ nằm hẳn dưới 0 dưới **mỗi** cách gom cụm đăng ký trước, sau hiệu chỉnh Holm cho 3 họ:
-     - (i) bootstrap theo doanh nghiệp: lấy lại cả doanh nghiệp với mọi câu của nó qua 4 lô, phân tầng theo lô;
-     - (ii) bootstrap theo quý × ngành cấp 1 (phân ngành ghim ở pha 0);
+     - (i) bootstrap theo doanh nghiệp: tập cụm là mọi doanh nghiệp có ít nhất một câu đã chấm của họ đó trong 4 lô. Mỗi lần lặp rút có hoàn lại đúng số doanh nghiệp ấy. Mỗi doanh nghiệp được rút mang theo mọi câu của nó qua cả 4 lô, giữ nguyên lô của từng câu. Không phân tầng, không rút riêng từng lô. d̄* là trung bình trên mọi câu của các doanh nghiệp được rút;
+     - (ii) bootstrap theo quý × ngành cấp 1 (phân ngành ghim ở pha 0): rút có hoàn lại các cụm (quý, ngành) từ mọi cụm của 4 lô; mỗi cụm mang theo mọi câu của nó;
+     - mỗi cách lặp 10.000 lần, khoảng tin cậy theo phân vị ở mức sau Holm. Hạt giống ghim trong `protocol.json`;
    - kết luận không đổi khi đổi cách gom cụm: một cách cho khoảng chứa 0 thì không PASS. Báo cả hai khoảng;
    - đạt ở cả phân tích chính và phân tích độ nhạy VOID (QĐ-S2);
    - d̄ < 0 ở ít nhất 3 trong 4 lô;
@@ -138,7 +142,18 @@
 7. **Phần đo phụ.** Chọn 20% số câu theo hash ghim trước. Một phiên Claude trần dự báo các câu đó trước giờ niêm phong, với prompt riêng có hash; không dùng `CONTROL_B_PROMPT`. Báo cáo hiệu SCN trừ Claude trần để đo phần đóng góp của lớp đọc. Đây không phải điều kiện PASS.
 8. **Tập VN30** được báo riêng. Nếu d̄ của tập VN30 ≥ 0 thì họ đó không được dùng cho sổ trên rổ VN30, dù đã PASS.
 9. **Khóa giao thức.**
-   - Trước giờ niêm phong của lô xác nhận đầu tiên, ghim vào sổ đăng ký thử (L-06) `protocol_hash`. Đó là hash của: prompt, `model_id`, khuôn THẺ ĐỌC, bảng ánh xạ chỉ tiêu, bảng cụm từ, công thức baseline, mã máy chấm, mã phân tích phán quyết, N, các cách gom cụm và ngưỡng của mục 11.
+   - Trước giờ niêm phong của lô xác nhận đầu tiên, ghim vào sổ đăng ký thử (L-06) `protocol_hash`, là sha256 của tệp `experiments/SCN-001/protocol.json`. Tệp này liệt kê từng thành phần dưới đây, kèm sha256 của tệp nguồn hoặc kèm giá trị:
+     - văn bản ADR-0017 tại commit Owner gộp;
+     - prompt, `model_id`, khuôn THẺ ĐỌC, bảng ánh xạ chỉ tiêu, bảng cụm từ, phân ngành, công thức baseline;
+     - mã bộ thu, mã máy chấm, mã phân tích phán quyết;
+     - mọi quy tắc và ngưỡng dẫn tới PASS, NO_EDGE, INCONCLUSIVE, VOID và lô không hợp lệ:
+       - QĐ-S2: quy tắc chỉ mục đầy đủ, các loại VOID, ngưỡng VOID 10%;
+       - QĐ-S3: ngưỡng bỏ câu 10%, xác suất bất lợi khi không công bố;
+       - QĐ-S6 mục 4: Δ, độ mạnh, α, Holm cho 3 họ, N, DEFF dùng để chốt N;
+       - QĐ-S6 mục 5: hai cách gom cụm, số lần lặp và hạt giống bootstrap, phân tích độ nhạy VOID, điều kiện 3/4 lô, ECE ≤ 0,10 với 5 nhóm;
+       - QĐ-S6 mục 8: luật của tập VN30;
+       - QĐ-S6 mục 11: sàn 30 cụm, n_eff.
+   - Mã phân tích chỉ được đọc ngưỡng từ `protocol.json`. Test bắt buộc: đổi bất kỳ giá trị nào trong tệp thì hash đổi và CI từ chối dòng niêm phong.
    - Mỗi dòng niêm phong mang `protocol_hash` (QĐ-S3 mục 3). CI từ chối dòng có hash khác hash đã đăng ký.
    - Đổi bất kỳ thành phần nào sau đó thì các lô xác nhận đã niêm không vào phán quyết. Các lô đó vẫn được công bố và chấm. Muốn phán quyết phải đăng ký mới và chạy lại đủ 4 lô mới.
    - Ngày niêm phong của 4 lô xác nhận được ấn định từ trước.
