@@ -2,24 +2,25 @@
 
 - Ngày: 2026-11-21
 - Trạng thái: **PROPOSED — chưa hiệu lực.** Chỉ có hiệu lực khi ghế khác nhà cung cấp chấm (L-09) và Owner gộp (L-10). Owner có thể duyệt từng quyết định QĐ-1…QĐ-8 riêng.
-- Người đề xuất: Claude Project TTC (Anthropic), ghế kiến trúc sư trưởng. Chép chữ vào kho: phiên Claude Code (Anthropic), theo LỆNH A1.
+- Người đề xuất: Claude Project TTC (Anthropic), ghế kiến trúc sư trưởng. Chép chữ vào kho: phiên Claude Code (Anthropic).
 - Người chấm: chưa có. Phải là ChatGPT (OpenAI) hoặc Gemini (Google), chấm đúng commit.
 - Owner duyệt: chưa.
 
 ## Nguồn chữ và phạm vi
 
-- Ba mục "Quyết định", "Thang vốn: tiêu chí số" và "Điều kiện dừng và đảo" chép từ mục 3, 6 và 9 của tài liệu *[TTC] LỆNH CODE — HOÀN THIỆN KIẾN TRÚC TỪ DỮ LIỆU TỚI VỐN*. Tài liệu đó ghi ngày 21/11/2026, cơ sở `main` `20f5d924bbf52c34b68baeaff9df8d022a0af363`.
-- Tài liệu nguồn chưa nằm trong kho. Các mã lệnh K0, A1, D1–D5, E1, E2a, E2b, E3, E4, R1, F1 và FWD-001 là tên việc trong gói lệnh của tài liệu đó. ADR này **không** phát lệnh nào: mỗi lệnh chỉ có hiệu lực khi Owner phát cho ghế.
+- **ADR này chính là văn bản quyết định.** Owner duyệt chữ trong ADR này, không duyệt tài liệu nào nằm ngoài kho. Không câu nào ở đây lấy tài liệu ngoài kho làm căn cứ.
+- Mọi số đo và trạng thái nêu trong ADR là tại `main` `20f5d924bbf52c34b68baeaff9df8d022a0af363`, dữ liệu tới phiên 20/11/2026.
+- Các mã việc D1–D5, E1, E2a, E2b, E3, E4, R1, F1 và FWD-001 chỉ là tên gọi. ADR này **không** phát lệnh nào: mỗi việc chỉ có hiệu lực khi Owner phát cho một ghế. Phạm vi tệp của mỗi việc do lệnh đó ghi và do PR thực hiện liệt kê; L-09 và Owner gộp kiểm phạm vi đó.
 - ADR này không sửa `architecture/ARCHITECTURE.md`, `governance/LAWS.md`, `governance/GATES.md`, `governance/SAFETY_STATE.yaml`, `config.yaml` hay mã.
 - Không đổi `deployment_level: 0`. Không bật tiền thật. Không nêu mã nên mua hay bán (L-02). Không nêu số vốn thật (L-03).
 - ADR-0015 (PR #68, PROPOSED) có bảng cổng BASELINE-001 và PAPER/RISK. FWD-001 hiện thực hai hàng đó nếu ADR-0015 được duyệt, nhưng ADR này không phụ thuộc vào việc ADR-0015 được duyệt.
 
-## Quyết định (mục 3 của tài liệu nguồn)
+## Quyết định
 
 | Mã | Quyết định đề xuất |
 |---|---|
 | QĐ-1 | Theo điều 7 của ADR-0009 (bản vá engine đi PR riêng, có test end-to-end, L-09, Owner gộp), cho phép các PR E1, E2a, E2b, E3, R1, F1, E4 chạm đúng các tệp engine nêu trong từng lệnh. Trừ E3 (đổi mặc định theo QĐ-6), mọi thay đổi nằm sau tham số và mặc định giữ hành vi cũ. `engine/adjust.py` và `data.sources` vẫn không đổi. |
-| QĐ-2 | Trong cổng chứng cứ, "chia tách" và "trả cổ tức bằng cổ phiếu" thuộc một lớp STOCK khi so loại. Engine vốn tính hệ số như nhau cho hai loại (`adjust.STOCK`). Nguyên văn loại của bản gốc vẫn lưu. |
+| QĐ-2 | Trong cổng chứng cứ, "chia tách" và "trả cổ tức bằng cổ phiếu" thuộc một lớp STOCK khi so loại. Engine vốn tính hệ số như nhau cho hai loại (`adjust.STOCK`). Nguyên văn loại của bản gốc vẫn lưu. Lệnh E1 phải có test từ chối cổ tức tiền mặt, phát hành quyền mua, và mọi nguyên văn ngoài bảng ánh xạ (ra `CACH_LY_LOAI_CHUA_ANH_XA`). Tỷ lệ vẫn phải khớp. Nguyên văn loại sự kiện trong manifest không bị sửa. Đổi bảng ánh xạ phải qua PR và L-09. |
 | QĐ-3 | Mặt nạ nhiễm theo cửa sổ quanh sự kiện thay cho mặt nạ theo ô. |
 | QĐ-4 | Phép thử tiến dùng rổ VN30 đã ghim theo ngày và tải thêm giá BSR, LPB, MCH, TCX, VPL. Nghiên cứu cũ giữ rổ cấu hình và mang nhãn RETROSPECTIVE. |
 | QĐ-5 | Tham số FWD-001: 12 kỳ cố định; 3 sổ đối chứng; tối đa 2 sổ bóng chọn bằng quy tắc cơ học (S1 là đặc tả của lần thử có `ic_t` cao nhất trong `research/trials.csv` tại ngày đăng ký; S2 là `signed_sum` trên đủ 13 đặc trưng); giới hạn rủi ro danh nghĩa như lệnh R1. |
@@ -29,7 +30,27 @@
 
 Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVERNOR_POLICY`; nguồn giá chính thức; bảo vệ `main` (P5).
 
-## Thang vốn: tiêu chí số (mục 6 của tài liệu nguồn; đề xuất cho QĐ-7; tên bậc theo `GATES.md`)
+## Trạng thái từng quyết định
+
+| QĐ | Trạng thái | Owner | Ngày |
+|---|---|---|---|
+| QĐ-1 | PROPOSED | | |
+| QĐ-2 | PROPOSED | | |
+| QĐ-3 | PROPOSED | | |
+| QĐ-4 | PROPOSED | | |
+| QĐ-5 | PROPOSED | | |
+| QĐ-6 | PROPOSED | | |
+| QĐ-7 | PROPOSED | | |
+| QĐ-8 | PROPOSED | | |
+
+Quy tắc:
+
+- Gộp ADR này không tự duyệt quyết định nào.
+- Chỉ quyết định được Owner ghi `ACCEPTED` kèm ngày trong bảng này mới có hiệu lực.
+- `DEFERRED`, `REJECTED` hoặc ô trống là chưa có hiệu lực.
+- Mỗi PR engine theo QĐ-1 và mỗi bước thang vốn theo QĐ-7 vẫn phải qua L-09 và Owner gộp riêng.
+
+## Thang vốn: tiêu chí số (đề xuất cho QĐ-7; tên bậc theo `GATES.md`)
 
 | Bước | Điều kiện trong `GATES.md` | Tiêu chí số đề xuất | Hiện trạng |
 |---|---|---|---|
@@ -37,22 +58,27 @@ Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVE
 | 1 → 2 Backtest | Phí, trượt giá, holdout, walk-forward, chế độ thị trường | Có khoảng lịch sử đủ điều kiện PIT; E4 đã gộp; ít nhất một đặc tả đạt cùng lúc: `ic_t` ≥ ngưỡng L-06 (hiện 3,69), lãi ròng > 0, `fold_pos` ≥ 0,6, `recent_ic` > 0, từ 2 chế độ dương, DSR ≥ 0,95, và đạt trên holdout khóa | 0/222 |
 | 2 → 3 Giấy có mô hình | Backtest qua robustness; Owner duyệt | Owner ghi mô hình vào `state/MODEL_REGISTRY.yaml` qua PR | 0 mô hình |
 | 3 → 4 Vốn nhỏ | Giấy đạt tiêu chí; Risk Gate; Owner; `live_trading_enabled` | Mô hình ACTIVE đủ 12 kỳ tái cơ cấu; hiệu ròng so với `FWD-EW` dương; IC thực hiện không ở DEGRADING hoặc PAUSED; phí và tỷ lệ không khớp không quá 1,5 lần giả định; sụt giảm trong ngưỡng; 0 vi phạm cổng và 0 sự cố PIT; `OWNER_MISSION` đã ký; giới hạn vốn thật đặt ngoài kho; `main` được bảo vệ; có ADR riêng và ý kiến pháp lý | Chưa |
-| 4 → 5, 5 → 6 | Theo `GATES.md` | Ngoài phạm vi lệnh này | — |
+| 4 → 5, 5 → 6 | Theo `GATES.md` | Ngoài phạm vi ADR này | — |
 
 - 12 kỳ trùng ngưỡng mẫu tối thiểu đã có trong `engine/attribution.py` (dưới 12 lần tái cơ cấu thì không kết luận về kỹ năng).
-- 12 kỳ không chứng minh được lợi thế nhỏ hơn 2,37% mỗi kỳ. Qua bước 3 → 4 nghĩa là hệ thống vận hành đúng và không có dấu hiệu xấu, không phải lợi thế đã được xác nhận.
+- 12 kỳ không chứng minh được lợi thế nhỏ hơn khoảng 2,37% mỗi kỳ.
+  - Công thức: Δ = (z0,975 + z0,80) × σ / √n = 2,80 × 2,93% / √12 ≈ 2,37%, với n = 12 kỳ.
+  - σ = 2,93% là độ lệch chuẩn mỗi kỳ của lợi suất danh mục 5 mã chọn ngẫu nhiên trừ bình quân rổ. Số này đo trên 137 kỳ 20 phiên không chồng lấn, 400 lần chọn mỗi kỳ, trên bảng giá `data.load_market()` tại `main` `20f5d92`, as_of 2026-11-20.
+  - Giả định: các kỳ độc lập; kiểm định hai phía 5%; độ mạnh 80%; không hiệu chỉnh nhiều phép thử.
+  - Đây là ước lượng để lập kế hoạch, không phải tiêu chí và không phải bằng chứng.
+- Qua bước 3 → 4 nghĩa là hệ thống vận hành đúng và không có dấu hiệu xấu, không phải lợi thế đã được xác nhận.
 - Ở bậc 4, Owner tự đặt lệnh trong tài khoản của mình. Hệ thống không gửi lệnh (`autonomous_order_execution: false` giữ nguyên). Vị thế thật không vào kho (L-03).
 
-## Điều kiện dừng và đảo (mục 9 của tài liệu nguồn)
+## Điều kiện dừng và đảo
 
 - D0 trượt quá 8 tuần so với 08/01/2027 thì báo Owner. Không nới điều kiện để kịp mốc.
 - Sau 12 kỳ, nếu không sổ bóng nào đạt và đợt 2 không có đặc tả qua bậc 2, ghi NO_EDGE cho không gian 13 × 3 trên VN30. Khi đó Owner quyết mở giả thuyết mới bằng ADR, hoặc giữ TTC ở vai nghiên cứu và sổ dự báo.
 - Mọi tham số mới của E2a, E2b, F1 gỡ được bằng một PR. Chuỗi `legacy` không bị xóa.
-- Lệnh này không đổi mẫu 194 cặp, mốc 31/03/2027 và cột dừng 3 tuần của §8.
+- ADR này không đổi mẫu 194 cặp, mốc 31/03/2027 và cột dừng 3 tuần của §8.
 
 ## Lý do
 
-Bằng chứng và phép tính đầy đủ nằm ở mục 1–2 của tài liệu nguồn; ADR này không chép lại. Trạng thái trên `main` tại cơ sở nêu trên, kiểm được trong kho:
+Trạng thái trên `main` `20f5d92`, kiểm được trong kho:
 
 - `reports/PIT-001_20261121.json`: kết luận NOT_READY, 18 hạng mục.
 - `research/trials.csv`: 222/222 lần thử REJECTED.
@@ -73,4 +99,4 @@ Bằng chứng và phép tính đầy đủ nằm ở mục 1–2 của tài li�
 
 ## Ảnh hưởng tới ARCHITECTURE.md
 
-Không sửa trong PR này (LỆNH A1 cấm). Nếu ADR được ACCEPTED, một PR riêng thêm một dòng trỏ tới ADR này ở §4.3 và §8. Không viết bản kiến trúc mới (L-07).
+Không sửa trong PR này. Nếu ADR được ACCEPTED, một PR riêng thêm một dòng trỏ tới ADR này ở §4.3 và §8. Không viết bản kiến trúc mới (L-07).
