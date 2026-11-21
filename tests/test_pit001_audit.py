@@ -156,9 +156,9 @@ class AuditFixtureTests(unittest.TestCase):
                     "    return 'APPLIED'\n")
         self._write("engine/data.py", "def load_market(as_of=None):\n    return adjust.build_events(None, None, None, None)\n")
         result = pit.audit(self.root)
-        self.assertEqual(pit._status_map(result["findings"])["UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN"], "PASS")
+        self.assertEqual(pit._status_map(result["findings"])["UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN"], "INCONCLUSIVE")
 
-    def test_blocking_checks_can_pass_while_adr_schema_stays_fail(self):
+    def test_schema_fail_never_certifies_ready(self):
         members = _members()
         doc = self._doc("s1", "ban goc", "2024-01-02", "2024-01-01T10:00:00Z", members)
         self._manifest([doc])
@@ -192,10 +192,10 @@ class AuditFixtureTests(unittest.TestCase):
         st = pit._status_map(result["findings"])
         self.assertEqual(st["ADR0008_SCHEMA"], "FAIL")
         self.assertEqual(st["UNIVERSE_COVERAGE"], "PASS")
-        self.assertEqual(st["ENGINE_UNIVERSE_MODE"], "PASS")
-        self.assertEqual(st["PRICE_COVERAGE"], "PASS")
+        self.assertEqual(st["ENGINE_UNIVERSE_MODE"], "INCONCLUSIVE")
+        self.assertEqual(st["TICKER_PRESENCE"], "PASS")
         self.assertEqual(st["PROVENANCE_HASH"], "PASS")
-        self.assertEqual(result["conclusion"], "READY")
+        self.assertEqual(result["conclusion"], "NOT_READY")
         self.assertFalse(result["alpha_claim"])
 
     def test_news_without_effective_token_is_fail(self):
@@ -216,6 +216,90 @@ class AuditFixtureTests(unittest.TestCase):
         self.assertEqual(finding["status"], "FAIL")
         self.assertEqual(finding["evidence"]["actual_columns"], ["effective_date", "ticker", "action", "source_id"])
 
+
+class FailClosedMatrixTests(unittest.TestCase):
+    """Mỗi thiếu hụt trong hợp đồng đều ngăn READY, kể cả không có FAIL khác."""
+    def test_each_critical_fail_blocks_ready(self):
+        critical = (
+            "PROVENANCE_HASH", "PUBLICATION_BEFORE_USE", "DECISION_TIME_OF_KNOWLEDGE",
+            "CSV_INTERNAL", "ADR0008_SCHEMA", "UNIVERSE_COVERAGE",
+            "MEMBERSHIP_BEFORE_FIRST_EVIDENCE", "CONTINUITY_BETWEEN_REVIEWS",
+            "ENGINE_UNIVERSE_MODE", "CONFIG_VS_EVIDENCED_BASKET",
+            "TICKER_PRESENCE", "PRICE_WINDOW_COVERAGE",
+            "CORPORATE_ACTION_VERIFICATION", "UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN",
+            "PDF_VN30_CONTENT", "HOSE_2510691_SCOPE",
+            "NEWS_EFFECTIVE_DATE_TEXT", "MARKET_MICROSTRUCTURE_ASSUMPTIONS",
+        )
+        baseline = [pit.finding(k, "PASS", "fixture") for k in critical]
+        self.assertEqual(pit.conclude(baseline)[0], "READY")
+        for key in critical:
+            for status in ("FAIL", "UNKNOWN", "INCONCLUSIVE"):
+                changed = [pit.finding(f["id"], status if f["id"] == key else "PASS", "fixture")
+                           for f in baseline]
+                got = pit.conclude(changed)[0]
+                want = "NOT_READY" if status == "FAIL" else "INCONCLUSIVE"
+                with self.subTest(key=key, status=status):
+                    self.assertEqual(got, want)
+        self.assertEqual(pit.conclude(baseline[:-1])[0], "INCONCLUSIVE")
+
+    def test_not_ready_overrides_other_missing_evidence(self):
+        rows = [pit.finding("PROVENANCE_HASH", "UNKNOWN", "x"),
+                pit.finding("ADR0008_SCHEMA", "FAIL", "x")]
+        self.assertEqual(pit.conclude(rows)[0], "NOT_READY")
+
+    def test_comments_and_literals_do_not_prove_verified_gate(self):
+        src = ("def build_events(a,b,c,d):\n"
+               "    # source_status is checked\n"
+               "    note = 'source_status'\n"
+               "    return 'APPLIED'\n")
+        self.assertFalse(pit.research_chain_requires_verified_status(src))
+        self.assertFalse(pit.load_market_uses_verified_chain(
+            "def load_market():\n    # verified_factors()\n    note = 'verified_factors'\n    return 1\n"))
+
+    def test_engine_historical_string_in_comment_is_not_proof(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            (root / "engine").mkdir()
+            (root / "engine/data.py").write_text(
+                "def load_market():\n    # vn30_history is loaded\n"
+                "    path = 'vn30_history'\n    return path\n", encoding="utf-8")
+            result = pit.check_engine_mode(root, {"universe_basis":"HISTORICAL"})
+            self.assertEqual(result["status"], "INCONCLUSIVE")
+
+    def test_price_one_row_per_symbol_is_not_window_pass(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            p = root / "data/store/prices/2024-01.csv"
+            p.parent.mkdir(parents=True)
+            p.write_text("date,ticker,close\n2024-01-02,AAA,1\n"
+                         "2024-01-02,BBB,1\n", encoding="utf-8")
+            info = pit._price_tickers(root)
+            states = [("2024-01-02", {"AAA", "BBB"})]
+            self.assertEqual(pit.check_ticker_presence(info, states)["status"], "PASS")
+            coverage = pit.check_price_window_coverage(info, states, {"horizon_days":20})
+            self.assertEqual(coverage["status"], "FAIL")
+
+    def test_publication_same_day_after_decision_is_fail(self):
+        docs = [{"source_id":"news", "published_at":"2026-11-02T09:00:00Z",
+                 "effective_date":"2026-11-02"}]   # 16:00 VN > 15:00 decision
+        cfg = {"research":{"decision_time_local":"15:00"}}
+        self.assertEqual(pit.check_publication_order(docs)["status"], "PASS")
+        self.assertEqual(pit.check_decision_cutoff(docs, cfg)["status"], "FAIL")
+        self.assertEqual(pit.check_decision_cutoff(docs, {})["status"], "INCONCLUSIVE")
+
+    def test_date_only_outside_news_summary_is_not_proof(self):
+        raw = '{"data":{"title":"13/05/2026", "summary":"Không có thông báo ngày hiệu lực"}}'
+        self.assertFalse(pit._news_effective_statement(raw, "2026-05-13"))
+
+    def test_missing_pdf_content_never_counts_as_pass(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            docs = [{"source_id":"p", "path":"data/missing.pdf",
+                     "effective_date":"2026-11-16", "members_after":["AAA"]}]
+            self.assertEqual(pit.check_pdf_contents(root, docs)["status"], "INCONCLUSIVE")
 
 if __name__ == "__main__":
     unittest.main()
