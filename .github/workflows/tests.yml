@@ -53,6 +53,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
         run: python tools/ledger_audit.py --base "$BASE_SHA" --github
+      - name: PIT-001 replay deterministic (read-only)
+        run: |
+          python tools/pit001_audit.py > /tmp/pit001_a.json
+          python tools/pit001_audit.py > /tmp/pit001_b.json
+          cmp /tmp/pit001_a.json /tmp/pit001_b.json
+          python -c 'import json; x=json.load(open("/tmp/pit001_a.json")); print("PIT001_JSON="+json.dumps(x, sort_keys=True, ensure_ascii=False, separators=(",",":")))'
       - name: Test khong duoc sua tep nao cua kho
         run: |
           if [ -n "$(git status --porcelain)" ]; then
