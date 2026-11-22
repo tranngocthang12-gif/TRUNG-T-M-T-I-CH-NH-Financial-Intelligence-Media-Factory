@@ -22,10 +22,17 @@ Ngắt khi sụt giảm NAV (R1b; QĐ-5, QĐ-5a của ADR-0016; O-R của Owner:
     đo lại); mỗi phiên đã đo ghi một dòng paper/drawdown.csv, chỉ ghi thêm, chạy lại cùng phiên không ghi trùng.
   - Không đo được (thiếu giá gốc, lịch hỏng, thiếu hoặc hỏng max_drawdown): mỗi lần chạy ghi DRAWDOWN_UNVERIFIED kèm phiên và
     lý do; không mở vị thế mới (lệnh mua chờ ghi UNFILLED_RISK_UNVERIFIED); không ép bán; checked_through dừng trước phiên đó.
-  - Khóa: phiên đầu tiên có sụt giảm ≥ max_drawdown → `risk_lock` {since, detected_on, drawdown, peak, nav, liquidation};
-    quyết định RISK_CASH_WAIT_OWNER, mục tiêu rỗng (bán hết ở phiên khớp kế, lệnh bán khóa sàn thử lại mỗi lần chạy); khi khóa
-    còn: không khớp lệnh mua (UNFILLED_RISK_LOCK), không chấm mô hình, mỗi kỳ tái cơ cấu chỉ ghi lại RISK_CASH_WAIT_OWNER; hết
-    vị thế thì liquidation DONE kèm phiên. NAV phục hồi không gỡ khóa. Dữ liệu đóng băng vẫn đo, vẫn khóa.
+  - Khóa: phiên đầu tiên có sụt giảm ≥ max_drawdown → `risk_lock` {since, detected_on, drawdown, peak, nav, threshold,
+    max_exit_days, exit_sessions, liquidation}; quyết định RISK_CASH_WAIT_OWNER, mục tiêu rỗng; khi khóa còn: không khớp lệnh
+    mua (UNFILLED_RISK_LOCK), không chấm mô hình, mỗi kỳ tái cơ cấu chỉ ghi lại RISK_CASH_WAIT_OWNER. NAV phục hồi không gỡ
+    khóa. Dữ liệu đóng băng vẫn đo, vẫn khóa.
+  - Thanh lý khi khóa (O-R; Owner xác nhận 22/11/2026): từ phiên khớp kế, mỗi phiên mỗi mã bán tối đa max_participation ×
+    giá trị giao dịch bình quân adv_sessions phiên (giá và khối lượng GỐC của kho, risk_gate.adv_values), theo giá đóng cửa
+    gốc của chính phiên đó. Thiếu giá gốc phiên đó (UNFILLED_NO_PRICE), không đo được giá trị giao dịch bình quân hay giới
+    hạn hỏng (UNFILLED_LIQUIDITY), khóa sàn (UNFILLED_LIMIT_DOWN): phiên đó không bán mã đó, thử lại phiên sau. Phần còn lại
+    giữ PENDING (quyết định LIQUIDATION_PENDING kèm lý do từng mã). Sau max_exit_days phiên khớp mà còn vị thế: mỗi lần chạy
+    ghi LIQUIDATION_OVERDUE (vi phạm), vẫn bán tiếp theo giới hạn. liquidation DONE chỉ khi hết vị thế.
+  - Lệnh chờ đặt ở phiên s (pending_set_on) chỉ khớp ở lần chạy có phiên sau s: chạy lại cùng phiên không khớp lệnh nào.
   - Chỉ Owner gỡ (risk_gate.release_check): RISK_LOCK_RELEASED_BY_OWNER, xóa risk_lock, đỉnh = NAV phiên gỡ; thiếu điều kiện
     thì giữ khóa và ghi RISK_LOCK_RELEASE_UNVERIFIED kèm lý do."""
 import numpy as np, pandas as pd
@@ -160,13 +167,49 @@ def _measure_drawdown(dd, start, events, as_of, lim):
     return breach, stop
 
 def _lock_text(lock, positions):
-    """Trạng thái khóa cho báo cáo phiên: còn vị thế thì không ghi là đã bán."""
+    """Trạng thái khóa cho báo cáo phiên: còn vị thế thì không ghi là đã bán. Ngưỡng lấy từ risk_lock (ghi lúc khóa), không
+    đọc lại config: ngưỡng trong config hỏng sau khi khóa không làm lần chạy dừng."""
     liq = lock.get("liquidation")
     tail = (f"thanh lý PENDING, còn {len(positions)} mã ({', '.join(sorted(positions))})" if positions
             else f"thanh lý DONE phiên {lock.get('liquidated_on')}" if liq == "DONE" else f"thanh lý {liq}")
-    return (f"khóa sụt giảm NAV từ phiên {lock['since']} (sụt giảm {lock['drawdown']:.2%} ≥ ngưỡng "
-            f"{float(CFG['paper']['risk_limits']['max_drawdown']):.0%}; đỉnh {lock['peak']:,.0f}; NAV {lock['nav']:,.0f}); "
-            f"{tail}; chờ Owner gỡ bằng paper.risk_lock_release")
+    thr = lock.get("threshold")
+    thr = f"{thr:.0%}" if isinstance(thr, (int, float)) and not isinstance(thr, bool) else "không rõ"
+    return (f"khóa sụt giảm NAV từ phiên {lock['since']} (sụt giảm {lock['drawdown']:.2%} ≥ ngưỡng {thr}; "
+            f"đỉnh {lock['peak']:,.0f}; NAV {lock['nav']:,.0f}); {tail}; chờ Owner gỡ bằng paper.risk_lock_release")
+
+def _liquidity(as_of, tickers, lim):
+    """Đầu vào cho lệnh thanh lý khi khóa (O-R) → ({mã: giá đóng cửa gốc phiên as_of}, {mã: giá trị giao dịch bình quân},
+    {mã: (mã lệnh không khớp, lý do)}). Giá và khối lượng GỐC của kho; giá trị giao dịch bình quân theo risk_gate.adv_values
+    trên trục phiên HOSE (như cổng R1a). Mã có trong mục lý do thì phiên này không bán."""
+    t0, why = pd.Timestamp(as_of), {}
+    bad = risk_gate.limits_problem(lim)
+    if bad:
+        return {}, {}, {t: ("UNFILLED_LIQUIDITY", bad) for t in tickers}
+    try:
+        cal = risk_gate.load_calendar(ROOT)
+        s = data.load_store(root=ROOT)
+        s = s[s.date <= t0]
+        raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
+        vol = s.pivot(index="date", columns="ticker", values="volume").sort_index()
+        axis = risk_gate.session_axis(raw.index, cal, until=t0)
+        adv, prob = risk_gate.adv_values(raw, vol, axis, list(tickers), int(lim["adv_sessions"]))
+    except Exception as e:                              # noqa: BLE001 — lịch hỏng, kho đọc lỗi: không bán phiên này
+        return {}, {}, {t: ("UNFILLED_LIQUIDITY", f"{type(e).__name__}: {e}") for t in tickers}
+    price = {}
+    for t in tickers:
+        p = raw.at[t0, t] if t in raw.columns and t0 in raw.index else np.nan
+        if not (pd.notna(p) and np.isfinite(float(p)) and float(p) > 0):
+            why[t] = ("UNFILLED_NO_PRICE", f"thiếu giá đóng cửa gốc phiên {t0.date()}")
+        elif t in prob:
+            why[t] = ("UNFILLED_LIQUIDITY", f"không đo được giá trị giao dịch bình quân {int(lim['adv_sessions'])} phiên: "
+                                            f"{prob[t]}")
+        else:
+            price[t] = float(p)
+    return price, adv, why
+
+def _exit_days(lim, lock):
+    """max_exit_days đang dùng: của config nếu giới hạn hợp lệ, không thì giá trị ghi lúc khóa (có thể None)."""
+    return int(lim["max_exit_days"]) if risk_gate.limits_problem(lim) is None else lock.get("max_exit_days")
 
 def _market(as_of, tickers, px, frozen):
     """Đầu vào thị trường cho risk_gate.check tại as_of (mục tiêu và vị thế còn giữ): dữ liệu CHỈ ĐỌC dưới ROOT cộng giá."""
@@ -191,7 +234,10 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
     new_lock = breach is not None and not st.get("risk_lock")
     if new_lock:
         st["risk_lock"] = {"since": breach["date"], "detected_on": d, "drawdown": round(breach["drawdown"], 6),
-                           "peak": round(breach["peak"], 0), "nav": round(breach["nav"], 0), "liquidation": "PENDING"}
+                           "peak": round(breach["peak"], 0), "nav": round(breach["nav"], 0),
+                           "threshold": float(lim["max_drawdown"]),
+                           "max_exit_days": int(lim["max_exit_days"]) if risk_gate.limits_problem(lim) is None else None,
+                           "exit_sessions": 0, "liquidation": "PENDING"}
     release = None                                     # (hành động, lý do) của việc Owner gỡ khóa ở lần chạy này
     if st.get("risk_lock") and not new_lock:
         ok, why = risk_gate.release_check(st["risk_lock"], P.get("risk_lock_release"), root=ROOT)
@@ -206,16 +252,58 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
         elif why is not None:
             release = ("RISK_LOCK_RELEASE_UNVERIFIED", f"giữ khóa từ phiên {st['risk_lock']['since']}: {why}")
     # 1) Khớp lệnh đã quyết định phiên trước
-    if st["pending"] is not None and not frozen:
+    # R1b vòng 2: lệnh chờ đặt ở phiên s chỉ khớp ở phiên sau s (chạy lại cùng phiên không khớp, không ghi giao dịch)
+    fillable = st.get("pending_set_on") is None or d > st["pending_set_on"]
+    if st["pending"] is not None and not frozen and fillable:
         target = st["pending"]
         traded = False
         up, down = locked(close, as_of)
         blocked = []
-        for t in [t for t in st["positions"] if t not in target]:
+        sells = [t for t in st["positions"] if t not in target]
+        liq = bool(st.get("risk_lock")) and bool(sells)        # R1b: thanh lý khi khóa, theo giới hạn thanh khoản (O-R)
+        if liq:
+            st["risk_lock"]["exit_sessions"] = int(st["risk_lock"].get("exit_sessions") or 0) + 1
+            lpx, ladv, lwhy = _liquidity(as_of, sells, lim)
+            notes = []
+        for t in sells:
             if t in down:                                   # khóa sàn: không bán được, giữ lại và thử phiên sau
                 blocked.append(t)
                 _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "UNFILLED_LIMIT_DOWN",
                                              "quantity": 0, "price": round(float(px[t]), 2), "fees": 0})
+                if liq:
+                    notes.append(f"{t}: khóa sàn")
+                continue
+            if liq:
+                held = st["positions"][t]
+                if t in lwhy:
+                    side, why = lwhy[t]
+                    blocked.append(t)
+                    notes.append(f"{t}: {why}")
+                    _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": side, "quantity": 0,
+                                                 "price": round(float(px[t]), 2) if pd.notna(px.get(t)) else 0, "fees": 0})
+                    continue
+                cap = int(float(lim["max_participation"]) * ladv[t] / lpx[t])
+                sh = held if cap >= held else cap // lot * lot
+                if sh <= 0:
+                    blocked.append(t)
+                    notes.append(f"{t}: giới hạn {float(lim['max_participation']):.0%} × giá trị giao dịch bình quân "
+                                 f"{int(lim['adv_sessions'])} phiên = {cap:,} cp, chưa đủ một lô")
+                    _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "UNFILLED_LIQUIDITY",
+                                                 "quantity": 0, "price": round(lpx[t], 2), "fees": 0})
+                    continue
+                p = lpx[t] * (1 - c["slippage"])
+                st["cash"] += sh * p * (1 - c["sell_fee"] - c["sell_tax"])
+                cost = sh * lpx[t] * c["slippage"] + sh * p * (c["sell_fee"] + c["sell_tax"])
+                st["costs_paid"] += cost; traded = True
+                _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "SELL", "quantity": sh,
+                                             "price": round(p, 2), "fees": round(cost, 0)})
+                if sh < held:
+                    st["positions"][t] = held - sh
+                    blocked.append(t)
+                    notes.append(f"{t}: bán {sh:,}/{held:,} cp (giới hạn {float(lim['max_participation']):.0%} × giá trị "
+                                 f"giao dịch bình quân {int(lim['adv_sessions'])} phiên = {cap:,} cp), còn {held - sh:,}")
+                else:
+                    st["positions"].pop(t)
                 continue
             sh = st["positions"].pop(t); p = px[t] * (1 - c["slippage"])
             st["cash"] += sh * p * (1 - c["sell_fee"] - c["sell_tax"])
@@ -257,6 +345,10 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
             _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "BUY", "quantity": sh,
                                          "price": round(px[t] * (1 + c["slippage"]), 2),
                                          "fees": round(sh * px[t] * (c["slippage"] + c["buy_fee"]), 0)})
+        if liq and st["positions"]:
+            _append("paper/decisions.csv", {"date": d, "action": "LIQUIDATION_PENDING", "targets": "",
+                                            "models": f"phiên khớp thanh lý thứ {st['risk_lock']['exit_sessions']}: "
+                                                      + "; ".join(notes)})
         # Còn lệnh chưa khớp vì khóa biên độ → thử lại phiên sau, với các mã của mục tiêu mà cổng chưa từ chối ở phiên này.
         st["pending"] = [t for t in target if t not in refused] if blocked else None
         st["last_rebalance"] = d
@@ -282,7 +374,14 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
         _append("paper/decisions.csv", decision)
     lock = st.get("risk_lock")
     if lock and st["positions"]:
-        st["pending"] = []              # bán hết ở phiên khớp kế; lệnh bán khóa sàn thử lại mỗi lần chạy
+        st["pending"] = []              # thanh lý từ phiên khớp kế, theo giới hạn thanh khoản; phần chưa bán thử lại mỗi lần chạy
+        n_exit = _exit_days(lim, lock)
+        if n_exit is not None and int(lock.get("exit_sessions") or 0) >= n_exit:
+            lock.setdefault("overdue_since", d)
+            _append("paper/decisions.csv", {
+                "date": d, "action": "LIQUIDATION_OVERDUE", "targets": "",
+                "models": f"vi phạm O-R: đã {lock['exit_sessions']} phiên khớp thanh lý (max_exit_days {n_exit}) mà còn "
+                          f"{len(st['positions'])} mã ({', '.join(sorted(st['positions']))}); vẫn bán tiếp theo giới hạn"})
     if lock and (new_lock or (due and not frozen)):
         decision = {"date": d, "action": "RISK_CASH_WAIT_OWNER", "targets": "", "models": _lock_text(lock, st["positions"])}
         _append("paper/decisions.csv", decision)
@@ -328,5 +427,9 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
     done = [r["date"] for r in runs if ct is not None and r["date"] <= ct]
     dd["runs"] = [r for r in runs if not done or r["date"] >= max(done)]
     st["dd"] = dd
+    if st["pending"] is None:           # R1b vòng 2: phiên đặt (hoặc đặt lại) lệnh chờ; khớp từ phiên sau
+        st.pop("pending_set_on", None)
+    else:
+        st["pending_set_on"] = d
     save_json(ST, st)
     return nav, decision

@@ -35,9 +35,10 @@ def _prices(drop_at=None, drop_to=8_000.0, recover=9_800.0, tickers=("A", "B")):
     return px
 
 
-def _home(tmp, raw, skip=()):
+def _home(tmp, raw, skip=(), vol=None):
+    vol = vol or {}
     rows = [{"date": d.strftime("%Y-%m-%d"), "ticker": t, "open": raw.at[d, t], "high": raw.at[d, t], "low": raw.at[d, t],
-             "close": raw.at[d, t], "volume": 10_000_000.0, "observed_at": "2026-03-01", "source": "fixture"}
+             "close": raw.at[d, t], "volume": vol.get(t, 10_000_000.0), "observed_at": "2026-03-01", "source": "fixture"}
             for d in raw.index for t in raw.columns if (str(d.date()), t) not in skip and pd.notna(raw.at[d, t])]
     data.save_store(pd.DataFrame(rows, columns=data.COLS), root=tmp)
     return tmp
@@ -261,6 +262,118 @@ def test_floor_locked_sell_stays_pending_and_is_not_reported_as_sold(env):
     lines = _csv(home, "decisions.csv")
     first = lines[lines.date == D[25]].models.item()
     assert "thanh lý PENDING, còn 1 mã (A)" in first and "DONE" not in first
+
+
+# ---------- 5b. thanh lý theo giới hạn thanh khoản, giá gốc, chạy lại (bản chấm L-09 PR #91 vòng 1) ----------
+
+def _cap(raw, vol, i, ticker="A"):
+    """Số cổ phiếu được bán ở phiên IDX[i]: max_participation × giá trị giao dịch bình quân adv_sessions phiên / giá gốc,
+    làm tròn xuống lô (tính độc lập với mã: từ bảng giá fixture)."""
+    lim, lot = config.CFG["paper"]["risk_limits"], config.CFG["lot_size"]
+    n = int(lim["adv_sessions"])
+    p = raw[ticker].iloc[i - n + 1:i + 1].to_numpy(dtype=float)
+    adv = float((p * vol).mean())
+    return int(float(lim["max_participation"]) * adv / float(raw[ticker].iloc[i])) // lot * lot
+
+
+def test_rerun_of_the_lock_session_does_not_sell_early(env):
+    raw = _prices(drop_at=23)
+    home = _home(env, raw)
+    _state(home, D[20])
+    _, st1 = _run(home, 25, raw)                                 # phát hiện, đặt lệnh thanh lý cho phiên sau
+    assert st1["pending"] == [] and st1["pending_set_on"] == D[25]
+    trd1 = _csv(home, "trades.csv")
+    _, st2 = _run(home, 25, raw)                                 # chạy lại cùng phiên: không khớp, không ghi giao dịch
+    assert _csv(home, "trades.csv").equals(trd1) and "SELL" not in trd1.get("side", pd.Series(dtype=str)).tolist()
+    for k in ("positions", "cash", "pending", "pending_set_on", "risk_lock"):
+        assert st2[k] == st1[k], k
+    _, st3 = _run(home, 26, raw)                                 # phiên sau mới bán
+    trd = _csv(home, "trades.csv")
+    assert trd[trd.side == "SELL"].date.tolist() == [D[26]] and st3["positions"] == {}
+    assert st3["risk_lock"]["liquidated_on"] == D[26] and "pending_set_on" not in st3
+
+
+def test_liquidation_sells_within_the_participation_limit_and_flags_overdue(env):
+    raw, v = _prices(drop_at=23), 200_000.0                      # A: 200.000 cp/phiên → ~20.100 cp/phiên được bán
+    home = _home(env, raw, vol={"A": v})
+    _state(home, D[20])
+    _run(home, 25, raw)
+    held = SH0
+    for i in (26, 27, 28, 29):
+        dec, st = _run(home, i, raw)
+        if i == 26:                                              # chạy lại phiên vừa bán một phần: không bán thêm
+            trd_before, st_before = _csv(home, "trades.csv"), st
+            _, st_again = _run(home, 26, raw)
+            assert _csv(home, "trades.csv").equals(trd_before) and st_again["positions"] == st_before["positions"]
+            assert st_again["risk_lock"]["exit_sessions"] == 1
+        cap = _cap(raw, v, i)
+        trd = _csv(home, "trades.csv")
+        sold = trd[(trd.date == D[i]) & (trd.side == "SELL")]
+        assert sold.quantity.astype(int).tolist() == [min(cap, held)], i
+        held -= min(cap, held)
+        assert st["positions"] == ({"A": held} if held else {}) and st["risk_lock"]["exit_sessions"] == i - 25
+        assert st["risk_lock"]["liquidation"] == "PENDING" and held > 0
+    decs = _csv(home, "decisions.csv")
+    assert decs[decs.action == "LIQUIDATION_PENDING"].date.tolist() == D[26:30]
+    assert decs[decs.action == "LIQUIDATION_OVERDUE"].date.tolist() == D[28:30]          # sau 3 phiên khớp vẫn còn
+    assert "max_exit_days 3" in decs[decs.action == "LIQUIDATION_OVERDUE"].models.iloc[0]
+    assert st["risk_lock"]["overdue_since"] == D[28]
+
+
+def test_liquidation_without_the_raw_price_of_the_session_waits_and_is_not_done(env):
+    raw = _prices(drop_at=23)
+    home = _home(env, raw, skip={(D[26], "A")})                  # kho thiếu giá gốc A phiên IDX[26]
+    _state(home, D[20])
+    _run(home, 25, raw)
+    dec, st = _run(home, 26, raw)                                # bảng close (đã ffill) vẫn có giá A ở IDX[26]
+    trd = _csv(home, "trades.csv")
+    assert "SELL" not in trd.side.tolist() and trd[trd.side == "UNFILLED_NO_PRICE"].asset.tolist() == ["A"]
+    assert st["positions"] == {"A": SH0} and st["risk_lock"]["liquidation"] == "PENDING"
+    decs = _csv(home, "decisions.csv")
+    assert "thiếu giá đóng cửa gốc phiên " + D[26] in decs[decs.action == "LIQUIDATION_PENDING"].models.item()
+    data.save_store(pd.DataFrame([{"date": D[26], "ticker": "A", "open": 9_800.0, "high": 9_800.0, "low": 9_800.0,
+                                   "close": 9_800.0, "volume": 1e7, "observed_at": "2026-04-20", "source": "fixture"}],
+                                 columns=data.COLS), root=home)
+    dec, st = _run(home, 27, raw)                                # có giá: thử lại và bán
+    assert st["positions"] == {} and st["risk_lock"]["liquidation"] == "DONE" and st["risk_lock"]["liquidated_on"] == D[27]
+
+
+@pytest.mark.parametrize("broken", ["TODO", None])
+def test_broken_threshold_while_locked_keeps_the_lock_and_saves_the_state(env, monkeypatch, broken):
+    """Ngưỡng hỏng SAU khi đã khóa (broken=None: mất cả khối risk_limits): tới kỳ ghi lại RISK_CASH_WAIT_OWNER, lần chạy không
+    dừng; ngưỡng trong thông báo lấy từ risk_lock; vẫn ghi DRAWDOWN_UNVERIFIED, giữ khóa và lưu trạng thái."""
+    monkeypatch.setitem(config.CFG["paper"], "rebalance_days", 1)          # tới kỳ mỗi phiên
+    raw = _prices(drop_at=23)
+    home = _home(env, raw)
+    _state(home, D[20])
+    _, st = _run(home, 25, raw)
+    assert st["risk_lock"]["threshold"] == 0.15 and st["risk_lock"]["max_exit_days"] == 3
+    _, st = _run(home, 26, raw)                                  # bán hết
+    assert st["risk_lock"]["liquidation"] == "DONE"
+    if broken is None:
+        monkeypatch.setitem(config.CFG["paper"], "risk_limits", None)
+    else:
+        monkeypatch.setitem(config.CFG["paper"]["risk_limits"], "max_drawdown", broken)
+    dec, st = _run(home, 27, raw)
+    today = _csv(home, "decisions.csv").query("date == @D[27]")
+    assert {"DRAWDOWN_UNVERIFIED", "RISK_CASH_WAIT_OWNER"} <= set(today.action)
+    assert "ngưỡng 15%" in today[today.action == "RISK_CASH_WAIT_OWNER"].models.item()
+    assert dec["action"] == "RISK_CASH_WAIT_OWNER" and st["last_date"] == D[27] and "risk_lock" in st
+
+
+def test_liquidation_with_broken_limits_sells_nothing_and_retries(env, monkeypatch):
+    raw = _prices(drop_at=23)
+    home = _home(env, raw)
+    _state(home, D[20])
+    _run(home, 25, raw)
+    monkeypatch.setitem(config.CFG["paper"], "risk_limits", None)
+    dec, st = _run(home, 26, raw)
+    trd = _csv(home, "trades.csv")
+    assert trd[trd.date == D[26]].side.tolist() == ["UNFILLED_LIQUIDITY"] and st["positions"] == {"A": SH0}
+    assert st["risk_lock"]["liquidation"] == "PENDING" and st["risk_lock"]["exit_sessions"] == 1 and st["pending"] == []
+    decs = _csv(home, "decisions.csv").query("date == @D[26]")
+    assert "thiếu paper.risk_limits" in decs[decs.action == "LIQUIDATION_PENDING"].models.item()
+    assert "DRAWDOWN_UNVERIFIED" in decs.action.tolist()
 
 
 # ---------- 6. chạy lại cùng phiên, dữ liệu đóng băng ----------
