@@ -1,0 +1,437 @@
+{
+  "notice": "Bản gốc lịch nghỉ giao dịch của HOSE, tải nguyên byte từ api.hsx.vn và staticfile.hsx.vn. data/trading_calendar.csv chỉ ghi ngày nghỉ (is_session=0) khi một tin dưới đây ghi ngày đó. Thứ Bảy, Chủ nhật là WEEKEND (ngày làm bù thứ Bảy 10/01/2026 và 22/08/2026 HOSE ghi không tổ chức giao dịch). Năm 2027 chưa có thông báo nghỉ của HOSE: không đoán; các ngày trong chua_co_thong_bao.dates giữ is_session=1 với source_id CHUA_CO_THONG_BAO.",
+  "source_documents": [
+    {
+      "source_id": "hose-2426350",
+      "title": "HOSE: Thông báo về việc cập nhật lịch nghỉ giao dịch Tết Dương lịch năm 2026",
+      "published_at": "2025-12-31T09:00:00",
+      "published_at_field": "data.postedDate",
+      "published_at_note": "giây Unix của data.postedDate viết ISO 8601, không gắn múi giờ vì JSON không ghi múi giờ (postedDate=1767171600, createdDate=1766683196, publishFrom=1766620800, approvedDate=1767198208)",
+      "declares": {
+        "Tết Dương lịch": [
+          "2026-01-01",
+          "2026-01-02"
+        ]
+      },
+      "files": [
+        {
+          "role": "tin",
+          "url": "https://api.hsx.vn/n/api/v1/1/news/2426350",
+          "path": "data/evidence/calendar/hose-2426350/hose_news_2426350.json",
+          "sha256": "cf4d71c4930db32deecdae257bf8889a95e370c1a3cc12e0517495fde52afadb",
+          "bytes": 1928,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:24:44Z"
+        },
+        {
+          "role": "danh_sach_tep_dinh_kem",
+          "url": "https://api.hsx.vn/m/api/v1/1/mediafiles/1/2426350?pageIndex=1&pageSize=10&year=0",
+          "path": "data/evidence/calendar/hose-2426350/hose_mediafiles_2426350.json",
+          "sha256": "2bfc17dde76f54bc5a9d84fd08061bb75947fd33f6635257590204457e218d47",
+          "bytes": 549,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:24:45Z"
+        },
+        {
+          "role": "tep_dinh_kem",
+          "url": "https://staticfile.hsx.vn/Uploads/UploadDocuments/2426350/20251225_Thong%20bao%20%20ve%20%20viec%20cap%20nhat%20lich%20nghi%20giao%20dich%20Tet%20Duong%20lich%202026%20toan%20thi%20truong.pdf",
+          "path": "data/evidence/calendar/hose-2426350/20251225_Thong bao  ve  viec cap nhat lich nghi giao dich Tet Duong lich 2026 toan thi truong.pdf",
+          "sha256": "ef798ee1078b1895b026dfea5652630f408f6772dcdc59a07690b833241aed2c",
+          "bytes": 194413,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:38:42Z"
+        }
+      ]
+    },
+    {
+      "source_id": "hose-2437411",
+      "title": "HOSE: Thông báo lịch nghỉ giao dịch năm 2026",
+      "published_at": "2026-04-29T08:50:00",
+      "published_at_field": "data.postedDate",
+      "published_at_note": "giây Unix của data.postedDate viết ISO 8601, không gắn múi giờ vì JSON không ghi múi giờ (postedDate=1777452600, createdDate=1770368951, publishFrom=1770336000, approvedDate=1777452759)",
+      "declares": {
+        "Tết Dương lịch": [
+          "2026-01-01",
+          "2026-01-02"
+        ],
+        "Tết Nguyên Đán": [
+          "2026-02-16",
+          "2026-02-17",
+          "2026-02-18",
+          "2026-02-19",
+          "2026-02-20"
+        ],
+        "Giỗ Tổ Hùng Vương (nghỉ bù)": [
+          "2026-04-27"
+        ],
+        "Giải phóng miền Nam 30/4 và Quốc tế Lao động 01/5": [
+          "2026-04-30",
+          "2026-05-01"
+        ],
+        "Lễ Quốc khánh 2/9": [
+          "2026-08-31",
+          "2026-09-01",
+          "2026-09-02"
+        ]
+      },
+      "files": [
+        {
+          "role": "tin",
+          "url": "https://api.hsx.vn/n/api/v1/1/news/2437411",
+          "path": "data/evidence/calendar/hose-2437411/hose_news_2437411.json",
+          "sha256": "196330493c190f8d224fc66b6804857f917780265f20bfaf98d7dab76bcec6b4",
+          "bytes": 3025,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:24:39Z"
+        },
+        {
+          "role": "danh_sach_tep_dinh_kem",
+          "url": "https://api.hsx.vn/m/api/v1/1/mediafiles/1/2437411?pageIndex=1&pageSize=10&year=0",
+          "path": "data/evidence/calendar/hose-2437411/hose_mediafiles_2437411.json",
+          "sha256": "dd3402e650c0af3010c31337e303306146dd804c76c908db58751bf940361423",
+          "bytes": 884,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:24:43Z"
+        },
+        {
+          "role": "tep_dinh_kem",
+          "url": "https://staticfile.hsx.vn/Uploads/UploadDocuments/2437411/20251225_Thong%20bao%20%20ve%20%20viec%20cap%20nhat%20lich%20nghi%20giao%20dich%20Tet%20Duong%20lich%202026%20toan%20thi%20truong.pdf",
+          "path": "data/evidence/calendar/hose-2437411/20251225_Thong bao  ve  viec cap nhat lich nghi giao dich Tet Duong lich 2026 toan thi truong.pdf",
+          "sha256": "9abd31ac1664a6db5b179ee8f2eae4b90544312d6f1d4a52f6c28032b406f796",
+          "bytes": 146085,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:32:55Z"
+        },
+        {
+          "role": "tep_dinh_kem",
+          "url": "https://staticfile.hsx.vn/Uploads/UploadDocuments/2437411/20251209_Thong%20bao%20ve%20lich%20nghi%202026%20toan%20thi%20truong.pdf",
+          "path": "data/evidence/calendar/hose-2437411/20251209_Thong bao ve lich nghi 2026 toan thi truong.pdf",
+          "sha256": "7197a28764962f760a96bca0e46f1670c925716c53c8f43303194c25eea95d0b",
+          "bytes": 1089386,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:37:40Z"
+        }
+      ]
+    },
+    {
+      "source_id": "hose-2513531",
+      "title": "HOSE: Thông báo về lịch nghỉ giao dịch Ngày Văn hóa Việt Nam năm 2026",
+      "published_at": "2026-11-11T10:34:00",
+      "published_at_field": "data.postedDate",
+      "published_at_note": "giây Unix của data.postedDate viết ISO 8601, không gắn múi giờ vì JSON không ghi múi giờ (postedDate=1794393240, createdDate=1794393247, publishFrom=1794355200, approvedDate=1794393307)",
+      "declares": {
+        "Ngày Văn hóa Việt Nam": [
+          "2026-11-24"
+        ]
+      },
+      "files": [
+        {
+          "role": "tin",
+          "url": "https://api.hsx.vn/n/api/v1/1/news/2513531",
+          "path": "data/evidence/calendar/hose-2513531/hose_news_2513531.json",
+          "sha256": "562989058dfbb2c54b5c0d23ff4811f9a2b878f2eea5bd9d802188bf2172fd72",
+          "bytes": 1529,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:24:46Z"
+        },
+        {
+          "role": "danh_sach_tep_dinh_kem",
+          "url": "https://api.hsx.vn/m/api/v1/1/mediafiles/1/2513531?pageIndex=1&pageSize=10&year=0",
+          "path": "data/evidence/calendar/hose-2513531/hose_mediafiles_2513531.json",
+          "sha256": "44271864c215d2c02a8035ffd0fcc265a5346c2a37ae4770ee861300dbae8139",
+          "bytes": 133,
+          "http_status": 200,
+          "accessed_at": "2026-11-21T17:24:48Z"
+        }
+      ]
+    }
+  ],
+  "holidays": [
+    {
+      "date": "2026-01-01",
+      "source_id": "hose-2426350"
+    },
+    {
+      "date": "2026-01-02",
+      "source_id": "hose-2426350"
+    },
+    {
+      "date": "2026-02-16",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-02-17",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-02-18",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-02-19",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-02-20",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-04-27",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-04-30",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-05-01",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-08-31",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-09-01",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-09-02",
+      "source_id": "hose-2437411"
+    },
+    {
+      "date": "2026-11-24",
+      "source_id": "hose-2513531"
+    }
+  ],
+  "chua_co_thong_bao": {
+    "rule": "Mọi ngày thứ Hai–thứ Sáu trong ±3 ngày lịch quanh mỗi ngày lễ năm 2027 theo Điều 112 Bộ luật Lao động 2019 (1/1, 30/4, 1/5, 2/9, 10/3 âm lịch) và Ngày Văn hóa Việt Nam 24/11 (HOSE nghỉ năm 2026, chưa rõ có lặp lại), riêng Tết Âm lịch ±7 ngày lịch quanh mùng 1. Không phải ngày nghỉ: chỉ đánh dấu chưa có thông báo.",
+    "lunar_dates": {
+      "mung_1_tet_2027": "2027-02-06",
+      "gio_to_10_3_2027": "2027-04-16",
+      "method": "thuật toán thiên văn Hồ Ngọc Đức, múi giờ +7; kiểm trên 2026 khớp thông báo HOSE: mùng 1 Tết 2026-02-17, 10/3 âm lịch 2026-04-26"
+    },
+    "dates": [
+      {
+        "date": "2026-12-29",
+        "near": [
+          "Tết Dương lịch 2027"
+        ]
+      },
+      {
+        "date": "2026-12-30",
+        "near": [
+          "Tết Dương lịch 2027"
+        ]
+      },
+      {
+        "date": "2026-12-31",
+        "near": [
+          "Tết Dương lịch 2027"
+        ]
+      },
+      {
+        "date": "2027-01-01",
+        "near": [
+          "Tết Dương lịch 2027"
+        ]
+      },
+      {
+        "date": "2027-01-04",
+        "near": [
+          "Tết Dương lịch 2027"
+        ]
+      },
+      {
+        "date": "2027-02-01",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-02",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-03",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-04",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-05",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-08",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-09",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-10",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-11",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-02-12",
+        "near": [
+          "Tết Âm lịch 2027 (mùng 1)"
+        ]
+      },
+      {
+        "date": "2027-04-13",
+        "near": [
+          "Giỗ Tổ Hùng Vương 2027 (10/3 âm lịch)"
+        ]
+      },
+      {
+        "date": "2027-04-14",
+        "near": [
+          "Giỗ Tổ Hùng Vương 2027 (10/3 âm lịch)"
+        ]
+      },
+      {
+        "date": "2027-04-15",
+        "near": [
+          "Giỗ Tổ Hùng Vương 2027 (10/3 âm lịch)"
+        ]
+      },
+      {
+        "date": "2027-04-16",
+        "near": [
+          "Giỗ Tổ Hùng Vương 2027 (10/3 âm lịch)"
+        ]
+      },
+      {
+        "date": "2027-04-19",
+        "near": [
+          "Giỗ Tổ Hùng Vương 2027 (10/3 âm lịch)"
+        ]
+      },
+      {
+        "date": "2027-04-27",
+        "near": [
+          "Giải phóng miền Nam 30/4/2027"
+        ]
+      },
+      {
+        "date": "2027-04-28",
+        "near": [
+          "Giải phóng miền Nam 30/4/2027",
+          "Quốc tế Lao động 1/5/2027"
+        ]
+      },
+      {
+        "date": "2027-04-29",
+        "near": [
+          "Giải phóng miền Nam 30/4/2027",
+          "Quốc tế Lao động 1/5/2027"
+        ]
+      },
+      {
+        "date": "2027-04-30",
+        "near": [
+          "Giải phóng miền Nam 30/4/2027",
+          "Quốc tế Lao động 1/5/2027"
+        ]
+      },
+      {
+        "date": "2027-05-03",
+        "near": [
+          "Giải phóng miền Nam 30/4/2027",
+          "Quốc tế Lao động 1/5/2027"
+        ]
+      },
+      {
+        "date": "2027-05-04",
+        "near": [
+          "Quốc tế Lao động 1/5/2027"
+        ]
+      },
+      {
+        "date": "2027-08-30",
+        "near": [
+          "Quốc khánh 2/9/2027"
+        ]
+      },
+      {
+        "date": "2027-08-31",
+        "near": [
+          "Quốc khánh 2/9/2027"
+        ]
+      },
+      {
+        "date": "2027-09-01",
+        "near": [
+          "Quốc khánh 2/9/2027"
+        ]
+      },
+      {
+        "date": "2027-09-02",
+        "near": [
+          "Quốc khánh 2/9/2027"
+        ]
+      },
+      {
+        "date": "2027-09-03",
+        "near": [
+          "Quốc khánh 2/9/2027"
+        ]
+      },
+      {
+        "date": "2027-11-22",
+        "near": [
+          "Ngày Văn hóa Việt Nam 24/11/2027"
+        ]
+      },
+      {
+        "date": "2027-11-23",
+        "near": [
+          "Ngày Văn hóa Việt Nam 24/11/2027"
+        ]
+      },
+      {
+        "date": "2027-11-24",
+        "near": [
+          "Ngày Văn hóa Việt Nam 24/11/2027"
+        ]
+      },
+      {
+        "date": "2027-11-25",
+        "near": [
+          "Ngày Văn hóa Việt Nam 24/11/2027"
+        ]
+      },
+      {
+        "date": "2027-11-26",
+        "near": [
+          "Ngày Văn hóa Việt Nam 24/11/2027"
+        ]
+      }
+    ]
+  }
+}
