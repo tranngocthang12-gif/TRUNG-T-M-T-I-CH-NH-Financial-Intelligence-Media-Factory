@@ -34,7 +34,10 @@ Ngắt khi sụt giảm NAV (R1b; QĐ-5, QĐ-5a của ADR-0016; O-R của Owner:
     ghi LIQUIDATION_OVERDUE (vi phạm), vẫn bán tiếp theo giới hạn. liquidation DONE chỉ khi hết vị thế.
   - Lệnh chờ đặt ở phiên s (pending_set_on) chỉ khớp ở lần chạy có phiên sau s: chạy lại cùng phiên không khớp lệnh nào.
   - Chỉ Owner gỡ (risk_gate.release_check): RISK_LOCK_RELEASED_BY_OWNER, xóa risk_lock, đỉnh = NAV phiên gỡ; thiếu điều kiện
-    thì giữ khóa và ghi RISK_LOCK_RELEASE_UNVERIFIED kèm lý do."""
+    thì giữ khóa và ghi RISK_LOCK_RELEASE_UNVERIFIED kèm lý do. Còn vị thế (thanh lý PENDING) thì chưa gỡ dù đủ điều kiện
+    (Owner xác nhận 22/11/2026): giữ khóa, ghi RISK_LOCK_RELEASE_UNVERIFIED «thanh lý chưa xong, còn N mã», bán tiếp theo
+    giới hạn thanh khoản; giá trị gỡ vẫn hiệu lực, lần chạy đầu tiên sau khi thanh lý DONE xét lại và gỡ nếu đủ điều kiện.
+    Mã không bán được mãi thì khóa còn mãi, kèm LIQUIDATION_OVERDUE."""
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
 from . import adjust, data, risk_gate
@@ -243,6 +246,11 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
         ok, why = risk_gate.release_check(st["risk_lock"], P.get("risk_lock_release"), root=ROOT)
         if ok and dd.get("nav_date") != d:
             ok, why = False, f"chưa đo được NAV phiên gỡ {d} để đặt lại đỉnh"
+        if ok and st["positions"]:      # Owner 22/11/2026: thanh lý chưa xong thì chưa gỡ, bán tiếp theo giới hạn O-R
+            held = sorted(st["positions"])
+            ok, why = False, (f"thanh lý chưa xong, còn {len(held)} mã ({', '.join(held)}); tiếp tục bán theo giới hạn "
+                              f"thanh khoản, giá trị gỡ vẫn hiệu lực và được xét lại ở lần chạy đầu tiên sau khi thanh lý "
+                              f"xong ({why})")
         if ok:
             lk = st.pop("risk_lock")
             dd["peak"], dd["peak_date"] = float(dd["nav"]), d

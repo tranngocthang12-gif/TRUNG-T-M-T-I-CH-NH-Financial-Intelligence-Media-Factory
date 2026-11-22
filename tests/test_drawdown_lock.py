@@ -416,7 +416,12 @@ class Api:
         return {"number": 91, "merged": self.merged, "merged_at": "2026-04-10T00:00:00Z", "merged_by": {"login": self.merged_by}}
 
 
-GIT = lambda root: ("a" * 40, None)                              # noqa: E731
+def _git(value):
+    """git_last_release_commit giả: commit đổi giá trị mới nhất là 'aaaa…' và đặt `value`."""
+    return lambda root: ("a" * 40, value, None)
+
+
+GIT = _git("2026-03-25")
 
 
 @pytest.mark.parametrize("value, api, git, ok, why", [
@@ -428,7 +433,9 @@ GIT = lambda root: ("a" * 40, None)                              # noqa: E731
     ("2026-03-25", Api(merged=False), GIT, False, "không thuộc PR nào đã gộp vào main"),
     ("2026-03-25", Api(pulls=[]), GIT, False, "không thuộc PR nào"),
     ("2026-03-25", Api(fail=True), GIT, False, "API GitHub"),
-    ("2026-03-25", Api(), lambda root: (None, "kho nông (shallow clone)"), False, "kho nông"),
+    ("2026-03-25", Api(), lambda root: (None, None, "kho nông (shallow clone)"), False, "kho nông"),
+    ("2026-03-25", Api(), _git("2026-03-24"), False, "lần đổi giá trị paper.risk_lock_release mới nhất"),
+    ("2026-03-25", Api(), _git(None), False, "khác risk_lock.since"),
 ])
 def test_release_check_needs_the_exact_value_and_an_owner_merged_pr(value, api, git, ok, why):
     got, reason = rg.release_check({"since": "2026-03-25"}, value, root=".", git=git, api=api, owner="owner")
@@ -450,7 +457,7 @@ def _locked_home(env):
 
 def test_recovered_nav_or_wrong_release_does_not_unlock(env, monkeypatch):
     home, raw = _locked_home(env)
-    monkeypatch.setattr(rg, "git_last_release_commit", GIT)
+    monkeypatch.setattr(rg, "git_last_release_commit", _git(D[23]))
     monkeypatch.setattr(rg, "github_api", Api())
     monkeypatch.setenv("GITHUB_REPOSITORY_OWNER", "owner")
     _run(home, 27, raw)                                          # chưa đặt giá trị gỡ: NAV hồi cũng không gỡ
@@ -461,9 +468,10 @@ def test_recovered_nav_or_wrong_release_does_not_unlock(env, monkeypatch):
 
 
 @pytest.mark.parametrize("api, git, why", [
-    (Api(merged_by="ai-khac"), GIT, "không phải chủ kho"),
-    (Api(fail=True), GIT, "API GitHub"),
-    (Api(), lambda root: (None, "kho nông (shallow clone): thiếu lịch sử git"), "kho nông"),
+    (Api(merged_by="ai-khac"), _git(D[23]), "không phải chủ kho"),
+    (Api(fail=True), _git(D[23]), "API GitHub"),
+    (Api(), _git(D[22]), "lần đổi giá trị paper.risk_lock_release mới nhất"),
+    (Api(), lambda root: (None, None, "kho nông (shallow clone): thiếu lịch sử git"), "kho nông"),
 ])
 def test_release_without_owner_merge_keeps_the_lock(env, monkeypatch, api, git, why):
     home, raw = _locked_home(env)
@@ -477,7 +485,7 @@ def test_release_without_owner_merge_keeps_the_lock(env, monkeypatch, api, git, 
 
 def test_owner_release_unlocks_and_resets_the_peak(env, monkeypatch):
     home, raw = _locked_home(env)
-    monkeypatch.setattr(rg, "git_last_release_commit", GIT)
+    monkeypatch.setattr(rg, "git_last_release_commit", _git(D[23]))
     monkeypatch.setattr(rg, "github_api", Api())
     monkeypatch.setenv("GITHUB_REPOSITORY_OWNER", "owner")
     monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", D[23])
@@ -489,29 +497,154 @@ def test_owner_release_unlocks_and_resets_the_peak(env, monkeypatch):
     assert dec is None or dec["action"] not in ("RISK_LOCK_RELEASED_BY_OWNER", "RISK_LOCK_RELEASE_UNVERIFIED")
 
 
-def test_git_release_commit_reads_history_and_refuses_shallow_clones(tmp_path):
-    def git(*a, cwd):
-        subprocess.run(["git", *a], cwd=cwd, check=True, capture_output=True)
+def _repo(path):
+    """Kho git tạm: → (git, commit); commit(nội dung, thông điệp[, tệp]) ghi tệp, commit và trả sha."""
+    path.mkdir(parents=True, exist_ok=True)
+
+    def git(*a):
+        return subprocess.run(["git", *a], cwd=path, check=True, capture_output=True, text=True).stdout.strip()
+
+    def commit(text, msg, name="config.yaml"):
+        (path / name).write_text(text, encoding="utf-8")
+        git("add", name)
+        git("commit", "-q", "-m", msg)
+        return git("rev-parse", "HEAD")
+    git("init", "-q")
+    git("config", "user.email", "t@example.invalid")
+    git("config", "user.name", "t")
+    return git, commit
+
+
+def test_git_release_commit_follows_the_yaml_value_and_refuses_shallow_clones(tmp_path):
+    """Bản chấm L-09 PR #91 vòng 2, BLOCKER 2: chỉ commit đổi GIÁ TRỊ paper.risk_lock_release mới tính; commit chỉ sửa chú
+    thích có tên field, đổi ngoặc kép, đổi định dạng hay khóa khác thì không; dòng đổi giá trị không chứa tên field vẫn tính."""
     src = tmp_path / "src"
-    src.mkdir()
-    git("init", "-q", cwd=src)
-    git("config", "user.email", "t@example.invalid", cwd=src)
-    git("config", "user.name", "t", cwd=src)
-    (src / "config.yaml").write_text("paper:\n  risk_lock_release: null\n", encoding="utf-8")
-    git("add", "config.yaml", cwd=src)
-    git("commit", "-q", "-m", "a", cwd=src)
-    (src / "config.yaml").write_text("paper:\n  risk_lock_release: 2026-03-25\n", encoding="utf-8")
-    git("commit", "-q", "-am", "b", cwd=src)
-    (src / "note.txt").write_text("x", encoding="utf-8")
-    git("add", "note.txt", cwd=src)
-    git("commit", "-q", "-m", "c", cwd=src)
-    sha, why = rg.git_last_release_commit(src)
-    head_b = subprocess.run(["git", "rev-parse", "HEAD~1"], cwd=src, capture_output=True, text=True).stdout.strip()
-    assert sha == head_b and why is None
+    _, commit = _repo(src)
+    commit("paper:\n  risk_lock_release: null\n", "a")                                      # commit gốc: null, chưa đổi
+    b = commit("paper:\n  risk_lock_release: 2026-03-25\n", "b")                            # đổi giá trị
+    commit("x", "c", name="note.txt")                                                       # không đụng config.yaml
+    commit("paper:\n  # risk_lock_release: chỉ chủ kho đổi\n  risk_lock_release: '2026-03-25'\n", "d")  # chú thích, ngoặc
+    commit("paper:\n  risk_lock_release:\n    2026-03-25\n  other: 1\n", "e")               # định dạng, khóa khác
+    assert rg.git_last_release_commit(src) == (b, "2026-03-25", None)
+    f = commit("paper:\n  risk_lock_release:\n    2026-03-27\n  other: 1\n", "f")           # dòng đổi không có tên field
+    assert rg.git_last_release_commit(src) == (f, "2026-03-27", None)
     shallow = tmp_path / "shallow"
     subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{src}", str(shallow)], check=True, capture_output=True)
-    sha, why = rg.git_last_release_commit(shallow)
-    assert sha is None and "kho nông" in why
+    sha, value, why = rg.git_last_release_commit(shallow)
+    assert sha is None and value is None and "kho nông" in why
+    commit("paper: [\n", "g")                                                                # YAML hỏng: không đoán
+    sha, value, why = rg.git_last_release_commit(src)
+    assert sha is None and value is None and "không phải YAML hợp lệ" in why
+    root = tmp_path / "root"
+    _, commit = _repo(root)
+    r0 = commit("paper:\n  risk_lock_release: 2026-03-25\n", "gốc")                         # commit gốc đặt giá trị
+    assert rg.git_last_release_commit(root) == (r0, "2026-03-25", None)
+    added = tmp_path / "added"
+    _, commit = _repo(added)
+    commit("x", "gốc", name="note.txt")
+    a1 = commit("paper:\n  risk_lock_release: 2026-03-25\n", "thêm config.yaml")             # commit cha chưa có tệp
+    assert rg.git_last_release_commit(added) == (a1, "2026-03-25", None)
+    never = tmp_path / "never"
+    _, commit = _repo(never)
+    commit("paper:\n  risk_lock_release: null  # risk_lock_release\n", "n0")
+    commit("paper:\n  risk_lock_release: null  # risk_lock_release: sửa chú thích\n", "n1")
+    sha, value, why = rg.git_last_release_commit(never)
+    assert sha is None and "không tìm thấy commit nào đổi giá trị" in why
+
+
+class ShaApi:
+    """API GitHub giả theo commit: commits/{sha}/pulls → PR prs[sha] đã gộp vào main; pulls/{số} → người gộp merged_by[số]."""
+    def __init__(self, prs, merged_by):
+        self.prs, self.merged_by, self.calls = prs, merged_by, []
+
+    def __call__(self, path):
+        self.calls.append(path)
+        kind, key = path.split("/")[:2]
+        if kind == "commits":
+            return ([{"number": self.prs[key], "merged_at": "2026-04-10T00:00:00Z", "base": {"ref": "main"}}]
+                    if key in self.prs else [])
+        n = int(key)
+        return {"number": n, "merged": True, "merged_at": "2026-04-10T00:00:00Z", "merged_by": {"login": self.merged_by[n]}}
+
+
+def test_owner_comment_commit_after_an_unapproved_value_change_keeps_the_lock(env, monkeypatch):
+    """Bản chấm L-09 PR #91 vòng 2, BLOCKER 2 (đối kháng, git thật): giá trị gỡ do một PR không phải chủ kho gộp đặt; sau đó chủ
+    kho gộp PR chỉ sửa chú thích có tên field. Commit được xác minh là commit đổi GIÁ TRỊ → giữ khóa. Đối chứng: chủ kho gộp
+    PR đổi giá trị thì gỡ."""
+    home, raw = _locked_home(env)                                # khóa từ D[23], đã bán hết
+    _, commit = _repo(home)
+    commit("paper:\n  risk_lock_release: null\n", "nền")
+    bad = commit(f"paper:\n  risk_lock_release: {D[23]}\n", "đổi giá trị, không do chủ kho gộp")
+    note = commit(f"paper:\n  # risk_lock_release: chỉ chủ kho gộp PR đổi giá trị này\n  risk_lock_release: {D[23]}\n",
+                  "chỉ sửa chú thích")
+    api = ShaApi({bad: 7, note: 8}, {7: "ai-khac", 8: "owner"})
+    monkeypatch.setattr(rg, "github_api", api)
+    monkeypatch.setenv("GITHUB_REPOSITORY_OWNER", "owner")
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", D[23])
+    dec, st = _run(home, 27, raw)
+    assert "risk_lock" in st and dec["action"] == "RISK_LOCK_RELEASE_UNVERIFIED"
+    assert "không phải chủ kho" in dec["models"] and "#7: ai-khac" in dec["models"]
+    assert f"commits/{bad}/pulls" in api.calls and f"commits/{note}/pulls" not in api.calls
+    commit("paper:\n  risk_lock_release: null\n", "về null")                                 # đối chứng
+    good = commit(f"paper:\n  risk_lock_release: {D[23]}\n", "chủ kho gộp PR đặt lại giá trị")
+    api.prs[good], api.merged_by[9] = 9, "owner"
+    _, st = _run(home, 28, raw)
+    rel = _csv(home, "decisions.csv").query("date == @D[28] and action == 'RISK_LOCK_RELEASED_BY_OWNER'")
+    assert "risk_lock" not in st and "PR #9" in rel.models.item() and good[:7] in rel.models.item()
+
+
+def test_owner_release_during_liquidation_waits_until_everything_is_sold(env, monkeypatch):
+    """Bản chấm L-09 PR #91 vòng 2, BLOCKER 1; Owner chọn 22/11/2026 «Hoãn gỡ tới khi thanh lý xong»: Owner gỡ khi đã bán một
+    phần → giữ khóa, RISK_LOCK_RELEASE_UNVERIFIED «thanh lý chưa xong», không phiên nào bán quá giới hạn thanh khoản; lần
+    chạy đầu tiên sau khi thanh lý DONE thì gỡ, đỉnh đặt lại."""
+    raw, v = _prices(drop_at=23), 400_000.0                      # A: ~40.200 cp/phiên được bán → hết sau 3 phiên khớp
+    home = _home(env, raw, vol={"A": v})
+    _state(home, D[20])
+    _run(home, 25, raw)
+    _, st = _run(home, 26, raw)                                  # phiên khớp thứ nhất: bán một phần
+    assert st["positions"] == {"A": SH0 - _cap(raw, v, 26)} and st["risk_lock"]["liquidation"] == "PENDING"
+    monkeypatch.setattr(rg, "git_last_release_commit", _git(D[23]))
+    monkeypatch.setattr(rg, "github_api", Api())
+    monkeypatch.setenv("GITHUB_REPOSITORY_OWNER", "owner")
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", D[23])  # Owner gỡ khi còn vị thế
+    for i in (27, 28):
+        before = st["positions"]["A"]
+        _, st = _run(home, i, raw)
+        trd = _csv(home, "trades.csv")
+        sold = trd[(trd.date == D[i]) & (trd.side == "SELL")].quantity.astype(int).tolist()
+        assert sold == [min(_cap(raw, v, i), before)], i         # bán theo giới hạn, không bán hết một lần
+        assert "risk_lock" in st and "risk_lock_released" not in st
+        day = D[i]
+        rel = _csv(home, "decisions.csv").query("date == @day and action == 'RISK_LOCK_RELEASE_UNVERIFIED'")
+        assert "thanh lý chưa xong, còn 1 mã (A)" in rel.models.item() and "chủ kho" in rel.models.item()
+    assert st["positions"] == {} and st["risk_lock"]["liquidation"] == "DONE" and st["risk_lock"]["liquidated_on"] == D[28]
+    decs = _csv(home, "decisions.csv")
+    assert not {"RISK_LOCK_RELEASED_BY_OWNER", "LIQUIDATION_OVERDUE"} & set(decs.action)
+    _, st = _run(home, 29, raw)                                  # lần chạy đầu tiên sau khi thanh lý xong: gỡ
+    assert "risk_lock" not in st and st["risk_lock_released"] == {"since": D[23], "on": D[29]}
+    assert _csv(home, "decisions.csv").query("date == @D[29]").action.tolist().count("RISK_LOCK_RELEASED_BY_OWNER") == 1
+    assert st["dd"]["peak"] == st["dd"]["nav"] and st["dd"]["peak_date"] == D[29]
+
+
+def test_owner_release_with_a_position_that_cannot_be_sold_keeps_the_lock_and_flags_overdue(env, monkeypatch):
+    """Owner 22/11/2026: mã không bán được mãi (ở đây: giao dịch quá ít, giới hạn chưa đủ một lô) thì khóa còn mãi, kèm
+    LIQUIDATION_OVERDUE; mỗi lần chạy ghi RISK_LOCK_RELEASE_UNVERIFIED «thanh lý chưa xong»."""
+    raw = _prices(drop_at=23)
+    home = _home(env, raw, vol={"A": 100.0})
+    _state(home, D[20])
+    _run(home, 25, raw)
+    monkeypatch.setattr(rg, "git_last_release_commit", _git(D[23]))
+    monkeypatch.setattr(rg, "github_api", Api())
+    monkeypatch.setenv("GITHUB_REPOSITORY_OWNER", "owner")
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", D[23])
+    for i in (26, 27, 28, 29):
+        _, st = _run(home, i, raw)
+    assert "risk_lock" in st and st["positions"] == {"A": SH0} and st["risk_lock"]["liquidation"] == "PENDING"
+    decs = _csv(home, "decisions.csv")
+    rel = decs[decs.action == "RISK_LOCK_RELEASE_UNVERIFIED"]
+    assert rel.date.tolist() == D[26:30] and rel.models.str.contains("thanh lý chưa xong, còn 1 mã").all()
+    assert decs[decs.action == "LIQUIDATION_OVERDUE"].date.tolist() == D[28:30]
+    assert "RISK_LOCK_RELEASED_BY_OWNER" not in decs.action.tolist() and "SELL" not in _csv(home, "trades.csv").side.tolist()
 
 
 # ---------- 8. sổ không có vị thế: đầu ra cũ không đổi ----------

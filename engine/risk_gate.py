@@ -41,6 +41,7 @@ import urllib.request
 
 import numpy as np
 import pandas as pd
+import yaml
 
 LIMIT_KEYS = ("max_weight", "max_participation", "max_exit_days", "adv_sessions",
               "quarantine_sessions_before", "quarantine_sessions_after")
@@ -330,21 +331,62 @@ def drawdown_path(navs, peak, threshold, peak_date=None):
     return {"rows": rows, "breach": first, "stopped_at": stop, "peak": float(peak), "peak_date": peak_date}
 
 
+def _release_value(doc):
+    """paper.risk_lock_release của một config.yaml đã đọc, dạng chuỗi (None khi không có). Chuỗi: ngày YAML không ngoặc
+    (date) và có ngoặc (str) là cùng một giá trị, như phép so `str(release_value) != since` của release_check."""
+    paper = doc.get("paper") if isinstance(doc, dict) else None
+    v = paper.get("risk_lock_release") if isinstance(paper, dict) else None
+    return None if v is None else str(v)
+
+
 def git_last_release_commit(root):
-    """→ (sha, None) của commit mới nhất đổi dòng `risk_lock_release` trong config.yaml (`git log -1 -G risk_lock_release`),
-    hoặc (None, lý do): kho nông (thiếu lịch sử), không có commit nào như vậy, git lỗi."""
+    """→ (sha, giá trị, None) của commit mới nhất ĐỔI GIÁ TRỊ `paper.risk_lock_release` trong config.yaml, cùng giá trị
+    commit đó đặt; hoặc (None, None, lý do): kho nông (thiếu lịch sử), không có commit nào như vậy, config.yaml ở một commit
+    không đọc được (YAML hỏng: không đoán, giữ khóa), git lỗi.
+
+    Duyệt `git log -- config.yaml` từ mới tới cũ; với mỗi commit, đọc YAML của config.yaml ở commit đó và ở commit cha thứ
+    nhất (commit gốc, hoặc commit cha chưa có tệp: giá trị None) rồi so giá trị. Commit chỉ sửa chú thích, khoảng trắng,
+    ngoặc kép hay khóa khác — kể cả dòng có chữ `risk_lock_release` — không phải lần đổi giá trị (bản chấm L-09 PR #91 vòng 2)."""
     def git(*args):
-        return subprocess.run(["git", *args], cwd=str(root), capture_output=True, text=True, timeout=30)
+        return subprocess.run(["git", *args], cwd=str(root), capture_output=True, text=True, encoding="utf-8", timeout=30)
     r = git("rev-parse", "--is-shallow-repository")
     if r.returncode != 0:
-        return None, "không đọc được lịch sử git"
+        return None, None, "không đọc được lịch sử git"
     if r.stdout.strip() == "true":
-        return None, "kho nông (shallow clone): thiếu lịch sử git để xác minh commit gỡ khóa"
-    r = git("log", "-1", "-G", "risk_lock_release", "--format=%H", "--", "config.yaml")
-    sha = r.stdout.strip()
-    if r.returncode != 0 or not sha:
-        return None, "không tìm thấy commit nào đổi dòng risk_lock_release trong config.yaml"
-    return sha, None
+        return None, None, "kho nông (shallow clone): thiếu lịch sử git để xác minh commit gỡ khóa"
+    r = git("log", "--format=%H %P", "--", "config.yaml")
+    if r.returncode != 0:
+        return None, None, "không đọc được lịch sử git của config.yaml"
+    seen = {}
+
+    def value(rev):
+        if rev not in seen:
+            t = git("ls-tree", "--name-only", rev, "--", "config.yaml")
+            if t.returncode != 0:
+                raise ValueError(f"không đọc được cây của commit {rev[:7]}")
+            if not t.stdout.strip():
+                seen[rev] = None
+            else:
+                f = git("show", f"{rev}:config.yaml")
+                if f.returncode != 0:
+                    raise ValueError(f"không đọc được config.yaml ở commit {rev[:7]}")
+                try:
+                    seen[rev] = _release_value(yaml.safe_load(f.stdout))
+                except yaml.YAMLError as e:
+                    raise ValueError(f"config.yaml ở commit {rev[:7]} không phải YAML hợp lệ ({type(e).__name__})") from e
+        return seen[rev]
+
+    try:
+        for line in r.stdout.splitlines():
+            if not line.strip():
+                continue
+            sha, *parents = line.split()
+            new = value(sha)
+            if new != (value(parents[0]) if parents else None):
+                return sha, new, None
+    except (ValueError, subprocess.SubprocessError, OSError) as e:
+        return None, None, str(e)
+    return None, None, "không tìm thấy commit nào đổi giá trị paper.risk_lock_release trong config.yaml"
 
 
 def github_api(path):
@@ -364,10 +406,12 @@ def release_check(lock, release_value, *, root, git=None, api=None, owner=None):
 
     Đủ cả hai điều kiện mới gỡ:
       1. `paper.risk_lock_release` bằng đúng `risk_lock.since`;
-      2. commit mới nhất đổi dòng `risk_lock_release` trong config.yaml thuộc một PR đã gộp vào `main`, và người gộp
-         (`merged_by`) là chủ kho (`owner`, mặc định biến môi trường GITHUB_REPOSITORY_OWNER), xác minh qua API GitHub
-         (`commits/{sha}/pulls` rồi `pulls/{số}`).
-    `git(root)` → (sha, lý do) và `api(path)` → JSON được truyền vào để test; mặc định git_last_release_commit, github_api.
+      2. commit mới nhất ĐỔI GIÁ TRỊ `paper.risk_lock_release` trong config.yaml đặt đúng giá trị `risk_lock.since`, thuộc
+         một PR đã gộp vào `main`, và người gộp (`merged_by`) là chủ kho (`owner`, mặc định biến môi trường
+         GITHUB_REPOSITORY_OWNER), xác minh qua API GitHub (`commits/{sha}/pulls` rồi `pulls/{số}`). Commit mới hơn chỉ
+         sửa chú thích có tên field không thay được commit đổi giá trị.
+    `git(root)` → (sha, giá trị, lý do) và `api(path)` → JSON được truyền vào để test; mặc định git_last_release_commit,
+    github_api.
     Mọi lỗi (kho nông, không mạng, không token, API lỗi) đều là (False, lý do): giữ khóa."""
     if release_value is None:
         return False, None
@@ -380,13 +424,16 @@ def release_check(lock, release_value, *, root, git=None, api=None, owner=None):
     git = git or git_last_release_commit
     api = api or github_api
     try:
-        sha, why = git(root)
+        sha, value, why = git(root)
         if not sha:
             return False, why or "không xác định được commit gỡ khóa"
+        if value != since:
+            return False, (f"commit {sha[:7]} (lần đổi giá trị paper.risk_lock_release mới nhất) đặt {value}, khác "
+                           f"risk_lock.since = {since}")
         pulls = api(f"commits/{sha}/pulls") or []
         merged = [p for p in pulls if p.get("merged_at") and (p.get("base") or {}).get("ref") == "main"]
         if not merged:
-            return False, f"commit {sha[:7]} đổi risk_lock_release không thuộc PR nào đã gộp vào main"
+            return False, f"commit {sha[:7]} đổi giá trị risk_lock_release không thuộc PR nào đã gộp vào main"
         who = []
         for p in merged:
             pr = api(f"pulls/{p['number']}") or {}
