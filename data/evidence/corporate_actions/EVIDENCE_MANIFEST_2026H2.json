@@ -1,5 +1,5 @@
 {
-  "notice": "Ngày công bố của mọi văn bản trong tệp này là CHUA_XAC_MINH. Ngày ký không được ghi vào published_at. event_type để trống vì nguyên văn HOSE chưa được ánh xạ sang loại kỹ thuật của engine. Có PDF, hoặc ngày và hệ số trùng sự kiện engine, không đủ để vào chuỗi verified-adjusted.",
+  "notice": "Ngày công bố (published_at) chỉ được ghi khi có metadata tin HOSE đã ghim cạnh bản gốc (JSON tin và JSON danh sách tệp đính kèm); bản chưa đủ điều kiện để published_at = null và published_at_status = CHUA_XAC_MINH. Ngày ký và ngày trong tên tệp không được ghi vào published_at. event_type để trống; việc xếp lớp do bảng đóng STOCK_VERBATIM trong engine.verified_adjust quyết định theo ADR-0016 QĐ-2 và QĐ-2a. Có PDF, hoặc ngày và hệ số trùng sự kiện engine, không đủ để vào chuỗi verified-adjusted.",
   "source_documents": [
     {
       "source_id": "hose-2500573",

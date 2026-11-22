@@ -252,6 +252,26 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
             self.assertIn(info["status"], line)
             self.assertIn(doc["source_id"], ids)
 
+    def test_report_on_disk_equals_tool_output(self):
+        """Báo cáo do tools/corporate_action_evidence_2026h2.py sinh tất định; tệp trên đĩa phải bằng đúng đầu ra công cụ."""
+        import importlib.util
+
+        spec = importlib.util.spec_from_file_location("_ca_2026h2_tool", ROOT / "tools" / "corporate_action_evidence_2026h2.py")
+        tool = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(tool)
+        text = tool.render()
+        self.assertEqual(REPORT.read_text(encoding="utf-8"), text)
+        self.assertTrue(text.startswith("> Tệp do `tools/corporate_action_evidence_2026h2.py` sinh tất định"))
+        self.assertEqual(text, tool.render())
+        for old in ("Cả 17 văn bản chưa có metadata", "Ghi nhận trước nói tin HOSE"):
+            self.assertNotIn(old, text)
+        docs = _docs()
+        n_pub = sum(1 for d in docs if d["published_at"])
+        self.assertIn(f"Trong {len(docs)} văn bản, {n_pub} văn bản có ngày công bố", text)
+        for doc in docs:
+            line = next(row for row in text.splitlines() if row.startswith(f"| {doc['ticker']} {doc['official_ex_date']} |"))
+            self.assertTrue(line.rstrip().endswith(f"| {doc['note']} |"), doc["source_id"])
+
     def test_pdf_and_matching_numbers_do_not_enter_verified_chain(self):
         import pandas as pd
 
