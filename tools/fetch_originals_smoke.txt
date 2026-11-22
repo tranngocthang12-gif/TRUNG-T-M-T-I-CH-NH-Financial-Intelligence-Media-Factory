@@ -1,0 +1,14 @@
+# Lượt chạy thử của .github/workflows/fetch_originals.yml khi PR sửa công cụ (P0-3; phục vụ S0a, ADR-0017 QĐ-S9 mục 1).
+# Trang tin công bố thông tin trên www.hsx.vn (tin VN30, id 2388633, đã ghim ở data/evidence/vn30_reviews).
+https://www.hsx.vn/vi/tin-tuc/hose-danh-muc-co-phieu-thanh-phan-cua-bo-chi-so-hose-index-ky-thang-7-2025/2388633
+# Tin qua API của HOSE (TCB, id 1705374): EVIDENCE_MANIFEST.json ghi đây là nguồn cần để xác minh published_at.
+https://api.hsx.vn/n/api/v1/1/news/1705374
+# PDF của HOSE đã ghim trong kho (hose-1705374): khớp sha256 thì Actions tải đúng từng byte của bản gốc.
+https://staticfile.hsx.vn/Uploads/News/9453a4a7eeee428383139145a5221681/20240613_20240613%20-%20TCB%20-%20TB%20NDKCC%20phat%20hanh%20co%20phieu%20de%20tang%20von%20co%20phan%20tu%20NVCSH.pdf sha256=fac79d718815dc8b47578a6778b55f5ad71700ed18102aae84dd4eb23cd9d1de
+# S0a — chỉ mục công bố thông tin chung của HOSE: mọi tin trong một ngày đã qua, trang 1. JSON có paging.totalCount và
+# paging.totalPages, nên kiểm được việc tải đủ trang (ADR-0017, mục "Chỉ mục đầy đủ").
+https://api.hsx.vn/n/api/v1/1/news?pageIndex=1&pageSize=50&startDate=2026-10-27&endDate=2026-10-27
+# S0a — danh sách BCTC theo mã của HOSE (VIC, id chứng khoán 2239; mediafiles loại 5 là báo cáo tài chính), năm 2026.
+https://api.hsx.vn/m/api/v1/1/mediafiles/5/2239?pageIndex=1&pageSize=10&year=2026
+# S0a — một BCTC quý từ HOSE: VIC, BCTC riêng quý 3/2026 (1,4 MB; tệp BCTC 8,3 MB của ACB tải quá 20 phút ở lượt trước).
+https://staticfile.hsx.vn/Uploads/UploadDocuments/2509789/20261030%20-%20VIC%20-%20BCTC%20rieng%20Q3-2026.pdf

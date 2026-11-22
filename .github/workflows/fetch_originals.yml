@@ -1,0 +1,69 @@
+name: Tai ban goc (khong ghi main)
+
+# P0-3; luot chay thu phuc vu S0a cua ADR-0017 (QD-S9 muc 1-2). Tai ban goc theo danh sach URL, ghi sha256, so byte, header, gio may
+# chu; dua tep va manifest len ARTIFACT cua luot chay. Khong ghi main: quyen chi doc, khong push, khong commit.
+# - workflow_dispatch: Owner nhap danh sach URL (cach nhau bang khoang trang hoac dau phay; them "sha256=<hex>" sau URL
+#   neu muon doi chieu hash).
+# - pull_request: khi PR sua cong cu nay, chay thu voi tools/fetch_originals_smoke.txt.
+# Nhan URL qua bien moi truong, khong chen thang vao lenh shell.
+on:
+  workflow_dispatch:
+    inputs:
+      urls:
+        description: "URL https can tai; cach nhau bang khoang trang hoac dau phay; co the them sha256=<hex> sau URL"
+        required: true
+        type: string
+  pull_request:
+    paths:
+      - .github/workflows/fetch_originals.yml
+      - tools/fetch_originals.py
+      - tools/fetch_originals_smoke.txt
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fetch-originals-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    name: Tai ban goc vao artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Lay danh sach URL
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          URLS_INPUT: ${{ github.event.inputs.urls }}
+        run: |
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            printf '%s\n' "$URLS_INPUT" > "$RUNNER_TEMP/urls.txt"
+          else
+            cp tools/fetch_originals_smoke.txt "$RUNNER_TEMP/urls.txt"
+          fi
+          # Khong in nguyen danh sach URL vao log (co the chua token); cong cu chi in so URL va ten host.
+          grep -cv '^[[:space:]]*\(#\|$\)' "$RUNNER_TEMP/urls.txt" || true
+      - name: Tai (cong cu chi dung thu vien chuan cua Python)
+        run: python -u tools/fetch_originals.py --urls "$RUNNER_TEMP/urls.txt" --out "$RUNNER_TEMP/ban_goc" --deadline 900
+      - name: Dua tep va manifest len artifact cua luot chay
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ban-goc-run-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/ban_goc
+          if-no-files-found: warn
+          retention-days: 30
+      - name: Tom tat
+        if: always()
+        run: |
+          if [ -f "$RUNNER_TEMP/ban_goc/summary.md" ]; then cat "$RUNNER_TEMP/ban_goc/summary.md" >> "$GITHUB_STEP_SUMMARY"; fi
+      - name: Xac nhan khong sua kho
+        if: always()
+        run: test -z "$(git status --porcelain)"
