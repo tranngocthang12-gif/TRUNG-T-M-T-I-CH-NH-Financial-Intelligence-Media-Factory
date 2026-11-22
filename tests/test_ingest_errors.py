@@ -7,6 +7,7 @@ home.mkdir(parents=True)
 repo = pathlib.Path(__file__).resolve().parents[1]
 cfg = yaml.safe_load((repo / "config.yaml").read_text(encoding="utf-8"))
 cfg["universe"] = [f"S{i:02d}" for i in range(30)]
+cfg["data"]["ingest_extra"] = []                       # E2b: rổ giả S00–S29, không tải thêm mã ngoài rổ (fixture)
 cfg["data"]["sources"] = ["vnstock", "yahoo"]          # thử cả chuỗi dự phòng
 (home / "config.yaml").write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
 os.environ["TTC_HOME"] = str(home)

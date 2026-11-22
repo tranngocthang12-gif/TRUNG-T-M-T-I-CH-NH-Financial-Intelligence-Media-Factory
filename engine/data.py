@@ -105,6 +105,14 @@ def _fetch_yahoo(t, start, end):
 FETCHERS = {"vnstock": lambda t, s, e: _fetch_vnstock(t, s, e, CFG["data"]["vnstock_source"]),
             "yahoo": _fetch_yahoo}
 
+def ingest_tickers():
+    """Mã được tải giá và sự kiện quyền: `universe` rồi `data.ingest_extra` (E2b, QĐ-4), không trùng, giữ thứ tự."""
+    out = []
+    for t in list(CFG["universe"]) + list(CFG["data"].get("ingest_extra") or []):
+        if t not in out:
+            out.append(t)
+    return out
+
 def ingest(end=None):
     """Tai gia theo thu tu nguon trong config (data.sources); nguon sau chi dung khi nguon truoc loi.
     Ghi ro nguon cua tung dong. Tra ve nhat ky DAY DU: loi tung ma, tung nguon (khong chi in ra log)."""
@@ -113,7 +121,7 @@ def ingest(end=None):
     end = (end or dt.date.today()).isoformat()
     sources = list(CFG["data"]["sources"])
     frames, errors, no_new = [], [], []
-    for t in CFG["universe"]:
+    for t in ingest_tickers():
         last = store.loc[store.ticker == t, "date"].max() if len(store) else pd.NaT
         start = (last + pd.Timedelta(days=1)).date().isoformat() if pd.notna(last) else CFG["data"]["start"]
         if start > end:
@@ -154,7 +162,7 @@ def fetch_yahoo_actions():
         return [{"ticker": "*", "source": "yahoo_actions", "error": f"khong co yfinance ({e})"}]
     now = pd.Timestamp.now(tz="UTC").tz_localize(None).isoformat()
     rows, errors = [], []
-    for t in CFG["universe"]:
+    for t in ingest_tickers():
         try:
             a = yf.Ticker(f"{t}.VN").actions
         except Exception as e:
@@ -230,17 +238,175 @@ def code_fingerprint(files=None):
     return "code-sha256:" + h.hexdigest()
 
 
-def _derivation_id(research_input, cut, docs, ev):
+UNIVERSE_MODES = ("config", "historical")
+UNIVERSE_BY_BASIS = {"CURRENT": "config", "HISTORICAL": "historical"}
+VN30_HISTORY = "data/vn30_history.csv"
+VN30_COLUMNS = ["effective_date", "ticker", "action", "source_id"]
+VN30_MANIFEST = "data/evidence/vn30_reviews/EVIDENCE_MANIFEST.json"
+VN30_SIZE = 30
+MIN_HISTORY_ROWS = 250                              # bảng chỉ giữ mã có HƠN ngần ấy dòng giá (ngưỡng cũ, giữ nguyên)
+# Nhãn `source` của kho THỬ NGHIỆM: chỉ engine.synthetic ("synthetic") và fixture test ("fixture") ghi các nhãn này; ingest
+# ghi tên nguồn thật (data.sources). Kho mà MỌI dòng mang một trong các nhãn này là kho thử nghiệm. Chỉ kho thử nghiệm được
+# hai ngoại lệ: chế độ "config" khi kho không có mã nào của `universe`, và hợp đồng rổ lịch sử rút gọn (xem load_vn30_history).
+TEST_SOURCES = ("synthetic", "fixture")
+
+
+def is_test_store(store):
+    """True khi kho có dòng và mọi dòng đều có `source` ∈ TEST_SOURCES (kho tổng hợp hay fixture test). Nhãn là định danh,
+    so không phân biệt hoa thường; một dòng mang nhãn khác (ví dụ "yahoo") là đủ để kho được coi là kho vận hành."""
+    return len(store) > 0 and bool(store["source"].astype(str).str.strip().str.lower().isin(TEST_SOURCES).all())
+
+
+def universe_mode(universe=None):
+    """Chế độ rổ (E2b, QĐ-1, QĐ-4): None → theo `universe_basis` (CURRENT → "config", HISTORICAL → "historical")."""
+    if universe is None:
+        basis = CFG.get("universe_basis", "CURRENT")
+        if basis not in UNIVERSE_BY_BASIS:
+            raise ValueError(f"universe_basis phải là một trong {tuple(UNIVERSE_BY_BASIS)}, không phải {basis!r}")
+        return UNIVERSE_BY_BASIS[basis]
+    if universe not in UNIVERSE_MODES:
+        raise ValueError(f"universe phải là None hoặc một trong {UNIVERSE_MODES}, không phải {universe!r}")
+    return universe
+
+
+def _vn30_states(h):
+    """Phát lại tệp rổ theo ngày (REMOVE trước ADD) → [(ngày, tập thành viên sau ngày đó)]; REMOVE mã vắng hay ADD mã đang
+    có là tệp hỏng."""
+    members, states = set(), []
+    for d, g in h.groupby("effective_date", sort=True):
+        for t in g.loc[g["action"] == "REMOVE", "ticker"]:
+            if t not in members:
+                raise ValueError(f"{VN30_HISTORY} hỏng: REMOVE mã không có mặt {t} {d.date()}")
+            members.remove(t)
+        for t in g.loc[g["action"] == "ADD", "ticker"]:
+            if t in members:
+                raise ValueError(f"{VN30_HISTORY} hỏng: ADD mã đang có mặt {t} {d.date()}")
+            members.add(t)
+        states.append((d, set(members)))
+    return states
+
+
+def _vn30_provenance(root, h, states):
+    """Hợp đồng nguồn của rổ lịch sử (như tests/test_vn30_history.py): manifest bản gốc đã ghim đọc được, source_id duy nhất;
+    mọi source_id của tệp rổ có trong manifest và cùng ngày hiệu lực; mọi bản gốc trong manifest có tệp, đúng số byte và
+    sha256; rổ dựng từ tệp tại ngày hiệu lực của từng bản gốc trùng `members_after` của bản đó."""
+    mf = _root(root) / VN30_MANIFEST
+    if not mf.is_file():
+        raise ValueError(f"{VN30_HISTORY}: thiếu manifest bản gốc {VN30_MANIFEST}")
+    try:
+        docs = json.loads(mf.read_text(encoding="utf-8"))["source_documents"]
+        by_id = {d["source_id"]: d for d in docs}
+    except Exception as e:                                       # noqa: BLE001 — mọi lỗi đọc đều là manifest hỏng
+        raise ValueError(f"{VN30_MANIFEST} hỏng: {e}") from e
+    if len(by_id) != len(docs):
+        raise ValueError(f"{VN30_MANIFEST} hỏng: source_id trùng")
+    for r in h.itertuples(index=False):
+        d = by_id.get(r.source_id)
+        if d is None:
+            raise ValueError(f"{VN30_HISTORY}: source_id {r.source_id!r} ({r.ticker} {r.effective_date.date()}) không có "
+                             f"trong {VN30_MANIFEST}")
+        if d.get("effective_date") != str(r.effective_date.date()):
+            raise ValueError(f"{VN30_HISTORY}: {r.ticker} {r.effective_date.date()} khác ngày hiệu lực của bản gốc "
+                             f"{r.source_id} ({d.get('effective_date')})")
+    for d in docs:
+        f = _root(root) / str(d.get("path", ""))
+        if not d.get("path") or not f.is_file():
+            raise ValueError(f"{VN30_MANIFEST}: thiếu tệp bản gốc {d.get('path')!r} ({d['source_id']})")
+        blob = f.read_bytes()
+        if len(blob) != d.get("bytes") or hashlib.sha256(blob).hexdigest() != d.get("sha256"):
+            raise ValueError(f"{VN30_MANIFEST}: bản gốc {d['source_id']} lệch số byte hoặc sha256")
+        at = [m for day, m in states if str(day.date()) <= str(d.get("effective_date"))]
+        if not at or at[-1] != set(d.get("members_after") or []):
+            raise ValueError(f"{VN30_HISTORY}: rổ tại {d.get('effective_date')} không khớp members_after của {d['source_id']}")
+
+
+def load_vn30_history(root=None, strict=True):
+    """data/vn30_history.csv → bảng (effective_date, ticker, action, source_id), đã kiểm. Tệp thiếu hoặc hỏng thì ném lỗi:
+    chế độ "historical" không tự chuyển sang "config".
+    Luôn kiểm: đúng bốn cột VN30_COLUMNS theo thứ tự, có ít nhất một dòng, không ô trống (kể cả source_id), ngày YYYY-MM-DD,
+    mã ba ký tự [A-Z0-9], action ∈ {ADD, REMOVE}, một mã không có hai dòng trong cùng ngày, phát lại hợp lệ.
+    strict=True (mặc định; mọi kho vận hành): thêm rổ đúng 30 mã sau mỗi ngày hiệu lực và hợp đồng nguồn (_vn30_provenance).
+    strict=False chỉ dành cho kho thử nghiệm (is_test_store): rổ giả của fixture không có 30 mã hay bản gốc ghim."""
+    f = _root(root) / VN30_HISTORY
+    if not f.is_file():
+        raise FileNotFoundError(f"thiếu {VN30_HISTORY}: chế độ universe='historical' cần rổ VN30 theo kỳ")
+    try:
+        h = pd.read_csv(f, dtype=str, keep_default_na=False)
+    except Exception as e:                                       # noqa: BLE001 — mọi lỗi đọc đều là tệp hỏng
+        raise ValueError(f"{VN30_HISTORY} hỏng: {e}") from e
+    if list(h.columns) != VN30_COLUMNS or h.empty:
+        raise ValueError(f"{VN30_HISTORY} hỏng: cần đúng cột {VN30_COLUMNS} và ít nhất một dòng, có {list(h.columns)}")
+    h = h.fillna("").apply(lambda c: c.astype(str).str.strip())
+    if (h == "").any().any():
+        raise ValueError(f"{VN30_HISTORY} hỏng: có ô trống (mọi dòng cần đủ effective_date, ticker, action, source_id)")
+    if not h["effective_date"].str.fullmatch(r"\d{4}-\d{2}-\d{2}").all():
+        raise ValueError(f"{VN30_HISTORY} hỏng: effective_date không theo YYYY-MM-DD")
+    try:
+        h["effective_date"] = pd.to_datetime(h["effective_date"], format="%Y-%m-%d")
+    except (ValueError, TypeError) as e:
+        raise ValueError(f"{VN30_HISTORY} hỏng: effective_date không phải ngày ({e})") from e
+    if not h["ticker"].str.fullmatch(r"[A-Z0-9]{3}").all():
+        raise ValueError(f"{VN30_HISTORY} hỏng: mã không phải ba ký tự [A-Z0-9]")
+    odd = sorted(set(h["action"]) - {"ADD", "REMOVE"})
+    if odd:
+        raise ValueError(f"{VN30_HISTORY} hỏng: action lạ {odd}")
+    if h.duplicated(["effective_date", "ticker"]).any():
+        raise ValueError(f"{VN30_HISTORY} hỏng: một mã có hai dòng trong cùng ngày hiệu lực")
+    states = _vn30_states(h)
+    if strict:
+        bad = [(str(d.date()), len(m)) for d, m in states if len(m) != VN30_SIZE]
+        if bad:
+            raise ValueError(f"{VN30_HISTORY} hỏng: rổ phải đúng {VN30_SIZE} mã sau mỗi ngày hiệu lực, có {bad}")
+        _vn30_provenance(root, h, states)
+    return h.sort_values(["effective_date", "ticker"], kind="stable").reset_index(drop=True)
+
+
+def membership(index, hist):
+    """Ma trận thành viên (ngày × mã có trong tệp lịch sử). ADD có hiệu lực từ ngày ghi, tính cả ngày đó; REMOVE cũng vậy
+    (từ ngày ghi mã không còn là thành viên). Trước ngày hiệu lực đầu tiên của tệp: không mã nào là thành viên."""
+    index = pd.DatetimeIndex(index)
+    M = pd.DataFrame(False, index=index, columns=sorted(hist["ticker"].unique()))
+    for e in hist.sort_values("effective_date", kind="stable").itertuples(index=False):
+        M.loc[index >= e.effective_date, e.ticker] = e.action == "ADD"
+    return M
+
+
+def _universe_columns(columns, mode, hist, test_store):
+    """Cột (mã) của bảng giá theo chế độ rổ → (cột, ghi chú pit_gaps).
+      - "config": chỉ mã thuộc `universe`; mã `data.ingest_extra` hay mã bất kỳ ngoài `universe` không lọt vào. Kho không
+        có mã nào của `universe` thì DỪNG (ValueError), trừ kho thử nghiệm (is_test_store: mọi dòng có source ∈
+        TEST_SOURCES) — kho đó giữ mã của nó trừ mã `ingest_extra` ngoài `universe`, và ghi chú điều đó.
+      - "historical": mọi mã từng có tên trong data/vn30_history.csv (lọc theo ngày làm ở bước sau)."""
+    if mode == "historical":
+        names = set(hist["ticker"])
+        return [c for c in columns if c in names], []
+    u = set(CFG["universe"])
+    cols = [c for c in columns if c in u]
+    if cols:
+        return cols, []
+    if not test_store:
+        raise ValueError("chế độ universe='config': kho không có mã nào thuộc universe của config — dừng, không nghiên cứu "
+                         f"trên tập mã ngoài universe (mã trong kho: {sorted(columns)[:10]})")
+    extra = set(CFG["data"].get("ingest_extra") or []) - u
+    return [c for c in columns if c not in extra], [
+        f"kho thử nghiệm (mọi dòng có source ∈ {list(TEST_SOURCES)}) không có mã nào của universe: bảng giữ mã của kho, "
+        "trừ data.ingest_extra"]
+
+
+def _derivation_id(research_input, cut, docs, ev, universe=None):
     """Định danh dẫn xuất chỉ phụ thuộc đầu vào và phiên bản mã: chế độ, ngày cắt, hash kho giá, hash CSV sự kiện, metadata
     các bản gốc đã dùng (chế độ legacy không dùng bản gốc nên không có), config (tệp và giá trị đang dùng), và dấu vân tay mã
-    (code_fingerprint) ở trường code_commit của verified_adjust.derivation_manifest (ADR-0009)."""
+    (code_fingerprint) ở trường code_commit của verified_adjust.derivation_manifest (ADR-0009). Chế độ rổ "historical" thêm
+    `universe` (chế độ và sha256 của data/vn30_history.csv); chế độ "config" giữ khóa cũ (universe nằm trong config)."""
     m = va.derivation_manifest(root=config.ROOT, cfg=CFG, as_of=cut, docs=docs, ev=ev, code_commit=code_fingerprint())
     cfg_now = hashlib.sha256(json.dumps(CFG, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
     key = {"research_input": research_input, "verified_derivation_id": m["derivation_id"], "config_values": cfg_now}
+    if universe is not None:
+        key["universe"] = universe
     return "RI-" + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
 
 
-def load_market(as_of=None, research_input="legacy"):
+def load_market(as_of=None, research_input="legacy", universe=None):
     """Bang gia DIEU CHINH point-in-time + co loi du lieu + bao cao chat luong.
     Tra ve dict: close, volume (dieu chinh), raw_close, bad (co loi), events, quality, flags.
 
@@ -250,20 +416,39 @@ def load_market(as_of=None, research_input="legacy"):
         as_of hoặc phiên cuối) được áp hệ số; sự kiện không vào chuỗi không mang trạng thái APPLIED trong `events`. Thêm
         `exclude` (mặt nạ cửa sổ QĐ-3), `eligible` (có giá và không bị loại) và `event_checks` (bảng kiểm sự kiện).
     Cả hai chế độ thêm: research_input, derivation_id, pit_label (luôn "RETROSPECTIVE" ở bản này), pit_gaps.
-    Chế độ legacy không đọc manifest bản gốc, nên manifest hỏng không làm nó dừng; chế độ verified thì dừng."""
+    Chế độ legacy không đọc manifest bản gốc, nên manifest hỏng không làm nó dừng; chế độ verified thì dừng.
+
+    universe (E2b, QĐ-1 và QĐ-4 của ADR-0016) — rổ mã của bảng:
+      - None (mặc định): theo `universe_basis` (CURRENT → "config", HISTORICAL → "historical");
+      - "config": chỉ mã thuộc `universe` của config; mã `data.ingest_extra` có trong kho không lọt vào (xem _universe_columns);
+      - "historical": theo data/vn30_history.csv. Tại mỗi ngày chỉ giữ thành viên của ngày đó: ô của mã không phải thành
+        viên có close, volume, raw_close là NaN và `eligible` False. Trước ngày hiệu lực đầu tiên của tệp không mã nào
+        eligible (`quality.universe_unknown_before`). Tệp thiếu hoặc hỏng thì ném lỗi. Thêm khóa `eligible` (cả ở legacy)
+        và `members`; `quality` thêm `universe_mode`, `members_without_prices`, `members_last_session`.
+    Mọi chế độ: mã bị loại vì không có HƠN 250 dòng giá được liệt kê (mã → số dòng) ở `quality.dropped_short_history`
+    (khóa chỉ có khi danh sách khác rỗng); sự kiện quyền được lọc theo các mã có trong bảng trước adjust.build_events."""
     if research_input not in RESEARCH_INPUTS:
         raise ValueError(f"research_input phải là một trong {RESEARCH_INPUTS}, không phải {research_input!r}")
+    umode = universe_mode(universe)
     s = load_store()
     if s.empty:
         raise RuntimeError("Kho du lieu trong. Chay ingest hoac tao du lieu synthetic.")
+    test_store = is_test_store(s)                    # cả kho, trước khi cắt as_of
+    # rổ lịch sử thiếu/hỏng: dừng trước khi dựng bảng; hợp đồng đầy đủ trừ kho thử nghiệm
+    hist = load_vn30_history(strict=not test_store) if umode == "historical" else None
     if as_of is not None:
         s = s[s.date <= pd.Timestamp(as_of)]
     raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
     vol = s.pivot(index="date", columns="ticker", values="volume").sort_index()
     obs = s.pivot(index="date", columns="ticker", values="observed_at").sort_index()
-    keep = raw.columns[raw.notna().sum() > 250]
+    cols, ugaps = _universe_columns(list(raw.columns), umode, hist, test_store)
+    raw, vol, obs = raw[cols], vol[cols], obs[cols]
+    n_rows = raw.notna().sum()
+    keep = raw.columns[n_rows > MIN_HISTORY_ROWS]
+    short = {t: int(n_rows[t]) for t in raw.columns if t not in keep}
     raw, vol, obs = raw[keep], vol[keep], obs[keep]
-    events = adjust.build_events(raw, obs, adjust.load_manual(), adjust.load_yahoo())
+    man, yah = adjust.load_manual(), adjust.load_yahoo()             # sự kiện của mã không có trong bảng: bỏ trước khi xét
+    events = adjust.build_events(raw, obs, man[man["ticker"].isin(keep)], yah[yah["ticker"].isin(keep)])
     cut = pd.Timestamp(as_of) if as_of is not None else raw.index[-1]
     docs, checks = [], None                          # legacy không đọc manifest bản gốc nào (QĐ-1: mặc định giữ hành vi cũ)
     if research_input == "verified":
@@ -275,6 +460,10 @@ def load_market(as_of=None, research_input="legacy"):
     else:
         F, S = adjust.factors(raw.index, raw.columns, events)
     adj = raw * F
+    members = None
+    if umode == "historical":                       # chất lượng dữ liệu chỉ xét ô thành viên: biến động của mã lúc ngoài rổ
+        members = membership(raw.index, hist).reindex(columns=raw.columns, fill_value=False)   # không gắn cờ, không dừng
+        adj = adj.where(members)
     bad, rep, flags = adjust.quality(adj)
     rep["events"] = events.status.value_counts().to_dict() if len(events) else {}
     rep["events_not_applied"] = [f"{e.ticker} {e.ex_date.date()} {e.type} ({e.source}): {e.status}"
@@ -283,18 +472,44 @@ def load_market(as_of=None, research_input="legacy"):
     rep["events_applied"] = [f"{e.ticker} {e.trade_date.date()} {e.type} ({e.source}, {e.source_status}): "
                              f"gốc {e.raw_return:+.2%} → điều chỉnh {e.adj_return:+.2%}"
                              for e in events.itertuples() if e.status == "APPLIED"]
-    out = {"close": adj.ffill(limit=5), "volume": (vol / S).fillna(0), "raw_close": raw, "bad": bad,
+    if short:
+        rep["dropped_short_history"] = short
+    close, volume, raw_out = adj.ffill(limit=5), (vol / S).fillna(0), raw
+    if umode == "historical":
+        close, volume, raw_out = close.where(members), volume.where(members), raw.where(members)
+        ever = membership(raw.index, hist).any()
+        last = membership(raw.index[-1:], hist).iloc[0]
+        rep["universe_mode"] = "historical"
+        rep["universe_unknown_before"] = str(hist["effective_date"].min().date())
+        rep["members_without_prices"] = {
+            t: (f"bị loại vì thiếu lịch sử ({short[t]} dòng)" if t in short else "không có dòng giá trong kho")
+            for t in sorted(ever[ever].index) if t not in raw.columns}
+        n_last = int(last.sum())
+        with_px = [t for t in last[last].index if t in raw.columns and pd.notna(raw.at[raw.index[-1], t])]
+        rep["members_last_session"] = {"date": str(raw.index[-1].date()), "members": n_last, "with_prices": len(with_px)}
+    out = {"close": close, "volume": volume, "raw_close": raw_out, "bad": bad,
            "events": events, "quality": rep, "flags": flags}
-    gaps = ["rổ theo cấu hình hiện tại (universe), chưa theo thành viên VN30 từng ngày",
-            "trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE"]
+    if umode == "historical":
+        gaps = [f"rổ theo thành viên VN30 từng ngày ({VN30_HISTORY}), chỉ có từ {rep['universe_unknown_before']}: trước "
+                "ngày đó không mã nào eligible",
+                "trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE"]
+    else:
+        gaps = ["rổ theo cấu hình hiện tại (universe), chưa theo thành viên VN30 từng ngày", *ugaps,
+                "trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE"]
     if research_input == "legacy":
         gaps.append("sự kiện quyền chưa kiểm: hệ số theo chuỗi điều chỉnh hiện hành, gồm sự kiện chưa đối chiếu bản gốc")
+    uid = None if umode == "config" else {
+        "mode": umode, "vn30_history_sha256": va.sha256_file(config.ROOT / VN30_HISTORY),
+        "vn30_manifest_sha256": va.sha256_file(config.ROOT / VN30_MANIFEST) if (config.ROOT / VN30_MANIFEST).is_file() else None}
     out.update(research_input=research_input, derivation_id=_derivation_id(research_input, cut, docs,
-                                                                             events if checks is None else checks),
+                                                                             events if checks is None else checks, uid),
                pit_label="RETROSPECTIVE", pit_gaps=gaps)
     if checks is not None:
         exclude = window_exclude(raw.index, raw.columns, checks, *window_bounds())
-        out.update(exclude=exclude, eligible=raw.notna() & ~exclude, event_checks=checks)
+        out.update(exclude=exclude, eligible=raw_out.notna() & ~exclude, event_checks=checks)
+    if members is not None:
+        out.update(members=members, eligible=out.get("eligible", raw_out.notna()) & members)
+        rep["members_last_session"]["eligible"] = int(out["eligible"].iloc[-1].sum())
     return out
 
 def write_derived(mk=None):
