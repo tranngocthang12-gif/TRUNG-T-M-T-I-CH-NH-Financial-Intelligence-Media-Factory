@@ -64,7 +64,8 @@ def write(as_of, regime_now, trials, bandit, reg, nav, decision, attr, alerts, t
     state = {"as_of": as_of, "regime": regime_now, "total_trials": n_total, "current_t_threshold": round(thr, 2),
              "models": act, "paper_nav": nav, "paper_max_drawdown": paper_drawdown(),
              "universe_basis": CFG.get("universe_basis", "CURRENT"), "universe_bias": survivorship_note(), "alerts": alerts,
-             "data_quality": {k: v for k, v in (quality or {}).items() if k != "flags_window"} | (
+             # E2c: quality.sessions (ngày không phải phiên) không chép vào ENGINE_STATE — Owner duyệt 22/11/2026
+             "data_quality": {k: v for k, v in (quality or {}).items() if k not in ("flags_window", "sessions")} | (
                  {"flags_window": (quality or {}).get("flags_window", [])[:50]} if quality else {}),
              "data_ingest": ingest, "news_errors": news_errors or [],
              "bandit": {m: {"trials": v["trials"], "survivors": v["survivors"],

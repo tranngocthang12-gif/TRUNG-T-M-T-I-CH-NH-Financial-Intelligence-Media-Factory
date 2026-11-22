@@ -121,7 +121,17 @@ def _ref(home, as_of=None):
         return _main_reference(as_of)
 
 
+def _without_sessions(x):
+    """E2c (Owner cho sửa assert, 22/11/2026): chế độ mặc định sessions="keep" thêm đúng một khóa quality.sessions (liệt kê
+    ngày không phải phiên, không bỏ ngày nào); bản tham chiếu trước E2c không có khóa này. Bỏ khóa đó trước khi so."""
+    q = dict(x["quality"])
+    sess = q.pop("sessions", None)
+    assert sess is None or (sess["mode"] == "keep" and sess["dropped"] == 0)
+    return {**x, "quality": q}
+
+
 def _same(a, b):
+    a, b = _without_sessions(a), _without_sessions(b)
     return {k: _h(a[k]) for k in OLD_KEYS} == {k: _h(b[k]) for k in OLD_KEYS}
 
 
