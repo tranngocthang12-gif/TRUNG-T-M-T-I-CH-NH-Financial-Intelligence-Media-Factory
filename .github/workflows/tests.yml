@@ -15,9 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes test_governance test_timing_lock test_source_original test_directional_accuracy test_measurement_integration test_scorecard_refresh test_b1_engine_bridge test_verified_adjust test_corporate_action_evidence test_corporate_action_evidence_2026h2 test_vn30_history test_forecast_candidates test_pit001_audit test_price_integrity_b1 test_fetch_originals test_corporate_action_evidence_vn30_bo_sung test_trading_calendar test_model_gate test_risk_gate test_research_input_verified"
+      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes test_governance test_timing_lock test_source_original test_directional_accuracy test_measurement_integration test_scorecard_refresh test_b1_engine_bridge test_verified_adjust test_corporate_action_evidence test_corporate_action_evidence_2026h2 test_vn30_history test_forecast_candidates test_pit001_audit test_price_integrity_b1 test_fetch_originals test_corporate_action_evidence_vn30_bo_sung test_trading_calendar test_model_gate test_risk_gate test_research_input_verified test_session_robot test_universe_modes"
       SCRIPTS: "test_no_lookahead test_adjustment test_ingest_errors test_ledger_pipeline test_quality_gate test_llm_review_budget"
-      EXTRA_UNITTEST: "test_universe_modes"   # E2b: danh sach rieng, khong xung dot UNITTEST cua F1a (#88)
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,7 +31,7 @@ jobs:
         run: |
           for f in tests/test_*.py; do
             n=$(basename "$f" .py)
-            echo " $UNITTEST $SCRIPTS $EXTRA_UNITTEST " | grep -q " $n " || { echo "Tep $f chua duoc dua vao tests.yml"; exit 1; }
+            echo " $UNITTEST $SCRIPTS " | grep -q " $n " || { echo "Tep $f chua duoc dua vao tests.yml"; exit 1; }
           done
       - name: PIT-001 replay deterministic (read-only)
         run: |
@@ -42,8 +41,6 @@ jobs:
           python -c 'import json; x=json.load(open("/tmp/pit001_a.json")); print("PIT-001:",x["conclusion"],"findings=",len(x["findings"]))'
       - name: Test dang unittest (luat, Ledger, phan dinh, so thu L-06)
         run: python -m pytest -q $(for n in $UNITTEST; do printf "tests/%s.py " "$n"; done)
-      - name: Test E2b universe theo ngay (khong trung voi danh sach F1a)
-        run: python -m pytest -q $(for n in $EXTRA_UNITTEST; do printf "tests/%s.py " "$n"; done)
       - name: Test dang script cu cua engine (moi tep mot tien trinh rieng, khong dung chung TTC_HOME)
         run: |
           for n in $SCRIPTS; do

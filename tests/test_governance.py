@@ -659,7 +659,8 @@ class WorkflowLintTests(unittest.TestCase):
         self.assertEqual(engine["env"].get("TTC_REGISTRY_PUSH"), "1")        # L-06: đăng ký lên main trước khi chạy backtest
         self.assertIn('--trials "$TRIALS"', engine["run"])
         on = d.get("on", d.get(True))
-        self.assertEqual(on["schedule"][0]["cron"], "30 9 * * 5")            # hằng tuần, thứ Sáu (ARCHITECTURE §4.3)
+        self.assertEqual([c["cron"] for c in on["schedule"]],               # QĐ-10: mỗi phiên, hai lượt dự phòng
+                         ["30 9 * * 1-5", "17 13 * * 1-5", "47 16 * * 1-5"])
 
     def test_manual_cycle_requires_main_before_checkout(self):
         """L-06: manual từ nhánh phụ phải dừng trước checkout và trước mọi bước ghi sổ."""
@@ -675,7 +676,9 @@ class WorkflowLintTests(unittest.TestCase):
         # Chạy đúng script trích từ YAML với env giả lập; không cần GitHub token/API.
         cases = [
             ("workflow_dispatch", "refs/heads/main", "1", True),
+            ("workflow_dispatch", "refs/heads/main", "0", True),
             ("workflow_dispatch", "refs/heads/feature", "1", False),
+            ("workflow_dispatch", "refs/heads/feature", "0", False),
             ("workflow_dispatch", "refs/heads/feature", "6", False),
             ("workflow_dispatch", "refs/heads/main", "6", False),
             ("workflow_dispatch", "refs/heads/main", "", False),

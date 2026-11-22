@@ -32,6 +32,7 @@
 | QĐ-5a | Trong FWD-001, cổng R1a áp cho mọi sổ. Ngưỡng sụt giảm NAV 15% ở các sổ FWD chỉ để ghi nhận (`DRAWDOWN_BREACH`); không khóa và không bán. Ngắt thật (khóa, bán hết, chỉ Owner gỡ) do R1b hiện thực, áp cho sổ giấy chính (sổ của mô hình Owner duyệt ACTIVE) và mọi sổ gắn vốn thật. R1b phải gộp trước khi đăng ký FWD-001. Quyết định này thay phần "ngưỡng sụt giảm" của QĐ-5 đối với các sổ FWD. |
 | QĐ-10 | Robot vòng học chạy mỗi phiên HOSE (thứ Hai đến thứ Sáu, bỏ ngày nghỉ theo `data/trading_calendar.csv`) cho các bước: tải giá, định giá sổ giấy, cổng rủi ro, ghi quyết định của sổ. Bước nghiên cứu (đăng ký và chạy lần thử L-06, thăng hạng và theo dõi suy giảm mô hình) vẫn chỉ chạy thứ Sáu, 6 lần thử mỗi tuần; chạy tay tối đa 1 lần thử. Không gian 13 × 3 và ngưỡng theo số lần thử không đổi. Đây vẫn là robot và các đường ghi mà ADR-0013 đã ghi nhận; không thêm đường ghi `main` mới. |
 | QĐ-11 | Phép thử FWD-001 chạy theo mục "Giao thức FWD-001" của ADR này. Dòng đăng ký L-06 của FWD-001 phải chép đúng các tham số đó. |
+| QĐ-11a | Làm rõ giao thức FWD-001 trước khi đăng ký, theo mục "Làm rõ giao thức FWD-001 (QĐ-11a)" của ADR này. Không đổi tham số nào của QĐ-11. Dòng đăng ký L-06 của FWD-001 ghi sha256 của cả hai mục "Giao thức FWD-001 (QĐ-11)" và "Làm rõ giao thức FWD-001 (QĐ-11a)". |
 
 Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVERNOR_POLICY`; nguồn giá chính thức; bảo vệ `main` (P5).
 
@@ -52,6 +53,7 @@ Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVE
 | QĐ-5a | ACCEPTED | Owner | 22/11/2026 |
 | QĐ-10 | ACCEPTED | Owner | 22/11/2026 |
 | QĐ-11 | ACCEPTED | Owner | 22/11/2026 |
+| QĐ-11a | ACCEPTED | Owner | 22/11/2026 |
 
 Quy tắc:
 
@@ -110,6 +112,23 @@ Quy tắc:
    - 12 kỳ là mẫu nhỏ. Nếu độ lệch chuẩn của d là 3% mỗi kỳ (giả định, chưa đo), mức vượt trội trung bình phải khoảng 2,2% mỗi kỳ thì khả năng PASS mới đạt 50%, và khoảng 3% mỗi kỳ thì mới đạt 80%. PASS không phải điều kiện đủ để lên bậc vốn.
 8. **Không đổi luật giữa chừng.** Sổ nằm công khai trên `main` nên kết quả từng kỳ ai cũng xem được. Không tham số nào của mục này được đổi sau khi đăng ký. Muốn đổi thì đăng ký phép thử mới với D0 mới.
 9. **Đăng ký.** Dòng `kind: "forward_test"` trong `research/trial_registry.jsonl` ghi mã `FWD-001`, D0, năm sổ, đặc tả của S1 và S2, và sha256 của mục này tại commit Owner gộp.
+
+## Làm rõ giao thức FWD-001 (QĐ-11a)
+
+1. **Phiên.** Phiên của FWD-001 là ngày mà `data/trading_calendar.csv` ghi `is_session=1` với nguồn là một thông báo HOSE hoặc `HOSE_DEFAULT`. Ngày ghi `CHUA_CO_THONG_BAO` và ngày nằm ngoài vùng lịch phủ chỉ là phiên khi kho giá có giá của ít nhất một thành viên rổ ở ngày đó.
+2. **Xử lý tuần tự.** Robot xử lý lần lượt từng phiên kể từ phiên đã xử lý gần nhất, theo thứ tự: áp sự kiện quyền cho vị thế đang giữ từ trước phiên, khớp lệnh chờ ở đóng cửa phiên, định giá, đo sụt giảm, rồi (chỉ ở phiên tái cơ cấu) ra quyết định. Cổ phiếu mua ở đóng cửa phiên s không hưởng sự kiện có ngày giao dịch không hưởng quyền là s.
+3. **Niêm phong lúc khớp.** Lệnh của quyết định phiên t chỉ khớp ở đóng cửa phiên t+1, sau khi robot xác minh qua API GitHub rằng lượt chạy ghi quyết định đó đã kết thúc trước 09:00 giờ Việt Nam của phiên t+1. Không xác minh được thì robot dừng trước phiên t+1 và thử lại ở lần chạy sau; không khớp ở phiên khác. Xác minh được là trễ thì ghi `LATE_VOID` theo mục 5 của giao thức.
+4. **Không quyết định muộn.** Quyết định cho phiên tái cơ cấu t chỉ được ra trong lượt chạy mà t là phiên mới nhất có giá trong kho. Lượt đó không ghi được quyết định lên `main` (lỗi, không chạy, quá hạn) thì phiên t là `LATE_VOID`.
+5. **Thiếu giá.** Mã không có giá gốc ở một phiên được coi là không giao dịch ở phiên đó: định giá theo giá gốc gần nhất và ghi `STALE_PRICE`; lệnh của mã đó không khớp và thử lại ở phiên sau, như khóa biên độ. Phiên có trong lịch mà kho chưa có giá của thành viên nào thì robot dừng trước phiên đó và thử lại ở lần chạy sau.
+6. **Sự kiện quyền với vị thế đang giữ.** Định giá ở phiên s dùng giá đóng cửa gốc của phiên s. Số cổ phiếu và tiền mặt là sau khi áp các sự kiện có ngày giao dịch không hưởng quyền ≤ s, như sổ giấy hiện có:
+   - cổ tức tiền mặt: cộng tiền theo bảng sự kiện của engine (trạng thái APPLIED), sau thuế cổ tức;
+   - sự kiện cổ phiếu: nhân số cổ phiếu theo hệ số trong bảng sự kiện; sự kiện chưa vào chuỗi kiểm chứng tại phiên xử lý thì ghi thêm `CA_UNVERIFIED`;
+   - sự kiện robot biết muộn (ngày không hưởng quyền đã qua) được áp ở phiên đang xử lý và ghi `CA_LATE`.
+   Mỗi lần áp ghi một dòng vào sổ giao dịch của sổ FWD.
+7. **Phán quyết chờ bằng chứng.** Phán quyết chỉ ra khi mọi sự kiện cổ phiếu đã áp vào vị thế của năm sổ trong 12 kỳ đều đã vào chuỗi kiểm chứng. Hệ số đã kiểm khác hệ số đã áp thì kiểm toán dựng lại các sổ từ D0 theo hệ số đã kiểm, với cùng danh mục mục tiêu đã niêm phong. Sau 60 phiên kể từ mốc NAV thứ 13 mà còn sự kiện chưa kiểm thì phán quyết là INCONCLUSIVE.
+8. **Dữ liệu tại lúc quyết định.** Quyết định dùng dữ liệu có trên `main` lúc lượt chạy đó chạy. Mỗi dòng quyết định ghi: mã lượt chạy GitHub Actions; sha256 của `data/vn30_history.csv` và `data/trading_calendar.csv`; `derivation_id`; danh mục mục tiêu của từng sổ. Cập nhật rổ hay lịch được ghi sau phiên quyết định thì không áp ngược.
+9. **Dời D0.** D0 thực tế là phiên đầu tiên, kể từ D0 đã đăng ký, có quyết định được niêm phong đúng hạn. Mọi mốc kỳ tính từ D0 thực tế.
+10. **Kiểm toán độc lập với sổ.** `tools/fwd_audit.py` dựng lại năm sổ từ D0 theo danh mục mục tiêu đã niêm phong, các dòng áp sự kiện quyền đã ghi, giá trong kho và luật của giao thức; lệch với NAV robot đã ghi thì báo lỗi. Trước kỳ 12, kiểm toán chỉ báo tính toàn vẹn và lợi suất từng kỳ; không tính thống kê t hay giá trị p.
 
 ## Điều kiện dừng và đảo
 

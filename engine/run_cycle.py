@@ -1,18 +1,75 @@
 """Một vòng học: DATA → FEATURES → REGIME → RESEARCH (meta-learning chọn phương pháp) → PROMOTION
 → LIVE PREDICTION → DECAY → PAPER TRADE → ATTRIBUTION → REPORT.
-Chạy: python -m engine.run_cycle [--source live|store|synthetic] [--as-of YYYY-MM-DD] [--trials N]
-  live = tải dữ liệu mới theo config data.sources (hiện: yahoo) rồi chạy; "vnstock" là tên cũ của "live"."""
+Chạy: python -m engine.run_cycle [--source live|store|synthetic] [--as-of YYYY-MM-DD] [--trials N] [--mode auto|ops|research]
+  live = tải dữ liệu mới theo config data.sources (hiện: yahoo) rồi chạy; "vnstock" là tên cũ của "live".
+
+Chế độ (F1a, QĐ-10 của ADR-0016):
+  - research (mặc định khi gọi tay): như trước — nghiên cứu (đăng ký và chạy lần thử L-06, thăng hạng, theo dõi suy giảm),
+    dự báo, sổ giấy, chuyên gia, báo cáo;
+  - ops: phần vận hành mỗi phiên — dự báo của mô hình đã có, sổ giấy, phân rã, chấm Ledger và scorecard, báo cáo. KHÔNG
+    đăng ký hay chạy lần thử, không thăng hạng, không theo dõi suy giảm, không llm_review, không chuyên gia, không tải tin,
+    không ghi state/bandit.json. Chỉ nhận --trials 0;
+  - auto (lượt theo lịch): CHỈ theo dữ liệu, không theo đồng hồ máy chạy. Phiên mới nhất có giá MỚI HƠN ENGINE_STATE.as_of:
+    là thứ Sáu thì research với research.trials_per_cycle lần thử, ngày khác thì ops. Bằng nhau (đã xử lý) thì chỉ làm mới
+    scorecard như trước. Cũ hơn (giá lùi, hay --as-of về phiên cũ) thì DỪNG, không ghi gì. auto không nhận --force: phiên
+    xử lý chỉ tiến lên theo thời gian, không chạy lại nghiên cứu (L-06)."""
 import argparse, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
 from . import data, features, regime, research, meta, knowledge, paper, attribution, report, llm_review
 from . import ledger, experts, facts, knowledge_notes
 
+MODES = ("auto", "ops", "research")
+
 def load_ledger():
     p = ROOT / "research/trials.csv"
     return pd.read_csv(p) if p.exists() else None
 
-def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, live=False, ingest=None):
+def select_mode(mode, newest, last, trials=None, force=False):
+    """→ (chế độ chạy "ops"|"research", số lần thử) hoặc None khi phiên mới nhất đã xử lý (chỉ làm mới scorecard).
+    Chỉ dựa trên dữ liệu: `newest` là phiên mới nhất có giá trong kho, `last` là ENGINE_STATE.as_of. Không đọc đồng hồ."""
+    if mode not in MODES:
+        raise ValueError(f"--mode phải là một trong {MODES}, không phải {mode!r}")
+    if mode == "ops" and trials not in (None, 0):
+        raise ValueError(f"--mode ops chỉ nhận --trials 0, không phải {trials!r}")
+    if mode == "auto" and trials is not None:
+        raise ValueError("--mode auto tự chọn số lần thử; không truyền --trials")
+    if mode == "auto":
+        if force:
+            raise ValueError("--mode auto không nhận --force: lượt theo lịch chỉ xử lý phiên mới hơn ENGINE_STATE.as_of")
+        if last is not None and pd.Timestamp(newest) < pd.Timestamp(last):
+            raise ValueError(f"--mode auto: phiên mới nhất có giá {newest} cũ hơn phiên đã xử lý {last} — dừng, không "
+                             "xử lý lại phiên cũ")
+        if last is not None and pd.Timestamp(newest) == pd.Timestamp(last):
+            return None                                             # đã xử lý: không nghiên cứu lại
+        if pd.Timestamp(newest).weekday() == 4:                     # phiên thứ Sáu
+            return "research", int(CFG["research"]["trials_per_cycle"])
+        return "ops", 0
+    if last == newest and not force:
+        return None
+    if mode == "ops":
+        return "ops", 0
+    return "research", trials
+
+def _mark_mode(as_of, mode, research_as_of):
+    """Ghi chế độ vào state/ENGINE_STATE.json (khóa mode, research_as_of) và vào dòng đầu báo cáo phiên."""
+    st = load_json("state/ENGINE_STATE.json", {})
+    st["mode"] = mode
+    if research_as_of is not None:
+        st["research_as_of"] = research_as_of
+    save_json("state/ENGINE_STATE.json", st)
+    p = path(f"reports/cycle_{as_of}.md")
+    lines = p.read_text(encoding="utf-8").split("\n")
+    lines[0] = f"{lines[0]} — chế độ {mode}"
+    p.write_text("\n".join(lines), encoding="utf-8")
+
+def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, live=False, ingest=None, mode="research"):
+    if mode not in ("ops", "research"):
+        raise ValueError(f"cycle chỉ chạy chế độ ops hoặc research, không phải {mode!r}")
+    if mode == "ops" and trials not in (None, 0):
+        raise ValueError(f"chế độ ops chỉ nhận trials 0, không phải {trials!r}")
+    ops = mode == "ops"
+    prev_research_as_of = load_json("state/ENGINE_STATE.json", {}).get("research_as_of")
     mk = data.load_market(as_of)                    # GIÁ ĐIỀU CHỈNH point-in-time + cờ lỗi dữ liệu
     close, volume, bad, quality = mk["close"], mk["volume"], mk["bad"], mk["quality"]
     as_of = str((pd.Timestamp(as_of) if as_of else close.index[-1]).date())
@@ -29,46 +86,50 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
     bandit, ledger_df = meta.load(), load_ledger()
     registry = knowledge.load_registry()
     done = []
-    n_trials = 0 if skip else (CFG["research"]["trials_per_cycle"] if trials is None else trials)
-    for _ in range(n_trials):
-        method, spec = meta.next_spec(bandit, rng, ledger_df)
-        if spec is None:
-            break
-        n_total = research.next_trial_number(ledger_df)
-        thr = research.threshold(n_total)
-        reg_hash = research.register_trial(f"T{n_total:05d}", as_of, method, spec, thr)   # L-06: đăng ký trước
-        oos, folds = research.walk_forward(ds, spec)
-        m = research.metrics(oos, folds, reg_lab)
-        status = research.classify(m, thr)
-        mid = research.spec_id(spec)
-        prev_sr = (pd.to_numeric(ledger_df["sharpe"], errors="coerce").dropna().tolist()
-                   if ledger_df is not None and "sharpe" in ledger_df else [])
-        var_sr = research.sharpe_variance(prev_sr, m["sharpe"], m["sr_T"])   # N = mọi lần thử từ đầu (kể cả chưa ghi Sharpe)
-        dsr = research.deflated_sharpe(m["sharpe"], m["sr_T"], m["sr_skew"], m["sr_kurt"], n_total, var_sr)
-        row = {"trial_id": f"T{n_total:05d}", "cycle_date": as_of, "method": method, "spec_id": mid,
-               "features": ";".join(spec["features"]), "model": spec["model"], "ic_mean": m["ic_mean"],
-               "ic_t": m["ic_t"], "net_ann": m["net_ann"], "fold_pos": m["fold_pos"], "threshold": thr,
-               "status": status, "regimes": json.dumps(m["regimes"]),
-               "sharpe": m["sharpe"], "sharpe_ann": m["sharpe_ann"], "dsr": dsr, "registry_hash": reg_hash,
-               "max_dd": m["max_dd"]}        # max_dd chỉ vào báo cáo; research/trials.csv giữ đúng 17 cột (L-06)
-        ledger_df = pd.concat([ledger_df, pd.DataFrame([row])], ignore_index=True) if ledger_df is not None else pd.DataFrame([row])
-        meta.update(bandit, method, status)
-        if status != "REJECTED":
-            knowledge.write_candidate(mid, spec, m, status, row["trial_id"], as_of)
-        was_new = mid not in registry
-        knowledge.promote(registry, mid, spec, m, status, as_of)
-        if was_new and mid in registry and use_llm:
-            llm_review.review(mid, load_json(f"knowledge/candidates/{mid}.json", {}), m, as_of)
-        done.append(row)
-    research.append_trial_results(done)                   # chỉ ghi thêm; dòng cũ giữ nguyên từng ký tự (L-06)
-    meta.save(bandit)
+    if not ops:                                       # ops: không đăng ký, không chạy lần thử, không ghi bandit
+        n_trials = 0 if skip else (CFG["research"]["trials_per_cycle"] if trials is None else trials)
+        for _ in range(n_trials):
+            method, spec = meta.next_spec(bandit, rng, ledger_df)
+            if spec is None:
+                break
+            n_total = research.next_trial_number(ledger_df)
+            thr = research.threshold(n_total)
+            reg_hash = research.register_trial(f"T{n_total:05d}", as_of, method, spec, thr)   # L-06: đăng ký trước
+            oos, folds = research.walk_forward(ds, spec)
+            m = research.metrics(oos, folds, reg_lab)
+            status = research.classify(m, thr)
+            mid = research.spec_id(spec)
+            prev_sr = (pd.to_numeric(ledger_df["sharpe"], errors="coerce").dropna().tolist()
+                       if ledger_df is not None and "sharpe" in ledger_df else [])
+            var_sr = research.sharpe_variance(prev_sr, m["sharpe"], m["sr_T"])   # N = mọi lần thử từ đầu (kể cả chưa ghi Sharpe)
+            dsr = research.deflated_sharpe(m["sharpe"], m["sr_T"], m["sr_skew"], m["sr_kurt"], n_total, var_sr)
+            row = {"trial_id": f"T{n_total:05d}", "cycle_date": as_of, "method": method, "spec_id": mid,
+                   "features": ";".join(spec["features"]), "model": spec["model"], "ic_mean": m["ic_mean"],
+                   "ic_t": m["ic_t"], "net_ann": m["net_ann"], "fold_pos": m["fold_pos"], "threshold": thr,
+                   "status": status, "regimes": json.dumps(m["regimes"]),
+                   "sharpe": m["sharpe"], "sharpe_ann": m["sharpe_ann"], "dsr": dsr, "registry_hash": reg_hash,
+                   "max_dd": m["max_dd"]}        # max_dd chỉ vào báo cáo; research/trials.csv giữ đúng 17 cột (L-06)
+            ledger_df = pd.concat([ledger_df, pd.DataFrame([row])], ignore_index=True) if ledger_df is not None else pd.DataFrame([row])
+            meta.update(bandit, method, status)
+            if status != "REJECTED":
+                knowledge.write_candidate(mid, spec, m, status, row["trial_id"], as_of)
+            was_new = mid not in registry
+            knowledge.promote(registry, mid, spec, m, status, as_of)
+            if was_new and mid in registry and use_llm:
+                llm_review.review(mid, load_json(f"knowledge/candidates/{mid}.json", {}), m, as_of)
+            done.append(row)
+        research.append_trial_results(done)                   # chỉ ghi thêm; dòng cũ giữ nguyên từng ký tự (L-06)
+        meta.save(bandit)
 
     # LIVE PREDICTION + DECAY
     if skip:
         preds_today, alerts = pd.DataFrame(columns=["date", "model_id", "ticker", "score"]), []
     else:
         preds_today, allp = knowledge.live_predict(ds, registry, as_of, udates)
-        alerts = knowledge.decay(registry, allp, ds, as_of)
+        if ops:
+            alerts = []                                  # ops: không theo dõi suy giảm (decay chỉ ở lượt research)
+        else:
+            alerts = knowledge.decay(registry, allp, ds, as_of)
     knowledge.save_registry(registry)
 
     # PAPER + ATTRIBUTION
@@ -78,10 +139,12 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
 
     # ---- v1.0 GĐ1: PREDICTION LEDGER ----
     resolved = ledger.resolve(close, as_of, bad)
-    news = facts.ingest_news(as_of) if live else {"new_items": 0, "errors": []}
+    news = facts.ingest_news(as_of) if live and not ops else {"new_items": 0, "errors": []}
     if skip:
         ex = {"ran": False, "reasons": [f"tạm dừng: tỷ lệ lỗi dữ liệu {quality['error_rate_window']:.2%} "
                                         f"> ngưỡng {quality['max_error_rate']:.2%}"]}
+    elif ops:
+        ex = {"ran": False, "reasons": ["chế độ ops: chuyên gia chỉ chạy ở lượt nghiên cứu"]}
     else:
         ex = experts.run(as_of, close) if use_llm else {"ran": False, "reasons": ["tắt bởi --no-llm"]}
     sc = ledger.scorecard(as_of)
@@ -91,6 +154,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         report.write(as_of, regime_now, done, bandit, registry, nav, decision, attr, alerts,
                      research.threshold(max(1, n_total)), n_total, quality=quality, ingest=ingest,
                      news_errors=news["errors"])
+        _mark_mode(as_of, mode, as_of if not ops else prev_research_as_of)
         L = ["", "## Prediction Ledger (v1.0)", f"- Tin mới vào Fact Layer: {news['new_items']}"
              + (f" | lỗi nguồn: {len(news['errors'])}" if news["errors"] else ""),
              f"- Chuyên gia: " + (f"ghi {ex.get('recorded', 0)} dự báo, loại {ex.get('rejected', 0)}, "
@@ -130,7 +194,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         with open(path(f"reports/cycle_{as_of}.md"), "a", encoding="utf-8") as f:
             f.write("\n".join(L) + "\n")
     return {"as_of": as_of, "trials": done, "alerts": alerts, "nav": nav, "decision": decision,
-            "experts": ex, "resolved": len(resolved), "quality": quality}
+            "experts": ex, "resolved": len(resolved), "quality": quality, "mode": mode}
 
 def refresh_scorecard_report(as_of, attempts=3, while_writing=None):
     """Viết lại reports/scorecard.json từ Ledger hiện tại. Không đăng ký trial, không backtest, không đụng NAV giấy hay model.
@@ -181,11 +245,20 @@ def main():
     ap.add_argument("--source", default=CFG["data"]["source"])
     ap.add_argument("--as-of", default=None)
     ap.add_argument("--trials", type=int, default=None)
+    ap.add_argument("--mode", default="research", choices=MODES,
+                    help="auto: lượt theo lịch, chế độ theo phiên mới nhất có giá; ops: vận hành, không nghiên cứu; "
+                         "research: như trước")
     ap.add_argument("--no-llm", action="store_true")
     ap.add_argument("--force", action="store_true", help="chạy lại dù ngày này đã xử lý")
     ap.add_argument("--scorecard-only", action="store_true",
                     help="chỉ sinh lại scorecard từ Ledger; không nghiên cứu, không trial, không paper, không model")
     a = ap.parse_args()
+    if a.mode == "ops" and a.trials not in (None, 0):
+        ap.error("--mode ops chỉ nhận --trials 0")
+    if a.mode == "auto" and a.trials is not None:
+        ap.error("--mode auto tự chọn số lần thử; không truyền --trials")
+    if a.mode == "auto" and a.force:
+        ap.error("--mode auto không nhận --force: lượt theo lịch chỉ xử lý phiên mới hơn ENGINE_STATE.as_of")
     if a.scorecard_only:
         as_of = a.as_of or str(data.load_panel(None)[0].index[-1].date())
         raise SystemExit(refresh_scorecard_report(as_of))
@@ -203,7 +276,11 @@ def main():
         make_store()
     last = load_json("state/ENGINE_STATE.json", {}).get("as_of")
     newest = str(data.load_panel(a.as_of)[0].index[-1].date())
-    if last == newest and not a.force:
+    try:
+        sel = select_mode(a.mode, newest, last, a.trials, a.force)
+    except ValueError as e:                          # auto gặp phiên cũ hơn phiên đã xử lý: dừng trước mọi bước ghi
+        raise SystemExit(f"[cycle] {e}")
+    if sel is None:
         if ing is not None:                          # vẫn lưu nhật ký tải (kể cả lỗi) dù không chạy vòng học
             st = load_json("state/ENGINE_STATE.json", {})
             st["data_ingest"] = ing
@@ -213,7 +290,8 @@ def main():
             raise SystemExit(1)
         print(f"[cycle] Ngày {newest} đã xử lý (có thể hôm nay nghỉ giao dịch). Bỏ qua nghiên cứu.")
         return
-    r = cycle(a.as_of, a.trials, use_llm=not a.no_llm, live=live, ingest=ing)
+    mode, trials = sel
+    r = cycle(a.as_of, trials, use_llm=not a.no_llm, live=live, ingest=ing, mode=mode)
     print(f"[cycle] {r['as_of']} | thử nghiệm: {len(r['trials'])} | cảnh báo: {r['alerts']} | NAV: {r['nav']:,.0f}")
 
 if __name__ == "__main__":
