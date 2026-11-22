@@ -14,6 +14,8 @@ import tempfile
 import unittest
 import urllib.parse
 
+from tools.publication_proof import proof_errors
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "data" / "evidence" / "corporate_actions" / "EVIDENCE_MANIFEST_VN30_BO_SUNG.json"
 REPORT = ROOT / "reports" / "CORPORATE_ACTION_EVIDENCE_VN30_BO_SUNG_20261121.md"
@@ -34,10 +36,11 @@ def _docs(path=MANIFEST):
     return _man(path)["source_documents"]
 
 
-def published_from_posted(seconds, signed_date):
-    """Luật D1: giây Unix → ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ; phần ngày trùng signed_date → None."""
-    iso = dt.datetime.fromtimestamp(seconds, dt.timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
-    return None if iso[:10] == signed_date else iso
+def published_from_posted(seconds, signed_date=None):
+    """QĐ-9: giây Unix → ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ; trùng ngày ký vẫn ghi
+    (signed_date giữ cho chữ ký hàm cũ, không còn đổi kết quả). Điều kiện ngày ký và ngày không hưởng quyền nằm ở
+    tools/publication_proof.proof_errors."""
+    return dt.datetime.fromtimestamp(seconds, dt.timezone.utc).replace(tzinfo=None).isoformat(timespec="seconds")
 
 
 def publication_binding_errors(root, docs):
@@ -57,9 +60,11 @@ def publication_binding_errors(root, docs):
         want = published_from_posted(posted, doc["signed_date"])
         if doc["published_at"] != want:
             errors.append(f"{sid} published_at {doc['published_at']!r} khác giá trị suy từ data.postedDate {want!r}")
-        status, ev = ("DA_XAC_MINH", rel) if want else ("CHUA_XAC_MINH", None)
-        if doc["published_at_status"] != status or doc["publication_evidence"] != ev:
+        media = str(pathlib.Path(doc["path"]).parent / f"hose_mediafiles_{nid}.json")
+        if (doc["published_at_status"], doc["publication_evidence"], doc.get("publication_media_evidence")) != \
+                ("DA_XAC_MINH", rel, media):
             errors.append(f"{sid} trạng thái hoặc publication_evidence không khớp published_at")
+        errors += proof_errors(doc, root)
     return errors
 
 
@@ -220,32 +225,37 @@ if __name__ == "__main__":
 # ---------- Bản chấm L-09 vòng 1 (PR #78): luật múi giờ, ràng buộc published_at với JSON gốc, trang tra cứu ----------
 
 class PublicationRuleTests(unittest.TestCase):
-    def test_rule_uses_the_unix_utc_date_at_day_boundaries(self):
+    def test_qd9_rule_at_day_boundaries(self):
+        """Ngày đăng (UTC, không gắn múi giờ) không sớm hơn ngày ký; ngày của (ngày đăng + 7 giờ) sớm hơn ngày không hưởng quyền."""
+        mch = next(d for d in _docs() if d["ticker"] == "MCH")
         day = dt.datetime(2026, 7, 31, tzinfo=dt.timezone.utc)
-        s = lambda d: int((day + d).timestamp())  # noqa: E731
-        self.assertIsNone(published_from_posted(s(dt.timedelta(0)), "2026-07-31"))
-        self.assertIsNone(published_from_posted(s(dt.timedelta(hours=23, minutes=59, seconds=59)), "2026-07-31"))
-        self.assertEqual(published_from_posted(s(dt.timedelta(days=1)), "2026-07-31"), "2026-08-01T00:00:00")
-        # 17:00 UTC là 00:00 giờ Việt Nam ngày hôm sau: theo luật D1 vẫn là cùng ngày ký, nên để trống (thận trọng).
-        self.assertIsNone(published_from_posted(s(dt.timedelta(hours=17)), "2026-07-31"))
-        self.assertEqual(published_from_posted(s(dt.timedelta(hours=-1)), "2026-07-31"), "2026-07-30T23:00:00")
+        s = lambda d: published_from_posted(int((day + d).timestamp()))  # noqa: E731
+        self.assertEqual(s(dt.timedelta(0)), "2026-07-31T00:00:00")
+        self.assertEqual(s(dt.timedelta(hours=23, minutes=59, seconds=59)), "2026-07-31T23:59:59")
+        base = {**mch, "signed_date": "2026-07-31", "official_ex_date": "2026-08-02"}
+        rules = lambda pub: [e for e in proof_errors({**base, "published_at": pub}, ROOT)  # noqa: E731
+                             if "sớm hơn ngày ký" in e or "cộng 7 giờ" in e]
+        self.assertEqual(rules("2026-07-31T00:00:00"), [])
+        self.assertTrue(rules("2026-07-30T23:59:59"))             # sớm hơn ngày ký
+        self.assertEqual(rules("2026-07-31T16:59:59"), [])        # +7 giờ = 2026-07-31T23:59:59
+        self.assertEqual(rules("2026-08-01T16:59:59"), [])        # +7 giờ = 2026-08-01, trước 2026-08-02
+        self.assertTrue(rules("2026-08-01T17:00:00"))             # +7 giờ = 2026-08-02, không sớm hơn ngày GDKHQ
 
-    def test_mch_is_same_day_under_the_d1_rule(self):
+    def test_mch_same_day_is_accepted_under_qd9(self):
         mch = next(d for d in _docs() if d["ticker"] == "MCH")
         posted = json.loads((ROOT / pathlib.Path(mch["path"]).parent / "hose_news_2485688.json").read_bytes())["data"]["postedDate"]
         self.assertEqual(posted, 1785522230)
-        self.assertIsNone(published_from_posted(posted, mch["signed_date"]))
-        self.assertIsNone(mch["published_at"])
-        self.assertIn("2026-07-31T18:23:50", mch["published_at_note"])
+        self.assertEqual(mch["published_at"], "2026-07-31T18:23:50")
+        self.assertEqual(mch["published_at"][:10], mch["signed_date"])
+        self.assertEqual(mch["published_at_status"], "DA_XAC_MINH")
+        self.assertIn("QĐ-9", mch["published_at_note"])
+        self.assertEqual(proof_errors(mch, ROOT), [])
 
     def test_editing_only_the_manifest_date_is_caught(self):
         docs = _docs()
         for i, doc in enumerate(docs):
             bad = [dict(d) for d in docs]
-            bad[i]["published_at"] = "2026-06-30T18:10:56" if doc["published_at"] else "2026-08-01T01:23:50"
-            if doc["published_at"] is None:
-                bad[i].update(published_at_status="DA_XAC_MINH",
-                              publication_evidence=str(pathlib.Path(doc["path"]).parent / f"hose_news_{doc['source_id'][5:]}.json"))
+            bad[i]["published_at"] = "2026-08-01T01:23:50" if doc["ticker"] == "MCH" else "2026-06-30T18:10:56"
             self.assertTrue(publication_binding_errors(ROOT, bad), doc["source_id"])
         bad = [dict(d) for d in docs]
         first = next(i for i, d in enumerate(bad) if d["published_at"])

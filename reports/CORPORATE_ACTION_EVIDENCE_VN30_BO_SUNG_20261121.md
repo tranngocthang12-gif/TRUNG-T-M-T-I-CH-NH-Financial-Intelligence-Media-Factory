@@ -7,8 +7,8 @@
 **Manifest:** `data/evidence/corporate_actions/EVIDENCE_MANIFEST_VN30_BO_SUNG.json`. Dùng cùng khuôn trường với `EVIDENCE_MANIFEST_2026H2.json`:
 - `event_type` để trống;
 - nguyên văn loại sự kiện chép vào `event_type_verbatim`;
-- `published_at` theo luật D1: lấy giây Unix `data.postedDate` của tin HOSE, viết ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ. «Trùng ngày ký» so phần ngày của chuỗi đó với `signed_date`; trùng thì để trống.
-- MCH: `postedDate` = 1785522230 → 2026-07-31T18:23:50, trùng ngày ký 2026-07-31, nên để trống. Đọc theo giờ Việt Nam (+7 giờ) thì là 2026-08-01T01:23:50, khác ngày ký. Ở cả hai cách đọc, ngày đăng đều trước ngày không hưởng quyền 10/08/2026. Chưa có quyết định chốt múi giờ, nên giữ cách thận trọng. QĐ-9 (gói giao số 2) sẽ xử lý trường hợp này.
+- `published_at` theo QĐ-9 (ADR-0016): lấy giây Unix `data.postedDate` của tin HOSE, viết ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ; chỉ nhận khi `tools/publication_proof.py` kiểm được từ metadata HOSE đã ghim, kể cả khi trùng ngày ký.
+- MCH: `postedDate` = 1785522230 → 2026-07-31T18:23:50, trùng ngày ký 2026-07-31; được nhận theo QĐ-9. Đọc theo giờ Việt Nam (+7 giờ) là 2026-08-01T01:23:50, vẫn trước ngày không hưởng quyền 10/08/2026. Cả 3 sự kiện đều có ngày công bố.
 
 **Cách đọc PDF:** PDF là ảnh quét, không có lớp chữ. Ngày, tỷ lệ và lý do do Claude (Anthropic) đọc từ ảnh; **chưa có ghế khác nhà cung cấp đối chiếu**. Bảng «Đối chiếu ảnh quét» dưới đây ghi từng trường cần kiểm, theo vị trí trên trang 1 của mỗi PDF.
 
@@ -17,7 +17,7 @@
 | Mã | Bản gốc | Thông báo | Ngày ký | Ngày công bố | Ngày không hưởng quyền | Ngày đăng ký cuối cùng | Nguyên văn loại | Tỷ lệ |
 |---|---|---|---|---|---|---|---|---|
 | BSR | hose-2475353 | 1434/TB-SGDHCM | 2026-06-29 | 2026-06-30T18:10:55 | 2026-08-11 | 2026-08-12 | chi trả cổ tức bằng tiền | 3%/mệnh giá, 300 đồng/cổ phiếu |
-| MCH | hose-2485688 | 1643/TB-SGDHCM | 2026-07-31 | CHƯA XÁC MINH (HOSE đăng 2026-07-31T18:23:50, trùng ngày ký) | 2026-08-10 | 2026-08-11 | tạm ứng cổ tức bằng tiền | 20%/mệnh giá, 2.000 đồng/cổ phiếu |
+| MCH | hose-2485688 | 1643/TB-SGDHCM | 2026-07-31 | 2026-07-31T18:23:50 (trùng ngày ký, nhận theo QĐ-9) | 2026-08-10 | 2026-08-11 | tạm ứng cổ tức bằng tiền | 20%/mệnh giá, 2.000 đồng/cổ phiếu |
 | TCX | hose-2496161 | 1860/TB-SGDHCM | 2026-09-10 | 2026-09-11T08:41:56 | 2026-09-17 | 2026-09-18 | trả cổ tức bằng cổ phiếu | 5:1, hệ số 1,2 |
 
 - Hai dòng cổ tức tiền có `official_ratio` để trống, vì cổ tức tiền không phải hệ số giá.
