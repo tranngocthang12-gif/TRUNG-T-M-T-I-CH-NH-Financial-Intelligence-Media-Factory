@@ -71,9 +71,10 @@ def _commit_all(home, msg, when):
         _git(home, "commit", "-q", "-m", msg, when=when)
 
 
-def _home(tmp, close=None, vol=None, drop=(), events=(), calendar=True, unann=(), holidays=(), register=True, **spec):
+def _home(tmp, close=None, vol=None, drop=(), events=(), calendar=True, unann=(), holidays=(), register=True, cal_end=None,
+          **spec):
     """Kho tạm (kho git). drop: các (ngày, mã) không có dòng giá (mã None = mọi mã); unann: ngày lịch ghi
-    CHUA_CO_THONG_BAO; holidays: ngày nghỉ trong lịch (is_session = 0)."""
+    CHUA_CO_THONG_BAO; holidays: ngày nghỉ trong lịch (is_session = 0); cal_end: ngày cuối vùng lịch phủ (mặc định 2026-12-31)."""
     home = pathlib.Path(tmp)
     home.mkdir(parents=True, exist_ok=True)
     close = _prices() if close is None else close
@@ -91,7 +92,7 @@ def _home(tmp, close=None, vol=None, drop=(), events=(), calendar=True, unann=()
     if calendar:
         un, hol = {pd.Timestamp(d) for d in unann}, {pd.Timestamp(d) for d in holidays}
         lines = ["date,is_session,source_id"]
-        for d in pd.date_range("2025-01-01", "2026-12-31", freq="D"):
+        for d in pd.date_range("2025-01-01", cal_end or "2026-12-31", freq="D"):
             lines.append(f"{d.date()},0,WEEKEND" if d.weekday() >= 5 else f"{d.date()},0,fx-hol" if d in hol else
                          f"{d.date()},1,{data.UNANNOUNCED if d in un else 'HOSE_DEFAULT'}")
         (home / "data" / "trading_calendar.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -908,3 +909,104 @@ def test_replay_rejects_a_tampered_gate_record(env, change, why):
     _edit_gate(home, S[D0 + 1], "FWD-EW", change)
     with pytest.raises(fwd.ReplayMismatch, match=why):
         fwd.replay(home, SPEC, S[D0 + 2])
+
+
+# ---------- 15. bản chấm L-09 PR #95 vòng 2 ----------
+
+def test_an_unannounced_day_with_no_price_row_at_all_is_not_a_session(env):
+    """BLOCKER 1: ngày X lịch ghi CHUA_CO_THONG_BAO và kho KHÔNG có dòng nào ở X (session_axis vẫn thêm X vì lịch ghi
+    is_session=1): X không phải phiên, không WAIT_PRICES, robot xử lý tiếp X+1. Kỳ 1 dời sang D0+4 (3 phiên sau D0 không
+    tính X). Cửa sổ ADV của cổng R1a cũng không tính X: cổng PASS ở quyết định D0+4 và khớp D0+5, không lý do «thiếu giá»."""
+    x = IDX[D0 + 2]
+    home = _home(env, drop=[(x, None)], unann=[x])
+    rb = Robot(home)
+    for i in (D0, D0 + 1, D0 + 3, D0 + 4, D0 + 5):
+        assert rb.day(i)["stopped"] is None, S[i]
+    dec = _csv(home, "decisions.csv")
+    assert "WAIT_PRICES" not in set(dec.action)
+    assert dec[dec.action == "DECIDE"][["date", "k"]].drop_duplicates().values.tolist() == [[S[D0], "0"], [S[D0 + 4], "1"]]
+    nav = _csv(home, "nav.csv")
+    assert nav.date.unique().tolist() == [S[D0], S[D0 + 1], S[D0 + 3], S[D0 + 4], S[D0 + 5]]
+    assert _state(home)["last"] == S[D0 + 5]
+    g = _gate_rows(home)
+    assert g[["date", "book", "note"]].values.tolist() == [
+        [S[D0], "FWD-EW", "decide: PASS"], [S[D0], "FWD-HOLD", "decide: PASS"],
+        [S[D0 + 1], "FWD-EW", "fill: PASS"], [S[D0 + 1], "FWD-HOLD", "fill: PASS"],
+        [S[D0 + 4], "FWD-EW", "decide: PASS"], [S[D0 + 4], "FWD-HOLD", "decide: PASS"],
+        [S[D0 + 5], "FWD-EW", "fill: PASS"]]
+    assert all(not json.loads(x)["market"]["adv_problem"] for x in g.targets)
+    assert fwd.replay(home, SPEC, S[D0 + 5]).astype(str).reset_index(drop=True).equals(
+        nav[["date", "book", "nav"]].reset_index(drop=True))
+
+
+
+def test_a_zero_volume_day_outside_calendar_coverage_is_not_a_session(env):
+    """Lịch chỉ phủ tới D0+1; ở D0+3 mọi mã có dòng giá nhưng khối lượng 0 (kiểu Yahoo lặp giá phiên trước vào ngày nghỉ).
+    load_market xếp D0+3 vào non_session_zero_volume: D0+3 không phải phiên, không WAIT_PRICES, kỳ dời sang D0+4."""
+    x = IDX[D0 + 3]
+    vol = pd.DataFrame(1e6, index=IDX, columns=TICK)
+    vol.loc[x] = 0.0
+    home = _home(env, vol=vol, cal_end=S[D0 + 1])
+    rb = Robot(home)
+    for i in range(D0, D0 + 5):
+        assert rb.day(i)["stopped"] is None, S[i]
+    assert "WAIT_PRICES" not in set(_csv(home, "decisions.csv").action)
+    nav = _csv(home, "nav.csv")
+    assert nav.date.unique().tolist() == [S[D0], S[D0 + 1], S[D0 + 2], S[D0 + 4]] and _state(home)["last"] == S[D0 + 4]
+    assert fwd.replay(home, SPEC, S[D0 + 4]).astype(str).reset_index(drop=True).equals(
+        nav[["date", "book", "nav"]].reset_index(drop=True))
+
+@pytest.mark.parametrize("bad", ["trades.csv", "drawdown.csv"])
+def test_a_journal_conflict_in_a_later_file_writes_no_byte_to_any_file(env, monkeypatch, bad):
+    """BLOCKER 2: nhật ký còn thiếu nav.csv (tệp đầu) nhưng một tệp sau không khớp: JOURNAL_CONFLICT, không tệp nào đổi."""
+    home = _home(env)
+    rb = Robot(home)
+    rb.day(D0)
+    with monkeypatch.context() as m:
+        _crash_at(m, 2)                                     # nhật ký đã ghi, chưa nối CSV nào
+        with pytest.raises(Killed):
+            rb.day(D0 + 1, commit=False)
+    with open(_dir(home) / bad, "a", encoding="utf-8") as fh:
+        fh.write("x")                                       # vẫn trong khoảng kích thước, nội dung khác nhật ký
+    snap = _snapshot(_dir(home))
+    res = rb.day(D0 + 1, commit=False)
+    assert res["stopped"] == "JOURNAL_CONFLICT" and _snapshot(_dir(home)) == snap
+
+
+def test_late_events_in_a_chain_use_the_shares_effective_before_each_event(env):
+    """BLOCKER 3: chia tách 2:1 của AAA và BBB có hiệu lực ở D0+2, rồi cổ tức tiền 500 đ của AAA và cổ tức cổ phiếu 1,2 của BBB
+    có hiệu lực ở D0+3; robot biết cả bốn sự kiện cùng lúc ở D0+4. Cổ tức tính trên số cổ phiếu SAU chia tách."""
+    px = _prices()
+    px.loc[IDX[D0 + 2]:, ["AAA", "BBB"]] = (px.loc[IDX[D0 + 2]:, ["AAA", "BBB"]] / 2).round(-1)
+    px.loc[IDX[D0 + 3]:, "BBB"] = (px.loc[IDX[D0 + 3]:, "BBB"] / 1.2).round(-1)
+    home = _home(env, close=px)
+    rb = Robot(home)
+    rb.days(D0, D0 + 3)
+    _write_events(home, [
+        {"ticker": "AAA", "ex_date": S[D0 + 2], "type": "stock_split", "ratio": 2.0},
+        {"ticker": "BBB", "ex_date": S[D0 + 2], "type": "stock_split", "ratio": 2.0},
+        {"ticker": "AAA", "ex_date": S[D0 + 3], "type": "cash_dividend", "cash_per_share": 500.0},
+        {"ticker": "BBB", "ex_date": S[D0 + 3], "type": "stock_dividend", "ratio": 1.2}])
+    rb.day(D0 + 4)
+    trd = _csv(home, "trades.csv")
+    ca = trd[(trd.book == "FWD-HOLD") & trd.side.isin(["CASH_DIVIDEND", "STOCK_ADJUST"])]
+    a, b = _pos(home, "FWD-HOLD", S[D0 + 1])["AAA"], _pos(home, "FWD-HOLD", S[D0 + 1])["BBB"]
+    got = ca[["asset", "side", "quantity", "value", "flags", "effective_date"]].values.tolist()
+    tax = C["dividend_tax"]
+    assert got == [
+        ["AAA", "STOCK_ADJUST", str(a), "2.0", "CA_LATE;CA_UNVERIFIED", S[D0 + 2]],
+        ["BBB", "STOCK_ADJUST", str(b), "2.0", "CA_LATE;CA_UNVERIFIED", S[D0 + 2]],
+        ["AAA", "CASH_DIVIDEND", str(2 * a), str(round(2 * a * 500 * (1 - tax), 2)), "CA_LATE", S[D0 + 3]],
+        ["BBB", "STOCK_ADJUST", str(int(2 * b * 1.2) - 2 * b), "1.2", "CA_LATE;CA_UNVERIFIED", S[D0 + 3]]]
+    assert set(ca.date) == {S[D0 + 4]}                                       # ghi ở phiên xử lý, hiệu lực theo sự kiện
+    pos = _pos(home, "FWD-HOLD", S[D0 + 4])
+    assert pos["AAA"] == 2 * a and pos["BBB"] == int(2 * b * 1.2)
+    nav = _csv(home, "nav.csv")
+    r = nav[(nav.date == S[D0 + 4]) & (nav.book == "FWD-HOLD")]
+    cash3 = float(nav[(nav.date == S[D0 + 3]) & (nav.book == "FWD-HOLD")].cash.item())
+    sold = trd[(trd.book == "FWD-HOLD") & (trd.date == S[D0 + 4]) & (trd.side == "SELL")]
+    proceeds = sum(int(x.quantity) * float(x.price) for x in sold.itertuples()) * (1 - C["sell_fee"] - C["sell_tax"])
+    assert abs(float(r.cash.item()) - (cash3 + 2 * a * 500 * (1 - tax) + proceeds)) <= 2
+    assert abs(float(r.nav.item()) - (float(r.cash.item()) + sum(n * px.at[IDX[D0 + 4], t] for t, n in pos.items()))) <= 1
+    assert fwd.replay(home, SPEC, S[D0 + 4]).astype(str).reset_index(drop=True).equals(
+        nav[["date", "book", "nav"]].reset_index(drop=True))

@@ -18,8 +18,9 @@ Luật (mục của QĐ-11a trong ngoặc):
   - Đầu vào: data.load_market(as_of, research_input="verified", universe="historical", sessions="calendar"). Nhãn phải là
     "PIT_MODES_ONLY" (Owner xác nhận 22/11/2026, gói 4 đã sửa: F1b dùng nhãn này); khác thì ghi PIT_REJECTED, không xử lý
     phiên nào. "Đủ điều kiện" tại phiên s là `eligible` tại s.
-  - Phiên (1): risk_gate.session_axis(ngày của kho giá, lịch, until=as_of), bỏ ngày CHUA_CO_THONG_BAO và ngày ngoài vùng lịch
-    mà không thành viên rổ nào có giá (danh sách của load_market). Có giá = dòng giá với khối lượng > 0.
+  - Phiên (1): risk_gate.session_axis(ngày của kho giá, lịch, until=as_of), bỏ ngày ngoài vùng lịch mà không thành viên rổ
+    nào có giá, và mọi ngày lịch ghi CHUA_CO_THONG_BAO mà không thành viên rổ nào có giá, kể cả ngày kho không có dòng nào.
+    Có giá = dòng giá với khối lượng > 0.
   - Tuần tự từng phiên sau phiên đã xử lý gần nhất (2): xác minh niêm phong quyết định phiên trước → sự kiện quyền cho vị thế
     giữ từ trước phiên → khớp → định giá → đo sụt giảm → quyết định (chỉ ở phiên tái cơ cấu). Mỗi phiên ghi qua nhật ký
     journal.json (các byte sẽ nối vào từng CSV và state.json mới, ghi nguyên tử trước); lần chạy sau thấy nhật ký thì ghi
@@ -39,6 +40,8 @@ Luật (mục của QĐ-11a trong ngoặc):
     STALE_PRICE và thử lại. Phiên không thành viên nào có giá → WAIT_PRICES, dừng trước phiên đó.
   - Sự kiện quyền (6): bảng sự kiện của engine (adjust.build_events, trạng thái APPLIED), như sổ giấy. Cơ sở là số cổ phiếu
     nắm giữ trước phiên giao dịch không hưởng quyền (dựng từ trades.csv), nên cổ phiếu mua ở đóng cửa phiên đó không hưởng.
+    Cơ sở tính theo ngày hiệu lực (`effective_date` của trades.csv): cổ phiếu chia tách biết muộn có hiệu lực từ phiên giao
+    dịch không hưởng quyền của nó, nên được tính cho sự kiện có ngày hiệu lực sau đó dù dòng được ghi ở phiên xử lý.
     Cổ tức tiền: cơ sở × tiền mỗi cổ phiếu × (1 − thuế cổ tức). Sự kiện cổ phiếu: thêm int(cơ sở × hệ số) − cơ sở cổ phiếu;
     chưa vào chuỗi kiểm chứng → CA_UNVERIFIED. Sự kiện biết muộn (ngày giao dịch không hưởng quyền trước phiên đang xử lý)
     áp ở phiên đang xử lý, ghi CA_LATE.
@@ -51,7 +54,9 @@ Luật (mục của QĐ-11a trong ngoặc):
     trượt giá theo `costs`. Bán trước, mua sau; mua giới hạn bởi tiền mặt.
   - Cổng R1a (QĐ-5a): risk_gate.check lúc quyết định và lúc khớp lệnh mua, cùng ngữ nghĩa với paper.run (FAIL lúc quyết định
     → mục tiêu = vị thế đang giữ; mã bị loại không mua; FAIL lúc khớp → không mua mã nào; mã bị từ chối không thử lại). Sổ
-    FWD không có trạng thái đóng băng dữ liệu: cổng nhận frozen=False.
+    FWD không có trạng thái đóng băng dữ liệu: cổng nhận frozen=False. Thị trường là risk_gate.market_snapshot tại phiên,
+    trừ giá (giá gốc của phiên) và giá trị giao dịch bình quân: cửa sổ adv_sessions phiên tính trên trục phiên FWD ở mục
+    (1), nên ngày không phải phiên (kể cả ngày CHUA_CO_THONG_BAO kho không có dòng nào) không làm cửa sổ có phiên trống.
 `replay(root, spec, until)` dựng lại các sổ từ D0 tới phiên robot đã ghi xong, bằng danh mục mục tiêu đã niêm phong, các
 dòng áp sự kiện đã ghi, giá trong kho và luật trên; cổng R1a ở phiên khớp được tính lại từ đầu vào ở dòng RISK_GATE (xem
 replay).
@@ -90,7 +95,8 @@ MARKET = {"research_input": "verified", "universe": "historical", "sessions": "c
 PIT_REQUIRED = data.PIT_MODES_ONLY
 COLS = {
     "nav.csv": ["date", "book", "nav", "cash", "n_positions", "stale"],
-    "trades.csv": ["date", "book", "asset", "side", "quantity", "price", "fees", "event", "value", "flags"],
+    "trades.csv": ["date", "book", "asset", "side", "quantity", "price", "fees", "event", "value", "flags",
+                   "effective_date"],
     "decisions.csv": ["date", "action", "book", "k", "run_id", "decided_at", "deadline", "vn30_history_sha256",
                       "trading_calendar_sha256", "derivation_id", "targets", "note"],
     "periods.csv": ["k", "decision_session", "fill_session", "status", "note"],
@@ -215,15 +221,16 @@ def _commit(d, rows, state=None):
 
 
 def finish_journal(d, j=None):
-    """Hoàn tất nhật ký ghi dở → True; không có nhật ký → False. Mỗi CSV phải có kích thước từ `offset` tới `offset` + số
-    byte cần nối, và phần đã có phải trùng đầu của các byte đó (ghi dở); khi đó chỉ nối phần còn thiếu. Khác đi thì
-    JournalConflict (không ghi thêm gì)."""
+    """Hoàn tất nhật ký ghi dở → True; không có nhật ký → False. Kiểm MỌI CSV trước: kích thước từ `offset` tới `offset` + số
+    byte cần nối, và phần đã có trùng đầu của các byte đó (ghi dở). Một tệp không khớp thì JournalConflict và không tệp nào
+    bị ghi thêm byte nào; mọi tệp khớp thì mới nối phần còn thiếu của từng tệp và ghi state.json."""
     jp = d / JOURNAL
     if j is None:
         if not jp.exists():
             return False
         j = json.loads(jp.read_text(encoding="utf-8"))
-    for name in COLS:
+    todo = []
+    for name in COLS:                       # lượt 1: kiểm MỌI tệp, chưa ghi byte nào
         part = j["parts"].get(name)
         if part is None:
             continue
@@ -237,7 +244,9 @@ def finish_journal(d, j=None):
                 if fh.read() != b[:cur - off]:
                     raise JournalConflict(f"{name}: phần đã ghi sau byte {off} khác nội dung của nhật ký")
         if cur < off + len(b):
-            _append_bytes(f, b[cur - off:])
+            todo.append((f, b[cur - off:]))
+    for f, rest in todo:                    # lượt 2: mọi tệp khớp nhật ký, mới nối phần còn thiếu
+        _append_bytes(f, rest)
     if j["state"] is not None:
         _atomic_write(d / STATE, _state_text(j["state"]))
     _drop_journal(jp)
@@ -398,13 +407,19 @@ class _Ctx:
         axis = risk_gate.session_axis(list(self.raw.index) if len(self.raw) else [t0], self.cal, until=t0)
         q = self.mk["quality"]["sessions"]
         off = {pd.Timestamp(d) for d in list(q["non_session_unannounced"]) + list(q["non_session_zero_volume"])}
-        self.sessions = [d for d in axis if d not in off and d <= t0]
-        idx = pd.DatetimeIndex(self.sessions)
+        axis0 = pd.DatetimeIndex([d for d in axis if d not in off and d <= t0])
         has = (self.raw > 0) & (vol > 0)                               # có giá: dòng giá với khối lượng > 0
-        self.ok = has.reindex(index=idx, fill_value=False).fillna(False).astype(bool)
+        ok0 = has.reindex(index=axis0, fill_value=False).fillna(False).astype(bool)
+        m = self.mk["members"].reindex(index=axis0, columns=ok0.columns, fill_value=False).fillna(False).astype(bool)
+        priced0 = (ok0 & m).any(axis=1)
+        # QĐ-11a mục 1: ngày lịch ghi CHUA_CO_THONG_BAO chỉ là phiên khi một thành viên rổ có giá. session_axis thêm mọi ngày
+        # lịch ghi is_session=1, kể cả ngày CHUA_CO_THONG_BAO mà kho không có dòng nào (load_market không liệt kê ngày đó).
+        unann = self.unannounced()
+        self.sessions = [d for d in axis0 if not (d in unann and not bool(priced0[d]))]
+        idx = pd.DatetimeIndex(self.sessions)
+        self.ok = ok0.reindex(idx)
         self.last = self.raw.where(has).ffill().reindex(idx, method="ffill")   # giá gốc gần nhất ≤ phiên
-        m = self.mk["members"].reindex(index=idx, columns=self.ok.columns, fill_value=False).fillna(False).astype(bool)
-        self.session_ok = (self.ok & m).any(axis=1)
+        self.session_ok = priced0.reindex(idx)
         priced = self.session_ok[self.session_ok]
         self.newest = priced.index[-1] if len(priced) else None
         self.events = self.mk.get("event_checks")
@@ -418,6 +433,16 @@ class _Ctx:
         self.adj = r.ffill(limit=5)
         self._snap = {}
         self._inputs = None
+
+    def unannounced(self):
+        """Các ngày data/trading_calendar.csv ghi source_id = CHUA_CO_THONG_BAO (chưa có thông báo nghỉ lễ của HOSE)."""
+        p = self.root.joinpath(*risk_gate.CALENDAR)
+        if not self.cal or not p.is_file():
+            return set()
+        t = pd.read_csv(p, dtype=str, keep_default_na=False)
+        if "source_id" not in t.columns:
+            return set()
+        return {pd.Timestamp(d) for d in t.loc[t["source_id"] == data.UNANNOUNCED, "date"]}
 
     def priced(self, t, s):
         return t in self.ok.columns and bool(self.ok.at[s, t])
@@ -443,6 +468,8 @@ class _Ctx:
             lim = config.CFG["paper"].get("risk_limits")
             snap = risk_gate.market_snapshot(s, list(key[1]), lim, root=self.root, frozen=False)
             snap["price"] = {t: p for t in key[1] if (p := self.price(t, s)) is not None}
+            if not snap["errors"] and risk_gate.limits_problem(lim) is None:     # cửa sổ ADV trên trục phiên FWD (adv)
+                snap["adv_value"], snap["adv_problem"] = self.adv(s, list(key[1]))
             self._snap[key] = snap
         return self._snap[key]
 
@@ -460,10 +487,13 @@ class _Ctx:
         return self._inputs
 
     def adv(self, s, tickers):
-        """Giá trị giao dịch bình quân tính lại từ giá và khối lượng gốc của kho tới phiên s (như market_snapshot)."""
+        """Giá trị giao dịch bình quân tính lại từ giá và khối lượng gốc của kho tới phiên s (risk_gate.adv_values), trên trục
+        phiên FWD tới s: không gồm ngày CHUA_CO_THONG_BAO hay ngày ngoài vùng lịch mà không thành viên rổ nào có giá
+        (QĐ-11a mục 1). market_snapshot dùng risk_gate.session_axis, trục này thêm lại ngày CHUA_CO_THONG_BAO kho không có
+        dòng nào; cửa sổ khi đó có một phiên trống và cổng FAIL suốt adv_sessions phiên."""
         lim = config.CFG["paper"].get("risk_limits") or {}
         raw, vol = self.raw.loc[:s], self.vol.loc[:s]
-        axis = risk_gate.session_axis(raw.index, self.cal, until=s)
+        axis = pd.DatetimeIndex([d for d in self.sessions if d <= s])
         return risk_gate.adv_values(raw, vol, axis, list(tickers), int(lim.get("adv_sessions", 20)))
 
     def gate(self, stage, book, s, targets, nav, positions, rows, k=""):
@@ -531,7 +561,7 @@ def _fill(book, bk, order, s, ctx, rows, gate):
 
     def trade(t, side, qty=0, price=0.0, fees=0.0):
         rows.append({"date": si, "book": book, "asset": t, "side": side, "quantity": int(qty), "price": round(price, 2),
-                     "fees": round(fees, 0), "event": "", "value": "", "flags": ""})
+                     "fees": round(fees, 0), "event": "", "value": "", "flags": "", "effective_date": si})
     for t in sorted(legs):                                          # bán trước
         held, want = bk["positions"].get(t, 0), legs[t]
         if want >= held:
@@ -596,18 +626,22 @@ def _new_state(test_id, spec, books):
 
 
 def _history(d):
-    """{sổ: {mã: [(phiên, thay đổi số cổ phiếu)]}} từ trades.csv: cơ sở của sự kiện quyền."""
+    """{sổ: {mã: [(ngày hiệu lực, thay đổi số cổ phiếu)]}} từ trades.csv: cơ sở của sự kiện quyền."""
     h = {}
     t = _read(d, "trades.csv")
-    for r in t.itertuples(index=False):
-        _record(h, {"date": r.date, "book": r.book, "asset": r.asset, "side": r.side, "quantity": r.quantity})
+    for r in t.to_dict("records"):
+        _record(h, r)
     return h
 
 
 def _record(h, row):
+    """Ngày hiệu lực của dòng: lệnh mua bán là phiên khớp; dòng STOCK_ADJUST là phiên giao dịch không hưởng quyền của sự
+    kiện (`effective_date`), kể cả khi robot biết muộn và ghi dòng ở phiên sau — để cổ phiếu chia tách biết muộn được tính
+    vào cơ sở của sự kiện có ngày hiệu lực sau đó (bản chấm L-09 PR #95 vòng 2, BLOCKER 3)."""
     sign = {"BUY": 1, "SELL": -1, "STOCK_ADJUST": 1}.get(row["side"])
     if sign:
-        h.setdefault(row["book"], {}).setdefault(row["asset"], []).append((row["date"], sign * int(row["quantity"])))
+        h.setdefault(row["book"], {}).setdefault(row["asset"], []).append(
+            (row.get("effective_date") or row["date"], sign * int(row["quantity"])))
 
 
 def _held_before(h, book, t, day):
@@ -630,7 +664,7 @@ def _corporate_actions(st, ctx, s, books, hist, out):
         seen.add(key)
         te, stock = _iso(e.trade_date), e.type in adjust.STOCK
         flags = (["CA_LATE"] if te < si else []) + (["CA_UNVERIFIED"] if stock and not bool(e.in_verified_chain) else [])
-        for b in books:
+        for b in books:                    # cơ sở: số cổ phiếu hiệu lực trước phiên te, gồm sự kiện biết muộn có hiệu lực trước te
             base = _held_before(hist, b, e.ticker, te)
             if base <= 0:
                 continue
@@ -640,7 +674,7 @@ def _corporate_actions(st, ctx, s, books, hist, out):
             else:
                 row = {"side": "CASH_DIVIDEND", "quantity": base, "price": float(e.cash_per_share),
                        "value": round(base * float(e.cash_per_share) * (1 - tax), 2)}
-            row.update(date=si, book=b, asset=e.ticker, fees=0, event=key, flags=";".join(flags))
+            row.update(date=si, book=b, asset=e.ticker, fees=0, event=key, flags=";".join(flags), effective_date=te)
             _apply_ca_row(st["books"][b], st["open"].get(b), row)
             _record(hist, row)
             out["trades.csv"].append(row)
