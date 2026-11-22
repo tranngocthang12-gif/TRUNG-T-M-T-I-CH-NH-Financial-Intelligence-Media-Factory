@@ -216,10 +216,25 @@ def window_exclude(index, columns, checks, before, after):
     return pd.DataFrame(m, index=index, columns=columns)
 
 
+CODE_FILES = tuple(pathlib.Path(__file__).resolve().parent / n for n in ("data.py", "adjust.py", "verified_adjust.py"))
+
+
+def code_fingerprint(files=None):
+    """Dấu vân tay xác định của mã tạo đầu vào nghiên cứu: sha256 theo tên tệp và NỘI DUNG từng tệp trong CODE_FILES
+    (engine/data.py, engine/adjust.py, engine/verified_adjust.py). Không phụ thuộc đường dẫn hay git; đổi một byte mã (kể cả
+    chú thích) thì dấu vân tay đổi."""
+    h = hashlib.sha256()
+    for f in files or CODE_FILES:
+        f = pathlib.Path(f)
+        h.update(f"{f.name}:{hashlib.sha256(f.read_bytes()).hexdigest()}\n".encode())
+    return "code-sha256:" + h.hexdigest()
+
+
 def _derivation_id(research_input, cut, docs, ev):
-    """Định danh dẫn xuất chỉ phụ thuộc đầu vào: chế độ, ngày cắt, hash kho giá, hash CSV sự kiện, metadata mọi bản gốc,
-    config (tệp và giá trị đang dùng). Dùng lại verified_adjust.derivation_manifest; code_commit để trống."""
-    m = va.derivation_manifest(root=config.ROOT, cfg=CFG, as_of=cut, docs=docs, ev=ev, code_commit=None)
+    """Định danh dẫn xuất chỉ phụ thuộc đầu vào và phiên bản mã: chế độ, ngày cắt, hash kho giá, hash CSV sự kiện, metadata
+    các bản gốc đã dùng (chế độ legacy không dùng bản gốc nên không có), config (tệp và giá trị đang dùng), và dấu vân tay mã
+    (code_fingerprint) ở trường code_commit của verified_adjust.derivation_manifest (ADR-0009)."""
+    m = va.derivation_manifest(root=config.ROOT, cfg=CFG, as_of=cut, docs=docs, ev=ev, code_commit=code_fingerprint())
     cfg_now = hashlib.sha256(json.dumps(CFG, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
     key = {"research_input": research_input, "verified_derivation_id": m["derivation_id"], "config_values": cfg_now}
     return "RI-" + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
@@ -234,7 +249,8 @@ def load_market(as_of=None, research_input="legacy"):
       - "verified": chỉ sự kiện cổ phiếu vào chuỗi kiểm chứng (engine.verified_adjust, bản gốc từ evidence_docs, ngày cắt là
         as_of hoặc phiên cuối) được áp hệ số; sự kiện không vào chuỗi không mang trạng thái APPLIED trong `events`. Thêm
         `exclude` (mặt nạ cửa sổ QĐ-3), `eligible` (có giá và không bị loại) và `event_checks` (bảng kiểm sự kiện).
-    Cả hai chế độ thêm: research_input, derivation_id, pit_label (luôn "RETROSPECTIVE" ở bản này), pit_gaps."""
+    Cả hai chế độ thêm: research_input, derivation_id, pit_label (luôn "RETROSPECTIVE" ở bản này), pit_gaps.
+    Chế độ legacy không đọc manifest bản gốc, nên manifest hỏng không làm nó dừng; chế độ verified thì dừng."""
     if research_input not in RESEARCH_INPUTS:
         raise ValueError(f"research_input phải là một trong {RESEARCH_INPUTS}, không phải {research_input!r}")
     s = load_store()
@@ -249,8 +265,9 @@ def load_market(as_of=None, research_input="legacy"):
     raw, vol, obs = raw[keep], vol[keep], obs[keep]
     events = adjust.build_events(raw, obs, adjust.load_manual(), adjust.load_yahoo())
     cut = pd.Timestamp(as_of) if as_of is not None else raw.index[-1]
-    docs, checks = evidence_docs(), None
+    docs, checks = [], None                          # legacy không đọc manifest bản gốc nào (QĐ-1: mặc định giữ hành vi cũ)
     if research_input == "verified":
+        docs = evidence_docs()                       # manifest hỏng thì ném lỗi: chế độ đã kiểm không chạy với bản gốc hỏng
         checks = va.verify_events(events, raw, docs, evidence_root=config.ROOT, as_of=cut)
         F, S = va.verified_factors(raw.index, raw.columns, checks)
         events = checks[list(events.columns)].copy()

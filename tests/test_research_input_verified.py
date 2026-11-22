@@ -161,6 +161,19 @@ def test_features_without_exclude_are_byte_identical(tmp_path):
     assert _h(features.dataset(close, vol, H, None, pd.DataFrame(False, index=IDX, columns=TICKERS))) == _h(ref)
 
 
+@pytest.mark.parametrize("text", ["{khong phai json", '{"source_documents": [', "", "\x00\x01"])
+def test_legacy_ignores_a_broken_manifest_but_verified_refuses_it(tmp_path, text):
+    """Vòng chấm 1, BLOCKER 1: manifest bản gốc hỏng không được làm đường mặc định dừng, vì legacy không dùng bản gốc. Đầu ra
+    cũ của legacy vẫn trùng từng byte bản trước E2a; chế độ verified thì dừng (không chạy với bản gốc hỏng)."""
+    home = _home(tmp_path, _partial(), manual=_manual(IDX[OFF - W]), docs=[_doc(tmp_path)])
+    ok = _market(home)["derivation_id"]
+    (home.joinpath(*data.EVIDENCE_DIR) / "EVIDENCE_MANIFEST_HONG.json").write_text(text, encoding="utf-8")
+    mk = _assert_legacy_unchanged(home)
+    assert mk["derivation_id"] == ok                                    # legacy không phụ thuộc manifest
+    with pytest.raises(ValueError):                                     # json.JSONDecodeError là ValueError
+        _market(home, research_input="verified")
+
+
 def test_unknown_research_input_is_rejected(tmp_path):
     home = _home(tmp_path, _walk())
     for bad in ("Verified", "", None, "pit"):
@@ -340,6 +353,61 @@ def test_derivation_id_depends_only_on_inputs(tmp_path):
     f = sorted((home / config.CFG["data"]["store_dir"]).glob("*.csv"))[-1]
     f.write_bytes(f.read_bytes().replace(b"fixture", b"fixturE", 1))
     assert _ids(home, research_input="verified") != c
+
+
+def test_legacy_derivation_id_does_not_depend_on_unused_evidence(tmp_path):
+    home = _home(tmp_path, _walk(), docs=[_doc(tmp_path)])
+    a = _ids(home)
+    (home.joinpath(*data.EVIDENCE_DIR) / "EVIDENCE_MANIFEST_FX.json").write_text('{"source_documents": []}', encoding="utf-8")
+    assert _ids(home) == a
+
+
+def _code_copies(tmp, edit=None):
+    out = []
+    for f in data.CODE_FILES:
+        q = tmp / "ma" / f.name
+        q.parent.mkdir(parents=True, exist_ok=True)
+        b = f.read_bytes()
+        q.write_bytes(edit(f.name, b) if edit else b)
+        out.append(q)
+    return tuple(out)
+
+
+def test_derivation_id_changes_with_the_algorithm_version_when_data_is_unchanged(tmp_path, monkeypatch):
+    """Vòng chấm 1, BLOCKER 2: cùng giá gốc, config, sự kiện và bản gốc; chỉ đổi mã tạo dữ liệu (ví dụ window_exclude) thì
+    derivation_id phải đổi. Bản sao giống hệt mã thì id giữ nguyên (dấu vân tay theo nội dung, không theo đường dẫn)."""
+    home = _home(tmp_path / "nha", _partial(), yahoo=_yahoo(), docs=[_doc(tmp_path / "nha")])
+    ids = {}
+    for mode in ("legacy", "verified"):
+        ids[mode] = _ids(home, research_input=mode)
+        monkeypatch.setattr(data, "CODE_FILES", _code_copies(tmp_path / mode))
+        assert _ids(home, research_input=mode) == ids[mode]
+        changed = _code_copies(tmp_path / (mode + "_doi"), lambda n, b: b.replace(b"pos - before", b"pos-before", 1)
+                               if n == "data.py" else b)
+        monkeypatch.setattr(data, "CODE_FILES", changed)
+        assert _ids(home, research_input=mode) != ids[mode]
+        monkeypatch.undo()
+    assert data.code_fingerprint().startswith("code-sha256:")
+    m = va.derivation_manifest(root=home, cfg=config.CFG, as_of=IDX[-1], docs=[], ev=NONE, code_commit=data.code_fingerprint())
+    assert m["code_commit"] == data.code_fingerprint()                 # dấu vân tay nằm ở trường code_commit (ADR-0009)
+
+
+def test_publication_date_comes_only_from_pinned_evidence(tmp_path):
+    """Làm rõ C2 (vòng chấm 1): cột published_at trong CSV sự kiện tay không được đọc (adjust giữ EV_COLS), nên C2 đạt vì sự
+    kiện không có bản gốc ghim (THIEU_BANG_CHUNG). Ngày công bố chỉ lấy từ bản gốc đã ghim; với bản gốc công bố sau ngày cắt
+    thì trạng thái là CONG_BO_SAU_NGAY_CAT, như test_publication_after_the_cut_keeps_the_event_out_of_the_chain."""
+    cut = IDX[OFF + 30]
+    m = _manual(IDX[OFF]).assign(published_at=str(IDX[-1].date()))
+    home = _home(tmp_path, _true_raw(), manual=m)
+    with patch.object(config, "ROOT", home), patch.object(adjust, "ROOT", home):
+        assert "published_at" not in adjust.load_manual().columns
+    mk = _market(home, as_of=str(cut.date()), research_input="verified")
+    assert mk["event_checks"].verify_state.tolist() == [va.Q + "THIEU_BANG_CHUNG"]
+    m2 = home.joinpath(*data.EVIDENCE_DIR) / "EVIDENCE_MANIFEST_FX.json"
+    m2.parent.mkdir(parents=True, exist_ok=True)
+    m2.write_text(json.dumps({"source_documents": [_doc(home, published=str(IDX[-1].date()))]}), encoding="utf-8")
+    mk = _market(home, as_of=str(cut.date()), research_input="verified")
+    assert mk["event_checks"].verify_state.tolist() == [va.Q + "CONG_BO_SAU_NGAY_CAT"]
 
 
 def test_pit_label_and_gaps(tmp_path):
