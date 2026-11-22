@@ -1,12 +1,16 @@
 """E2c (QĐ-1 của ADR-0016): trục phiên của đầu vào nghiên cứu — `load_market(..., sessions="keep"|"calendar")`.
 
+«Có giá» của một ngày: ít nhất một thành viên rổ có dòng giá với khối lượng > 0 (QĐ-11a; Owner xác nhận 22/11/2026).
 Ngày không phải phiên (data.non_session_days):
-  - trong vùng data/trading_calendar.csv phủ: ngày lịch ghi is_session=0 (chỉ lịch quyết định);
-  - ngoài vùng đó, hoặc khi không có tệp lịch: ngày mà mọi mã trong kho có khối lượng bằng 0 hoặc thiếu;
+  - trong vùng data/trading_calendar.csv phủ: ngày lịch ghi is_session=0; ngày lịch ghi CHUA_CO_THONG_BAO mà không có giá;
+  - ngoài vùng đó, hoặc khi không có tệp lịch: ngày không có giá;
   - lịch hỏng: lỗi ở cả hai chế độ.
-"keep" (mặc định) giữ trục ngày và chỉ liệt kê các ngày đó ở `quality.sessions`; khóa này không vào ENGINE_STATE, nên đầu
-ra vòng học không đổi. "calendar" bỏ các ngày đó khỏi kho trước mọi phép tính: kết quả bằng đúng kết quả của một kho không có
-các dòng đó. pit_label = POINT_IN_TIME chỉ khi research_input="verified", universe "historical", sessions="calendar".
+Phiên chính thức (is_session=1, nguồn HOSE hoặc HOSE_DEFAULT) không có giá vẫn là phiên: liệt kê ở missing_sessions; chế độ
+"calendar" thêm vào trục (giá NaN) ngày kho không có dòng nào.
+"keep" (mặc định) giữ trục ngày và chỉ liệt kê ở `quality.sessions`; khóa này không vào ENGINE_STATE, nên đầu ra vòng học
+không đổi. "calendar" dựng trục phiên trước mọi phép tính: kết quả bằng đúng kết quả của một kho không có các dòng bị bỏ.
+pit_label = PIT_MODES_ONLY chỉ khi research_input="verified", universe "historical", sessions="calendar" và có tệp lịch đọc
+được; không trường hợp nào trả POINT_IN_TIME (Owner xác nhận 22/11/2026).
 
 Fixture ghi vào thư mục tạm (config.ROOT và adjust.ROOT được vá); lượt chạy engine diễn ra trong tiến trình con với TTC_HOME
 tạm. Không mạng, không ghi vào kho.
@@ -36,21 +40,29 @@ from engine import adjust, config, data  # noqa: E402
 
 IDX = pd.bdate_range("2025-03-03", periods=420)            # 2025-03-03 … 2026-10-09
 U = list(config.CFG["universe"][:4])
+X = "ZZZ"                                                   # mã trong kho, không thuộc rổ (không thuộc universe)
 OBS = "2026-10-12"
 NONE = pd.DataFrame(columns=adjust.EV_COLS)
 COV = ("2026-01-01", "2026-12-31")                          # vùng lịch giả phủ
 T = pd.Timestamp
 HOL = [T("2026-01-01"), T("2026-01-02"), T("2026-02-16"), T("2026-02-17"), T("2026-02-18")]   # lịch nghỉ, khối lượng 0
 CALV = T("2026-04-30")                                      # lịch nghỉ nhưng kho có khối lượng > 0
-ZS = T("2026-03-10")                                        # lịch ghi là phiên, mọi mã khối lượng 0
+ZS = T("2026-03-10")                                        # phiên chính thức, mọi mã khối lượng 0: thiếu giá, vẫn là phiên
+MISS = T("2026-05-20")                                      # phiên chính thức, kho không có dòng nào: thiếu giá, vẫn là phiên
 ZV = [IDX[40], IDX[41], IDX[42]]                            # 2025-04-28…30: ngoài vùng lịch, mọi mã khối lượng 0
 ZM = IDX[60]                                                # 2025-05-26: 2 mã khối lượng 0, 2 mã không có dòng
 PZ = IDX[75]                                                # 2025-06-16: chỉ 2 trong 4 mã khối lượng 0
-UNANN = T("2026-06-01")                                     # lịch ghi CHUA_CO_THONG_BAO, trong khoảng dữ liệu
+NM = IDX[90]                                                # 2025-07-07: thành viên rổ khối lượng 0, chỉ ZZZ giao dịch
+UNANN = T("2026-06-01")                                     # CHUA_CO_THONG_BAO, có giá: là phiên
+UNANN_NT = T("2026-07-01")                                  # CHUA_CO_THONG_BAO, mọi mã khối lượng 0: không phải phiên
+UNANN_NR = T("2026-08-03")                                  # CHUA_CO_THONG_BAO, kho không có dòng: không lên trục
 UNANN_OUT = T("2026-12-28")                                 # CHUA_CO_THONG_BAO, sau ngày cuối của dữ liệu
+UNANN_ALL = (UNANN, UNANN_NT, UNANN_NR, UNANN_OUT)
 CAL_OFF = sorted(HOL + [CALV])
-VOL_OFF = sorted(ZV + [ZM])
-OFF = sorted(CAL_OFF + VOL_OFF)
+VOL_OFF = sorted(ZV + [ZM, NM])
+OFF = sorted(CAL_OFF + [UNANN_NT] + VOL_OFF)
+MISSING = [ZS, MISS]
+NO_ROWS = {MISS, UNANN_NR}
 KEYS = ("close", "volume", "raw_close", "bad", "events", "flags")
 
 
@@ -60,14 +72,17 @@ def _iso(days):
 
 def _prices(seed=11):
     rng = np.random.default_rng(seed)
-    r = rng.normal(0.0, 0.012, size=(len(IDX), len(U))).clip(-0.05, 0.05)
-    close = pd.DataFrame(20000.0 * np.cumprod(1 + r, axis=0), index=IDX, columns=U).round(-1)
-    vol = pd.DataFrame(1e6, index=IDX, columns=U)
-    for d in HOL + ZV + [ZS, ZM]:                           # ngày nghỉ: giá giữ nguyên phiên trước, khối lượng 0
+    cols = U + [X]
+    r = rng.normal(0.0, 0.012, size=(len(IDX), len(cols))).clip(-0.05, 0.05)
+    close = pd.DataFrame(20000.0 * np.cumprod(1 + r, axis=0), index=IDX, columns=cols).round(-1)
+    vol = pd.DataFrame(1e6, index=IDX, columns=cols)
+    for d in HOL + ZV + [ZS, ZM, NM, UNANN_NT]:             # ngày nghỉ: giá giữ nguyên phiên trước, khối lượng 0
         close.loc[d] = close.iloc[IDX.get_loc(d) - 1].values
         vol.loc[d] = 0.0
+    vol.loc[NM, X] = 1e6                                    # chỉ mã ngoài rổ giao dịch
     vol.loc[PZ, U[:2]] = 0.0
     close.loc[ZM, U[2:]] = np.nan                           # hai mã không có dòng ngày ZM
+    close.loc[list(NO_ROWS)] = np.nan                       # kho không có dòng nào
     return close, vol
 
 
@@ -84,7 +99,7 @@ def _rows(close, vol, skip=()):
     return pd.DataFrame(out, columns=data.COLS)
 
 
-def _calendar(off=CAL_OFF, unann=(UNANN, UNANN_OUT), lo=COV[0], hi=COV[1]):
+def _calendar(off=CAL_OFF, unann=UNANN_ALL, lo=COV[0], hi=COV[1]):
     lines = ["date,is_session,source_id"]
     for d in pd.date_range(lo, hi, freq="D"):
         if d.weekday() >= 5:
@@ -151,19 +166,26 @@ def test_keep_is_the_default_keeps_the_axis_and_lists_the_non_sessions(tmp_path)
     assert _h(mk["quality"]) == _h(keep["quality"])
     q = mk["quality"]["sessions"]
     assert q == {"mode": "keep", "calendar_coverage": list(COV), "non_session_calendar": _iso(CAL_OFF),
-                 "non_session_zero_volume": _iso(VOL_OFF), "dropped": 0, "unannounced": _iso([UNANN])}
-    assert str(ZS.date()) not in json.dumps(q) and str(PZ.date()) not in json.dumps(q)   # lịch ghi phiên; có mã giao dịch
+                 "non_session_unannounced": _iso([UNANN_NT]), "non_session_zero_volume": _iso(VOL_OFF),
+                 "missing_sessions": _iso(MISSING), "inserted": [], "dropped": 0,
+                 "unannounced": _iso([UNANN, UNANN_NT, UNANN_NR])}
+    assert str(PZ.date()) not in json.dumps(q) and str(UNANN.date()) not in json.dumps(q["missing_sessions"])
+    assert MISS not in mk["close"].index                                  # keep: trục giữ nguyên, chỉ liệt kê
     assert "trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE" in mk["pit_gaps"]
 
 
 def test_keep_changes_nothing_but_the_session_report(tmp_path):
     """Cùng kho: mọi khóa trả về (kể cả quality trừ `sessions`, derivation_id, pit_gaps) giống từng byte với lượt mà phép tìm
-    ngày không phải phiên không tìm thấy ngày nào."""
+    ngày không phải phiên không tìm thấy ngày nào (giữ nguyên vùng lịch phủ)."""
     home = _home(tmp_path, manual=_manual(IDX[50]))
+    real = data.non_session_days
+
+    def empty(*a, **k):
+        r = real(*a, **k)
+        return {**{key: [] for key in r if key != "coverage"}, "coverage": r["coverage"]}
     for kw in ({}, {"research_input": "verified"}, {"universe": "historical"}):
         a = _market(home, **kw)
-        empty = {"calendar": [], "zero_volume": [], "unannounced": [], "coverage": None}
-        with patch.object(data, "non_session_days", lambda *x, **y: empty):
+        with patch.object(data, "non_session_days", empty):
             b = _market(home, **kw)
         assert set(a) == set(b)
         a["quality"].pop("sessions"), b["quality"].pop("sessions")
@@ -173,16 +195,28 @@ def test_keep_changes_nothing_but_the_session_report(tmp_path):
 
 # ---------- calendar ----------------------------------------------------------------------------------------------------
 
-def test_calendar_drops_calendar_holidays_and_zero_volume_days_outside_the_calendar(tmp_path):
+def test_calendar_drops_non_sessions_and_keeps_every_official_session(tmp_path):
     home = _home(tmp_path)
     mk = _market(home, sessions="calendar")
     axis = list(mk["close"].index)
-    assert axis == [d for d in _store_dates(home) if d not in set(OFF)]
-    assert ZS in axis and PZ in axis                                 # lịch ghi phiên; có mã giao dịch
+    assert axis == sorted([d for d in _store_dates(home) if d not in set(OFF)] + [MISS])
+    assert {ZS, MISS, PZ, UNANN} <= set(axis) and UNANN_NR not in axis     # phiên thiếu giá ở lại; có giá thì là phiên
     assert not set(OFF) & set(axis)
+    assert mk["raw_close"].loc[MISS].isna().all() and (mk["volume"].loc[MISS] == 0).all()
     q = mk["quality"]["sessions"]
-    assert (q["mode"], q["dropped"]) == ("calendar", len(OFF))
-    assert (q["non_session_calendar"], q["non_session_zero_volume"]) == (_iso(CAL_OFF), _iso(VOL_OFF))
+    assert (q["mode"], q["dropped"], q["inserted"], q["missing_sessions"]) == ("calendar", len(OFF), _iso([MISS]),
+                                                                               _iso(MISSING))
+    assert (q["non_session_calendar"], q["non_session_unannounced"], q["non_session_zero_volume"]) == \
+        (_iso(CAL_OFF), _iso([UNANN_NT]), _iso(VOL_OFF))
+    assert any("2 phiên chính thức" in g and str(MISS.date()) in g for g in mk["pit_gaps"])
+    assert X not in mk["close"].columns                                  # mã ngoài rổ không làm NM thành phiên
+
+
+def test_historical_basket_before_the_first_effective_date_uses_the_table_tickers(tmp_path):
+    mk = _market(_home(tmp_path), universe="historical", sessions="calendar")
+    axis = set(mk["close"].index)
+    assert set(IDX[:20]) <= axis                                         # trước ngày hiệu lực đầu tiên vẫn có phiên
+    assert not set(ZV) & axis and NM not in axis
 
 
 @pytest.mark.parametrize("kw", [{}, {"research_input": "verified"}, {"universe": "historical"},
@@ -192,7 +226,7 @@ def test_calendar_equals_a_store_without_those_rows(tmp_path, kw):
     cách ly ở IDX[50] có cửa sổ −21/+120 phiên phủ ba ngày ZV và ngày ZM, nên cửa sổ đếm trên trục đã bỏ."""
     ev = _manual(IDX[50])
     a = _market(_home(tmp_path / "a", manual=ev), sessions="calendar", **kw)
-    b = _market(_home(tmp_path / "b", manual=ev, skip=set(OFF)), **kw)
+    b = _market(_home(tmp_path / "b", manual=ev, skip=set(OFF)), sessions="calendar", **kw)   # chỉ còn thêm MISS
     keys = [k for k in (*KEYS, "exclude", "eligible", "event_checks", "members") if k in a]
     assert set(keys) == {k for k in (*KEYS, "exclude", "eligible", "event_checks", "members") if k in b}
     for k in keys:
@@ -207,13 +241,25 @@ def test_calendar_equals_a_store_without_those_rows(tmp_path, kw):
         assert x.iloc[k - before:k + after + 1].all() and not x.iloc[:k - before].any()
 
 
+def test_an_official_session_without_rows_counts_in_the_quarantine_window(tmp_path):
+    """MISS (phiên chính thức, kho không có dòng) nằm trong 21 phiên trước sự kiện cách ly EV2: cửa sổ QĐ-3 đếm cả MISS."""
+    ev2 = T("2026-06-08")
+    mk = _market(_home(tmp_path, manual=_manual(ev2)), research_input="verified", sessions="calendar")
+    official = sorted((set(_store_dates(tmp_path)) - set(OFF)) | {MISS})   # trục phiên dựng độc lập với mã
+    before, _ = data.window_bounds()
+    first = official[official.index(ev2) - before]
+    x = mk["exclude"][U[0]]
+    assert MISS in x.index and x.loc[MISS] and first < MISS
+    assert x[x].index[0] == first
+
+
 def test_without_a_calendar_file_the_zero_volume_rule_covers_every_day(tmp_path):
     home = _home(tmp_path, calendar=False)
     mk = _market(home, sessions="calendar")
-    zero = sorted(HOL + ZV + [ZS, ZM])                               # CALV có khối lượng: không bỏ
+    zero = sorted(HOL + ZV + [ZS, ZM, NM, UNANN_NT])                 # CALV có khối lượng: không bỏ
     q = mk["quality"]["sessions"]
-    assert (q["calendar_coverage"], q["non_session_calendar"], q["non_session_zero_volume"], q["unannounced"]) == \
-        (None, [], _iso(zero), [])
+    assert (q["calendar_coverage"], q["non_session_calendar"], q["non_session_zero_volume"], q["unannounced"],
+            q["missing_sessions"], q["inserted"]) == (None, [], _iso(zero), [], [], [])
     assert list(mk["close"].index) == [d for d in _store_dates(home) if d not in set(zero)]
     assert any("không có data/trading_calendar.csv" in g for g in mk["pit_gaps"])
 
@@ -235,8 +281,8 @@ def test_unannounced_days_are_listed_only_inside_the_data_range(tmp_path):
     home = _home(tmp_path)
     assert _market(home, as_of=str(IDX[300].date()))["quality"]["sessions"]["unannounced"] == []     # 2026-04-27 < UNANN
     mk = _market(home, sessions="calendar")
-    assert mk["quality"]["sessions"]["unannounced"] == _iso([UNANN])                                  # UNANN_OUT ngoài dữ liệu
-    assert any(data.UNANNOUNCED in g and g.startswith("1 ngày") for g in mk["pit_gaps"])
+    assert mk["quality"]["sessions"]["unannounced"] == _iso([UNANN, UNANN_NT, UNANN_NR])              # UNANN_OUT ngoài dữ liệu
+    assert any(data.UNANNOUNCED in g and g.startswith("3 ngày") for g in mk["pit_gaps"])
 
 
 def test_coverage_note_only_when_the_data_leaves_the_calendar(tmp_path):
@@ -255,11 +301,25 @@ def test_coverage_note_only_when_the_data_leaves_the_calendar(tmp_path):
 def test_pit_label_for_each_combination(tmp_path, research_input, universe, sessions):
     mk = _market(_home(tmp_path), research_input=research_input, universe=universe, sessions=sessions)
     if (research_input, universe, sessions) == ("verified", "historical", "calendar"):
-        assert mk["pit_label"] == "POINT_IN_TIME"
+        assert mk["pit_label"] == "PIT_MODES_ONLY"
         assert mk["pit_from"] == str(IDX[20].date())                 # ngày hiệu lực đầu tiên của data/vn30_history.csv
     else:
         assert mk["pit_label"] == "RETROSPECTIVE" and "pit_from" not in mk
-        assert mk["pit_gaps"]
+    for g in data.PIT_EVIDENCE_GAPS:                                   # giá không có vintage; PIT-001 NOT_READY
+        assert g in mk["pit_gaps"]
+    assert any("ADR-0009 mục 4" in g for g in mk["pit_gaps"]) and any("PIT-001 NOT_READY" in g for g in mk["pit_gaps"])
+
+
+def test_three_modes_without_a_calendar_file_are_retrospective(tmp_path):
+    mk = _market(_home(tmp_path, calendar=False), research_input="verified", universe="historical", sessions="calendar")
+    assert mk["pit_label"] == "RETROSPECTIVE" and "pit_from" not in mk
+    assert any("không có data/trading_calendar.csv" in g for g in mk["pit_gaps"])
+
+
+def test_no_code_returns_point_in_time():
+    assert data.PIT_MODES_ONLY == "PIT_MODES_ONLY"
+    src = (REPO / "engine" / "data.py").read_text(encoding="utf-8")
+    assert 'pit_label="POINT_IN_TIME"' not in src and '= "POINT_IN_TIME"' not in src
 
 
 def test_derivation_id_carries_the_session_mode_and_the_calendar(tmp_path):
@@ -269,7 +329,16 @@ def test_derivation_id_carries_the_session_mode_and_the_calendar(tmp_path):
     p = home / "data" / "trading_calendar.csv"
     p.write_text(p.read_text(encoding="utf-8").replace("HOSE_DEFAULT", "HOSE_DEFAULT2"), encoding="utf-8")
     assert _market(home)["derivation_id"] == keep["derivation_id"]                 # keep: khóa cũ, không đọc sha lịch
-    assert _market(home, sessions="calendar")["derivation_id"] != cal["derivation_id"]
+    cal2 = _market(home, sessions="calendar")["derivation_id"]
+    assert cal2 != cal["derivation_id"]
+    (tmp_path / "code").mkdir()
+    code = tmp_path / "code" / "risk_gate.py"                      # mã đọc lịch đổi → id của chế độ calendar đổi
+    code.write_bytes((REPO / "engine" / "risk_gate.py").read_bytes())
+    with patch.object(data, "CALENDAR_CODE_FILES", (code,)):
+        assert _market(home, sessions="calendar")["derivation_id"] == cal2
+        code.write_text(code.read_text(encoding="utf-8") + "\n# đổi\n", encoding="utf-8")
+        assert _market(home, sessions="calendar")["derivation_id"] != cal2
+        assert _market(home)["derivation_id"] == keep["derivation_id"]          # keep không phụ thuộc mã đọc lịch
 
 
 def test_rejects_an_unknown_session_mode(tmp_path):
@@ -289,7 +358,8 @@ DRIVER = textwrap.dedent('''
             return cls(2026, 1, 2, 3, 4, 5, tzinfo=tz)
     patches = [mock.patch.object(research, "datetime", FixedDT)]
     if sys.argv[1] == "empty":
-        empty = {"calendar": [], "zero_volume": [], "unannounced": [], "coverage": None}
+        empty = {"calendar": [], "unannounced_no_price": [], "zero_volume": [], "missing": [], "unannounced": [],
+                 "coverage": None}
         patches.append(mock.patch.object(data, "non_session_days", lambda *a, **k: empty))
     for p in patches:
         p.start()
