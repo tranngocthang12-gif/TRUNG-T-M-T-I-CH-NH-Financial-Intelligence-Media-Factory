@@ -292,16 +292,12 @@ def _verified_market(home, as_of=None):
 XF = dict(strict=True, raises=AssertionError)
 
 
-@pytest.mark.xfail(reason="UNVERIFIED_EVENTS_IN_RESEARCH_CHAIN: chưa có chế độ đầu vào đã kiểm load_market(research_input="
-                          "'verified'); không đòi đổi mặc định, Owner chọn A/B/C (ADR-0009 điều 7)", **XF)
 def test_c1_verified_research_input_rejects_unverified_corporate_event(tmp_path):
     home = _home(tmp_path, _true_raw(), manual=_manual(IDX[OFF], ratio=1.9))
     mk = _verified_market(home)
     assert "APPLIED" not in _status(mk["events"], IDX[OFF])
 
 
-@pytest.mark.xfail(reason="DECISION_TIME_OF_KNOWLEDGE: chế độ đầu vào đã kiểm chưa có, nên chưa có nơi đọc ngày công bố "
-                          "của sự kiện quyền; không đòi đổi mặc định", **XF)
 def test_c2_verified_research_input_ignores_event_published_after_decision_date(tmp_path):
     m = _manual(IDX[OFF], status="DA_KIEM_CHUNG").assign(published_at=str(IDX[-1].date()))
     home = _home(tmp_path, _true_raw(), manual=m)
@@ -338,7 +334,6 @@ def test_c5_non_trading_rows_are_not_counted_as_sessions(tmp_path):
     assert not set(ghost) & set(mk["close"].index) or str(ghost[0].date()) in rep
 
 
-@pytest.mark.xfail(reason="ADR-0009 tiêu chí 5: đầu vào nghiên cứu chưa mang derivation_id và nhãn mức point-in-time", **XF)
 def test_c6_research_input_carries_derivation_id_and_pit_label(tmp_path):
     mk = _market(_home(tmp_path, _walk()))
     assert mk.get("derivation_id") and mk.get("pit_label") in ("RETROSPECTIVE", "POINT_IN_TIME")
