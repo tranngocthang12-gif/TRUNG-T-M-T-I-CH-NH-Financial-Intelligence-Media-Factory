@@ -69,6 +69,11 @@ Báo cáo tương lai tách hai lớp ghế B: câu trả lời của ghế B, v
 Giữ nguyên mã; chạy hằng tuần thay vì hằng ngày (thứ Sáu, từ v3.0.2); đóng băng không gian giả thuyết (13 feature × 3 mô hình × VN30); thêm Deflated Sharpe và sổ đăng ký thử `research/trial_registry.jsonl` (đã làm v3.0.2: mỗi lần thử đăng ký có hash chuỗi và được đẩy lên `main` trước khi chạy, lần thử bỏ dở vẫn được đếm, kết quả chỉ-ghi-thêm có neo lịch sử, CI đối chiếu); giả thuyết mới chỉ chạy khi đã đăng ký trước. Kho dữ liệu đổi sang ghi tăng dần (append) để git không phình (C2 — đã làm, ADR-0006: kho cũ đóng băng, dòng mới nối vào tệp tháng, kiểm toán bắt mọi lần viết lại). Benchmark ghi rõ là "bình quân đều VN30 hiện tại", không gọi là VN-Index (C6).
 ADR-0008: báo cáo gắn nhãn thiên lệch sống sót khi danh sách là VN30 hiện tại; giấy không khớp ở phiên khóa trần/sàn; báo cáo có sụt giảm lớn nhất (backtest và NAV giấy).
 ADR-0009: bản giá dẫn xuất có phiên bản, nguồn gốc và cách hoàn tác; không sửa kho giá gốc của ADR-0006. Điều 7 chưa cho đổi `engine/adjust.py`, `data.sources`, và chưa bật SSI/DNSE.
+ADR-0016 (ACCEPTED 21–22/11/2026) là đường từ dữ liệu tới vốn: đầu vào nghiên cứu đã kiểm và cửa sổ cách ly (QĐ-1…QĐ-4); mô hình chỉ ACTIVE khi Owner duyệt (QĐ-6); cổng rủi ro trước khi mua R1a và ngắt khi sụt giảm R1b (QĐ-5, QĐ-5a); robot chạy mỗi phiên HOSE cho phần vận hành, bước nghiên cứu vẫn chỉ ở phiên thứ Sáu (QĐ-10); giao thức phép thử tiến FWD-001 (QĐ-11, QĐ-11a). Từ QĐ-10, chữ "chạy hằng tuần" ở đoạn trên chỉ còn đúng với bước nghiên cứu.
+
+### 4.4 Sổ chấm nhanh SCN-001
+
+ADR-0017 (ACCEPTED 21/11/2026): phép thử SCN-001 dự báo chỉ tiêu và sự kiện doanh nghiệp từ văn bản công bố thông tin, sổ riêng trong `experiments/SCN-001/`, không dùng Ledger, không tính vào mẫu 194 cặp.
 
 ## 5. Nửa HỌC (Thư viện + Học viện) — ghế thi công, không phải MINH TRÍ
 
@@ -79,6 +84,7 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 - Mệnh đề = `knowledge_item` + `hypothesis.invalidation_conditions`; mỗi mệnh đề có `chain`, `supports ≥ 3`, hạn hiệu lực; trần 60 đang dùng; thay thế bằng `supersedes`.
 - Học viện: đề kín do Claude ra và giữ ngoài kho tới khi thi; A trả lời chỉ bằng ghi chú ≥ CITED; B trả lời trần; sổ điểm theo mắt xích; phán quyết HELPED/HURT/UNUSED cho mệnh đề; `competency_map` chỉ do mã nâng.
 - Miền hẹp đầu tiên: kế toán và BCTC ngân hàng VN30 (Luật Kế toán 2015, **TT 99/2025** thay TT 200 từ 01/01/2026, VAS, chế độ kế toán TCTD), Luật CK 2019 + Luật 56/2024, NĐ 155/2020 + **NĐ 245/2025**, TT 96/2020, văn bản NHNN hiện hành về phân loại nợ và an toàn vốn (kiểm hiệu lực TT 41/2016), BCTC kiểm toán 10 ngân hàng VN30. Thứ tự học: kỷ luật và chi phí → kế toán → thống kê → luật thị trường → định giá và ngành → vĩ mô truyền dẫn → địa chính trị ở mức bản đồ phơi nhiễm.
+- THẺ ĐỌC của SCN-001 (ADR-0017, QĐ-S4) là đầu vào dự báo của phép thử đó, không phải KNOWLEDGE_NOTE; thẻ không nâng hạng tri thức, không làm căn cứ cho CITED hay mệnh đề.
 
 ## 6. Nửa QUẢN TRỊ
 
@@ -92,6 +98,7 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 | Việc | Chạy ở đâu | Chi phí |
 |---|---|---|
 | Engine, Ledger, Actions kiểm Issue, validate | GitHub Actions (kho công khai: miễn phí) | 0 |
+| Bộ thu chỉ mục công bố thông tin, máy chấm và kiểm toán của SCN-001 (ADR-0017, QĐ-S4, QĐ-S5, QĐ-S8) | GitHub Actions | 0 |
 | Ghi chú, mệnh đề, mã công cụ | Ghế thi công: lệnh theo handoff mục 2 (Gmail), lên `main` bằng PR | gói thuê bao |
 | Thiết kế, chấm, ra đề | Claude trong Project (gói Max) | gói thuê bao |
 | Nhóm B | Phiên Claude trần | gói thuê bao |
@@ -108,6 +115,8 @@ Chi tiết ở `docs/TTC_TANG_HOC_HIEU_v0.2.md`; tóm tắt luật:
 | G4 (mốc xem xét sau 6 tháng, không phải hạn phải đủ 194) | báo cáo đánh giá | chỉ cân nhắc API/Media khi đã tới mốc xem xét và Ledger có ≥ 194 bất đồng đã chấm; 194 là điều kiện cân nhắc, không phải sản lượng cam kết | chưa đủ 194 tại mốc không tự động là thất bại của mốc |
 
 G0 đã đạt điều kiện kỹ thuật ngày 18/11/2026, chưa phải G1. Sổ có sáu dự báo F-37–F-42, ba cặp A/B (CPI, IIP, bán lẻ), mỗi cặp cùng câu hỏi và cùng ngày theo giờ Việt Nam; cả sáu có dấu nhận robot khớp hash. `state/PROJECT_STATE.yaml` ghi `V3_G0_DAT_DIEU_KIEN_KY_THUAT`. Thư viện 1/40: Luật Kế toán 88/2015 đã `SOURCED`; ghi chú `KN-T2-luat-ke-toan-88-2015-goc` vẫn `DRAFT`, chưa có ghi chú `CITED`. G1 chưa đạt. Việc này không hủy cột dừng/đảo (“quá 3 tuần → chỉ giữ Ledger”): cột đó đã quá hạn nếu tính từ 22/10/2026 hoặc từ ngày gộp 24/10/2026. Không có biên bản Owner bác riêng nhánh đó vào ngày 17/11/2026. Việc đang lưu vẫn là ADR-0002 (PR #29): không thu hẹp v3.0 theo điều kiện hoàn tác của ADR-0001; mốc xét lại 31/03/2027. Đó không phải bằng chứng trực tiếp về cột 3 tuần. Hai đồng hồ không phải một luật. Ghi nhận điều kiện kỹ thuật của G0 không dừng đồng hồ 3 tuần và không dời mốc 31/03/2027. Quyết định 2 của ADR-0010 giữ nguyên chữ đã chấm, kể cả câu pha cũ trong quyết định đó; pha hiện tại đọc ở `PROJECT_STATE.yaml` và ở đoạn này (ADR-0013). Dời mốc 31/03/2027 phải bằng ADR mới, không bằng sửa ngày trong ADR-0002.
+
+ADR-0018 (ACCEPTED 22/11/2026): Owner không áp cột "quá 3 tuần → chỉ giữ Ledger" của G0; cột đó hết hiệu lực. Các điều kiện dừng đo được đang áp: mốc xét lại 31/03/2027 (ADR-0002); D0 của FWD-001 chưa có tới 05/03/2027 thì báo Owner, và NO_EDGE sau 12 kỳ (ADR-0016); dưới 20 dự báo mỗi tháng ở G1. Tiêu chí số của thang vốn: ADR-0016, QĐ-7.
 
 Không có trong lộ trình: tiền thật; cấp vốn 4+ chỉ xét khi G3 cho alpha có ý nghĩa và Owner quyết.
 
