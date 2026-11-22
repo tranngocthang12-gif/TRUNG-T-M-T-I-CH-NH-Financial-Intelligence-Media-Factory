@@ -9,9 +9,10 @@ Chế độ (F1a, QĐ-10 của ADR-0016):
   - ops: phần vận hành mỗi phiên — dự báo của mô hình đã có, sổ giấy, phân rã, chấm Ledger và scorecard, báo cáo. KHÔNG
     đăng ký hay chạy lần thử, không thăng hạng, không theo dõi suy giảm, không llm_review, không chuyên gia, không tải tin,
     không ghi state/bandit.json. Chỉ nhận --trials 0;
-  - auto (lượt theo lịch): CHỈ theo dữ liệu, không theo đồng hồ máy chạy. Phiên mới nhất có giá chưa được xử lý (khác
-    ENGINE_STATE.as_of): là thứ Sáu thì research với research.trials_per_cycle lần thử, ngày khác thì ops. Đã xử lý thì chỉ
-    làm mới scorecard như trước."""
+  - auto (lượt theo lịch): CHỈ theo dữ liệu, không theo đồng hồ máy chạy. Phiên mới nhất có giá MỚI HƠN ENGINE_STATE.as_of:
+    là thứ Sáu thì research với research.trials_per_cycle lần thử, ngày khác thì ops. Bằng nhau (đã xử lý) thì chỉ làm mới
+    scorecard như trước. Cũ hơn (giá lùi, hay --as-of về phiên cũ) thì DỪNG, không ghi gì. auto không nhận --force: phiên
+    xử lý chỉ tiến lên theo thời gian, không chạy lại nghiên cứu (L-06)."""
 import argparse, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
@@ -33,12 +34,19 @@ def select_mode(mode, newest, last, trials=None, force=False):
         raise ValueError(f"--mode ops chỉ nhận --trials 0, không phải {trials!r}")
     if mode == "auto" and trials is not None:
         raise ValueError("--mode auto tự chọn số lần thử; không truyền --trials")
-    if last == newest and not force:
-        return None
     if mode == "auto":
+        if force:
+            raise ValueError("--mode auto không nhận --force: lượt theo lịch chỉ xử lý phiên mới hơn ENGINE_STATE.as_of")
+        if last is not None and pd.Timestamp(newest) < pd.Timestamp(last):
+            raise ValueError(f"--mode auto: phiên mới nhất có giá {newest} cũ hơn phiên đã xử lý {last} — dừng, không "
+                             "xử lý lại phiên cũ")
+        if last is not None and pd.Timestamp(newest) == pd.Timestamp(last):
+            return None                                             # đã xử lý: không nghiên cứu lại
         if pd.Timestamp(newest).weekday() == 4:                     # phiên thứ Sáu
             return "research", int(CFG["research"]["trials_per_cycle"])
         return "ops", 0
+    if last == newest and not force:
+        return None
     if mode == "ops":
         return "ops", 0
     return "research", trials
@@ -249,6 +257,8 @@ def main():
         ap.error("--mode ops chỉ nhận --trials 0")
     if a.mode == "auto" and a.trials is not None:
         ap.error("--mode auto tự chọn số lần thử; không truyền --trials")
+    if a.mode == "auto" and a.force:
+        ap.error("--mode auto không nhận --force: lượt theo lịch chỉ xử lý phiên mới hơn ENGINE_STATE.as_of")
     if a.scorecard_only:
         as_of = a.as_of or str(data.load_panel(None)[0].index[-1].date())
         raise SystemExit(refresh_scorecard_report(as_of))
@@ -266,7 +276,10 @@ def main():
         make_store()
     last = load_json("state/ENGINE_STATE.json", {}).get("as_of")
     newest = str(data.load_panel(a.as_of)[0].index[-1].date())
-    sel = select_mode(a.mode, newest, last, a.trials, a.force)
+    try:
+        sel = select_mode(a.mode, newest, last, a.trials, a.force)
+    except ValueError as e:                          # auto gặp phiên cũ hơn phiên đã xử lý: dừng trước mọi bước ghi
+        raise SystemExit(f"[cycle] {e}")
     if sel is None:
         if ing is not None:                          # vẫn lưu nhật ký tải (kể cả lỗi) dù không chạy vòng học
             st = load_json("state/ENGINE_STATE.json", {})

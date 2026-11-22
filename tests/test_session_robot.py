@@ -64,13 +64,15 @@ DRIVER = textwrap.dedent('''
             st.enter_context(mock.patch.object(time, "time", lambda: t.timestamp() + (real() - t0)))
         if spec.get("no_mark"):
             st.enter_context(mock.patch.object(run_cycle, "_mark_mode", lambda *a, **k: None))
-        if "cycle" in spec:
-            r = run_cycle.cycle(**spec["cycle"])
-            print("RESULT=" + json.dumps({"mode": r["mode"], "trials": len(r["trials"]), "as_of": r["as_of"]}))
-        else:
-            sys.argv = ["engine.run_cycle", *spec["argv"]]
-            run_cycle.main()
-    print("CALLS=" + json.dumps(calls, sort_keys=True))
+        try:
+            if "cycle" in spec:
+                r = run_cycle.cycle(**spec["cycle"])
+                print("RESULT=" + json.dumps({"mode": r["mode"], "trials": len(r["trials"]), "as_of": r["as_of"]}))
+            else:
+                sys.argv = ["engine.run_cycle", *spec["argv"]]
+                run_cycle.main()
+        finally:                                   # kể cả khi main() dừng bằng SystemExit
+            print("CALLS=" + json.dumps(calls, sort_keys=True), flush=True)
 ''')
 
 
@@ -191,7 +193,22 @@ class SelectModeTests(unittest.TestCase):
         with machine_clock(f"{SAT} 10:00"):
             self.assertIsNone(run_cycle.select_mode("auto", FRI, FRI))
             self.assertIsNone(run_cycle.select_mode("auto", MON_BEFORE, MON_BEFORE))
-            self.assertEqual(run_cycle.select_mode("auto", FRI, FRI, force=True), ("research", 6))
+        with self.assertRaises(ValueError):                 # bản chấm vòng 1: auto không nhận --force
+            run_cycle.select_mode("auto", FRI, FRI, force=True)
+
+    def test_auto_never_goes_back_and_never_forces(self):
+        """Bản chấm L-09 PR #88 vòng 1: phiên xử lý của auto chỉ tiến lên theo thời gian."""
+        with self.assertRaises(ValueError):                 # giá lùi / --as-of về một thứ Sáu cũ
+            run_cycle.select_mode("auto", "2023-01-20", FRI)
+        with self.assertRaises(ValueError):
+            run_cycle.select_mode("auto", MON_BEFORE, FRI)
+        for last in (FRI, "2023-01-26", None):
+            with self.subTest(last=last), self.assertRaises(ValueError):
+                run_cycle.select_mode("auto", FRI, last, force=True)
+        self.assertIsNone(run_cycle.select_mode("auto", FRI, "2023-01-27"))      # cùng phiên, khác cách viết vẫn bằng
+        self.assertEqual(run_cycle.select_mode("auto", MON_AFTER, FRI), ("ops", 0))
+        # chạy tay giữ chính sách hiện hành (Owner tự chịu: --force chỉ có ở chạy tay, workflow không truyền)
+        self.assertEqual(run_cycle.select_mode("research", FRI, FRI, 1, force=True), ("research", 1))
 
     def test_manual_modes(self):
         self.assertEqual(run_cycle.select_mode("research", FRI, "2023-01-26", 1), ("research", 1))
@@ -428,9 +445,36 @@ class SessionRobotEngineTests(unittest.TestCase):
         self.assertEqual(ra[0], rc[0] + " — chế độ research")
         self.assertEqual(ra[1:], rc[1:])
 
+    def _all_files(self, home):
+        return {p.relative_to(home).as_posix(): _sha(p) for p in sorted(home.rglob("*")) if p.is_file()}
+
+    def test_auto_never_reprocesses_an_older_or_processed_session(self):
+        """Bản chấm L-09 PR #88 vòng 1: sau lượt research phiên FRI, auto với --as-of về thứ Sáu cũ hơn, hay auto --force
+        cùng phiên hoặc phiên sau, đều dừng: register_trial không được gọi và không tệp nào trong kho bị ghi."""
+        home = self._home("long")
+        code, out, calls = _drive(home, {"argv": ["--source", "store", "--mode", "auto", "--as-of", FRI, "--no-llm"]})
+        self.assertEqual((code, calls.get("register_trial")), (0, 6), out)
+        before = self._all_files(home)
+        older = (pd.Timestamp(FRI) - pd.offsets.BDay(5)).strftime("%Y-%m-%d")          # thứ Sáu tuần trước
+        self.assertEqual(pd.Timestamp(older).weekday(), 4)
+        code, out, calls = _drive(home, {"argv": ["--source", "store", "--mode", "auto", "--as-of", older, "--no-llm"]})
+        self.assertNotEqual(code, 0, out)
+        self.assertIn("cũ hơn phiên đã xử lý", out)
+        self.assertEqual(calls.get("register_trial", 0), 0)
+        self.assertEqual(self._all_files(home), before)
+        later = (pd.Timestamp(FRI) + pd.offsets.BDay(5)).strftime("%Y-%m-%d")           # thứ Sáu kế, chưa xử lý
+        for as_of in (FRI, later):
+            with self.subTest(as_of=as_of):
+                code, out, calls = _drive(home, {"argv": ["--source", "store", "--mode", "auto", "--as-of", as_of,
+                                                          "--force", "--no-llm"]})
+                self.assertEqual(code, 2, out)
+                self.assertEqual(calls.get("register_trial", 0), 0)
+                self.assertEqual(self._all_files(home), before)
+
     def test_cli_rejects_bad_mode_and_trials_before_writing(self):
         for args in (["--mode", "ops", "--trials", "1"], ["--mode", "ops", "--trials", "6"],
-                     ["--mode", "auto", "--trials", "6"], ["--mode", "auto", "--trials", "0"], ["--mode", "weekly"]):
+                     ["--mode", "auto", "--trials", "6"], ["--mode", "auto", "--trials", "0"], ["--mode", "weekly"],
+                     ["--mode", "auto", "--force"]):
             with self.subTest(args=args):
                 home = self._home("fri")
                 before = sorted(p.relative_to(home).as_posix() for p in home.rglob("*"))
