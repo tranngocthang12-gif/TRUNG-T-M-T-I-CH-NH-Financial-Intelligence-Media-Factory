@@ -5,11 +5,14 @@ Ghi TANG DAN (ADR-0006, C2): kho cu `data.store` (prices.csv.gz) DONG BANG — k
 `data.store_dir`, moi thang giao dich mot tep CSV `YYYY-MM.csv`; chi NOI THEM vao cuoi tep (thu tu = thu tu quan sat),
 khong bao gio viet lai dong cu. tools/ledger_audit.py kiem: kho cu khong doi, moi tep thang cu la tien to cua ban moi."""
 import datetime as dt
+import hashlib
+import json
 import pathlib
 import numpy as np, pandas as pd
 from . import config
 from .config import CFG, path
 from . import adjust
+from . import verified_adjust as va
 
 COLS = ["date", "ticker", "open", "high", "low", "close", "volume", "observed_at", "source"]
 
@@ -173,9 +176,67 @@ def fetch_yahoo_actions():
             path(CFG["corporate_actions"]["yahoo_cache"]), index=False)
     return errors
 
-def load_market(as_of=None):
+RESEARCH_INPUTS = ("legacy", "verified")
+EVIDENCE_DIR = ("data", "evidence", "corporate_actions")
+NOT_IN_CHAIN = "KHONG_VAO_CHUOI_KIEM_CHUNG"
+
+
+def evidence_docs(root=None):
+    """Mọi bản gốc trong các tệp EVIDENCE_MANIFEST*.json dưới data/evidence/corporate_actions/, đọc theo thứ tự tên tệp.
+    Đây là nơi DUY NHẤT đầu vào nghiên cứu đọc bản gốc (không dùng DEFAULT_EVIDENCE của tools/build_verified_derivation.py,
+    vốn chỉ có manifest đầu)."""
+    d = _root(root).joinpath(*EVIDENCE_DIR)
+    return va.load_evidence(sorted(d.glob("EVIDENCE_MANIFEST*.json"), key=lambda p: p.name)) if d.is_dir() else []
+
+
+def window_bounds():
+    """(trước, sau) của cửa sổ loại mã QĐ-3 (ADR-0016): trước = horizon_days + 1 (nhãn tại t nhìn tới t + 1 + h, nên mọi
+    nhãn chạm phiên sự kiện bị loại); sau = quality.feature_lookback − 1 (đặc trưng nhìn lại ngần ấy phiên kể cả t)."""
+    return int(CFG["horizon_days"]) + 1, int(CFG["quality"]["feature_lookback"]) - 1
+
+
+def window_exclude(index, columns, checks, before, after):
+    """Mặt nạ QĐ-3: ô (t, mã) là True khi vị trí của t trên trục ngày `index` thuộc [k − before, k + after], với k là vị trí
+    phiên áp dụng của một sự kiện có `taints` của mã đó. Sự kiện lệch ngày: hợp của cửa sổ quanh ngày engine (`trade_date`)
+    và quanh ngày chính thức (`official_trade_date`, không có thì `official_ex_date`). Vị trí của một ngày là phiên đầu tiên
+    trên trục không sớm hơn ngày đó; ngày sau phiên cuối có vị trí len(index)."""
+    index = pd.DatetimeIndex(index)
+    m = np.zeros((len(index), len(columns)), dtype=bool)
+    col = {t: j for j, t in enumerate(columns)}
+    for r in checks[checks["taints"].astype(bool)].itertuples(index=False):
+        j = col.get(r.ticker)
+        if j is None:
+            continue
+        days = [r.trade_date, r.official_trade_date if pd.notna(r.official_trade_date) else r.official_ex_date]
+        for k in {pd.Timestamp(x) for x in days if pd.notna(x)}:
+            pos = int(index.searchsorted(k))
+            lo, hi = max(0, pos - before), min(len(index) - 1, pos + after)
+            if lo <= hi:
+                m[lo:hi + 1, j] = True
+    return pd.DataFrame(m, index=index, columns=columns)
+
+
+def _derivation_id(research_input, cut, docs, ev):
+    """Định danh dẫn xuất chỉ phụ thuộc đầu vào: chế độ, ngày cắt, hash kho giá, hash CSV sự kiện, metadata mọi bản gốc,
+    config (tệp và giá trị đang dùng). Dùng lại verified_adjust.derivation_manifest; code_commit để trống."""
+    m = va.derivation_manifest(root=config.ROOT, cfg=CFG, as_of=cut, docs=docs, ev=ev, code_commit=None)
+    cfg_now = hashlib.sha256(json.dumps(CFG, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
+    key = {"research_input": research_input, "verified_derivation_id": m["derivation_id"], "config_values": cfg_now}
+    return "RI-" + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def load_market(as_of=None, research_input="legacy"):
     """Bang gia DIEU CHINH point-in-time + co loi du lieu + bao cao chat luong.
-    Tra ve dict: close, volume (dieu chinh), raw_close, bad (co loi), events, quality, flags."""
+    Tra ve dict: close, volume (dieu chinh), raw_close, bad (co loi), events, quality, flags.
+
+    research_input (E2a, QĐ-1 và QĐ-3 của ADR-0016):
+      - "legacy" (mặc định): chuỗi điều chỉnh hiện hành của engine.adjust; mọi khóa cũ không đổi từng byte;
+      - "verified": chỉ sự kiện cổ phiếu vào chuỗi kiểm chứng (engine.verified_adjust, bản gốc từ evidence_docs, ngày cắt là
+        as_of hoặc phiên cuối) được áp hệ số; sự kiện không vào chuỗi không mang trạng thái APPLIED trong `events`. Thêm
+        `exclude` (mặt nạ cửa sổ QĐ-3), `eligible` (có giá và không bị loại) và `event_checks` (bảng kiểm sự kiện).
+    Cả hai chế độ thêm: research_input, derivation_id, pit_label (luôn "RETROSPECTIVE" ở bản này), pit_gaps."""
+    if research_input not in RESEARCH_INPUTS:
+        raise ValueError(f"research_input phải là một trong {RESEARCH_INPUTS}, không phải {research_input!r}")
     s = load_store()
     if s.empty:
         raise RuntimeError("Kho du lieu trong. Chay ingest hoac tao du lieu synthetic.")
@@ -187,7 +248,15 @@ def load_market(as_of=None):
     keep = raw.columns[raw.notna().sum() > 250]
     raw, vol, obs = raw[keep], vol[keep], obs[keep]
     events = adjust.build_events(raw, obs, adjust.load_manual(), adjust.load_yahoo())
-    F, S = adjust.factors(raw.index, raw.columns, events)
+    cut = pd.Timestamp(as_of) if as_of is not None else raw.index[-1]
+    docs, checks = evidence_docs(), None
+    if research_input == "verified":
+        checks = va.verify_events(events, raw, docs, evidence_root=config.ROOT, as_of=cut)
+        F, S = va.verified_factors(raw.index, raw.columns, checks)
+        events = checks[list(events.columns)].copy()
+        events.loc[(events["status"] == "APPLIED") & ~checks["in_verified_chain"].astype(bool), "status"] = NOT_IN_CHAIN
+    else:
+        F, S = adjust.factors(raw.index, raw.columns, events)
     adj = raw * F
     bad, rep, flags = adjust.quality(adj)
     rep["events"] = events.status.value_counts().to_dict() if len(events) else {}
@@ -197,8 +266,19 @@ def load_market(as_of=None):
     rep["events_applied"] = [f"{e.ticker} {e.trade_date.date()} {e.type} ({e.source}, {e.source_status}): "
                              f"gốc {e.raw_return:+.2%} → điều chỉnh {e.adj_return:+.2%}"
                              for e in events.itertuples() if e.status == "APPLIED"]
-    return {"close": adj.ffill(limit=5), "volume": (vol / S).fillna(0), "raw_close": raw, "bad": bad,
-            "events": events, "quality": rep, "flags": flags}
+    out = {"close": adj.ffill(limit=5), "volume": (vol / S).fillna(0), "raw_close": raw, "bad": bad,
+           "events": events, "quality": rep, "flags": flags}
+    gaps = ["rổ theo cấu hình hiện tại (universe), chưa theo thành viên VN30 từng ngày",
+            "trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE"]
+    if research_input == "legacy":
+        gaps.append("sự kiện quyền chưa kiểm: hệ số theo chuỗi điều chỉnh hiện hành, gồm sự kiện chưa đối chiếu bản gốc")
+    out.update(research_input=research_input, derivation_id=_derivation_id(research_input, cut, docs,
+                                                                             events if checks is None else checks),
+               pit_label="RETROSPECTIVE", pit_gaps=gaps)
+    if checks is not None:
+        exclude = window_exclude(raw.index, raw.columns, checks, *window_bounds())
+        out.update(exclude=exclude, eligible=raw.notna() & ~exclude, event_checks=checks)
+    return out
 
 def write_derived(mk=None):
     """Ghi du lieu DAN XUAT (tinh lai toan bo, ghi de, co ngay tinh): he so dieu chinh + co loi du lieu."""
