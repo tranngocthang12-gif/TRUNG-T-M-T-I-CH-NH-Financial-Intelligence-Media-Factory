@@ -1,5 +1,9 @@
 """Feature Library. Mọi feature tại ngày t chỉ dùng dữ liệu đến hết ngày t (kiểm tra bởi tests/test_no_lookahead.py).
-Đầu vào là GIÁ ĐIỀU CHỈNH. `bad` = cờ lỗi dữ liệu (adjust.quality): feature/nhãn chạm vào ô lỗi bị loại (NaN)."""
+Đầu vào là GIÁ ĐIỀU CHỈNH. `bad` = cờ lỗi dữ liệu (adjust.quality): feature/nhãn chạm vào ô lỗi bị loại (NaN).
+`exclude` (E2a, QĐ-3 của ADR-0016) = mặt nạ cửa sổ quanh sự kiện quyền chưa kiểm (data.window_exclude): ô bị loại thành NaN
+trước xếp hạng chéo (đặc trưng) và trước khi trừ trung bình rổ (nhãn), nên kết quả của các mã khác bằng đúng kết quả khi mã
+bị loại vắng mặt ở ngày đó. (rel_mom_20 trừ trung bình chéo bên trong, nhưng phép trừ một số chung cho mọi mã trong ngày không
+đổi thứ hạng, nên không cần mặt nạ ở đó.) exclude=None thì đầu ra không đổi."""
 import numpy as np, pandas as pd
 from .adjust import contamination
 from .config import CFG
@@ -23,36 +27,46 @@ FEATURES = {
     "dist_ma120":    ("trend",      lambda c, v: c / c.rolling(120).mean() - 1),
 }
 FAMILIES = sorted({f for f, _ in FEATURES.values()})
+def _ex(exclude, close):
+    if exclude is None: return None
+    return exclude.reindex(index=close.index, columns=close.columns).fillna(False).astype(bool)
 
 def _bad(bad, close):
     if bad is None: return None
     b = bad.reindex(index=close.index, columns=close.columns).fillna(False).astype(bool)
     return b if b.values.any() else None
 
-def build_wide(close, volume, bad=None):
+def build_wide(close, volume, bad=None, exclude=None):
     out = {}
     b = _bad(bad, close)
+    ex = _ex(exclude, close)
     contam = contamination(b, CFG["quality"]["feature_lookback"]) if b is not None else None
     for name, (_, f) in FEATURES.items():
         x = f(close, volume).replace([np.inf, -np.inf], np.nan)
         if contam is not None:
             x = x.mask(contam)                           # cửa sổ nhìn lại chứa ô lỗi dữ liệu → loại
+        if ex is not None:
+            x = x.mask(ex)                               # QĐ-3: ô trong cửa sổ quanh sự kiện chưa kiểm → loại
         out[name] = x.rank(axis=1, pct=True) - 0.5      # chuẩn hóa xếp hạng chéo theo ngày
     return out
 
-def labels_wide(close, h, bad=None):
+def labels_wide(close, h, bad=None, exclude=None):
     """Nhãn: lợi nhuận vượt trội trung bình universe, VÀO LỆNH ở close t+1 (không dùng giá t).
-    Nếu cửa sổ nắm giữ (t+1, t+1+h] của một mã có ô lỗi dữ liệu → nhãn mã đó bị loại."""
+    Nếu cửa sổ nắm giữ (t+1, t+1+h] của một mã có ô lỗi dữ liệu → nhãn mã đó bị loại.
+    `exclude`: nhãn của ô bị loại thành NaN trước khi trừ trung bình rổ."""
     fwd = close.shift(-(1 + h)) / close.shift(-1) - 1
     b = _bad(bad, close)
     if b is not None:
         fwd = fwd.mask(contamination(b, h).shift(-(1 + h)).fillna(False).astype(bool))
+    ex = _ex(exclude, close)
+    if ex is not None:
+        fwd = fwd.mask(ex)
     return fwd.sub(fwd.mean(axis=1), axis=0)
 
-def dataset(close, volume, h, bad=None):
-    wide = build_wide(close, volume, bad)
+def dataset(close, volume, h, bad=None, exclude=None):
+    wide = build_wide(close, volume, bad, exclude)
     idx = pd.MultiIndex.from_product([close.index, close.columns], names=["date", "ticker"])
     ds = pd.DataFrame({n: w.values.ravel() for n, w in wide.items()}, index=idx)
-    ds["y"] = labels_wide(close, h, bad).values.ravel()
+    ds["y"] = labels_wide(close, h, bad, exclude).values.ravel()
     ds["yr"] = ds["y"].groupby(level=0).rank(pct=True) - 0.5
     return ds
