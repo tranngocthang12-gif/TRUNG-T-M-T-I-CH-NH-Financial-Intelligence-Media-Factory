@@ -1,0 +1,600 @@
+{
+ "tool": "tools/price_integrity_b1.py",
+ "as_of": "2026-11-20",
+ "panel_sessions_x_tickers": [
+  2822,
+  30
+ ],
+ "session_definition": "Phiên suy từ dữ liệu: ngày trên trục ngày của panel, bỏ ngày mà mọi mã có dòng đều có khối lượng 0. Số suy từ dữ liệu nguồn, KHÔNG phải lịch giao dịch HOSE (lịch gốc chưa ghim trong kho).",
+ "inputs_sha256": {
+  "data/store/prices.csv.gz": "8ffa5e46b1f4d85ba96bc954636160ad2d2efb37154fc8d093c05f723f607251",
+  "data/corporate_actions.csv": "8726a09aefefc07f5691e3a1e9b3b28915e7625cf62a48285d53a2f5860a894e",
+  "data/derived/yahoo_actions.csv": "7f890f2e6f84a6e1a479867866755b47e030efa0b027f4d53f8a8c4969fbd359",
+  "data/evidence/corporate_actions/EVIDENCE_MANIFEST.json": "31e0988aaf1a382f2ac73130fc292c5650fbf499bbe7df83a48fea4a3565f93a",
+  "data/evidence/corporate_actions/EVIDENCE_MANIFEST_2026H2.json": "681da51eea80429b6cfd6e0cef5419fa966dc26e9cd26ae8450ea806b2e547c9"
+ },
+ "note": "Chỉ đọc. data/derived/yahoo_actions.csv được tải lại mỗi vòng học; số đo P0-P3 phụ thuộc bản tại sha256 trên.",
+ "partial_window_candidates": [
+  {
+   "ticker": "HDB",
+   "event_ex_date": "2026-10-09",
+   "source": "yahoo",
+   "source_status": "TU_DONG",
+   "engine_status": "APPLIED",
+   "ratio": 1.3,
+   "break_date": "2026-10-09",
+   "break_raw_return": -0.2,
+   "sessions_before_event_trade_date": 0
+  },
+  {
+   "ticker": "SSB",
+   "event_ex_date": "2021-07-23",
+   "source": "yahoo",
+   "source_status": "TU_DONG",
+   "engine_status": "DA_NAM_TRONG_GIA_NGUON",
+   "ratio": 1.091206,
+   "break_date": "2021-07-19",
+   "break_raw_return": -0.0819,
+   "sessions_before_event_trade_date": 4
+  },
+  {
+   "ticker": "TCB",
+   "event_ex_date": "2024-06-11",
+   "source": "CBTT HOSE/VSD: TCB phát hành cổ phiếu tă",
+   "source_status": "CAN_DOI_CHIEU",
+   "engine_status": "APPLIED",
+   "ratio": 2.0,
+   "break_date": "2024-06-11",
+   "break_raw_return": -0.4954,
+   "sessions_before_event_trade_date": 0
+  },
+  {
+   "ticker": "TCB",
+   "event_ex_date": "2024-06-20",
+   "source": "yahoo",
+   "source_status": "TU_DONG",
+   "engine_status": "DA_NAM_TRONG_GIA_NGUON",
+   "ratio": 2.0,
+   "break_date": "2024-06-11",
+   "break_raw_return": -0.4954,
+   "sessions_before_event_trade_date": 7
+  },
+  {
+   "ticker": "TCB",
+   "event_ex_date": "2026-10-29",
+   "source": "yahoo",
+   "source_status": "TU_DONG",
+   "engine_status": "APPLIED",
+   "ratio": 1.5,
+   "break_date": "2026-10-29",
+   "break_raw_return": -0.3328,
+   "sessions_before_event_trade_date": 0
+  },
+  {
+   "ticker": "TPB",
+   "event_ex_date": "2025-10-30",
+   "source": "yahoo",
+   "source_status": "TU_DONG",
+   "engine_status": "DA_NAM_TRONG_GIA_NGUON",
+   "ratio": 1.05,
+   "break_date": "2025-10-20",
+   "break_raw_return": -0.0911,
+   "sessions_before_event_trade_date": 8
+  },
+  {
+   "ticker": "TPB",
+   "event_ex_date": "2026-10-02",
+   "source": "yahoo",
+   "source_status": "TU_DONG",
+   "engine_status": "APPLIED",
+   "ratio": 1.15,
+   "break_date": "2026-10-02",
+   "break_raw_return": -0.1736,
+   "sessions_before_event_trade_date": 0
+  },
+  {
+   "ticker": "VCB",
+   "event_ex_date": "2025-03-03",
+   "source": "CBTT HOSE/VSD: VCB trả cổ tức bằng cổ ph",
+   "source_status": "CAN_DOI_CHIEU",
+   "engine_status": "APPLIED",
+   "ratio": 1.495,
+   "break_date": "2025-03-03",
+   "break_raw_return": -0.3311,
+   "sessions_before_event_trade_date": 0
+  },
+  {
+   "ticker": "VCB",
+   "event_ex_date": "2025-03-12",
+   "source": "yahoo",
+   "source_status": "TU_DONG",
+   "engine_status": "DA_NAM_TRONG_GIA_NGUON",
+   "ratio": 1.495,
+   "break_date": "2025-03-03",
+   "break_raw_return": -0.3311,
+   "sessions_before_event_trade_date": 7
+  }
+ ],
+ "tick_lot_grid": {
+  "TCB": {
+   "pre20": {
+    "sessions": 20,
+    "from": "2024-05-14",
+    "to": "2024-06-10",
+    "close_on_tick_grid": 20,
+    "close_x_ratio_on_tick_grid": 20,
+    "volume_on_lot_100": 20,
+    "volume_div_ratio_on_lot_100": 9,
+    "median_volume": 8946750
+   },
+   "window": {
+    "sessions": 7,
+    "from": "2024-06-11",
+    "to": "2024-06-19",
+    "close_on_tick_grid": 6,
+    "close_x_ratio_on_tick_grid": 7,
+    "volume_on_lot_100": 7,
+    "volume_div_ratio_on_lot_100": 7,
+    "median_volume": 19671200
+   },
+   "post20": {
+    "sessions": 20,
+    "from": "2024-06-20",
+    "to": "2024-07-17",
+    "close_on_tick_grid": 20,
+    "close_x_ratio_on_tick_grid": 20,
+    "volume_on_lot_100": 20,
+    "volume_div_ratio_on_lot_100": 12,
+    "median_volume": 10660250
+   },
+   "raw_step_at_window_start": -0.4954,
+   "raw_step_at_hose_ex_date": 0.0269
+  },
+  "VCB": {
+   "pre20": {
+    "sessions": 20,
+    "from": "2025-02-03",
+    "to": "2025-02-28",
+    "close_on_tick_grid": 20,
+    "close_x_ratio_on_tick_grid": 0,
+    "volume_on_lot_100": 20,
+    "volume_div_ratio_on_lot_100": 3,
+    "median_volume": 1393700
+   },
+   "window": {
+    "sessions": 7,
+    "from": "2025-03-03",
+    "to": "2025-03-11",
+    "close_on_tick_grid": 0,
+    "close_x_ratio_on_tick_grid": 7,
+    "volume_on_lot_100": 2,
+    "volume_div_ratio_on_lot_100": 7,
+    "median_volume": 3735855
+   },
+   "post20": {
+    "sessions": 20,
+    "from": "2025-03-12",
+    "to": "2025-04-09",
+    "close_on_tick_grid": 20,
+    "close_x_ratio_on_tick_grid": 1,
+    "volume_on_lot_100": 20,
+    "volume_div_ratio_on_lot_100": 1,
+    "median_volume": 2993350
+   },
+   "raw_step_at_window_start": -0.3311,
+   "raw_step_at_hose_ex_date": 0.0301
+  }
+ },
+ "policies": [
+  {
+   "policy": "P0_hien_hanh",
+   "stock_events_in_chain": 5,
+   "quality_flags": 142,
+   "flags_tcb_vcb_2024_2025": [
+    "TCB 2025-08-25 -0.0963",
+    "TCB 2025-10-20 -0.0824"
+   ],
+   "feature_cells_valid": 796561,
+   "label_cells_valid": 70515,
+   "rows_complete": 56299,
+   "returns_across_event": [
+    {
+     "ticker": "TCB",
+     "from": "2024-06-04",
+     "to": "2024-06-26",
+     "panel_steps": 16,
+     "sessions_inferred_from_data": 16,
+     "return": 0.0084
+    },
+    {
+     "ticker": "VCB",
+     "from": "2025-02-25",
+     "to": "2025-03-17",
+     "panel_steps": 14,
+     "sessions_inferred_from_data": 14,
+     "return": 0.0865
+    }
+   ]
+  },
+  {
+   "policy": "P1a_bo_su_kien_tay_chua_doi_chieu",
+   "stock_events_in_chain": 3,
+   "quality_flags": 144,
+   "flags_tcb_vcb_2024_2025": [
+    "TCB 2024-06-11 -0.4954",
+    "VCB 2025-03-03 -0.3311",
+    "TCB 2025-08-25 -0.0963",
+    "TCB 2025-10-20 -0.0824"
+   ],
+   "feature_cells_valid": 793415,
+   "label_cells_valid": 70475,
+   "rows_complete": 56017,
+   "returns_across_event": [
+    {
+     "ticker": "TCB",
+     "from": "2024-06-04",
+     "to": "2024-06-26",
+     "panel_steps": 16,
+     "sessions_inferred_from_data": 16,
+     "return": -0.4958
+    },
+    {
+     "ticker": "VCB",
+     "from": "2025-02-25",
+     "to": "2025-03-17",
+     "panel_steps": 14,
+     "sessions_inferred_from_data": 14,
+     "return": -0.2732
+    }
+   ],
+   "label_cells_changed_vs_P0": 1130,
+   "label_max_abs_change_vs_P0": 0.0026,
+   "label_cells_lost_vs_P0": 40,
+   "feature_cells_lost_vs_P0": 3146,
+   "rows_complete_lost_vs_P0": {
+    "TCB": 141,
+    "VCB": 141
+   }
+  },
+  {
+   "policy": "P1b_bo_moi_su_kien_chua_DA_KIEM_CHUNG",
+   "stock_events_in_chain": 0,
+   "quality_flags": 152,
+   "flags_tcb_vcb_2024_2025": [
+    "TCB 2024-06-11 -0.4954",
+    "VCB 2025-03-03 -0.3311",
+    "TCB 2025-08-25 -0.0963",
+    "TCB 2025-10-20 -0.0824"
+   ],
+   "feature_cells_valid": 784302,
+   "label_cells_valid": 70318,
+   "rows_complete": 55238,
+   "returns_across_event": [
+    {
+     "ticker": "TCB",
+     "from": "2024-06-04",
+     "to": "2024-06-26",
+     "panel_steps": 16,
+     "sessions_inferred_from_data": 16,
+     "return": -0.4958
+    },
+    {
+     "ticker": "VCB",
+     "from": "2025-02-25",
+     "to": "2025-03-17",
+     "panel_steps": 14,
+     "sessions_inferred_from_data": 14,
+     "return": -0.2732
+    }
+   ],
+   "label_cells_changed_vs_P0": 52216,
+   "label_max_abs_change_vs_P0": 0.0721,
+   "label_cells_lost_vs_P0": 257,
+   "feature_cells_lost_vs_P0": 16341,
+   "rows_complete_lost_vs_P0": {
+    "TCB": 158,
+    "VCB": 141
+   }
+  },
+  {
+   "policy": "P2_doi_ngay_su_kien_tay_sang_ngay_HOSE",
+   "stock_events_in_chain": 3,
+   "quality_flags": 144,
+   "flags_tcb_vcb_2024_2025": [
+    "TCB 2024-06-11 -0.4954",
+    "VCB 2025-03-03 -0.3311",
+    "TCB 2025-08-25 -0.0963",
+    "TCB 2025-10-20 -0.0824"
+   ],
+   "feature_cells_valid": 793415,
+   "label_cells_valid": 70475,
+   "rows_complete": 56017,
+   "returns_across_event": [
+    {
+     "ticker": "TCB",
+     "from": "2024-06-04",
+     "to": "2024-06-26",
+     "panel_steps": 16,
+     "sessions_inferred_from_data": 16,
+     "return": -0.4958
+    },
+    {
+     "ticker": "VCB",
+     "from": "2025-02-25",
+     "to": "2025-03-17",
+     "panel_steps": 14,
+     "sessions_inferred_from_data": 14,
+     "return": -0.2732
+    }
+   ],
+   "label_cells_changed_vs_P0": 1130,
+   "label_max_abs_change_vs_P0": 0.0026,
+   "label_cells_lost_vs_P0": 40,
+   "feature_cells_lost_vs_P0": 3146,
+   "rows_complete_lost_vs_P0": {
+    "TCB": 141,
+    "VCB": 141
+   },
+   "manual_events_after_redate": [
+    [
+     "TCB",
+     "2024-06-20",
+     "KHONG_KHOP"
+    ],
+    [
+     "VCB",
+     "2025-03-12",
+     "KHONG_KHOP"
+    ]
+   ]
+  },
+  {
+   "policy": "P3_chuoi_kiem_chung_cong_nhiem_o",
+   "stock_events_in_chain": 0,
+   "quality_flags": 152,
+   "flags_tcb_vcb_2024_2025": [
+    "TCB 2024-06-11 -0.4954",
+    "VCB 2025-03-03 -0.3311",
+    "TCB 2025-08-25 -0.0963",
+    "TCB 2025-10-20 -0.0824"
+   ],
+   "feature_cells_valid": 220846,
+   "label_cells_valid": 19776,
+   "rows_complete": 15470,
+   "returns_across_event": [
+    {
+     "ticker": "TCB",
+     "from": "2024-06-04",
+     "to": "2024-06-26",
+     "panel_steps": 16,
+     "sessions_inferred_from_data": 16,
+     "return": -0.4958
+    },
+    {
+     "ticker": "VCB",
+     "from": "2025-02-25",
+     "to": "2025-03-17",
+     "panel_steps": 14,
+     "sessions_inferred_from_data": 14,
+     "return": -0.2732
+    }
+   ],
+   "label_cells_changed_vs_P0": 15033,
+   "label_max_abs_change_vs_P0": 0.0721,
+   "label_cells_lost_vs_P0": 50739,
+   "feature_cells_lost_vs_P0": 575715,
+   "rows_complete_lost_vs_P0": {
+    "TCB": 1639,
+    "VCB": 2091
+   },
+   "verify_states": {
+    "CACH_LY_LOAI_SU_KIEN_LECH": 1,
+    "CACH_LY_THIEU_BANG_CHUNG": 124,
+    "CACH_LY_THIEU_NGAY_CONG_BO": 1,
+    "KHONG_ANH_HUONG": 25
+   },
+   "tainted_cell_share": 0.7183,
+   "tickers_tainted_last_252": 17
+  }
+ ],
+ "vcb_ratio_sensitivity": {
+  "window": {
+   "ticker": "VCB",
+   "from": "2025-02-25",
+   "to": "2025-03-17",
+   "panel_steps": 14,
+   "sessions_inferred_from_data": 14
+  },
+  "rows": [
+   {
+    "ratio": 1.4,
+    "engine_status": "APPLIED",
+    "adjusted_step_at_break": -0.0635,
+    "return": 0.0175
+   },
+   {
+    "ratio": 1.45,
+    "engine_status": "APPLIED",
+    "adjusted_step_at_break": -0.0301,
+    "return": 0.0538
+   },
+   {
+    "ratio": 1.495,
+    "engine_status": "APPLIED",
+    "adjusted_step_at_break": 0.0,
+    "return": 0.0865
+   },
+   {
+    "ratio": 1.54,
+    "engine_status": "APPLIED",
+    "adjusted_step_at_break": 0.0301,
+    "return": 0.1192
+   },
+   {
+    "ratio": 1.6,
+    "engine_status": "APPLIED",
+    "adjusted_step_at_break": 0.0702,
+    "return": 0.1629
+   }
+  ]
+ },
+ "calendar": {
+  "sessions_in_store": 2822,
+  "all_zero_volume_days": 123,
+  "label_windows": {
+   "horizon_steps": 20,
+   "windows": 2801,
+   "windows_with_fewer_inferred_sessions": 1118,
+   "min_inferred_sessions": 13,
+   "inferred_sessions_distribution_when_short": {
+    "13": 6,
+    "14": 20,
+    "15": 133,
+    "16": 62,
+    "17": 130,
+    "18": 228,
+    "19": 539
+   }
+  },
+  "all_zero_volume_days_with_unchanged_close": 123,
+  "by_year": {
+   "2017": 3,
+   "2018": 11,
+   "2019": 12,
+   "2020": 10,
+   "2021": 18,
+   "2022": 14,
+   "2023": 13,
+   "2024": 15,
+   "2025": 12,
+   "2026": 15
+  },
+  "days": [
+   "2017-01-26",
+   "2017-04-28",
+   "2017-09-04",
+   "2018-01-01",
+   "2018-02-14",
+   "2018-02-15",
+   "2018-02-16",
+   "2018-02-19",
+   "2018-02-20",
+   "2018-04-25",
+   "2018-04-30",
+   "2018-05-01",
+   "2018-09-03",
+   "2018-12-31",
+   "2019-01-01",
+   "2019-02-04",
+   "2019-02-05",
+   "2019-02-06",
+   "2019-02-07",
+   "2019-02-08",
+   "2019-04-15",
+   "2019-04-29",
+   "2019-04-30",
+   "2019-05-01",
+   "2019-09-02",
+   "2019-12-05",
+   "2020-01-01",
+   "2020-01-23",
+   "2020-01-24",
+   "2020-01-27",
+   "2020-01-28",
+   "2020-01-29",
+   "2020-04-02",
+   "2020-04-30",
+   "2020-05-01",
+   "2020-09-02",
+   "2021-01-01",
+   "2021-02-10",
+   "2021-02-11",
+   "2021-02-12",
+   "2021-02-15",
+   "2021-02-16",
+   "2021-04-21",
+   "2021-04-30",
+   "2021-05-03",
+   "2021-06-08",
+   "2021-09-02",
+   "2021-09-03",
+   "2021-10-06",
+   "2021-10-11",
+   "2021-10-14",
+   "2021-10-18",
+   "2021-10-25",
+   "2021-11-01",
+   "2022-01-03",
+   "2022-01-31",
+   "2022-02-01",
+   "2022-02-02",
+   "2022-02-03",
+   "2022-02-04",
+   "2022-02-15",
+   "2022-04-11",
+   "2022-05-02",
+   "2022-05-03",
+   "2022-06-02",
+   "2022-07-12",
+   "2022-09-01",
+   "2022-09-02",
+   "2023-01-02",
+   "2023-01-20",
+   "2023-01-23",
+   "2023-01-24",
+   "2023-01-25",
+   "2023-01-26",
+   "2023-05-01",
+   "2023-05-02",
+   "2023-05-03",
+   "2023-05-24",
+   "2023-06-22",
+   "2023-09-01",
+   "2023-09-04",
+   "2024-01-01",
+   "2024-01-25",
+   "2024-02-02",
+   "2024-02-08",
+   "2024-02-09",
+   "2024-02-12",
+   "2024-02-13",
+   "2024-02-14",
+   "2024-04-18",
+   "2024-04-29",
+   "2024-04-30",
+   "2024-05-01",
+   "2024-06-03",
+   "2024-09-02",
+   "2024-09-03",
+   "2025-01-01",
+   "2025-01-27",
+   "2025-01-28",
+   "2025-01-29",
+   "2025-01-30",
+   "2025-01-31",
+   "2025-04-07",
+   "2025-04-30",
+   "2025-05-01",
+   "2025-05-02",
+   "2025-09-01",
+   "2025-09-02",
+   "2026-01-01",
+   "2026-01-02",
+   "2026-02-16",
+   "2026-02-17",
+   "2026-02-18",
+   "2026-02-19",
+   "2026-02-20",
+   "2026-04-27",
+   "2026-04-30",
+   "2026-05-01",
+   "2026-08-31",
+   "2026-09-01",
+   "2026-09-02",
+   "2026-09-09",
+   "2026-10-05"
+  ],
+  "zero_volume_rows": 4954,
+  "rows": 73402
+ }
+}

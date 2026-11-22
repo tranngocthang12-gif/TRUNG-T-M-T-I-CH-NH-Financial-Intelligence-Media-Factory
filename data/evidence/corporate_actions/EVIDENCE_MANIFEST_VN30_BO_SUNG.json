@@ -1,0 +1,364 @@
+{
+  "notice": "Sự kiện quyền có ngày không hưởng quyền từ 2026-06-01 tới 2026-11-21 của BSR, LPB, MCH, TCX, VPL (QĐ-4, ADR-0016) tìm được qua các truy vấn HOSE đã ghim trong tra_cuu[].snapshots (mọi trang khớp totalCount và totalPages của chính API). Tính đầy đủ chỉ được chứng minh trong phạm vi các truy vấn đó. Chỉ nhận văn bản HOSE tải nguyên byte. event_type để trống, nguyên văn loại ở event_type_verbatim. published_at theo QĐ-9 (ADR-0016): giây Unix data.postedDate viết ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ, chỉ nhận khi tools/publication_proof.py kiểm được từ metadata HOSE đã ghim, kể cả khi trùng ngày ký (MCH). Mã không tìm thấy thông báo ghi UNKNOWN; UNKNOWN không có nghĩa là không có sự kiện.",
+  "source_documents": [
+    {
+      "source_id": "hose-2475353",
+      "url": "https://staticfile.hsx.vn/Uploads/UploadDocuments/2475353/20260630%20-%20BSR%20-%20TB%20NDKCC%20chi%20tra%20co%20tuc%20nam%202025%20bang%20tien.pdf",
+      "issuer": "Sở Giao dịch Chứng khoán Thành phố Hồ Chí Minh (HOSE)",
+      "signed_date": "2026-06-29",
+      "published_at": "2026-06-30T18:10:55",
+      "published_at_status": "DA_XAC_MINH",
+      "published_at_note": "published_at lấy từ data.postedDate = 1782843055 của tin HOSE 2475353, viết ISO 8601 2026-06-30T18:10:55. Tin HOSE 2475353: tải nguyên byte https://api.hsx.vn/n/api/v1/1/news/2475353 lúc 2026-11-21T17:50:10Z (HTTP 200, 901 byte, sha256 24068012789a3f48b1c70a8682d7d1eb0e1d188daae2914288e0f0bafe826db3), ghim ở data/evidence/corporate_actions/hose-2475353/hose_news_2475353.json. Mọi trường ngày giờ trong JSON tin (giây Unix): postedDate=1782843055, approvedDate=1782843055, createdDate=1782843055, publishFrom=1782777600, publishTo=1940544000, updatedDate=None. Tệp đính kèm: https://api.hsx.vn/m/api/v1/1/mediafiles/1/2475353?pageIndex=1&pageSize=10&year=0 lúc 2026-11-21T17:50:13Z (481 byte, sha256 59bb6ab03aabd71f56911ccd20f064c86daf9f4176cc0d42def56e5a3d627ba6), ghim ở data/evidence/corporate_actions/hose-2475353/hose_mediafiles_2475353.json; filePath '~/Uploads/UploadDocuments/2475353/20260630 - BSR - TB NDKCC chi tra co tuc nam 2025 bang tien.pdf' trùng url của bản gốc. JSON không ghi múi giờ nên published_at không gắn múi giờ. Ngày ký trên văn bản 2026-06-29 khác ngày đăng; không chọn ngày ký hay ngày trong tên tệp.",
+      "publication_evidence": "data/evidence/corporate_actions/hose-2475353/hose_news_2475353.json",
+      "publication_evidence_sha256": "24068012789a3f48b1c70a8682d7d1eb0e1d188daae2914288e0f0bafe826db3",
+      "publication_media_evidence": "data/evidence/corporate_actions/hose-2475353/hose_mediafiles_2475353.json",
+      "publication_media_sha256": "59bb6ab03aabd71f56911ccd20f064c86daf9f4176cc0d42def56e5a3d627ba6",
+      "accessed_at": "2026-11-21T17:52:11Z",
+      "effective_date": "2026-08-11",
+      "path": "data/evidence/corporate_actions/hose-2475353/20260630 - BSR - TB NDKCC chi tra co tuc nam 2025 bang tien.pdf",
+      "sha256": "6730fa375a2e3af1c8a9384e8212b2ad1a7e830f725fbec49ce9e95b752033e6",
+      "bytes": 255793,
+      "ticker": "BSR",
+      "event_type": null,
+      "event_type_status": "CHUA_XAC_MINH",
+      "event_type_verbatim": "chi trả cổ tức bằng tiền",
+      "event_type_note": "Nguyên văn mục 'Lý do và mục đích' trên văn bản: 'Chi trả cổ tức năm 2025 bằng tiền'. event_type_verbatim giữ cụm loại sự kiện, bỏ năm. Không phải mã loại kỹ thuật của engine. Ánh xạ CHUA_XAC_MINH.",
+      "official_ex_date": "2026-08-11",
+      "official_record_date": "2026-08-12",
+      "official_ratio": null,
+      "official_ratio_text": "3%/mệnh giá (1 cổ phiếu nhận được 300 đồng); cổ tức tiền, không phải hệ số giá, official_ratio = null",
+      "note": "Thông báo HOSE số 1434/TB-SGDHCM, ngày ký trên văn bản 29/06/2026, tin HOSE 2475353. Ngày giao dịch không hưởng quyền 11/08/2026, ngày đăng ký cuối cùng 12/08/2026. Ngày thanh toán 11/09/2026. PDF là ảnh quét không có lớp chữ; Claude (Anthropic) đọc, chưa có người khác đối chiếu."
+    },
+    {
+      "source_id": "hose-2485688",
+      "url": "https://staticfile.hsx.vn/Uploads/UploadDocuments/2485688/20260731%20-%20MCH%20-%20TB%20NDKCC%20tam%20ung%20co%20tuc%20dot%201%20nam%202026%20bang%20tien.pdf",
+      "issuer": "Sở Giao dịch Chứng khoán Thành phố Hồ Chí Minh (HOSE)",
+      "signed_date": "2026-07-31",
+      "published_at": "2026-07-31T18:23:50",
+      "published_at_status": "DA_XAC_MINH",
+      "published_at_note": "published_at lấy từ data.postedDate = 1785522230 của tin HOSE 2485688, viết ISO 8601 2026-07-31T18:23:50. Ngày đăng trùng ngày ký trên văn bản 2026-07-31; được nhận theo QĐ-9 (ADR-0016) vì máy kiểm được ngày đó từ metadata HOSE đã ghim (tools/publication_proof.py). Tin HOSE 2485688: tải nguyên byte https://api.hsx.vn/n/api/v1/1/news/2485688 lúc 2026-11-21T17:50:41Z (HTTP 200, 951 byte, sha256 9bbab1017c16707d09b9d8d733e3b5acc383d0ca666750bb33ff4603587e89d2), ghim ở data/evidence/corporate_actions/hose-2485688/hose_news_2485688.json. Mọi trường ngày giờ trong JSON tin (giây Unix): postedDate=1785522230, approvedDate=1785522230, createdDate=1785522230, publishFrom=1785456000, publishTo=1943222400, updatedDate=None. Tệp đính kèm: https://api.hsx.vn/m/api/v1/1/mediafiles/1/2485688?pageIndex=1&pageSize=10&year=0 lúc 2026-11-21T17:50:43Z (493 byte, sha256 f2c9f54c75cd1892b59ab9c0f4fa7632f34a7fa5da459086a7501c4ff786dd5b), ghim ở data/evidence/corporate_actions/hose-2485688/hose_mediafiles_2485688.json; filePath '~/Uploads/UploadDocuments/2485688/20260731 - MCH - TB NDKCC tam ung co tuc dot 1 nam 2026 bang tien.pdf' trùng url của bản gốc. JSON không ghi múi giờ nên published_at không gắn múi giờ. Không chọn ngày ký hay ngày trong tên tệp.",
+      "publication_evidence": "data/evidence/corporate_actions/hose-2485688/hose_news_2485688.json",
+      "publication_evidence_sha256": "9bbab1017c16707d09b9d8d733e3b5acc383d0ca666750bb33ff4603587e89d2",
+      "publication_media_evidence": "data/evidence/corporate_actions/hose-2485688/hose_mediafiles_2485688.json",
+      "publication_media_sha256": "f2c9f54c75cd1892b59ab9c0f4fa7632f34a7fa5da459086a7501c4ff786dd5b",
+      "accessed_at": "2026-11-21T17:54:15Z",
+      "effective_date": "2026-08-10",
+      "path": "data/evidence/corporate_actions/hose-2485688/20260731 - MCH - TB NDKCC tam ung co tuc dot 1 nam 2026 bang tien.pdf",
+      "sha256": "6e5e9809f5dc28b9ab3a6bfc6ab3f407dff99e38c76338f03b9f57c11541843a",
+      "bytes": 242458,
+      "ticker": "MCH",
+      "event_type": null,
+      "event_type_status": "CHUA_XAC_MINH",
+      "event_type_verbatim": "tạm ứng cổ tức bằng tiền",
+      "event_type_note": "Nguyên văn mục 'Lý do và mục đích' trên văn bản: 'Tạm ứng cổ tức đợt 1 năm 2026 bằng tiền'. event_type_verbatim giữ cụm loại sự kiện, bỏ năm. Không phải mã loại kỹ thuật của engine. Ánh xạ CHUA_XAC_MINH.",
+      "official_ex_date": "2026-08-10",
+      "official_record_date": "2026-08-11",
+      "official_ratio": null,
+      "official_ratio_text": "20%/mệnh giá (01 cổ phiếu được nhận 2.000 đồng); cổ tức tiền, không phải hệ số giá, official_ratio = null",
+      "note": "Thông báo HOSE số 1643/TB-SGDHCM, ngày ký trên văn bản 31/07/2026, tin HOSE 2485688. Ngày giao dịch không hưởng quyền 10/08/2026, ngày đăng ký cuối cùng 11/08/2026. Ngày thanh toán 19/08/2026. PDF là ảnh quét không có lớp chữ; Claude (Anthropic) đọc, chưa có người khác đối chiếu."
+    },
+    {
+      "source_id": "hose-2496161",
+      "url": "https://staticfile.hsx.vn/Uploads/UploadDocuments/2496161/20260910%20-%20TCX%20-%20TB%20ngay%20DKCC%20tra%20co%20tuc%20bang%20CP%20nam%202025.pdf",
+      "issuer": "Sở Giao dịch Chứng khoán Thành phố Hồ Chí Minh (HOSE)",
+      "signed_date": "2026-09-10",
+      "published_at": "2026-09-11T08:41:56",
+      "published_at_status": "DA_XAC_MINH",
+      "published_at_note": "published_at lấy từ data.postedDate = 1789116116 của tin HOSE 2496161, viết ISO 8601 2026-09-11T08:41:56. Tin HOSE 2496161: tải nguyên byte https://api.hsx.vn/n/api/v1/1/news/2496161 lúc 2026-11-21T17:50:47Z (HTTP 200, 959 byte, sha256 870f1ecafcbb9b29744cae7d6cb661bc00fc3c478e5697733ab24d73a3b64831), ghim ở data/evidence/corporate_actions/hose-2496161/hose_news_2496161.json. Mọi trường ngày giờ trong JSON tin (giây Unix): postedDate=1789116116, approvedDate=1789116116, createdDate=1789116116, publishFrom=1789084800, publishTo=1946851200, updatedDate=None. Tệp đính kèm: https://api.hsx.vn/m/api/v1/1/mediafiles/1/2496161?pageIndex=1&pageSize=10&year=0 lúc 2026-11-21T17:50:49Z (477 byte, sha256 2f63fbd8d86ddb4500ffad57d502251e417deae61e307f9cc9d99be2bfc616f4), ghim ở data/evidence/corporate_actions/hose-2496161/hose_mediafiles_2496161.json; filePath '~/Uploads/UploadDocuments/2496161/20260910 - TCX - TB ngay DKCC tra co tuc bang CP nam 2025.pdf' trùng url của bản gốc. JSON không ghi múi giờ nên published_at không gắn múi giờ. Ngày ký trên văn bản 2026-09-10 khác ngày đăng; không chọn ngày ký hay ngày trong tên tệp.",
+      "publication_evidence": "data/evidence/corporate_actions/hose-2496161/hose_news_2496161.json",
+      "publication_evidence_sha256": "870f1ecafcbb9b29744cae7d6cb661bc00fc3c478e5697733ab24d73a3b64831",
+      "publication_media_evidence": "data/evidence/corporate_actions/hose-2496161/hose_mediafiles_2496161.json",
+      "publication_media_sha256": "2f63fbd8d86ddb4500ffad57d502251e417deae61e307f9cc9d99be2bfc616f4",
+      "accessed_at": "2026-11-21T17:55:11Z",
+      "effective_date": "2026-09-17",
+      "path": "data/evidence/corporate_actions/hose-2496161/20260910 - TCX - TB ngay DKCC tra co tuc bang CP nam 2025.pdf",
+      "sha256": "3c5406e70b0380ec639c66b9af49586c7cebb3f2f41da1df4493b144dc7521eb",
+      "bytes": 270452,
+      "ticker": "TCX",
+      "event_type": null,
+      "event_type_status": "CHUA_XAC_MINH",
+      "event_type_verbatim": "trả cổ tức bằng cổ phiếu",
+      "event_type_note": "Nguyên văn mục 'Lý do và mục đích' trên văn bản: 'Trả cổ tức bằng cổ phiếu năm 2025'. event_type_verbatim giữ cụm loại sự kiện, bỏ năm. Không phải mã loại kỹ thuật của engine. Ánh xạ CHUA_XAC_MINH.",
+      "official_ex_date": "2026-09-17",
+      "official_record_date": "2026-09-18",
+      "official_ratio": 1.2,
+      "official_ratio_text": "5:1 (Người sở hữu 05 cổ phiếu được nhận 01 cổ phiếu mới); official_ratio = (5+1)/5 = 1,2",
+      "note": "Thông báo HOSE số 1860/TB-SGDHCM, ngày ký trên văn bản 10/09/2026, tin HOSE 2496161. Ngày giao dịch không hưởng quyền 17/09/2026, ngày đăng ký cuối cùng 18/09/2026. Số lượng cổ phiếu dự kiến phát hành 554.890.665; cổ phiếu lẻ làm tròn xuống và hủy. Công ty đăng tin đính chính thông báo phát hành của chính công ty cùng ngày (tin 2496179, không phải văn bản HOSE, không ghim). PDF là ảnh quét không có lớp chữ; Claude (Anthropic) đọc, chưa có người khác đối chiếu."
+    }
+  ],
+  "tra_cuu": [
+    {
+      "ticker": "BSR",
+      "securities_id": 4682,
+      "accessed_at": "2026-11-21T17:48:31Z",
+      "queries": [
+        "https://api.hsx.vn/q/api/v1/search?indexName=securities&field=code^2,isin,figi,introduction&query=BSR&page=1&pageSize=100 (id 4682)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/4682/1?pageIndex=<1..>&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (tin theo mã)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/4682/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/4682/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (lịch sự kiện quyền)"
+      ],
+      "result": "FOUND",
+      "source_ids": [
+        "hose-2475353"
+      ],
+      "other": "Tin 2481627 (TB 1575/TB-SGDHCM): ngày đăng ký cuối cùng lấy ý kiến cổ đông bằng văn bản; không phải cổ tức, thưởng, phát hành hay chia tách, không ghim.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4682/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/BSR_loai1_trang1.json",
+          "sha256": "b5b31ecf5657615d7c2014222ed2472063f3a34016907ce103019b621af76729",
+          "bytes": 28478,
+          "accessed_at": "2026-11-21T17:48:41Z",
+          "pageIndex": 1,
+          "totalCount": 34,
+          "totalPages": 1,
+          "items": 34
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4682/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/BSR_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:26Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4682/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/BSR_loai3_trang1.json",
+          "sha256": "4e452833d9b24e42c8d5a2513922ab8b866122ba5f352c655bde0df692b42723",
+          "bytes": 755,
+          "accessed_at": "2026-11-21T17:59:26Z",
+          "pageIndex": 1,
+          "totalCount": 1,
+          "totalPages": 1,
+          "items": 1
+        }
+      ]
+    },
+    {
+      "ticker": "LPB",
+      "securities_id": 2955,
+      "accessed_at": "2026-11-21T17:48:41Z",
+      "queries": [
+        "https://api.hsx.vn/q/api/v1/search?indexName=securities&field=code^2,isin,figi,introduction&query=LPB&page=1&pageSize=100 (id 2955)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/2955/1?pageIndex=<1..>&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (tin theo mã)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/2955/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/2955/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (lịch sự kiện quyền)"
+      ],
+      "result": "UNKNOWN",
+      "source_ids": [],
+      "other": "Không thấy thông báo HOSE nào có ngày không hưởng quyền từ 2026-06-01. Thông báo gần nhất tìm được: tin 2460398 (TB 1062/TB-SGDHCM), trả cổ tức năm 2025 bằng tiền mặt 30%/mệnh giá, ngày không hưởng quyền 14/05/2026, ngoài khung; không ghim. Lịch sự kiện quyền HOSE của mã từ 01/05/2026 chỉ có 14/05/2026.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai1_trang1.json",
+          "sha256": "580f11f7ed1cf2fb0021f61495409f20ffff53eed522d39a85b77132333daa19",
+          "bytes": 44568,
+          "accessed_at": "2026-11-21T17:48:59Z",
+          "pageIndex": 1,
+          "totalCount": 62,
+          "totalPages": 2,
+          "items": 50
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/1?pageIndex=2&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai1_trang2.json",
+          "sha256": "d9bd60246d142af657320dcc6e210a8ef85a29819f9cc92930d7cde07a5d934d",
+          "bytes": 10415,
+          "accessed_at": "2026-11-21T17:49:04Z",
+          "pageIndex": 2,
+          "totalCount": 62,
+          "totalPages": 2,
+          "items": 12
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:08Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai3_trang1.json",
+          "sha256": "e9ce01c6c0b1afaf5cc0d6eb4cac8ed0005d70158d8f4aad518c6325062aa67a",
+          "bytes": 755,
+          "accessed_at": "2026-11-21T17:59:14Z",
+          "pageIndex": 1,
+          "totalCount": 1,
+          "totalPages": 1,
+          "items": 1
+        }
+      ]
+    },
+    {
+      "ticker": "MCH",
+      "securities_id": 7519,
+      "accessed_at": "2026-11-21T17:49:04Z",
+      "queries": [
+        "https://api.hsx.vn/q/api/v1/search?indexName=securities&field=code^2,isin,figi,introduction&query=MCH&page=1&pageSize=100 (id 7519)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/7519/1?pageIndex=<1..>&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (tin theo mã)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/7519/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/7519/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (lịch sự kiện quyền)"
+      ],
+      "result": "FOUND",
+      "source_ids": [
+        "hose-2485688"
+      ],
+      "other": "Tin 2484666 là thông báo của chính công ty cho cùng sự kiện; các tin ESOP (2469853, 2473379, 2475320) là phát hành cho người lao động, không có ngày đăng ký cuối cùng; không ghim.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7519/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/MCH_loai1_trang1.json",
+          "sha256": "9196e0436e24b6da1fca5113ba9154c221c582e1e86d0c59fff6785405b8509b",
+          "bytes": 29768,
+          "accessed_at": "2026-11-21T17:49:13Z",
+          "pageIndex": 1,
+          "totalCount": 36,
+          "totalPages": 1,
+          "items": 36
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7519/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/MCH_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:32Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7519/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/MCH_loai3_trang1.json",
+          "sha256": "399640ca9155882b3ad1f8eff60661dff9474f2aad47aa30a36061e20d5e8e66",
+          "bytes": 755,
+          "accessed_at": "2026-11-21T17:59:34Z",
+          "pageIndex": 1,
+          "totalCount": 1,
+          "totalPages": 1,
+          "items": 1
+        }
+      ]
+    },
+    {
+      "ticker": "TCX",
+      "securities_id": 7391,
+      "accessed_at": "2026-11-21T17:49:13Z",
+      "queries": [
+        "https://api.hsx.vn/q/api/v1/search?indexName=securities&field=code^2,isin,figi,introduction&query=TCX&page=1&pageSize=100 (id 7391)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/7391/1?pageIndex=<1..>&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (tin theo mã)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/7391/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/7391/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (lịch sự kiện quyền)"
+      ],
+      "result": "FOUND",
+      "source_ids": [
+        "hose-2496161"
+      ],
+      "other": "Tin 2463430 (TB 1170/TB-SGDHCM): trả cổ tức bằng cổ phiếu năm 2024, 5:1, ngày không hưởng quyền 25/05/2026, ngoài khung; không ghim. Tin 2492159: trả lãi trái phiếu TCX126011, không phải cổ phiếu.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai1_trang1.json",
+          "sha256": "82c55005ed95f295c06d97b4077bbdc4a08e34a3e57462632ee92025b0cee5a2",
+          "bytes": 41944,
+          "accessed_at": "2026-11-21T17:49:25Z",
+          "pageIndex": 1,
+          "totalCount": 77,
+          "totalPages": 2,
+          "items": 50
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/1?pageIndex=2&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai1_trang2.json",
+          "sha256": "d0082751391fbe5b5c1e20e81d7aeca4cbb8464045f112dbb2192b5b96b03f56",
+          "bytes": 22679,
+          "accessed_at": "2026-11-21T17:49:36Z",
+          "pageIndex": 2,
+          "totalCount": 77,
+          "totalPages": 2,
+          "items": 27
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:35Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai3_trang1.json",
+          "sha256": "0c3a3cae303f3c380a4618242d533c24ae63db4732e5a4f3126c1d7a8d41712f",
+          "bytes": 1438,
+          "accessed_at": "2026-11-21T17:59:36Z",
+          "pageIndex": 1,
+          "totalCount": 2,
+          "totalPages": 1,
+          "items": 2
+        }
+      ]
+    },
+    {
+      "ticker": "VPL",
+      "securities_id": 4483,
+      "accessed_at": "2026-11-21T17:49:36Z",
+      "queries": [
+        "https://api.hsx.vn/q/api/v1/search?indexName=securities&field=code^2,isin,figi,introduction&query=VPL&page=1&pageSize=100 (id 4483)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/4483/1?pageIndex=<1..>&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (tin theo mã)",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/4483/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+        "https://api.hsx.vn/n/api/v1/1/news/securities/4483/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21 (lịch sự kiện quyền)"
+      ],
+      "result": "UNKNOWN",
+      "source_ids": [],
+      "other": "Không thấy thông báo ngày đăng ký cuối cùng nào từ 01/05/2026 (15 tin theo mã; lịch sự kiện quyền HOSE của mã trống). Tin 2473156 là kết quả chào bán cổ phiếu ưu đãi riêng lẻ, không phải sự kiện quyền của cổ phiếu phổ thông.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4483/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/VPL_loai1_trang1.json",
+          "sha256": "921990801bf446b30c196f4d9586e02f9b2ad3f95190bf8b0866a74cf05406f9",
+          "bytes": 11561,
+          "accessed_at": "2026-11-21T17:49:39Z",
+          "pageIndex": 1,
+          "totalCount": 15,
+          "totalPages": 1,
+          "items": 15
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4483/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/VPL_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:17Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4483/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/VPL_loai3_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:24Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        }
+      ]
+    }
+  ]
+}

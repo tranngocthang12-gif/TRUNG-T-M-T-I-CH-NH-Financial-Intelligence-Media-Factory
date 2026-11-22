@@ -85,8 +85,13 @@ class EvidenceSemanticsTests(unittest.TestCase):
             self.assertTrue(doc.get("signed_date_basis"), doc["source_id"])
 
     def test_published_at_needs_hose_publication_evidence(self):
-        """published_at chỉ được điền khi có metadata công bố của HOSE đã ghim (đường dẫn + sha256); không suy từ ngày ký
-        hay tên tệp. Chưa có thì published_at = null và published_at_status = CHUA_XAC_MINH."""
+        """published_at chỉ được điền khi tools/publication_proof.proof_errors kiểm được ngày đó từ metadata HOSE đã ghim (QĐ-9,
+        ADR-0016): JSON tin và JSON danh sách đính kèm (đường dẫn + sha256), không suy từ ngày ký hay tên tệp. Chưa có thì
+        published_at = null và published_at_status = CHUA_XAC_MINH."""
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from tools.publication_proof import proof_errors
+
         for doc in _docs():
             sid = doc["source_id"]
             self.assertIn(doc.get("published_at_status"), ("DA_XAC_MINH", "CHUA_XAC_MINH"), sid)
@@ -96,11 +101,15 @@ class EvidenceSemanticsTests(unittest.TestCase):
                 continue
             self.assertEqual(doc["published_at_status"], "DA_XAC_MINH", sid)
             ev = doc.get("published_at_evidence") or {}
-            for key in ("path", "sha256", "field", "accessed_at"):
+            for key in ("path", "sha256", "field", "accessed_at", "media_path", "media_sha256"):
                 self.assertIn(key, ev, sid)
-            blob = (ROOT / ev["path"]).read_bytes()
-            self.assertEqual(hashlib.sha256(blob).hexdigest(), ev["sha256"], sid)
-            self.assertNotEqual(ev["path"], doc["path"], f"{sid}: ngày công bố không lấy từ chính văn bản")
+            for path_key, sha_key in (("path", "sha256"), ("media_path", "media_sha256")):
+                blob = (ROOT / ev[path_key]).read_bytes()
+                self.assertEqual(hashlib.sha256(blob).hexdigest(), ev[sha_key], sid)
+                self.assertNotEqual(ev[path_key], doc["path"], f"{sid}: ngày công bố không lấy từ chính văn bản")
+            self.assertEqual(proof_errors(doc, ROOT), [], sid)
+            bad = {**doc, "published_at": doc["signed_date"]}
+            self.assertTrue(proof_errors(bad, ROOT), f"{sid}: ngày ký gõ tay phải bị từ chối")
 
     def test_source_event_class_is_separate_from_technical_type(self):
         for doc in _docs():
@@ -125,15 +134,22 @@ class EvidenceSemanticsTests(unittest.TestCase):
 
     def test_verified_gate_cannot_use_unverified_publication_or_mapping(self):
         """Dựng chuỗi giá tổng hợp khớp đúng từng văn bản (ngày, tỷ lệ, loại stock_dividend, bước gãy thật) rồi chạy cổng
-        verified-adjusted với manifest thật. Không sự kiện nào được DA_KIEM_CHUNG khi ngày công bố hoặc ánh xạ loại chưa xác
-        minh. Đối chứng: cùng văn bản, nếu hai trường đó đủ thì cổng xác minh được (lỗi nằm đúng ở hai trường đó)."""
+        verified-adjusted với manifest thật. Lớp của bản gốc do bảng đóng trong engine quyết định (ADR-0016 QĐ-2, QĐ-2a),
+        không theo technical_mapping_status. Với từng bản gốc:
+        - nguyên trạng: DA_KIEM_CHUNG khi và chỉ khi có published_at và lớp STOCK; ngoài ra không được xác minh, không vào chuỗi;
+        - chỉ bổ sung published_at: DA_KIEM_CHUNG khi và chỉ khi lớp STOCK; ngoài ra trạng thái cách ly;
+        - đối chứng âm 1: bỏ published_at thì không được xác minh;
+        - đối chứng âm 2: event_type trống, nguyên văn loại ngoài bảng (phát hành quyền mua), có published_at → LOAI_CHUA_ANH_XA;
+        - đối chứng dương: event_type stock_dividend và có published_at thì cổng xác minh được (lỗi nằm đúng ở các trường trên)."""
         import sys
         sys.path.insert(0, str(ROOT))
         import numpy as np
         import pandas as pd
         from engine import adjust, verified_adjust as va
 
+        rights = "phát hành cổ phiếu cho cổ đông hiện hữu theo phương thức thực hiện quyền mua"
         for doc in _docs():
+            sid = doc["source_id"]
             off = pd.Timestamp(doc["official_ex_date"])
             idx = pd.bdate_range(end=off + pd.Timedelta(days=40), periods=320)
             pos = int(idx.searchsorted(off))
@@ -145,21 +161,42 @@ class EvidenceSemanticsTests(unittest.TestCase):
                                     "ratio": float(doc["official_ratio"]), "cash_per_share": np.nan, "source": "manual",
                                     "source_status": "CAN_DOI_CHIEU", "note": ""}], columns=adjust.EV_COLS)
             events = adjust.build_events(close, obs, manual, pd.DataFrame(columns=adjust.EV_COLS))
-            self.assertEqual(events.status.tolist(), ["APPLIED"], doc["source_id"])
-            ev = va.verify_events(events, close, [doc], evidence_root=ROOT, as_of=idx[-1])
-            self.assertNotEqual(ev.verify_state.iloc[0], va.OK, f"{doc['source_id']}: {ev.verify_reason.iloc[0]}")
-            self.assertFalse(bool(ev.in_verified_chain.iloc[0]), doc["source_id"])
-            # Chỉ bổ sung ngày công bố, giữ nguyên ánh xạ loại của manifest: ánh xạ chưa xác minh vẫn phải bị chặn.
-            pub_only = {**doc, "published_at": str((off - pd.Timedelta(days=6)).date())}
-            ev = va.verify_events(events, close, [pub_only], evidence_root=ROOT, as_of=idx[-1])
-            if doc["technical_mapping_status"] != "KHOP_NGUYEN_VAN":
-                self.assertNotEqual(ev.verify_state.iloc[0], va.OK, f"{doc['source_id']}: ánh xạ chưa xác minh lọt cổng")
+            self.assertEqual(events.status.tolist(), ["APPLIED"], sid)
+
+            def run(d):
+                ev = va.verify_events(events, close, [d], evidence_root=ROOT, as_of=idx[-1])
+                return ev.verify_state.iloc[0], bool(ev.in_verified_chain.iloc[0]), ev.verify_reason.iloc[0]
+
+            stock = va._doc_class(doc)[0] == "STOCK"
+            pub = str((off - pd.Timedelta(days=6)).date())
+            # Bản gốc nguyên trạng.
+            state, chain, why = run(doc)
+            if doc.get("published_at") and stock:
+                self.assertEqual(state, va.OK, f"{sid}: {why}")
             else:
-                self.assertEqual(ev.verify_state.iloc[0], va.OK, f"{doc['source_id']}: {ev.verify_reason.iloc[0]}")
-            control = {**doc, "event_type": "stock_dividend",
-                       "published_at": str((off - pd.Timedelta(days=6)).date())}
-            ev = va.verify_events(events, close, [control], evidence_root=ROOT, as_of=idx[-1])
-            self.assertEqual(ev.verify_state.iloc[0], va.OK, f"đối chứng {doc['source_id']}: {ev.verify_reason.iloc[0]}")
+                self.assertNotEqual(state, va.OK, f"{sid}: {why}")
+                self.assertFalse(chain, sid)
+            # Chỉ bổ sung ngày công bố, giữ nguyên loại và nguyên văn của manifest.
+            state, chain, why = run({**doc, "published_at": pub})
+            if stock:
+                self.assertEqual(state, va.OK, f"{sid}: {why}")
+            else:
+                self.assertTrue(state.startswith(va.Q), f"{sid}: {state}")
+                self.assertFalse(chain, sid)
+            # Đối chứng âm 1: thiếu ngày công bố.
+            state, chain, why = run({**doc, "published_at": None})
+            self.assertNotEqual(state, va.OK, f"{sid}: {why}")
+            self.assertFalse(chain, sid)
+            # Đối chứng âm 2: loại chưa ánh xạ.
+            unmapped = {**doc, "event_type": None, "event_type_verbatim": rights, "source_event_text": rights,
+                        "published_at": pub}
+            state, chain, why = run(unmapped)
+            self.assertEqual(state, va.Q + "LOAI_CHUA_ANH_XA", f"{sid}: {why}")
+            self.assertFalse(chain, sid)
+            # Đối chứng dương.
+            control = {**doc, "event_type": "stock_dividend", "published_at": pub}
+            state, chain, why = run(control)
+            self.assertEqual(state, va.OK, f"đối chứng {sid}: {why}")
 
     def test_report_is_regenerated_from_manifest(self):
         with tempfile.TemporaryDirectory() as tmp:

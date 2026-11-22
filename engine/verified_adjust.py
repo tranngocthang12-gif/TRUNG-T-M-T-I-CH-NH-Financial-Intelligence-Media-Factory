@@ -6,12 +6,16 @@ CHUỖI GIÁ GỐC GÃY trong kho, chưa chắc là ngày giao dịch không hư
 (ví dụ CAN_DOI_CHIEU) chỉ được chép sang kết quả, KHÔNG tham gia quyết định APPLIED. Quyết định APPLIED chỉ dựa vào việc
 biên độ giá sau điều chỉnh nằm trong sàn. Đó là nguyên nhân một sự kiện chưa đối chiếu vẫn thành APPLIED.
 
-Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ vào chuỗi đó khi đủ cả sáu điều kiện:
+Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ vào chuỗi đó khi đủ cả chín điều kiện:
   1. có bản gốc đã ghim trong manifest (source_id, url, issuer, path, sha256 đều là chuỗi không rỗng), tệp tồn tại, đúng
-     sha256 và số byte; loại sự kiện in trên văn bản (`event_type`) TRÙNG ĐÚNG loại của sự kiện engine (không coi
-     `stock_split` và `stock_dividend` là một);
+     sha256 và số byte; bản gốc thuộc lớp STOCK như sự kiện engine (QĐ-2 và QĐ-2a, ADR-0016: chia tách, trả cổ tức bằng cổ
+     phiếu và cổ phiếu thưởng cùng một lớp vì engine tính hệ số như nhau). Bản gốc thuộc lớp STOCK khi `event_type` thuộc
+     `adjust.STOCK`, hoặc khi `event_type` trống và nguyên văn loại (`event_type_verbatim`, không có thì `source_event_text`)
+     nằm trong bảng ánh xạ đóng STOCK_VERBATIM; nguyên văn ngoài bảng thì CÁCH LY LOAI_CHUA_ANH_XA. Nguyên văn trong manifest
+     không bị sửa;
   2. có ngày công bố (`published_at`) hợp lệ: có mặt, không muộn hơn ngày cắt `as_of`, sớm hơn ngày không hưởng quyền;
-  3. tỷ lệ in trên văn bản (`official_ratio`) là số hữu hạn dương và trùng tỷ lệ của sự kiện;
+  3. tỷ lệ in trên văn bản (`official_ratio`) là số hữu hạn dương và trùng tỷ lệ của sự kiện khi làm tròn tới RATIO_DECIMALS
+     = 7 chữ số thập phân;
   4. NGÀY GIAO DỊCH mà engine đang áp sự kiện trùng ngày giao dịch của ngày không hưởng quyền chính thức;
   5. không có sự kiện nào khác của cùng bản gốc được engine áp ở ngày khác; "cùng bản gốc" xét theo cả `source_id` lẫn
      sha256 của tệp, nên đổi hay bỏ `source_id` không lách được kiểm tra này;
@@ -27,6 +31,11 @@ Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ v�
        - DA_NAM_TRONG_GIA_NGUON (không áp hệ số) chỉ nhận khi giá chứng minh "đã điều chỉnh"; không thì CÁCH LY
          GIA_CHUA_LIEN_TUC.
      Mơ hồ (cả hai bước giá trong biên) hoặc sai cả hai (cả hai ngoài biên) đều bị cách ly và nhiễm ô.
+  8. Với DA_NAM_TRONG_GIA_NGUON: KHÔNG có bước giá gốc ngoài biên nào trong WINDOW_DAYS ngày lịch trước phiên sự kiện; có thì
+     CÁCH LY GIA_GAY_TRUOC_NGAY_HUONG_QUYEN (nguồn có thể chỉ điều chỉnh vài phiên liền trước, như TCB/VCB trong kho thật).
+  9. Mọi phiên trên trục ngày của panel (`close.index`) trong [phiên sự kiện − WINDOW_DAYS ngày lịch, phiên sự kiện] đều có
+     giá của mã; thiếu bất kỳ phiên nào thì CÁCH LY THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN. Kiểm TRƯỚC điều kiện 7 và 8: khi thiếu
+     phiên, bước giá đo qua chỗ trống có biên nới theo số phiên (`adjust.bands`), nên một bước gãy có thể lọt qua cả hai.
 Không đạt thì CÁCH LY: không đưa vào hệ số của chuỗi kiểm chứng, và mọi ô giá của mã đó TRƯỚC ngày giao dịch của sự kiện bị
 đánh dấu TAINTED (không bảo đảm so sánh được qua sự kiện). Cổng KHÔNG đổi ngày hộ và KHÔNG suy ngày đúng từ bước nhảy giá.
 Sự kiện tiền mặt chưa có bằng chứng ghim nên chưa được xét; chuỗi kiểm chứng là chuỗi giá gốc cộng các sự kiện cổ phiếu
@@ -37,6 +46,8 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+import unicodedata
+from decimal import ROUND_HALF_UP, Decimal
 
 import numpy as np
 import pandas as pd
@@ -49,7 +60,27 @@ NO_DATA = ("KHONG_CO_MA", "CHUA_DEN_HAN", "NGOAI_DU_LIEU")                   # k
 VERIFIABLE = ("APPLIED", "DA_NAM_TRONG_GIA_NGUON")                           # danh sách cho phép: chỉ hai trạng thái này được kiểm
 DOC_REQUIRED = ("source_id", "url", "issuer", "path", "sha256")
 WINDOW_DAYS = 45          # bản gốc phải có ngày không hưởng quyền cách ngày engine không quá ngần này ngày lịch
-RATIO_TOL = 1e-9
+# Tỷ lệ so ở 7 chữ số thập phân: đó là độ chính xác của data/derived/yahoo_actions.csv (ví dụ CTG 2025: Yahoo 1.4463658,
+# văn bản 1,4463658403). So chặt hơn thì một sự kiện đúng bị loại chỉ vì nguồn làm tròn; so lỏng hơn thì tỷ lệ sai lọt qua.
+RATIO_DECIMALS = 7
+# QĐ-2 và QĐ-2a (ADR-0016): bảng ánh xạ ĐÓNG từ nguyên văn loại sự kiện trên bản gốc sang lớp STOCK. Chỉ gồm đúng các nguyên
+# văn đã gặp trong hai manifest của ba loại: trả cổ tức bằng cổ phiếu (QĐ-2); phát hành cổ phiếu để tăng vốn từ nguồn vốn
+# chủ sở hữu, tức cổ phiếu thưởng (QĐ-2a); câu gộp cổ tức bằng cổ phiếu với tăng vốn từ nguồn vốn chủ sở hữu (QĐ-2a). Không
+# có: cổ tức tiền, phát hành quyền mua, ESOP, chào bán riêng lẻ. Mọi nguyên văn ngoài bảng ra LOAI_CHUA_ANH_XA. Đổi bảng phải
+# qua PR và L-09. So sau khi chuẩn hóa: Unicode NFC, chữ thường (casefold), gộp khoảng trắng.
+STOCK_VERBATIM = frozenset({
+    # QĐ-2: trả cổ tức bằng cổ phiếu
+    "trả cổ tức bằng cổ phiếu",
+    "chi trả cổ tức bằng cổ phiếu",
+    "phát hành cổ phiếu để trả cổ tức",
+    # QĐ-2a: cổ phiếu thưởng (tăng vốn từ nguồn vốn chủ sở hữu)
+    "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+    "thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+    "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu",
+    # QĐ-2a: câu gộp cổ tức bằng cổ phiếu với tăng vốn từ nguồn vốn chủ sở hữu
+    "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu",
+})
+VERBATIM_FIELDS = ("event_type_verbatim", "source_event_text")
 
 OK = "DA_KIEM_CHUNG"
 NA_NODATA = "KHONG_ANH_HUONG"
@@ -58,7 +89,8 @@ Q = "CACH_LY_"
 STATES = (OK, NA_NODATA, NA_CASH, Q + "THIEU_BANG_CHUNG", Q + "BANG_CHUNG_HONG", Q + "THIEU_NGAY_CONG_BO",
           Q + "CONG_BO_SAU_NGAY_CAT", Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", Q + "TY_LE_LECH", Q + "LECH_NGAY",
           Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE", Q + "LOAI_SU_KIEN_LECH",
-          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC", Q + "GIA_KHONG_CHUNG_MINH_HE_SO")
+          Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC", Q + "GIA_KHONG_CHUNG_MINH_HE_SO",
+          Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN", Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN", Q + "LOAI_CHUA_ANH_XA")
 # trạng thái engine → giả thuyết giá phải được chứng minh; trạng thái cách ly khi không chứng minh được
 EXPECTED_HYPOTHESIS = {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}
 HYPOTHESIS_FAIL_STATE = {"CAN_HE_SO": Q + "GIA_KHONG_CHUNG_MINH_HE_SO", "DA_DIEU_CHINH": Q + "GIA_CHUA_LIEN_TUC"}
@@ -118,19 +150,46 @@ def _doc_problem(d, base):
     return None
 
 
-def _match(ticker, ex_date, typ, docs):
-    """Bản gốc cổ phiếu của cùng mã có ngày không hưởng quyền gần ngày của sự kiện nhất, trong WINDOW_DAYS ngày lịch.
+def _norm_text(x) -> str:
+    return " ".join(unicodedata.normalize("NFC", x).casefold().split()) if isinstance(x, str) else ""
 
-    Bản gốc khác loại vẫn được ghép (ưu tiên bản cùng loại khi cùng khoảng cách) để `_judge` CÁCH LY với lý do rõ ràng
-    và để bản gốc đó vẫn tham gia kiểm tra trùng ngày, thay vì bị bỏ qua lặng lẽ."""
+
+def _doc_class(d):
+    """(lớp, mô tả) của bản gốc: "STOCK", "OTHER" (event_type khác lớp STOCK) hoặc "UNMAPPED" (event_type trống và
+    nguyên văn loại không có trong STOCK_VERBATIM). Chỉ đọc, không sửa bản gốc."""
+    et = d.get("event_type")
+    if et in STOCK:
+        return "STOCK", f"event_type {et}"
+    if isinstance(et, str) and et.strip():
+        return "OTHER", f"event_type {et}"
+    for f in VERBATIM_FIELDS:
+        v = d.get(f)
+        if isinstance(v, str) and v.strip():
+            if _norm_text(v) in STOCK_VERBATIM:
+                return "STOCK", f"{f} '{v}' thuộc bảng ánh xạ STOCK"
+            return "UNMAPPED", f"{f} '{v}' không có trong bảng ánh xạ đóng STOCK_VERBATIM"
+    return "UNMAPPED", "event_type trống và không có nguyên văn loại sự kiện"
+
+
+def _ratio_key(x) -> Decimal:
+    return Decimal(repr(float(x))).quantize(Decimal(1).scaleb(-RATIO_DECIMALS), rounding=ROUND_HALF_UP)
+
+
+def _match(ticker, ex_date, typ, docs):
+    """Bản gốc của cùng mã có ngày không hưởng quyền gần ngày của sự kiện nhất, trong WINDOW_DAYS ngày lịch.
+
+    Nhận bản gốc lớp STOCK và bản gốc có `event_type` trống (xếp lớp bằng nguyên văn ở `_judge`); bản gốc có `event_type`
+    thuộc loại khác (ví dụ cổ tức tiền) không được ghép. Cùng khoảng cách thì ưu tiên bản lớp STOCK, rồi bản cùng loại.
+    Bản gốc chưa ánh xạ vẫn được ghép để `_judge` CÁCH LY với lý do rõ ràng và để nó tham gia kiểm tra trùng ngày."""
     best = None
     for d in docs:
-        if d.get("ticker") != ticker or d.get("event_type") not in STOCK:
+        et = d.get("event_type")
+        if d.get("ticker") != ticker or (et not in STOCK and isinstance(et, str) and et.strip()):
             continue
         od = _ts(d.get("official_ex_date"))
         if pd.isna(od) or pd.isna(ex_date):
             continue
-        key = (abs((od - ex_date).days), d.get("event_type") != typ)
+        key = (abs((od - ex_date).days), _doc_class(d)[0] != "STOCK", et != typ)
         if key[0] <= WINDOW_DAYS and (best is None or key < best[0]):
             best = (key, d)
     return best[1] if best else None
@@ -183,9 +242,12 @@ def _judge(r, d, close, base, as_of):
     bad = _doc_problem(d, base)
     if bad:
         return Q + "BANG_CHUNG_HONG", bad, pd.NaT, np.nan
-    if d.get("event_type") != r["type"]:
-        return (Q + "LOAI_SU_KIEN_LECH", f"văn bản là {d.get('event_type')}, engine ghi sự kiện là {r['type']}; "
-                "không coi hai loại là một", pd.NaT, np.nan)
+    cls, cdesc = _doc_class(d)
+    if cls == "UNMAPPED":
+        return Q + "LOAI_CHUA_ANH_XA", f"{cdesc}; không xếp được bản gốc vào lớp STOCK (QĐ-2, QĐ-2a)", pd.NaT, np.nan
+    if cls != "STOCK" or r["type"] not in STOCK:
+        return (Q + "LOAI_SU_KIEN_LECH", f"bản gốc ({cdesc}) và sự kiện engine ({r['type']}) không cùng lớp STOCK",
+                pd.NaT, np.nan)
     pub, off = _ts(d.get("published_at")), _ts(d.get("official_ex_date"))
     if pd.isna(pub):
         return Q + "THIEU_NGAY_CONG_BO", "bản gốc không có published_at; không lấy ngày hưởng quyền thay ngày công bố", pd.NaT, np.nan
@@ -197,8 +259,9 @@ def _judge(r, d, close, base, as_of):
     fo, fv = _positive_number(ro), _positive_number(rv)
     if fo is None or fv is None:
         return Q + "TY_LE_LECH", f"tỷ lệ không hợp lệ (văn bản {ro!r}, sự kiện {rv!r}); phải là số hữu hạn dương", pd.NaT, np.nan
-    if not abs(fo - fv) <= RATIO_TOL:
-        return Q + "TY_LE_LECH", f"tỷ lệ in trên văn bản {ro} khác tỷ lệ sự kiện {rv}", pd.NaT, np.nan
+    if _ratio_key(fo) != _ratio_key(fv):
+        return (Q + "TY_LE_LECH", f"tỷ lệ in trên văn bản {ro} khác tỷ lệ sự kiện {rv} ở {RATIO_DECIMALS} chữ số thập phân "
+                f"({_ratio_key(fo)} và {_ratio_key(fv)})", pd.NaT, np.nan)
     sess = close[r["ticker"]].dropna().index
     pos = int(sess.searchsorted(off))
     if pos >= len(sess):
@@ -215,10 +278,59 @@ def _judge(r, d, close, base, as_of):
     if r["status"] not in VERIFIABLE:
         return (Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", f"trạng thái engine {r['status']} không nằm trong danh sách cho phép "
                 f"{', '.join(VERIFIABLE)}", otd, 0.0)
+    gap = _missing_sessions(r, close, td)
+    if gap:
+        return Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN", gap, otd, 0.0
     bad_price = _price_problem(r, close, td)
     if bad_price:
         return bad_price[0], bad_price[1], otd, 0.0
+    if r["status"] == "DA_NAM_TRONG_GIA_NGUON":
+        pre = _pre_event_break(r, close, td)
+        if pre:
+            return Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN", pre, otd, 0.0
     return OK, "bản gốc ghim hợp lệ, ngày công bố hợp lệ, tỷ lệ và ngày áp dụng khớp", otd, 0.0
+
+
+def _missing_sessions(r, close, td):
+    """Lý do cách ly nếu mã thiếu giá ở một phiên bất kỳ của trục ngày panel trong [td − WINDOW_DAYS ngày lịch, td], hoặc None.
+
+    Trục ngày là `close.index` (mọi ngày có ít nhất một mã có giá). Không lấp chỗ trống, không suy giá; chỉ từ chối chứng nhận."""
+    win = close.index[(close.index >= td - pd.Timedelta(days=WINDOW_DAYS)) & (close.index <= td)]
+    miss = win[close.loc[win, r["ticker"]].isna().to_numpy()]
+    if not len(miss):
+        return None
+    return (f"thiếu giá {len(miss)}/{len(win)} phiên trên trục ngày của panel trong [{win[0].date()}, {td.date()}] "
+            f"(phiên thiếu đầu {miss[0].date()}, cuối {miss[-1].date()}); không đo được bước giá quanh sự kiện")
+
+
+def _pre_event_break(r, close, td):
+    """Lý do cách ly nếu giá gốc có bước ngoài biên trong WINDOW_DAYS ngày lịch TRƯỚC phiên sự kiện, hoặc None.
+
+    DA_NAM_TRONG_GIA_NGUON khẳng định MỌI giá trước ngày không hưởng quyền đã được nguồn điều chỉnh. Bước giá liên tục tại
+    phiên sự kiện chưa chứng minh điều đó: nguồn có thể chỉ chia lại vài phiên liền trước (kho thật: TCB 2024-06-11..19 và
+    VCB 2025-03-03..11, 7 phiên trước ngày không hưởng quyền HOSE — reports/PRICE_INTEGRITY_B1_20261121.md). Khi đó chuỗi
+    còn bước gãy ngoài biên vài phiên trước sự kiện. Cổng không suy ngày hay hệ số từ bước đó; chỉ từ chối chứng nhận."""
+    t = r["ticker"]
+    ret, K = adjust.obs_returns(close[[t]])
+    L = adjust.limits(close.index, [t])
+    s = close[t].dropna()
+    win = s.index[(s.index >= td - pd.Timedelta(days=WINDOW_DAYS)) & (s.index < td)]
+    for d in win:
+        x = ret.at[d, t]
+        if pd.isna(x):
+            continue
+        k = K.at[d, t]
+        up, dn = adjust.bands(L.at[d, t], k if pd.notna(k) else 1.0)
+        if -dn <= x <= up:
+            continue
+        adj = (1 + x) * float(r["ratio"]) - 1
+        n = int(((s.index >= d) & (s.index < td)).sum())
+        hint = ("nhân tỷ lệ thì trong biên: dấu hiệu nguồn chỉ điều chỉnh một phần" if -dn <= adj <= up
+                else "nhân tỷ lệ vẫn ngoài biên")
+        return (f"engine báo giá nguồn đã chứa điều chỉnh, nhưng giá gốc có bước {x:+.2%} ngoài biên −{dn:.2%}/+{up:.2%} tại "
+                f"{d.date()}, {n} phiên trước phiên sự kiện {td.date()} ({hint}); chưa chứng minh mọi giá trước sự kiện đã được "
+                "nguồn điều chỉnh")
+    return None
 
 
 def verify_events(events, close, docs, *, evidence_root, as_of) -> pd.DataFrame:
@@ -258,7 +370,8 @@ def verify_events(events, close, docs, *, evidence_root, as_of) -> pd.DataFrame:
                 by_doc.setdefault(k, set()).add(r["trade_date"])
     for r, d in zip(recs, matched):
         dates = set().union(*[by_doc.get(k, set()) for k in _keys(d)]) if d is not None else set()
-        if r["verify_state"] == OK and len(dates) > 1:
+        # Bước gãy trước sự kiện mà chính một ngày engine khác của cùng bản gốc gây ra thì chẩn đoán đúng là xung đột ngày.
+        if r["verify_state"] in (OK, Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN") and len(dates) > 1:
             r["verify_state"] = Q + "XUNG_DOT_NGAY"
             r["verify_reason"] = ("cùng bản gốc nhưng engine áp ở nhiều ngày: "
                                   + ", ".join(sorted(str(x.date()) for x in dates)))

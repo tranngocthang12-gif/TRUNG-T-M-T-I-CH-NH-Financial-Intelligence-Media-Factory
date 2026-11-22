@@ -6,9 +6,9 @@
       "issuer": "Sở Giao dịch Chứng khoán Thành phố Hồ Chí Minh (HOSE)",
       "signed_date": "2025-03-05",
       "signed_date_basis": "dòng 'Thành phố Hồ Chí Minh, ngày …' trên văn bản. Claude (Anthropic) chép từ ảnh quét bản gốc (PDF không có lớp chữ); chưa có người khác đọc đối chiếu.",
-      "published_at": null,
-      "published_at_status": "CHUA_XAC_MINH",
-      "published_at_note": "Chưa ghim metadata tin HOSE cho biết thời điểm HOSE đăng văn bản (tin HOSE id 1753594). Ngày ký in trên văn bản (signed_date) và ngày trong tên tệp không phải ngày công bố nên không dùng. Lấy tin gốc tại https://api.hsx.vn/n/api/v1/1/news/1753594 cần mạng tới hsx.vn; môi trường thực hiện 19/11/2026 bị chặn (proxy 403) và Owner không mở. Giá trị cũ của published_at (2025-03-05) trùng ngày ký nên đã bỏ.",
+      "published_at": "2025-03-06T09:07:00",
+      "published_at_status": "DA_XAC_MINH",
+      "published_at_note": "published_at lấy từ data.postedDate = 1741252020 của tin HOSE 1753594, viết ISO 8601 2025-03-06T09:07:00. Tin HOSE 1753594: tải nguyên byte https://api.hsx.vn/n/api/v1/1/news/1753594 lúc 2026-11-21T17:02:23Z (HTTP 200, 1427 byte, sha256 6cdde4209e0c729f0ca73caad20cc3a5d7dacdab26cc1e610763fb1346accd21), ghim ở data/evidence/corporate_actions/hose-1753594/hose_news_1753594.json. Mọi trường ngày giờ trong JSON tin (giây Unix): postedDate=1741252020, approvedDate=1741252020, createdDate=1741252020, publishFrom=1741219200, publishTo=1898985599, updatedDate=None. Tệp đính kèm: https://api.hsx.vn/m/api/v1/1/mediafiles/1/1753594?pageIndex=1&pageSize=10&year=0 lúc 2026-11-21T17:02:24Z (569 byte, sha256 17eccd201d3bac9ad88a4d7a9af7ef73d560c28fdffab1cd380667aee976bc8c), ghim ở data/evidence/corporate_actions/hose-1753594/hose_mediafiles_1753594.json; filePath '~/Uploads/News/bf9b74de956142b5a6c1e7f532842a31/20250306_20250305 - VCB - TB ngay DKCC PH CP de tra co tuc tu nguon LN con lai 2018 va 2021.pdf' trùng url của bản gốc (các trường ngày của tệp: createdDate=1741226820, publishDate=1741227154, publishFrom=1741194000). JSON không ghi múi giờ nên published_at không gắn múi giờ. Đối chiếu: ở cả 20 tin, createdDate của tệp đính kèm nhỏ hơn postedDate đúng 25200 giây (7 giờ) và publishFrom là 00:00 của ngày đăng; có thể postedDate là giờ Việt Nam ghi như UTC. Điều đó chưa được HOSE xác nhận. Ngày ký trên văn bản 2025-03-05 khác ngày đăng; Không chọn ngày ký hay ngày trong tên tệp làm ngày công bố.",
       "accessed_at": "2026-11-19T12:47:08Z",
       "effective_date": "2025-03-12",
       "path": "data/evidence/corporate_actions/hose-1753594/20250306_20250305 - VCB - TB ngay DKCC PH CP de tra co tuc tu nguon LN con lai 2018 va 2021.pdf",
@@ -26,7 +26,15 @@
       "official_record_date": "2025-03-13",
       "official_ratio": 1.495,
       "official_ratio_text": "1.000:495",
-      "note": "Thông báo HOSE số 359/TB-SGDHCM, ngày in trên văn bản 05/03/2025, tin HOSE id 1753594. Văn bản in: ngày giao dịch không hưởng quyền 12/03/2025, ngày đăng ký cuối cùng 13/03/2025, tỷ lệ thực hiện 1.000:495 (1.000 cổ phiếu được nhận thêm 495 cổ phiếu mới). official_ratio = (1000+495)/1000 = 1,495."
+      "note": "Thông báo HOSE số 359/TB-SGDHCM, ngày in trên văn bản 05/03/2025, tin HOSE id 1753594. Văn bản in: ngày giao dịch không hưởng quyền 12/03/2025, ngày đăng ký cuối cùng 13/03/2025, tỷ lệ thực hiện 1.000:495 (1.000 cổ phiếu được nhận thêm 495 cổ phiếu mới). official_ratio = (1000+495)/1000 = 1,495.",
+      "published_at_evidence": {
+        "path": "data/evidence/corporate_actions/hose-1753594/hose_news_1753594.json",
+        "sha256": "6cdde4209e0c729f0ca73caad20cc3a5d7dacdab26cc1e610763fb1346accd21",
+        "field": "data.postedDate",
+        "accessed_at": "2026-11-21T17:02:23Z",
+        "media_path": "data/evidence/corporate_actions/hose-1753594/hose_mediafiles_1753594.json",
+        "media_sha256": "17eccd201d3bac9ad88a4d7a9af7ef73d560c28fdffab1cd380667aee976bc8c"
+      }
     },
     {
       "source_id": "hose-1705374",
@@ -34,9 +42,9 @@
       "issuer": "Sở Giao dịch Chứng khoán Thành phố Hồ Chí Minh (HOSE)",
       "signed_date": "2024-06-12",
       "signed_date_basis": "dòng 'Thành phố Hồ Chí Minh, ngày …' trên văn bản. Claude (Anthropic) chép từ ảnh quét bản gốc (PDF không có lớp chữ); chưa có người khác đọc đối chiếu.",
-      "published_at": null,
-      "published_at_status": "CHUA_XAC_MINH",
-      "published_at_note": "Chưa ghim metadata tin HOSE cho biết thời điểm HOSE đăng văn bản (tin HOSE id 1705374). Ngày ký in trên văn bản (signed_date) và ngày trong tên tệp không phải ngày công bố nên không dùng. Lấy tin gốc tại https://api.hsx.vn/n/api/v1/1/news/1705374 cần mạng tới hsx.vn; môi trường thực hiện 19/11/2026 bị chặn (proxy 403) và Owner không mở. Giá trị cũ của published_at (2024-06-12) trùng ngày ký nên đã bỏ.",
+      "published_at": "2024-06-13T09:23:00",
+      "published_at_status": "DA_XAC_MINH",
+      "published_at_note": "published_at lấy từ data.postedDate = 1718270580 của tin HOSE 1705374, viết ISO 8601 2024-06-13T09:23:00. Tin HOSE 1705374: tải nguyên byte https://api.hsx.vn/n/api/v1/1/news/1705374 lúc 2026-11-21T17:02:27Z (HTTP 200, 1124 byte, sha256 4f3a642abb3b534bf93327029d544720782ea11c5067f02772e251c38b7e6856), ghim ở data/evidence/corporate_actions/hose-1705374/hose_news_1705374.json. Mọi trường ngày giờ trong JSON tin (giây Unix): postedDate=1718270580, approvedDate=1718270580, createdDate=1718270580, publishFrom=1718236800, publishTo=1876003199, updatedDate=None. Tệp đính kèm: https://api.hsx.vn/m/api/v1/1/mediafiles/1/1705374?pageIndex=1&pageSize=10&year=0 lúc 2026-11-21T17:02:28Z (551 byte, sha256 c5015b04029232a719a48bb3acabcee6d3253669eabe4a7aecc6f376536b3af4), ghim ở data/evidence/corporate_actions/hose-1705374/hose_mediafiles_1705374.json; filePath '~/Uploads/News/9453a4a7eeee428383139145a5221681/20240613_20240613 - TCB - TB NDKCC phat hanh co phieu de tang von co phan tu NVCSH.pdf' trùng url của bản gốc (các trường ngày của tệp: createdDate=1718245380, publishDate=1718245641, publishFrom=1718211600). JSON không ghi múi giờ nên published_at không gắn múi giờ. Đối chiếu: ở cả 20 tin, createdDate của tệp đính kèm nhỏ hơn postedDate đúng 25200 giây (7 giờ) và publishFrom là 00:00 của ngày đăng; có thể postedDate là giờ Việt Nam ghi như UTC. Điều đó chưa được HOSE xác nhận. Ngày ký trên văn bản 2024-06-12 khác ngày đăng; Không chọn ngày ký hay ngày trong tên tệp làm ngày công bố.",
       "accessed_at": "2026-11-19T12:47:08Z",
       "effective_date": "2024-06-20",
       "path": "data/evidence/corporate_actions/hose-1705374/20240613 - TCB - TB NDKCC phat hanh co phieu de tang von co phan tu NVCSH.pdf",
@@ -48,13 +56,21 @@
       "source_event_class": "PHAT_HANH_TANG_VON_TU_VON_CHU_SO_HUU",
       "technical_event_type": "stock_dividend",
       "technical_mapping_status": "CHUA_XAC_MINH",
-      "technical_mapping_note": "Văn bản ghi phát hành tăng vốn từ nguồn vốn chủ sở hữu (cổ phiếu thưởng), không ghi cổ tức. Engine chỉ có stock_split và stock_dividend; xếp vào stock_dividend chỉ vì công thức điều chỉnh giá tương đương, đó là ánh xạ chưa được chứng minh. Vì vậy event_type (trường cổng verified-adjusted đọc) để null; cổng không dùng văn bản này làm bằng chứng loại.",
+      "technical_mapping_note": "Văn bản ghi phát hành tăng vốn từ nguồn vốn chủ sở hữu (cổ phiếu thưởng), không ghi cổ tức. technical_mapping_status chỉ nói về việc gán một event_type cụ thể (stock_split hay stock_dividend): việc đó chưa xác minh nên event_type (trường cổng verified-adjusted đọc) để null. Từ QĐ-2a (ADR-0016), cổng verified-adjusted xếp nguyên văn source_event_text này vào lớp STOCK qua bảng đóng STOCK_VERBATIM.",
       "event_type": null,
       "official_ex_date": "2024-06-20",
       "official_record_date": "2024-06-21",
       "official_ratio": 2.0,
       "official_ratio_text": "1:1",
-      "note": "Thông báo HOSE về ngày đăng ký cuối cùng, ngày in trên văn bản 12/06/2024, tin HOSE id 1705374. Văn bản in: ngày giao dịch không hưởng quyền 20/06/2024, ngày đăng ký cuối cùng 21/06/2024, tỷ lệ thực hiện 1:1 (01 cổ phiếu được nhận 01 cổ phiếu mới), mục đích phát hành để tăng vốn cổ phần từ nguồn vốn chủ sở hữu. Số công văn trên bản scan không đọc chắc từng chữ số nên không ghi số đó. official_ratio = (1+1)/1 = 2."
+      "note": "Thông báo HOSE về ngày đăng ký cuối cùng, ngày in trên văn bản 12/06/2024, tin HOSE id 1705374. Văn bản in: ngày giao dịch không hưởng quyền 20/06/2024, ngày đăng ký cuối cùng 21/06/2024, tỷ lệ thực hiện 1:1 (01 cổ phiếu được nhận 01 cổ phiếu mới), mục đích phát hành để tăng vốn cổ phần từ nguồn vốn chủ sở hữu. Số công văn trên bản scan không đọc chắc từng chữ số nên không ghi số đó. official_ratio = (1+1)/1 = 2.",
+      "published_at_evidence": {
+        "path": "data/evidence/corporate_actions/hose-1705374/hose_news_1705374.json",
+        "sha256": "4f3a642abb3b534bf93327029d544720782ea11c5067f02772e251c38b7e6856",
+        "field": "data.postedDate",
+        "accessed_at": "2026-11-21T17:02:27Z",
+        "media_path": "data/evidence/corporate_actions/hose-1705374/hose_mediafiles_1705374.json",
+        "media_sha256": "c5015b04029232a719a48bb3acabcee6d3253669eabe4a7aecc6f376536b3af4"
+      }
     },
     {
       "source_id": "hose-2497378",
@@ -62,9 +78,9 @@
       "issuer": "Sở Giao dịch Chứng khoán Thành phố Hồ Chí Minh (HOSE)",
       "signed_date": "2026-09-15",
       "signed_date_basis": "dòng 'Thành phố Hồ Chí Minh, ngày …' trên văn bản. Claude (Anthropic) chép từ ảnh quét bản gốc (PDF không có lớp chữ); chưa có người khác đọc đối chiếu.",
-      "published_at": null,
-      "published_at_status": "CHUA_XAC_MINH",
-      "published_at_note": "Chưa ghim metadata tin HOSE cho biết thời điểm HOSE đăng văn bản (tin HOSE id 2497378). Ngày ký in trên văn bản (signed_date) và ngày trong tên tệp không phải ngày công bố nên không dùng. Lấy tin gốc tại https://api.hsx.vn/n/api/v1/1/news/2497378 cần mạng tới hsx.vn; môi trường thực hiện 19/11/2026 bị chặn (proxy 403) và Owner không mở. Giá trị cũ của published_at (2026-09-15) trùng ngày ký nên đã bỏ.",
+      "published_at": "2026-09-16T09:08:53",
+      "published_at_status": "DA_XAC_MINH",
+      "published_at_note": "published_at lấy từ data.postedDate = 1789549733 của tin HOSE 2497378, viết ISO 8601 2026-09-16T09:08:53. Tin HOSE 2497378: tải nguyên byte https://api.hsx.vn/n/api/v1/1/news/2497378 lúc 2026-11-21T17:02:00Z (HTTP 200, 1026 byte, sha256 bf30f2e05d5e61e5d72799baa31b327e6eb1a3866e42a495a594c3be47d48812), ghim ở data/evidence/corporate_actions/hose-2497378/hose_news_2497378.json. Mọi trường ngày giờ trong JSON tin (giây Unix): postedDate=1789549733, approvedDate=1789549733, createdDate=1789549733, publishFrom=1789516800, publishTo=1947283200, updatedDate=None. Tệp đính kèm: https://api.hsx.vn/m/api/v1/1/mediafiles/1/2497378?pageIndex=1&pageSize=10&year=0 lúc 2026-11-21T17:02:03Z (491 byte, sha256 12eabce95864fd73af26de94aa7a75e4036cce81d2abb48ae6a4682390ce103e), ghim ở data/evidence/corporate_actions/hose-2497378/hose_mediafiles_2497378.json; filePath '~/Uploads/UploadDocuments/2497378/20260915 - FPT - TB ngay DKCC phat hanh CP de tang von tu NV CSH.pdf' trùng url của bản gốc (các trường ngày của tệp: createdDate=1789524533, publishDate=1789491600, publishFrom=1789491600). JSON không ghi múi giờ nên published_at không gắn múi giờ. Đối chiếu: ở cả 20 tin, createdDate của tệp đính kèm nhỏ hơn postedDate đúng 25200 giây (7 giờ) và publishFrom là 00:00 của ngày đăng; có thể postedDate là giờ Việt Nam ghi như UTC. Điều đó chưa được HOSE xác nhận. Ngày ký trên văn bản 2026-09-15 khác ngày đăng; Không chọn ngày ký hay ngày trong tên tệp làm ngày công bố.",
       "accessed_at": "2026-11-19T12:47:08Z",
       "effective_date": "2026-09-21",
       "path": "data/evidence/corporate_actions/hose-2497378/20260915 - FPT - TB ngay DKCC phat hanh CP de tang von tu NV CSH.pdf",
@@ -76,13 +92,21 @@
       "source_event_class": "PHAT_HANH_TANG_VON_TU_VON_CHU_SO_HUU",
       "technical_event_type": "stock_dividend",
       "technical_mapping_status": "CHUA_XAC_MINH",
-      "technical_mapping_note": "Văn bản ghi phát hành tăng vốn từ nguồn vốn chủ sở hữu (cổ phiếu thưởng), không ghi cổ tức. Engine chỉ có stock_split và stock_dividend; xếp vào stock_dividend chỉ vì công thức điều chỉnh giá tương đương, đó là ánh xạ chưa được chứng minh. Vì vậy event_type (trường cổng verified-adjusted đọc) để null; cổng không dùng văn bản này làm bằng chứng loại.",
+      "technical_mapping_note": "Văn bản ghi phát hành tăng vốn từ nguồn vốn chủ sở hữu (cổ phiếu thưởng), không ghi cổ tức. technical_mapping_status chỉ nói về việc gán một event_type cụ thể (stock_split hay stock_dividend): việc đó chưa xác minh nên event_type (trường cổng verified-adjusted đọc) để null. Từ QĐ-2a (ADR-0016), cổng verified-adjusted xếp nguyên văn source_event_text này vào lớp STOCK qua bảng đóng STOCK_VERBATIM.",
       "event_type": null,
       "official_ex_date": "2026-09-21",
       "official_record_date": "2026-09-22",
       "official_ratio": 1.1,
       "official_ratio_text": "10:1",
-      "note": "Thông báo HOSE về ngày đăng ký cuối cùng, ngày in trên văn bản 15/09/2026, tin HOSE id 2497378. Văn bản in: ngày giao dịch không hưởng quyền 21/09/2026, ngày đăng ký cuối cùng 22/09/2026, tỷ lệ thực hiện 10:1 (10 cổ phiếu được nhận 01 cổ phiếu mới), mục đích phát hành để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu. Số công văn trên bản scan không đọc chắc từng chữ số nên không ghi số đó. official_ratio = (10+1)/10 = 1,1."
+      "note": "Thông báo HOSE về ngày đăng ký cuối cùng, ngày in trên văn bản 15/09/2026, tin HOSE id 2497378. Văn bản in: ngày giao dịch không hưởng quyền 21/09/2026, ngày đăng ký cuối cùng 22/09/2026, tỷ lệ thực hiện 10:1 (10 cổ phiếu được nhận 01 cổ phiếu mới), mục đích phát hành để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu. Số công văn trên bản scan không đọc chắc từng chữ số nên không ghi số đó. official_ratio = (10+1)/10 = 1,1.",
+      "published_at_evidence": {
+        "path": "data/evidence/corporate_actions/hose-2497378/hose_news_2497378.json",
+        "sha256": "bf30f2e05d5e61e5d72799baa31b327e6eb1a3866e42a495a594c3be47d48812",
+        "field": "data.postedDate",
+        "accessed_at": "2026-11-21T17:02:00Z",
+        "media_path": "data/evidence/corporate_actions/hose-2497378/hose_mediafiles_2497378.json",
+        "media_sha256": "12eabce95864fd73af26de94aa7a75e4036cce81d2abb48ae6a4682390ce103e"
+      }
     }
   ]
 }

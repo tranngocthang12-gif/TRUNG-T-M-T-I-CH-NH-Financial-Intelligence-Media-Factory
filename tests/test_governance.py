@@ -661,6 +661,36 @@ class WorkflowLintTests(unittest.TestCase):
         on = d.get("on", d.get(True))
         self.assertEqual(on["schedule"][0]["cron"], "30 9 * * 5")            # hằng tuần, thứ Sáu (ARCHITECTURE §4.3)
 
+    def test_manual_cycle_requires_main_before_checkout(self):
+        """L-06: manual từ nhánh phụ phải dừng trước checkout và trước mọi bước ghi sổ."""
+        _, d = self.wf["daily_cycle.yml"]
+        steps = d["jobs"]["cycle"]["steps"]
+        guard = steps[0]
+        self.assertNotIn("uses", guard)
+        self.assertIn("EVENT_REF", guard["env"])
+        self.assertEqual(guard["env"]["EVENT_REF"], "${{ github.ref }}")
+        self.assertIn("refs/heads/main", guard["run"])
+        self.assertIn('"$EVENT_REF" != "refs/heads/main"', guard["run"])
+        self.assertEqual(steps[1]["uses"], "actions/checkout@v4")
+        # Chạy đúng script trích từ YAML với env giả lập; không cần GitHub token/API.
+        cases = [
+            ("workflow_dispatch", "refs/heads/main", "1", True),
+            ("workflow_dispatch", "refs/heads/feature", "1", False),
+            ("workflow_dispatch", "refs/heads/feature", "6", False),
+            ("workflow_dispatch", "refs/heads/main", "6", False),
+            ("workflow_dispatch", "refs/heads/main", "", False),
+            ("schedule", "refs/heads/main", "", True),
+            ("push", "refs/heads/main", "1", False),
+        ]
+        for event, ref, trials, allowed in cases:
+            with self.subTest(event=event, ref=ref, trials=trials):
+                env = {**os.environ, "EVENT_NAME": event, "EVENT_REF": ref, "REQUESTED_TRIALS": trials}
+                result = subprocess.run(["bash", "-e", "-c", guard["run"]], env=env,
+                                        capture_output=True, text=True)
+                self.assertEqual(result.returncode == 0, allowed, result.stdout + result.stderr)
+                if not allowed:
+                    self.assertNotIn("effective_trials=", result.stdout)
+
     def test_review_gate_uses_base_branch_code_and_api(self):
         text, d = self.wf["review_gate.yml"]
         on = d.get("on", d.get(True))
@@ -771,7 +801,8 @@ class RiskAndBiasTests(unittest.TestCase):
 
     def test_paper_does_not_fill_at_locked_limits(self):
         import pandas as pd
-        from engine import paper
+        from unittest import mock
+        from engine import config, paper
         d = pd.bdate_range("2026-11-02", periods=4)
         close = pd.DataFrame({"AAA": [20000, 20000, 21400, 21600],      # phiên 3: +7% → khóa trần
                               "BBB": [30000, 30000, 30300, 30300],      # +1% → khớp bình thường
@@ -781,6 +812,17 @@ class RiskAndBiasTests(unittest.TestCase):
         (self.tmp / "paper" / "state.json").write_text(json.dumps({
             "cash": 500_000_000, "positions": {"CCC": 1000}, "pending": ["AAA", "BBB"], "last_rebalance": None,
             "costs_paid": 0.0, "n_rebalance": 0, "last_date": str(d[1].date())}), encoding="utf-8")
+        # R1a: lệnh mua chờ qua cổng rủi ro ở phiên khớp. Cổng cần kho giá đủ adv_sessions (20) phiên có khối lượng để đo
+        # thanh khoản: dựng 25 phiên tới d[-1], cùng giá với bảng close. Mục tiêu chỉ 2 mã nên mỗi mã nhận NAV/2 × 0,995 =
+        # 49,75%, vượt 20% mặc định: đặt max_weight 0,5 riêng cho test này, vừa đủ cho kịch bản. Các giới hạn khác giữ mặc định.
+        days = pd.bdate_range(end=d[-1], periods=25)
+        rows = [{"date": x.date().isoformat(), "ticker": t, "open": px, "high": px, "low": px, "close": px,
+                 "volume": 1_000_000.0, "observed_at": "2026-11-01", "source": "test"}
+                for x in days for t, px in ((c, float(close[c].get(x, close[c].iloc[0]))) for c in close.columns)]
+        store = self.tmp / config.CFG["data"]["store_dir"] / "2026-11.csv"
+        store.parent.mkdir(parents=True)
+        pd.DataFrame(rows).to_csv(store, index=False)
+        p = mock.patch.dict(config.CFG["paper"]["risk_limits"], {"max_weight": 0.5}); p.start(); self.addCleanup(p.stop)
         none = pd.DataFrame(columns=["date", "model_id", "ticker", "score"])
         self.assertEqual(paper.locked(close, d[2]), ({"AAA"}, {"CCC"}))
         paper.run(str(d[2].date()), close, none, {}, d)
