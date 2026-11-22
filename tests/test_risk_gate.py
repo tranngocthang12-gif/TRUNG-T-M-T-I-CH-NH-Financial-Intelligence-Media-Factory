@@ -111,7 +111,7 @@ def test_snapshot_window_for_quarantined_events(tmp_path, monkeypatch):
                                           va.NA_NODATA, va.NA_NODATA],
                          "in_verified_chain": [False, False, True, False, False]})
     monkeypatch.setattr(va, "verify_events", lambda *a, **kw: rows)
-    snap = rg.market_snapshot(as_of, list("ABCDE"), lim, root=tmp_path, frozen=False, nav_now=NAV)
+    snap = rg.market_snapshot(as_of, list("ABCDE"), lim, root=tmp_path, frozen=False, nav_history=[NAV])
     # A: 3 phiên sau k (≤ 5) → loại. B: 9 phiên sau → không. C: đã vào chuỗi → không.
     # D: k = 2026-03-03, 2 phiên sau phiên cuối → t ở 2 phiên trước k (≤ 2) → loại. E: 4 phiên trước k → không.
     assert sorted(snap["quarantined"]) == ["A", "D"], snap
@@ -158,9 +158,10 @@ def test_snapshot_failure_leaves_inputs_empty_so_check_fails(tmp_path, monkeypat
     def boom(*a, **k):
         raise ValueError("manifest hỏng")
     monkeypatch.setattr(va, "verify_events", boom)
-    snap = rg.market_snapshot(pd.Timestamp("2026-03-02"), T5, LIM, root=tmp_path, frozen=False, nav_now=NAV)
-    assert snap["quarantined"] is None and snap["errors"]
-    assert rg.check(T5, _book(), {**snap, "price": _market()["price"]}, LIM)["verdict"] == "FAIL"
+    snap = rg.market_snapshot(pd.Timestamp("2026-03-02"), T5, LIM, root=tmp_path, frozen=False, nav_history=[NAV])
+    assert snap["quarantined"] is None and snap["errors"] and snap["adv_value"] == {}
+    g = rg.check(T5, _book(), {**snap, "price": _market()["price"]}, LIM)
+    assert g["verdict"] == "FAIL" and "manifest hỏng" in g["reasons"][0]
 
 
 # ---------- 5. Dữ liệu đóng băng ----------
@@ -222,7 +223,7 @@ def _store(root, volume, n=40, tickers=("A", "B", "C", "D", "E", "F", "G", "H"))
     return idx, list(tickers)
 
 
-def _run_paper(root, monkeypatch, volume, nav_hist=None, limits="default"):
+def _run_paper(root, monkeypatch, volume, nav_hist=None, limits="default", frozen=False, state=None):
     monkeypatch.setattr(config, "ROOT", root)
     monkeypatch.setattr(paper, "ROOT", root)
     if limits != "default":
@@ -232,14 +233,18 @@ def _run_paper(root, monkeypatch, volume, nav_hist=None, limits="default"):
         (root / "paper").mkdir(parents=True, exist_ok=True)
         pd.DataFrame({"date": "2026-01-05", "nav": nav_hist, "cash": nav_hist, "n_positions": 0}).to_csv(
             root / "paper" / "nav.csv", index=False)
+    if state is not None:
+        (root / "paper").mkdir(parents=True, exist_ok=True)
+        (root / "paper" / "state.json").write_text(json.dumps(state), encoding="utf-8")
     close = pd.DataFrame({t: [10_000.0 + 100 * j + 10 * i for i in range(len(idx))] for j, t in enumerate(tickers)}, index=idx)
     reg = {"M": {"state": "ACTIVE", "backtest": {"ic_t": 3.0}}}
     as_of = idx[-1]
     preds = pd.DataFrame([(as_of, "M", t, float(k)) for k, t in enumerate(tickers)],
                          columns=["date", "model_id", "ticker", "score"])
-    nav, decision = paper.run(str(as_of.date()), close, preds, reg, idx)
+    nav, decision = paper.run(str(as_of.date()), close, preds, reg, idx, frozen=frozen)
     state = json.loads((root / "paper" / "state.json").read_text(encoding="utf-8"))
-    return decision, state, (root / "paper" / "decisions.csv").read_text(encoding="utf-8")
+    dec = root / "paper" / "decisions.csv"
+    return decision, state, dec.read_text(encoding="utf-8") if dec.exists() else ""
 
 
 def test_paper_output_unchanged_when_every_condition_passes(tmp_path, monkeypatch):
@@ -248,8 +253,10 @@ def test_paper_output_unchanged_when_every_condition_passes(tmp_path, monkeypatc
     assert d1["action"] == "REBALANCE" and d1["targets"] == "H;G;F;E;D" and "cổng rủi ro" not in d1["models"]
     monkeypatch.setattr(rg, "check", lambda targets, *a, **k: {"verdict": "PASS", "reasons": [], "targets": list(targets),
                                                                 "excluded": {}, "cash_wait_owner": False})
+    monkeypatch.setattr(rg, "breach", lambda *a, **k: None)             # tắt cả khóa sụt giảm mỗi phiên
     d2, s2, f2 = _run_paper(tmp_path / "khong_cong", monkeypatch, volume=1e6)
     assert (d1, s1, f1) == (d2, s2, f2)
+    assert "risk_lock" not in s1 and "risk_lock_released" not in s1
 
 
 def test_paper_fail_opens_no_new_position(tmp_path, monkeypatch):
@@ -261,12 +268,371 @@ def test_paper_fail_opens_no_new_position(tmp_path, monkeypatch):
 def test_paper_drawdown_goes_to_cash_and_waits_for_owner(tmp_path, monkeypatch):
     d, s, _ = _run_paper(tmp_path, monkeypatch, volume=1e6, nav_hist=[1.2e9])
     assert d["action"] == "RISK_CASH_WAIT_OWNER" and d["targets"] == "" and "chờ Owner" in d["models"]
-    assert s["pending"] is None
+    assert s["pending"] is None and s["risk_lock"]["since"] == "2026-02-27" and "16.67%" in s["risk_lock"]["reason"]
 
 
 def test_paper_fails_closed_without_limits(tmp_path, monkeypatch):
     d, s, _ = _run_paper(tmp_path, monkeypatch, volume=1e6, limits=None)
     assert d["action"] == "RISK_GATE_FAIL" and "risk_limits" in d["models"] and s["pending"] is None
+
+
+# ---------- 8. Vòng chấm 1 (L-09), lỗi 1–2: khóa sụt giảm đo MỖI phiên và giữ tới khi Owner gỡ ----------
+
+DD_DATES = pd.bdate_range("2026-01-05", periods=60)
+DD_TICKERS = list("ABCDEFGH")
+
+
+def _dd_close():
+    """Giá điều chỉnh: phẳng tới phiên 27; phiên 28–30 cả rổ −6%/phiên; phiên 31 D −7% (khóa sàn), mã khác +6%; phiên 32
+    D +6,5%; sau đó phẳng."""
+    r = np.zeros((len(DD_DATES), len(DD_TICKERS)))
+    r[28:31, :] = -0.06
+    r[31, :] = 0.06
+    r[31, DD_TICKERS.index("D")] = -0.07
+    r[32, DD_TICKERS.index("D")] = 0.065
+    base = np.array([10_000.0 + 1_000 * j for j in range(len(DD_TICKERS))])
+    return pd.DataFrame(base * np.cumprod(1 + r, axis=0), index=DD_DATES, columns=DD_TICKERS)
+
+
+def _dd_session(root, close, i):
+    as_of = DD_DATES[i]
+    preds = pd.DataFrame([(as_of, "M", t, float(k)) for k, t in enumerate(DD_TICKERS)],
+                         columns=["date", "model_id", "ticker", "score"])
+    return paper.run(str(as_of.date()), close, preds, {"M": {"state": "ACTIVE", "backtest": {"ic_t": 3.0}}}, DD_DATES)
+
+
+def _read(root, name):
+    return pd.read_csv(root / "paper" / name, dtype={"date": str})
+
+
+def test_drawdown_lock_trips_between_rebalances_and_holds_until_owner_releases(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "ROOT", tmp_path)
+    monkeypatch.setattr(paper, "ROOT", tmp_path)
+    monkeypatch.setitem(config.CFG["paper"], "rebalance_days", 5)
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", None)
+    close = _dd_close()
+    rows = [{"date": d.date().isoformat(), "ticker": t, "open": close.at[d, t], "high": close.at[d, t], "low": close.at[d, t],
+             "close": close.at[d, t], "volume": 1e9, "observed_at": "2026-01-01", "source": "test"}
+            for d in DD_DATES for t in DD_TICKERS]
+    store = tmp_path / config.CFG["data"]["store_dir"] / "2026-01.csv"
+    store.parent.mkdir(parents=True)
+    pd.DataFrame(rows).to_csv(store, index=False)
+    day = [str(d.date()) for d in DD_DATES]
+    for i in range(25, 45):
+        _dd_session(tmp_path, close, i)
+    dec, trd, nav = _read(tmp_path, "decisions.csv"), _read(tmp_path, "trades.csv"), _read(tmp_path, "nav.csv")
+    dd = 1 - nav.nav / nav.nav.cummax().clip(lower=1e9)
+    # Dữ liệu dựng đúng kịch bản: chạm 15% ở phiên 30, giữa hai kỳ (mua phiên 26, kỳ kế ở phiên 31).
+    assert dd[nav.date == day[29]].item() < 0.15 <= dd[nav.date == day[30]].item()
+    assert dec.date.tolist()[:2] == [day[25], day[30]] and dec.action.tolist()[:2] == ["REBALANCE", "RISK_CASH_WAIT_OWNER"]
+    st = json.loads((tmp_path / "paper" / "state.json").read_text(encoding="utf-8"))
+    assert st["risk_lock"]["since"] == day[30] and "≥ ngưỡng 15.00%" in st["risk_lock"]["reason"]
+    # Phiên 31: bán hết trừ D khóa sàn. NAV hồi lên dưới ngưỡng sụt giảm trong khi chưa thoát xong. Phiên 32: bán D.
+    t31 = trd[trd.date == day[31]]
+    assert sorted(t31[t31.side == "SELL"].asset) == ["E", "F", "G", "H"]
+    assert t31[t31.side == "UNFILLED_LIMIT_DOWN"].asset.tolist() == ["D"]
+    assert dd[nav.date == day[31]].item() < 0.15
+    assert trd[(trd.date == day[32])].side.tolist() == ["SELL"] and trd[(trd.date == day[32])].asset.tolist() == ["D"]
+    # Qua nhiều kỳ: không mua lại, mỗi kỳ chỉ ghi RISK_CASH_WAIT_OWNER.
+    after = dec[dec.date > day[30]]
+    assert len(after) >= 2 and set(after.action) == {"RISK_CASH_WAIT_OWNER"} and (after.targets.isna()).all()
+    assert trd[(trd.date > day[30]) & (trd.side == "BUY")].empty
+    assert st["positions"] == {} and st["pending"] is None
+    # Giá trị gỡ sai (không phải ngày bắt đầu khóa) không gỡ được khóa.
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", day[29])
+    for i in range(45, 50):
+        _dd_session(tmp_path, close, i)
+    st = json.loads((tmp_path / "paper" / "state.json").read_text(encoding="utf-8"))
+    assert st["risk_lock"]["since"] == day[30] and "RISK_LOCK_RELEASED_BY_OWNER" not in set(_read(tmp_path, "decisions.csv").action)
+    # Owner ghi đúng ngày (YAML không nháy cho ra datetime.date): gỡ ở phiên 50, đỉnh tính lại, kỳ sau được mở vị thế.
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", DD_DATES[30].date())
+    for i in range(50, 60):
+        _dd_session(tmp_path, close, i)
+    dec, trd = _read(tmp_path, "decisions.csv"), _read(tmp_path, "trades.csv")
+    st = json.loads((tmp_path / "paper" / "state.json").read_text(encoding="utf-8"))
+    assert "risk_lock" not in st and st["risk_lock_released"] == {"since": day[30], "on": day[50]}
+    rel = dec[dec.action == "RISK_LOCK_RELEASED_BY_OWNER"]
+    assert rel.date.tolist() == [day[50]]
+    later = dec[dec.date > day[50]]
+    assert later.action.tolist()[0] == "REBALANCE" and not trd[(trd.date > day[50]) & (trd.side == "BUY")].empty
+
+
+def test_owner_release_resets_the_peak_so_the_lock_does_not_trip_again_at_once(tmp_path, monkeypatch):
+    """NAV sau khi thoát vẫn thấp hơn đỉnh cũ quá 15%: gỡ khóa mà không tính lại đỉnh thì khóa lại ngay ở phiên gỡ."""
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", "2026-02-10")
+    st = {"cash": 1e9, "positions": {}, "pending": None, "last_rebalance": "2026-02-26", "costs_paid": 0.0,
+          "n_rebalance": 0, "last_date": "2026-02-26", "risk_lock": {"since": "2026-02-10", "reason": "thử"}}
+    (tmp_path / "paper").mkdir(parents=True)
+    pd.DataFrame({"date": ["2026-02-09", "2026-02-26"], "nav": [1.2e9, 1e9], "cash": [0, 1e9], "n_positions": [5, 0]}).to_csv(
+        tmp_path / "paper" / "nav.csv", index=False)
+    d, s, text = _run_paper(tmp_path, monkeypatch, volume=1e6, state=st)
+    assert "risk_lock" not in s and s["risk_lock_released"] == {"since": "2026-02-10", "on": "2026-02-27"}
+    assert d is None and text.splitlines()[1].split(",")[:2] == ["2026-02-27", "RISK_LOCK_RELEASED_BY_OWNER"]
+    assert len(text.splitlines()) == 2
+
+
+def test_drawdown_lock_also_trips_on_a_frozen_session(tmp_path, monkeypatch):
+    d, s, _ = _run_paper(tmp_path, monkeypatch, volume=1e6, nav_hist=[1.2e9], frozen=True)
+    assert d["action"] == "RISK_CASH_WAIT_OWNER" and s["risk_lock"]["since"] == "2026-02-27"
+
+
+def test_no_lock_and_no_state_change_below_the_threshold(tmp_path, monkeypatch):
+    d, s, _ = _run_paper(tmp_path, monkeypatch, volume=1e6, nav_hist=[1e9 / 0.8501])     # sụt 14,99%
+    assert d["action"] == "REBALANCE" and "risk_lock" not in s
+
+
+
+def test_locked_book_never_fills_a_buy_left_in_pending(tmp_path, monkeypatch):
+    """Khóa còn đó mà pending còn mã mua (ví dụ trạng thái ghi từ trước): bước khớp lệnh vẫn coi mục tiêu là rỗng."""
+    st = {"cash": 1e9, "positions": {}, "pending": ["H", "G"], "last_rebalance": "2026-02-26", "costs_paid": 0.0,
+          "n_rebalance": 0, "last_date": "2026-02-26", "risk_lock": {"since": "2026-02-20", "reason": "thử"}}
+    (tmp_path / "paper").mkdir(parents=True)
+    pd.DataFrame({"date": ["2026-02-26"], "nav": [1e9], "cash": [1e9], "n_positions": [0]}).to_csv(
+        tmp_path / "paper" / "nav.csv", index=False)
+    d, s, _ = _run_paper(tmp_path, monkeypatch, volume=1e6, state=st)
+    assert s["positions"] == {} and s["pending"] is None and s["risk_lock"]["since"] == "2026-02-20"
+    assert d is None                                            # không tới kỳ, không mới khóa: không ghi quyết định
+    assert not (tmp_path / "paper" / "trades.csv").exists() or "BUY" not in (tmp_path / "paper" / "trades.csv").read_text()
+
+# ---------- 9. Lỗi 3: lịch sử NAV — khởi tạo hợp lệ, mất lịch sử, dòng tương lai, tệp hỏng ----------
+
+def _nav_csv(root, rows):
+    (root / "paper").mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows, columns=["date", "nav", "cash", "n_positions"]).to_csv(root / "paper" / "nav.csv", index=False)
+
+
+def test_nav_history_initial_book_starts_from_initial_cash(tmp_path):
+    assert rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date=None, initial_cash=1e9) == ([1e9, 9e8], None)
+    _nav_csv(tmp_path, [("2026-03-02", 9e8, 9e8, 0)])          # chỉ có dòng của chính as_of: vẫn là phiên đầu
+    assert rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date=None, initial_cash=1e9) == ([1e9, 9e8], None)
+    assert rg.breach([1e9, 8.5e8], 8.5e8, LIM) and rg.breach([1e9, 8.51e8], 8.51e8, LIM) is None
+    # Chạm ngưỡng tính cả sai số dấu phẩy động (EPS = 1e-12), không hơn.
+    assert rg.breach([1e9], 1e9 * (0.85 + 1e-13), LIM) and rg.breach([1e9], 1e9 * (0.85 + 1e-11), LIM) is None
+
+
+@pytest.mark.parametrize("rows", [None, [("2026-02-25", 1e9, 1e9, 0), ("2026-02-26", 1e9, 1e9, 0)]])
+def test_nav_history_lost_when_the_last_processed_session_has_no_row(tmp_path, rows):
+    if rows is not None:
+        _nav_csv(tmp_path, rows)
+    h, why = rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date="2026-02-27", initial_cash=1e9)
+    assert h is None and "mất lịch sử NAV" in why and "2026-02-27" in why
+    g = _check(market=_market(nav_history=h, nav_history_problem=why))
+    assert g["verdict"] == "FAIL" and "mất lịch sử NAV" in g["reasons"][0] and not g["cash_wait_owner"]
+
+
+def test_nav_history_ignores_rows_after_as_of(tmp_path):
+    _nav_csv(tmp_path, [("2026-02-26", 1e9, 1e9, 0), ("2026-02-27", 1e9, 1e9, 0), ("2026-03-02", 1.1e9, 0, 5),
+                        ("2026-03-03", 2e9, 0, 5)])               # dòng của as_of (chạy lại) và dòng sau as_of
+    h, why = rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date="2026-03-03", initial_cash=1e9)
+    assert (h, why) == ([1e9, 1e9, 9e8], None)
+    assert rg.breach(h, 9e8, LIM) is None                       # nếu tính cả dòng 2e9 thì sụt 55% và khóa nhầm
+
+
+def test_nav_history_since_owner_release_uses_rows_from_that_day(tmp_path):
+    _nav_csv(tmp_path, [("2026-02-20", 2e9, 0, 5), ("2026-02-26", 1e9, 1e9, 0), ("2026-02-27", 1e9, 1e9, 0)])
+    h, _ = rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date="2026-02-27", initial_cash=1e9, since="2026-02-26")
+    assert h == [1e9, 1e9, 9e8]
+    h, _ = rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date="2026-02-27", initial_cash=1e9, since="2026-03-02")
+    assert h == [9e8]
+
+
+@pytest.mark.parametrize("text", ["date,nav\n27/02/2026,1000\n", "date,nav\n2026-02-27,abc\n", "date,nav\n2026-02-27,\n",
+                                  "date,nav\n2026-02-27,0\n", "date,nav\n2026-02-27,-5\n", "date,cash\n2026-02-27,1\n",
+                                  "date,nav\n2026-02-27,inf\n"])
+def test_nav_history_corrupt_file_fails(tmp_path, text):
+    (tmp_path / "paper").mkdir()
+    (tmp_path / "paper" / "nav.csv").write_text(text, encoding="utf-8")
+    h, why = rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date="2026-02-27", initial_cash=1e9)
+    assert h is None and why
+
+
+@pytest.mark.parametrize("cash", [None, 0, -1, float("nan"), True, "1e9"])
+def test_nav_history_needs_a_valid_initial_cash(tmp_path, cash):
+    h, why = rg.read_nav_history(tmp_path, "2026-03-02", 9e8, last_date=None, initial_cash=cash)
+    assert h is None and "initial_cash" in why
+
+
+@pytest.mark.parametrize("bad", [None, float("nan"), float("inf"), 0.0, -1.0, True, "1e9"])
+def test_invalid_values_in_nav_history_fail_instead_of_being_dropped(bad):
+    g = _check(market=_market(nav_history=[NAV * 2, bad]))      # bản trước bỏ qua giá trị hỏng rồi so với đỉnh còn lại
+    assert g["verdict"] == "FAIL" and "không hợp lệ" in g["reasons"][0] and not g["cash_wait_owner"]
+
+
+def test_paper_with_lost_nav_history_opens_no_position(tmp_path, monkeypatch):
+    st = {"cash": 1e9, "positions": {}, "pending": None, "last_rebalance": None, "costs_paid": 0.0, "n_rebalance": 0,
+          "last_date": "2026-02-26"}
+    d, s, _ = _run_paper(tmp_path, monkeypatch, volume=1e6, state=st)
+    assert d["action"] == "RISK_GATE_FAIL" and d["targets"] == "" and "mất lịch sử NAV" in d["models"]
+    assert s["pending"] is None and s["positions"] == {} and "risk_lock" not in s
+
+
+# ---------- 10. Lỗi 4: ADV đúng adv_sessions phiên cuối, thiếu thì FAIL, không lùi cửa sổ ----------
+
+ADV_IDX = pd.bdate_range("2026-01-05", periods=30)
+
+
+def _adv_frames(gaps=()):
+    raw = pd.DataFrame({"A": 10_000.0, "B": 20_000.0}, index=ADV_IDX)
+    vol = pd.DataFrame({"A": [1_000.0 * (i + 1) for i in range(30)], "B": 500.0}, index=ADV_IDX)
+    for t, i, col in gaps:
+        (raw if col == "close" else vol).iloc[i, list(raw.columns).index(t)] = np.nan
+    return raw, vol
+
+
+def test_adv_uses_exactly_the_last_n_sessions():
+    adv, why = rg.adv_values(*_adv_frames(), ADV_IDX, ["A", "B"], 20)
+    assert why == {} and adv["A"] == pytest.approx(10_000.0 * np.mean([1_000.0 * (i + 1) for i in range(10, 30)]))
+    assert adv["B"] == pytest.approx(20_000.0 * 500.0)
+
+
+@pytest.mark.parametrize("col", ["volume", "close"])
+def test_adv_gap_inside_the_window_fails_without_backfilling(col):
+    adv, why = rg.adv_values(*_adv_frames([("A", 25, col)]), ADV_IDX, ["A", "B"], 20)
+    assert "A" not in adv and "1/20 phiên" in why["A"] and str(ADV_IDX[25].date()) in why["A"] and "B" in adv
+    g = _check(["A", "B"], market=_market(adv_value=adv, adv_problem=why), limits=dict(LIM, max_weight=0.6))
+    assert g["verdict"] == "FAIL" and any(r.startswith("A: thiếu giá trị giao dịch") and "1/20" in r for r in g["reasons"])
+
+
+def test_adv_gap_just_outside_the_window_is_ignored():
+    full, _ = rg.adv_values(*_adv_frames(), ADV_IDX, ["A"], 20)
+    adv, why = rg.adv_values(*_adv_frames([("A", 9, "volume")]), ADV_IDX, ["A"], 20)
+    assert why == {} and adv == full
+
+
+def test_adv_fails_with_too_few_sessions_or_unknown_ticker():
+    adv, why = rg.adv_values(*_adv_frames(), ADV_IDX[:15], ["A", "Z"], 20)
+    assert adv == {} and "chỉ có 15 phiên" in why["A"]
+    adv, why = rg.adv_values(*_adv_frames(), ADV_IDX, ["Z"], 20)
+    assert adv == {} and "không có trong kho giá" in why["Z"]
+
+
+def test_adv_window_counts_a_calendar_session_missing_from_the_store(tmp_path, monkeypatch):
+    """Lịch HOSE ghi một ngày là phiên mà kho giá không có dòng nào: cửa sổ vẫn tính ngày đó, nên mọi mã FAIL."""
+    idx, _ = _store(tmp_path, volume=1e6)
+    gone = idx[30]
+    store = tmp_path / config.CFG["data"]["store_dir"] / "2026-01.csv"
+    df = pd.read_csv(store)
+    df[df.date != gone.date().isoformat()].to_csv(store, index=False)
+    _calendar(tmp_path, "2026-01-01", "2026-12-31")
+    monkeypatch.setattr(va, "verify_events", lambda *a, **kw: _NO_EVENTS)
+    snap = rg.market_snapshot(idx[-1], T5, LIM, root=tmp_path, frozen=False, nav_history=[NAV])
+    assert snap["adv_value"] == {} and all(str(gone.date()) in snap["adv_problem"][t] for t in T5)
+    (tmp_path / "data" / "trading_calendar.csv").unlink()        # không có lịch: dự phòng theo ngày của kho giá
+    snap = rg.market_snapshot(idx[-1], T5, LIM, root=tmp_path, frozen=False, nav_history=[NAV])
+    assert set(snap["adv_value"]) == set(T5)
+
+
+def test_session_axis_adds_calendar_sessions_missing_from_prices():
+    days = pd.bdate_range("2026-03-02", periods=5)
+    cal = {d.date().isoformat(): 1 for d in pd.bdate_range("2026-03-02", periods=7)}
+    axis = rg.session_axis(days.delete(2), cal, until=days[-1])
+    assert list(axis) == list(days)
+    assert list(rg.session_axis(days.delete(2), cal)) == list(days)
+    assert len(rg.session_axis(days, cal, until=pd.Timestamp("2026-03-10"))) == 7
+
+
+# ---------- 11. Lỗi 5: lịch HOSE có mà hỏng thì FAIL; không có thì dự phòng ----------
+
+_NO_EVENTS = pd.DataFrame(columns=["ticker", "type", "ex_date", "trade_date", "verify_state", "in_verified_chain"])
+
+
+def _calendar(root, start, end, holidays=(), mutate=None):
+    days = pd.date_range(start, end, freq="D")
+    df = pd.DataFrame({"date": [d.date().isoformat() for d in days],
+                       "is_session": [0 if d.weekday() >= 5 or d.date().isoformat() in holidays else 1 for d in days],
+                       "source_id": "test"})
+    if mutate is not None:
+        df = mutate(df)
+    p = root / "data" / "trading_calendar.csv"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(p, index=False)
+    return p
+
+
+def test_real_calendar_loads_and_missing_calendar_is_none(tmp_path):
+    cal = rg.load_calendar(REPO)
+    assert len(cal) == 730 and set(cal.values()) == {0, 1}
+    assert rg.load_calendar(tmp_path) is None
+
+
+def _set(i, col, value):
+    def f(df):
+        df = df.astype({col: object})
+        df.loc[i, col] = value
+        return df
+    return f
+
+
+CORRUPT = {                                                       # tên: (cách làm hỏng, đoạn lý do phải có)
+    "is_session=2": (_set(3, "is_session", 2), "is_session khác 0 và 1"),
+    "is_session rỗng": (_set(3, "is_session", ""), "is_session khác 0 và 1"),
+    "is_session chữ": (_set(3, "is_session", "yes"), "is_session khác 0 và 1"),
+    "ngày sai dạng": (_set(3, "date", "2026-1-04"), "không đúng dạng"),
+    "ngày không tồn tại": (_set(3, "date", "2026-02-30"), "không đúng dạng"),
+    "ngày trùng": (_set(3, "date", "2026-01-03"), "ngày trùng"),
+    "thiếu một ngày": (lambda df: df.drop(index=10), "không liền ngày"),
+    "thiếu cột is_session": (lambda df: df.drop(columns="is_session"), "thiếu cột"),
+    "rỗng": (lambda df: df.iloc[0:0], "rỗng"),
+}
+
+
+@pytest.mark.parametrize("name", sorted(CORRUPT))
+def test_corrupt_calendar_raises(tmp_path, name):
+    mutate, why = CORRUPT[name]
+    _calendar(tmp_path, "2026-01-01", "2026-03-31", mutate=mutate)
+    with pytest.raises(ValueError, match="lịch phiên HOSE") as e:
+        rg.load_calendar(tmp_path)
+    assert why in str(e.value)
+
+
+def test_unreadable_calendar_raises(tmp_path):
+    p = tmp_path / "data" / "trading_calendar.csv"
+    p.parent.mkdir(parents=True)
+    p.write_bytes(b"\xff\xfe\x00date")
+    with pytest.raises(ValueError, match="lịch phiên HOSE"):
+        rg.load_calendar(tmp_path)
+
+
+def _boundary_store(root):
+    idx = pd.bdate_range("2026-01-05", periods=160)
+    rows = [{"date": d.date().isoformat(), "ticker": t, "open": 10_000.0, "high": 10_000.0, "low": 10_000.0,
+             "close": 10_000.0, "volume": 1e6, "observed_at": "2026-01-01", "source": "test"}
+            for d in idx for t in ("X", "Y")]
+    p = root / config.CFG["data"]["store_dir"] / "2026-01.csv"
+    p.parent.mkdir(parents=True, exist_ok=True)
+    pd.DataFrame(rows).to_csv(p, index=False)
+    return idx
+
+
+@pytest.mark.parametrize("cal,t_pos,hit", [("holiday", 131, True), ("holiday", 132, False), ("none", 131, False),
+                                           ("none", 130, True)])
+def test_qd3_boundary_120_121_through_the_snapshot(tmp_path, monkeypatch, cal, t_pos, hit):
+    """k = phiên 10 của kho. Lịch HOSE ghi ngày idx[60] (có dòng trong kho) là ngày nghỉ: t = idx[131] là 120 phiên sau k
+    (trong cửa sổ), idx[132] là 121 (ngoài). Không có lịch thì đếm theo ngày của kho: idx[131] là 121 phiên (ngoài)."""
+    idx = _boundary_store(tmp_path)
+    if cal == "holiday":
+        _calendar(tmp_path, "2026-01-01", "2026-12-31", holidays={idx[60].date().isoformat()})
+    k = idx[10]
+    rows = pd.DataFrame({"ticker": ["X"], "type": ["stock_split"], "ex_date": [k], "trade_date": [k],
+                         "verify_state": [va.Q + "THIEU_BANG_CHUNG"], "in_verified_chain": [False]})
+    monkeypatch.setattr(va, "verify_events", lambda *a, **kw: rows)
+    snap = rg.market_snapshot(idx[t_pos], ["X", "Y"], LIM, root=tmp_path, frozen=False, nav_history=[NAV])
+    assert ("X" in snap["quarantined"]) is hit and "Y" not in snap["quarantined"], snap["quarantined"]
+
+
+@pytest.mark.parametrize("name", sorted(CORRUPT))
+def test_corrupt_calendar_makes_the_snapshot_fail_instead_of_falling_back(tmp_path, monkeypatch, name):
+    idx = _boundary_store(tmp_path)
+    _calendar(tmp_path, "2026-01-01", "2026-12-31", holidays={idx[60].date().isoformat()}, mutate=CORRUPT[name][0])
+    monkeypatch.setattr(va, "verify_events", lambda *a, **kw: _NO_EVENTS)
+    snap = rg.market_snapshot(idx[131], ["X", "Y"], LIM, root=tmp_path, frozen=False, nav_history=[NAV])
+    assert snap["quarantined"] is None and snap["adv_value"] == {} and "lịch phiên HOSE" in snap["errors"][0]
+    g = rg.check(["X", "Y"], _book(), {**snap, "price": {"X": 1e4, "Y": 1e4}}, dict(LIM, max_weight=0.6))
+    assert g["verdict"] == "FAIL" and "lịch phiên HOSE" in g["reasons"][0]
+
+
+def test_config_has_no_owner_release_by_default():
+    assert config.CFG["paper"]["risk_lock_release"] is None
 
 
 def test_tests_do_not_touch_the_repo():

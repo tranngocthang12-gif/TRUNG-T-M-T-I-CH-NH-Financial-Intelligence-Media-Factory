@@ -76,6 +76,11 @@ paper:
     adv_sessions: 20            # số phiên tính giá trị giao dịch bình quân
     quarantine_sessions_before: 21   # QĐ-3: loại mã khi phiên quyết định t ∈ [k − 21, k + 120] phiên quanh phiên áp dụng k
     quarantine_sessions_after: 120   # của một sự kiện cổ phiếu đang bị cách ly; đếm phiên theo lịch HOSE
+  # Khóa rủi ro (R1): sụt giảm NAV từ đỉnh chạm max_drawdown ở BẤT KỲ phiên định giá nào thì sổ ghi `risk_lock` vào
+  # paper/state.json, bán hết và không mở vị thế mới qua mọi kỳ. Máy không tự gỡ. Chỉ Owner gỡ, bằng PR ghi vào đây đúng
+  # ngày bắt đầu khóa (`risk_lock.since`, dạng "YYYY-MM-DD"); giá trị khác không gỡ được khóa nào. Sau khi gỡ, đỉnh NAV tính
+  # lại từ phiên gỡ.
+  risk_lock_release: null
 llm_review:
   enabled: true
   model: claude-sonnet-5
