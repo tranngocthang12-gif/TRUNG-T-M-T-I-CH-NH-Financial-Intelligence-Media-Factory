@@ -611,5 +611,106 @@ def test_quarantined_held_ticker_stays_held_while_the_rest_are_bought(tmp_path, 
     assert state()["positions"]["H"] == 10_000
 
 
+# ---------- 12. Danh mục tồn dư ngoài mục tiêu (vòng chấm L-09, BLOCKER 2) ----------
+
+RESID = "(vị thế còn giữ ngoài mục tiêu)"
+
+
+def test_residual_holding_over_the_weight_limit_fails():
+    g = _check(book=_book(positions={"Z": 25_000}), market=_market(price={**_market()["price"], "Z": 10_000.0},
+                                                                     adv_value={**_market()["adv_value"], "Z": 5e10}))
+    assert g["verdict"] == "FAIL" and any(r.startswith(f"Z {RESID}: tỷ trọng 25.00%") for r in g["reasons"])
+    g = _check(book=_book(positions={"Z": 15_000}), market=_market(price={**_market()["price"], "Z": 10_000.0},
+                                                                     adv_value={**_market()["adv_value"], "Z": 5e10}))
+    assert g["verdict"] == "PASS"
+
+
+@pytest.mark.parametrize("adv,why", [(1e8, "cần 15.0 phiên để thoát vị thế"), (None, "thiếu giá trị giao dịch bình quân")])
+def test_residual_holding_must_be_liquid_and_measurable(adv, why):
+    m = _market(price={**_market()["price"], "Z": 10_000.0})
+    m["adv_value"] = {**m["adv_value"], "Z": adv}
+    g = _check(book=_book(positions={"Z": 15_000}), market=m)          # 150 triệu, 7,5% NAV
+    assert g["verdict"] == "FAIL" and any(r.startswith(f"Z {RESID}: {why}") for r in g["reasons"])
+
+
+def test_residual_holding_without_a_price_fails():
+    g = _check(book=_book(positions={"Z": 15_000}))
+    assert g["verdict"] == "FAIL" and f"Z {RESID}: không có giá để định giá vị thế đang giữ" in g["reasons"]
+
+
+def test_held_quarantined_ticker_counts_as_residual():
+    m = _market(quarantined={"C": "sự kiện bị cách ly"})
+    g = _check(T5 + ["F"], book=_book(positions={"C": 25_000}), market=m)
+    assert g["excluded"] == {"C": "sự kiện bị cách ly"} and g["verdict"] == "FAIL"
+    assert any(r.startswith(f"C {RESID}: tỷ trọng 25.00%") for r in g["reasons"])
+
+
+PX_A38 = 10_000.0 + 10 * 38                                      # giá A ở idx[38] trong _paper_days
+
+
+def _holding_a(shares):
+    return {"cash": 1e9 - shares * PX_A38, "positions": {"A": shares}, "pending": None, "last_rebalance": None,
+            "costs_paid": 0.0, "n_rebalance": 0}
+
+
+def _a_limit_down(close, idx):
+    close.loc[idx[39]:, "A"] *= 0.93
+
+
+def test_limit_down_sell_of_an_overweight_holding_blocks_every_buy(tmp_path, monkeypatch):
+    """Đang giữ A khoảng 30% NAV, không thuộc mục tiêu. Phiên khớp idx[39]: A khóa sàn nên không bán được; A còn khoảng 28,6%
+    NAV > 20%: cổng FAIL, không mua mã nào. Phiên sau bán A; không mua lại các mã đã bị từ chối."""
+    idx, day, state = _paper_days(tmp_path, monkeypatch, _a_limit_down, _holding_a(29_000))
+    assert day(38)["targets"] == "H;G;F;E;D"
+    day(39)
+    trd, dec = _read(tmp_path, "trades.csv"), _read(tmp_path, "decisions.csv")
+    t39 = trd[trd.date == str(idx[39].date())]
+    assert t39[t39.side == "UNFILLED_LIMIT_DOWN"].asset.tolist() == ["A"] and "BUY" not in set(t39.side)
+    assert sorted(t39[t39.side == "UNFILLED_RISK_GATE"].asset) == list("DEFGH")
+    row = dec[dec.date == str(idx[39].date())]
+    assert row.action.tolist() == ["RISK_GATE_BLOCK_BUY"] and f"A {RESID}: tỷ trọng 28." in row.models.item()
+    assert state()["pending"] == []
+    day(40)
+    trd = _read(tmp_path, "trades.csv")
+    assert trd[trd.date == str(idx[40].date())].side.tolist() == ["SELL"] and "BUY" not in set(trd.side)
+    assert state()["positions"] == {} and state()["pending"] is None
+
+
+def test_limit_down_sell_of_a_small_holding_does_not_block_buys(tmp_path, monkeypatch):
+    idx, day, state = _paper_days(tmp_path, monkeypatch, _a_limit_down, _holding_a(9_000))      # khoảng 9% NAV
+    day(38)
+    day(39)
+    trd = _read(tmp_path, "trades.csv")
+    assert trd[trd.side == "UNFILLED_LIMIT_DOWN"].asset.tolist() == ["A"] and "UNFILLED_RISK_GATE" not in set(trd.side)
+    assert len(trd[trd.side == "BUY"]) >= 4
+
+
+# ---------- 13. FAIL lúc ra quyết định giữ nguyên MỌI vị thế (vòng chấm L-09, BLOCKER 1) ----------
+
+def test_fail_at_decision_keeps_holdings_outside_the_new_target_and_trades_nothing(tmp_path, monkeypatch):
+    """Đang giữ A, không thuộc mục tiêu mới H;G;F;E;D. G bị cách ly nên còn 4 mã mới, mỗi mã 24,9% > 20%: FAIL. Mục tiêu là
+    toàn bộ vị thế đang giữ; phiên sau không có giao dịch nào, A vẫn còn."""
+    idx, day, state = _paper_days(tmp_path, monkeypatch, state=_holding_a(9_000))
+    rows = pd.DataFrame({"ticker": ["G"], "type": ["stock_split"], "ex_date": [idx[37]], "trade_date": [idx[37]],
+                         "verify_state": [va.Q + "THIEU_BANG_CHUNG"], "in_verified_chain": [False]})
+    monkeypatch.setattr(va, "verify_events", lambda *a, **kw: rows)
+    d = day(38)
+    assert d["action"] == "RISK_GATE_FAIL" and d["targets"] == "A" and "tỷ trọng 24.88%" in d["models"]
+    assert state()["pending"] is None
+    day(39)
+    assert not (tmp_path / "paper" / "trades.csv").exists() and state()["positions"] == {"A": 9_000}
+
+
+def test_rebalance_still_sells_an_overweight_holding_the_model_dropped(tmp_path, monkeypatch):
+    """Đang giữ A khoảng 30% NAV, không thuộc mục tiêu mới. Cổng lúc ra quyết định chỉ xét vị thế sẽ còn giữ sau kỳ, nên PASS:
+    kỳ tái cơ cấu bán A (giảm rủi ro), không bị FAIL giữ A lại."""
+    idx, day, state = _paper_days(tmp_path, monkeypatch, state=_holding_a(29_000))
+    d = day(38)
+    assert d["action"] == "REBALANCE" and d["targets"] == "H;G;F;E;D" and "cổng rủi ro" not in d["models"]
+    day(39)
+    trd = _read(tmp_path, "trades.csv")
+    assert trd[trd.side == "SELL"].asset.tolist() == ["A"] and "A" not in state()["positions"]
+
+
 def test_tests_do_not_touch_the_repo():
     assert subprocess.check_output(["git", "status", "--porcelain", "--", "paper", "state"], cwd=REPO) == b""

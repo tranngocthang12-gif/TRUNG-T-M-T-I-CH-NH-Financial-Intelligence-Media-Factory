@@ -169,9 +169,13 @@ def adv_values(raw, vol, axis, tickers, n):
 def check(targets, book, market, limits) -> dict:
     """→ {"verdict": "PASS"|"FAIL", "reasons": [...], "targets": [...], "excluded": {...}}.
 
-    targets: danh sách mã mục tiêu. book: {"nav": số, "positions": {mã: số cổ phiếu}}. market: {"price": {mã: giá},
-    "adv_value": {mã: giá trị giao dịch bình quân}, "adv_problem": {mã: lý do}, "quarantined": {mã: lý do}, "frozen": bool,
-    "errors": [...]}. quarantined là None (không kiểm được) thì FAIL. `targets` trả về là mục tiêu sau khi loại mã bị cách ly."""
+    targets: danh sách mã mục tiêu. book: {"nav": số, "positions": {mã: số cổ phiếu}}, với positions là các vị thế SẼ CÒN GIỮ
+    sau bước đang xét (nơi gọi bỏ các mã sắp bán). market: {"price": {mã: giá}, "adv_value": {mã: giá trị giao dịch bình quân},
+    "adv_problem": {mã: lý do}, "quarantined": {mã: lý do}, "frozen": bool, "errors": [...]}. quarantined là None (không kiểm
+    được) thì FAIL. `targets` trả về là mục tiêu sau khi loại mã bị cách ly.
+
+    Điều kiện 1 và 2 xét cả danh mục tồn dư: mọi vị thế trong book.positions không thuộc mục tiêu sau khi loại (ví dụ lệnh bán
+    bị khóa sàn, hay mã đang giữ bị cách ly). Danh mục tồn dư vượt tỷ trọng hay khó thoát thì FAIL, không mua thêm mã nào."""
     out = {"verdict": "FAIL", "reasons": [], "targets": list(targets), "excluded": {}}
     bad = limits_problem(limits)
     if bad:
@@ -202,28 +206,30 @@ def check(targets, book, market, limits) -> dict:
     positions, price, adv = book.get("positions") or {}, market.get("price") or {}, market.get("adv_value") or {}
     adv_why = market.get("adv_problem") or {}
     per = nav / max(1, len(kept)) * BUY_BUDGET
+    residual = [t for t, sh in positions.items() if sh and t not in kept]      # danh mục tồn dư ngoài mục tiêu
     fails = []
-    for t in kept:
+    for t in kept + residual:
+        name = t if t in kept else f"{t} (vị thế còn giữ ngoài mục tiêu)"
         px = price.get(t)
         held = positions.get(t)
         if held:
             if px is None or not math.isfinite(float(px)) or px <= 0:
-                fails.append(f"{t}: không có giá để định giá vị thế đang giữ")
+                fails.append(f"{name}: không có giá để định giá vị thế đang giữ")
                 continue
             value = held * float(px)
         else:
             value = per
         w = value / nav
         if w > limits["max_weight"] + EPS:
-            fails.append(f"{t}: tỷ trọng {w:.2%} > giới hạn {limits['max_weight']:.2%}")
+            fails.append(f"{name}: tỷ trọng {w:.2%} > giới hạn {limits['max_weight']:.2%}")
         a = adv.get(t)
         if a is None or not math.isfinite(float(a)) or a <= 0:
-            fails.append(f"{t}: thiếu giá trị giao dịch bình quân {int(limits['adv_sessions'])} phiên — không đo được thanh khoản"
-                         + (f" ({adv_why[t]})" if adv_why.get(t) else ""))
+            fails.append(f"{name}: thiếu giá trị giao dịch bình quân {int(limits['adv_sessions'])} phiên — không đo được "
+                         f"thanh khoản" + (f" ({adv_why[t]})" if adv_why.get(t) else ""))
             continue
         days = value / (limits["max_participation"] * float(a))
         if days > limits["max_exit_days"] + EPS:
-            fails.append(f"{t}: cần {days:.1f} phiên để thoát vị thế > giới hạn {limits['max_exit_days']} phiên "
+            fails.append(f"{name}: cần {days:.1f} phiên để thoát vị thế > giới hạn {limits['max_exit_days']} phiên "
                          f"(tham gia {limits['max_participation']:.0%} giá trị giao dịch bình quân)")
     out["reasons"] += fails
     if not fails:

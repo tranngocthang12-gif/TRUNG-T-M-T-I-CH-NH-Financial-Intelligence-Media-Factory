@@ -5,9 +5,11 @@ Phiên khóa biên độ (ADR-0008): mã đóng cửa sát giá trần thì lệ
 lệnh đó giữ lại và thử lại phiên sau. "Sát" = biến động phiên ≥ LOCK_SHARE × biên độ của mã hôm đó (adjust.limits).
 
 Cổng rủi ro trước khi mua (R1a, QĐ-5 của ADR-0016; engine/risk_gate.py), gọi ở hai thời điểm:
-  - lúc ra quyết định: FAIL thì không mở vị thế mới (mục tiêu chỉ còn các mã đang giữ); mã bị cách ly thì không mua mã đó;
-  - lúc khớp lệnh mua đang chờ: chạy lại với dữ liệu của phiên khớp. FAIL thì không mua mã nào; mã bị cách ly thì không mua mã
-    đó. Mã bị chặn ghi UNFILLED_RISK_GATE, quyết định ghi RISK_GATE_BLOCK_BUY, và mã đó không quay lại hàng chờ.
+  - lúc ra quyết định, với các vị thế sẽ còn giữ sau kỳ (mã đang giữ thuộc mục tiêu): FAIL thì mục tiêu là TOÀN BỘ vị thế đang
+    giữ, nên kỳ đó không mua, không bán; mã bị cách ly thì không mua mã đó, mã đang giữ bị cách ly thì vẫn giữ;
+  - lúc khớp lệnh mua đang chờ, sau các lệnh bán, với dữ liệu của phiên khớp và MỌI vị thế còn lại (kể cả lệnh bán bị khóa
+    sàn): FAIL thì không mua mã nào; mã bị cách ly thì không mua mã đó. Mã bị chặn ghi UNFILLED_RISK_GATE, quyết định ghi
+    RISK_GATE_BLOCK_BUY, và mã đó không quay lại hàng chờ.
 Cổng không ép bán hay giảm vị thế đang giữ, không theo dõi giữa các lần chạy, không có ngắt khi sụt giảm NAV (R1b)."""
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
@@ -58,9 +60,10 @@ def apply_corporate_actions(st, events, as_of, d):
             _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": e.ticker, "side": "STOCK_ADJUST",
                                          "quantity": new - sh, "price": 0, "fees": 0})
 
-def _market(as_of, target, px, frozen):
-    """Đầu vào thị trường cho risk_gate.check tại as_of: dữ liệu CHỈ ĐỌC dưới ROOT cộng giá của phiên."""
-    snap = risk_gate.market_snapshot(as_of, target, CFG["paper"].get("risk_limits"), root=ROOT, frozen=frozen)
+def _market(as_of, tickers, px, frozen):
+    """Đầu vào thị trường cho risk_gate.check tại as_of (mục tiêu và vị thế còn giữ): dữ liệu CHỈ ĐỌC dưới ROOT cộng giá."""
+    snap = risk_gate.market_snapshot(as_of, list(dict.fromkeys(tickers)), CFG["paper"].get("risk_limits"), root=ROOT,
+                                     frozen=frozen)
     return {**snap, "price": {t: float(px[t]) for t in px.index if pd.notna(px[t])}}
 
 def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
@@ -95,8 +98,9 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
         buys = [t for t in target if t not in st["positions"] and pd.notna(px.get(t))]
         per = nav / max(1, len(target)) * 0.995
         refused = set()
-        if buys:        # R1a: lệnh mua chờ qua lại cổng rủi ro ở chính phiên khớp, với dữ liệu của phiên này
-            g = risk_gate.check(target, {"nav": nav, "positions": st["positions"]}, _market(as_of, target, px, frozen), lim)
+        if buys:        # R1a: lệnh mua chờ qua lại cổng ở chính phiên khớp, sau lệnh bán, với mọi vị thế còn lại
+            g = risk_gate.check(target, {"nav": nav, "positions": st["positions"]},
+                                _market(as_of, list(target) + list(st["positions"]), px, frozen), lim)
             refused = set(buys) if g["verdict"] == "FAIL" else set(g["excluded"]) & set(buys)
             if refused:
                 for t in [t for t in buys if t in refused]:
@@ -149,12 +153,13 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
             target = []
             decision = {"date": d, "action": "NO_ACTION_CASH", "targets": "",
                         "models": "không có mô hình ACTIVE — giữ tiền mặt là quyết định mặc định"}
-        if target:      # R1a: cổng rủi ro trước khi ghi quyết định. Cổng không ép bán: mã đang giữ vẫn ở trong mục tiêu.
-            g = risk_gate.check(target, {"nav": nav, "positions": st["positions"]}, _market(as_of, target, px, frozen), lim)
+        if target:      # R1a: cổng rủi ro trước khi ghi quyết định. Cổng không ép bán vị thế đang giữ.
+            keep = {t: s for t, s in st["positions"].items() if t in target}      # vị thế sẽ còn giữ sau kỳ
+            g = risk_gate.check(target, {"nav": nav, "positions": keep}, _market(as_of, target, px, frozen), lim)
             if g["verdict"] == "FAIL" or g["excluded"]:
                 fail = g["verdict"] == "FAIL"
-                held = [t for t in target if t in st["positions"]]
-                target = held if fail else [t for t in target if t not in g["excluded"] or t in st["positions"]]
+                target = list(st["positions"]) if fail else \
+                    [t for t in target if t not in g["excluded"] or t in st["positions"]]
                 decision = {"date": d, "action": "RISK_GATE_FAIL" if fail else decision["action"],
                             "targets": ";".join(target),
                             "models": f"{decision['models']} | cổng rủi ro {g['verdict']}: " + "; ".join(g["reasons"])}
