@@ -1,5 +1,5 @@
 {
-  "notice": "Sự kiện quyền có ngày không hưởng quyền từ 2026-06-01 tới 2026-11-21 của BSR, LPB, MCH, TCX, VPL (QĐ-4, ADR-0016), chỉ từ thông báo HOSE tải nguyên byte. event_type để trống, nguyên văn loại ở event_type_verbatim. published_at theo luật D1. Mã không tìm thấy thông báo ghi UNKNOWN trong tra_cuu kèm truy vấn đã tra; UNKNOWN không có nghĩa là không có sự kiện.",
+  "notice": "Sự kiện quyền có ngày không hưởng quyền từ 2026-06-01 tới 2026-11-21 của BSR, LPB, MCH, TCX, VPL (QĐ-4, ADR-0016) tìm được qua các truy vấn HOSE đã ghim trong tra_cuu[].snapshots (mọi trang khớp totalCount và totalPages của chính API). Tính đầy đủ chỉ được chứng minh trong phạm vi các truy vấn đó. Chỉ nhận văn bản HOSE tải nguyên byte. event_type để trống, nguyên văn loại ở event_type_verbatim. published_at theo luật D1: giây Unix data.postedDate viết ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ; 'trùng ngày ký' so phần ngày của chuỗi đó với signed_date. Đọc theo giờ Việt Nam (+7 giờ) thì MCH đăng 2026-08-01, khác ngày ký; chưa có quyết định chốt múi giờ nên giữ cách thận trọng (để trống); QĐ-9 sẽ xử lý. Mã không tìm thấy thông báo ghi UNKNOWN; UNKNOWN không có nghĩa là không có sự kiện.",
   "source_documents": [
     {
       "source_id": "hose-2475353",
@@ -92,7 +92,42 @@
       "source_ids": [
         "hose-2475353"
       ],
-      "other": "Tin 2481627 (TB 1575/TB-SGDHCM): ngày đăng ký cuối cùng lấy ý kiến cổ đông bằng văn bản; không phải cổ tức, thưởng, phát hành hay chia tách, không ghim."
+      "other": "Tin 2481627 (TB 1575/TB-SGDHCM): ngày đăng ký cuối cùng lấy ý kiến cổ đông bằng văn bản; không phải cổ tức, thưởng, phát hành hay chia tách, không ghim.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4682/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/BSR_loai1_trang1.json",
+          "sha256": "b5b31ecf5657615d7c2014222ed2472063f3a34016907ce103019b621af76729",
+          "bytes": 28478,
+          "accessed_at": "2026-11-21T17:48:41Z",
+          "pageIndex": 1,
+          "totalCount": 34,
+          "totalPages": 1,
+          "items": 34
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4682/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/BSR_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:26Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4682/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/BSR_loai3_trang1.json",
+          "sha256": "4e452833d9b24e42c8d5a2513922ab8b866122ba5f352c655bde0df692b42723",
+          "bytes": 755,
+          "accessed_at": "2026-11-21T17:59:26Z",
+          "pageIndex": 1,
+          "totalCount": 1,
+          "totalPages": 1,
+          "items": 1
+        }
+      ]
     },
     {
       "ticker": "LPB",
@@ -106,7 +141,53 @@
       ],
       "result": "UNKNOWN",
       "source_ids": [],
-      "other": "Không thấy thông báo HOSE nào có ngày không hưởng quyền từ 2026-06-01. Thông báo gần nhất tìm được: tin 2460398 (TB 1062/TB-SGDHCM), trả cổ tức năm 2025 bằng tiền mặt 30%/mệnh giá, ngày không hưởng quyền 14/05/2026, ngoài khung; không ghim. Lịch sự kiện quyền HOSE của mã từ 01/05/2026 chỉ có 14/05/2026."
+      "other": "Không thấy thông báo HOSE nào có ngày không hưởng quyền từ 2026-06-01. Thông báo gần nhất tìm được: tin 2460398 (TB 1062/TB-SGDHCM), trả cổ tức năm 2025 bằng tiền mặt 30%/mệnh giá, ngày không hưởng quyền 14/05/2026, ngoài khung; không ghim. Lịch sự kiện quyền HOSE của mã từ 01/05/2026 chỉ có 14/05/2026.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai1_trang1.json",
+          "sha256": "580f11f7ed1cf2fb0021f61495409f20ffff53eed522d39a85b77132333daa19",
+          "bytes": 44568,
+          "accessed_at": "2026-11-21T17:48:59Z",
+          "pageIndex": 1,
+          "totalCount": 62,
+          "totalPages": 2,
+          "items": 50
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/1?pageIndex=2&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai1_trang2.json",
+          "sha256": "d9bd60246d142af657320dcc6e210a8ef85a29819f9cc92930d7cde07a5d934d",
+          "bytes": 10415,
+          "accessed_at": "2026-11-21T17:49:04Z",
+          "pageIndex": 2,
+          "totalCount": 62,
+          "totalPages": 2,
+          "items": 12
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:08Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/2955/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/LPB_loai3_trang1.json",
+          "sha256": "e9ce01c6c0b1afaf5cc0d6eb4cac8ed0005d70158d8f4aad518c6325062aa67a",
+          "bytes": 755,
+          "accessed_at": "2026-11-21T17:59:14Z",
+          "pageIndex": 1,
+          "totalCount": 1,
+          "totalPages": 1,
+          "items": 1
+        }
+      ]
     },
     {
       "ticker": "MCH",
@@ -122,7 +203,42 @@
       "source_ids": [
         "hose-2485688"
       ],
-      "other": "Tin 2484666 là thông báo của chính công ty cho cùng sự kiện; các tin ESOP (2469853, 2473379, 2475320) là phát hành cho người lao động, không có ngày đăng ký cuối cùng; không ghim."
+      "other": "Tin 2484666 là thông báo của chính công ty cho cùng sự kiện; các tin ESOP (2469853, 2473379, 2475320) là phát hành cho người lao động, không có ngày đăng ký cuối cùng; không ghim.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7519/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/MCH_loai1_trang1.json",
+          "sha256": "9196e0436e24b6da1fca5113ba9154c221c582e1e86d0c59fff6785405b8509b",
+          "bytes": 29768,
+          "accessed_at": "2026-11-21T17:49:13Z",
+          "pageIndex": 1,
+          "totalCount": 36,
+          "totalPages": 1,
+          "items": 36
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7519/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/MCH_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:32Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7519/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/MCH_loai3_trang1.json",
+          "sha256": "399640ca9155882b3ad1f8eff60661dff9474f2aad47aa30a36061e20d5e8e66",
+          "bytes": 755,
+          "accessed_at": "2026-11-21T17:59:34Z",
+          "pageIndex": 1,
+          "totalCount": 1,
+          "totalPages": 1,
+          "items": 1
+        }
+      ]
     },
     {
       "ticker": "TCX",
@@ -138,7 +254,53 @@
       "source_ids": [
         "hose-2496161"
       ],
-      "other": "Tin 2463430 (TB 1170/TB-SGDHCM): trả cổ tức bằng cổ phiếu năm 2024, 5:1, ngày không hưởng quyền 25/05/2026, ngoài khung; không ghim. Tin 2492159: trả lãi trái phiếu TCX126011, không phải cổ phiếu."
+      "other": "Tin 2463430 (TB 1170/TB-SGDHCM): trả cổ tức bằng cổ phiếu năm 2024, 5:1, ngày không hưởng quyền 25/05/2026, ngoài khung; không ghim. Tin 2492159: trả lãi trái phiếu TCX126011, không phải cổ phiếu.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai1_trang1.json",
+          "sha256": "82c55005ed95f295c06d97b4077bbdc4a08e34a3e57462632ee92025b0cee5a2",
+          "bytes": 41944,
+          "accessed_at": "2026-11-21T17:49:25Z",
+          "pageIndex": 1,
+          "totalCount": 77,
+          "totalPages": 2,
+          "items": 50
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/1?pageIndex=2&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai1_trang2.json",
+          "sha256": "d0082751391fbe5b5c1e20e81d7aeca4cbb8464045f112dbb2192b5b96b03f56",
+          "bytes": 22679,
+          "accessed_at": "2026-11-21T17:49:36Z",
+          "pageIndex": 2,
+          "totalCount": 77,
+          "totalPages": 2,
+          "items": 27
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:35Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/7391/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/TCX_loai3_trang1.json",
+          "sha256": "0c3a3cae303f3c380a4618242d533c24ae63db4732e5a4f3126c1d7a8d41712f",
+          "bytes": 1438,
+          "accessed_at": "2026-11-21T17:59:36Z",
+          "pageIndex": 1,
+          "totalCount": 2,
+          "totalPages": 1,
+          "items": 2
+        }
+      ]
     },
     {
       "ticker": "VPL",
@@ -152,7 +314,42 @@
       ],
       "result": "UNKNOWN",
       "source_ids": [],
-      "other": "Không thấy thông báo ngày đăng ký cuối cùng nào từ 01/05/2026 (15 tin theo mã; lịch sự kiện quyền HOSE của mã trống). Tin 2473156 là kết quả chào bán cổ phiếu ưu đãi riêng lẻ, không phải sự kiện quyền của cổ phiếu phổ thông."
+      "other": "Không thấy thông báo ngày đăng ký cuối cùng nào từ 01/05/2026 (15 tin theo mã; lịch sự kiện quyền HOSE của mã trống). Tin 2473156 là kết quả chào bán cổ phiếu ưu đãi riêng lẻ, không phải sự kiện quyền của cổ phiếu phổ thông.",
+      "snapshots": [
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4483/1?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/VPL_loai1_trang1.json",
+          "sha256": "921990801bf446b30c196f4d9586e02f9b2ad3f95190bf8b0866a74cf05406f9",
+          "bytes": 11561,
+          "accessed_at": "2026-11-21T17:49:39Z",
+          "pageIndex": 1,
+          "totalCount": 15,
+          "totalPages": 1,
+          "items": 15
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4483/2?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/VPL_loai2_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:17Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        },
+        {
+          "url": "https://api.hsx.vn/n/api/v1/1/news/securities/4483/3?pageIndex=1&pageSize=50&startDate=2026-05-01&endDate=2026-11-21",
+          "path": "data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/VPL_loai3_trang1.json",
+          "sha256": "f2f44c437a3197475f2a4ccd228f1e74cefc5ff913666b89e5438733c1ff9c76",
+          "bytes": 133,
+          "accessed_at": "2026-11-21T17:59:24Z",
+          "pageIndex": 1,
+          "totalCount": 0,
+          "totalPages": 0,
+          "items": 0
+        }
+      ]
     }
   ]
 }

@@ -1,15 +1,16 @@
 # Sự kiện quyền BSR, LPB, MCH, TCX, VPL từ 01/06/2026 — 21/11/2026
 
-**Phạm vi:** năm mã bổ sung cho rổ VN30 theo QĐ-4 (ADR-0016). Gồm mọi thông báo ngày đăng ký cuối cùng của HOSE có ngày giao dịch không hưởng quyền từ 01/06/2026 tới 21/11/2026. Loại sự kiện gồm: cổ tức tiền, cổ tức cổ phiếu, cổ phiếu thưởng, phát hành, chia tách.
+**Phạm vi:** năm mã bổ sung cho rổ VN30 theo QĐ-4 (ADR-0016). Gồm các thông báo ngày đăng ký cuối cùng của HOSE có ngày giao dịch không hưởng quyền từ 01/06/2026 tới 21/11/2026, tìm được qua các truy vấn đã ghim ở mục «Truy vấn đã tra». Tính đầy đủ chỉ được chứng minh trong phạm vi các truy vấn đó. Loại sự kiện gồm: cổ tức tiền, cổ tức cổ phiếu, cổ phiếu thưởng, phát hành, chia tách.
 
 **Nguồn:** chỉ dùng tin và tệp đính kèm trên `api.hsx.vn` và `staticfile.hsx.vn`, tải nguyên byte ngày 21/11/2026. Không dùng báo chí hay trang thứ cấp.
 
 **Manifest:** `data/evidence/corporate_actions/EVIDENCE_MANIFEST_VN30_BO_SUNG.json`. Dùng cùng khuôn trường với `EVIDENCE_MANIFEST_2026H2.json`:
 - `event_type` để trống;
 - nguyên văn loại sự kiện chép vào `event_type_verbatim`;
-- `published_at` theo luật D1: lấy `data.postedDate` của tin HOSE, không gắn múi giờ. Ngày đăng trùng ngày ký thì để trống.
+- `published_at` theo luật D1: lấy giây Unix `data.postedDate` của tin HOSE, viết ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ. «Trùng ngày ký» so phần ngày của chuỗi đó với `signed_date`; trùng thì để trống.
+- MCH: `postedDate` = 1785522230 → 2026-07-31T18:23:50, trùng ngày ký 2026-07-31, nên để trống. Đọc theo giờ Việt Nam (+7 giờ) thì là 2026-08-01T01:23:50, khác ngày ký. Ở cả hai cách đọc, ngày đăng đều trước ngày không hưởng quyền 10/08/2026. Chưa có quyết định chốt múi giờ, nên giữ cách thận trọng. QĐ-9 (gói giao số 2) sẽ xử lý trường hợp này.
 
-**Cách đọc PDF:** PDF là ảnh quét, không có lớp chữ. Ngày, tỷ lệ và lý do do Claude (Anthropic) đọc từ ảnh; chưa có người khác đối chiếu.
+**Cách đọc PDF:** PDF là ảnh quét, không có lớp chữ. Ngày, tỷ lệ và lý do do Claude (Anthropic) đọc từ ảnh; **chưa có ghế khác nhà cung cấp đối chiếu**. Bảng «Đối chiếu ảnh quét» dưới đây ghi từng trường cần kiểm, theo vị trí trên trang 1 của mỗi PDF.
 
 ## Sự kiện tìm được
 
@@ -21,6 +22,20 @@
 
 - Hai dòng cổ tức tiền có `official_ratio` để trống, vì cổ tức tiền không phải hệ số giá.
 - Mỗi bản gốc được ghim kèm JSON tin HOSE và JSON danh sách tệp đính kèm. Tên PDF trong danh sách tệp đính kèm trùng đúng `url` của bản gốc.
+
+## Đối chiếu ảnh quét (trang 1 mỗi PDF; cần ghế khác nhà cung cấp kiểm và ghi tên)
+
+| PDF (sha256 16 ký tự đầu) | Trường | Dòng in trên trang 1 (Claude đọc) | Người kiểm khác nhà cung cấp |
+|---|---|---|---|
+| hose-2475353 BSR (6730fa375a2e3af1) | Số, ngày ký | góc trái «Số: 1434/TB-SGDHCM»; góc phải «ngày 29 tháng 06 năm 2026» | chưa có |
+| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 11/08/2026»; «Ngày đăng ký cuối cùng: 12/08/2026» | chưa có |
+| | Lý do, tỷ lệ | «Chi trả cổ tức năm 2025 bằng tiền»; «Tỷ lệ thực hiện: 3%/mệnh giá (1 cổ phiếu nhận được 300 đồng)»; «Ngày thanh toán: 11/09/2026» | chưa có |
+| hose-2485688 MCH (6e5e9809f5dc28b9) | Số, ngày ký | «Số: 1643/TB-SGDHCM»; «ngày 31 tháng 07 năm 2026» | chưa có |
+| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 10/08/2026»; «Ngày đăng ký cuối cùng: 11/08/2026» | chưa có |
+| | Lý do, tỷ lệ | «Tạm ứng cổ tức đợt 1 năm 2026 bằng tiền»; «Tỷ lệ thực hiện: 20%/mệnh giá (01 cổ phiếu được nhận 2.000 đồng)»; «Ngày thanh toán: 19/08/2026» | chưa có |
+| hose-2496161 TCX (3c5406e70b0380ec) | Số, ngày ký | «Số: 1860/TB-SGDHCM»; «ngày 10 tháng 09 năm 2026» | chưa có |
+| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 17/09/2026»; «Ngày đăng ký cuối cùng: 18/09/2026» | chưa có |
+| | Lý do, tỷ lệ | «Trả cổ tức bằng cổ phiếu năm 2025»; «Tỷ lệ thực hiện: 5:1 (Người sở hữu 05 cổ phiếu được nhận 01 cổ phiếu mới)»; «Số lượng cổ phiếu dự kiến phát hành: 554.890.665 cổ phiếu» | chưa có |
 
 ## Mã chưa tìm thấy thông báo
 
@@ -54,5 +69,16 @@ UNKNOWN nghĩa là đã tra theo các truy vấn dưới đây mà không tìm t
    - MCH: 10/08/2026.
    - TCX: 25/05/2026 và 17/09/2026.
    - VPL: không có.
+
+
+Các trang kết quả đã ghim nguyên byte ở `data/evidence/corporate_actions/vn30_bo_sung_tra_cuu/` (17 tệp, sha256 trong `tra_cuu[].snapshots` của manifest). Với tin theo mã (loại 1), số mục đã tải khớp `totalCount` và số trang khớp `totalPages` của chính API.
+
+| Mã | Tin theo mã (loại 1): totalCount / trang | Loại 2 | Lịch sự kiện quyền (loại 3) | Kết quả |
+|---|---|---|---|---|
+| BSR | 34 / 1 | 0 | 1 | FOUND |
+| LPB | 62 / 2 | 0 | 1 | UNKNOWN |
+| MCH | 36 / 1 | 0 | 1 | FOUND |
+| TCX | 77 / 2 | 0 | 2 | FOUND |
+| VPL | 15 / 1 | 0 | 0 | UNKNOWN |
 
 Chưa đưa các sự kiện này vào engine hay chuỗi giá. Kho giá chưa có năm mã này.
