@@ -1,4 +1,4 @@
-"""Tải bản gốc theo danh sách URL, ghi bằng chứng tải, KHÔNG ghi kho (P0-3, đồng thời S0a của ADR-0017).
+"""Tải bản gốc theo danh sách URL, ghi bằng chứng tải, KHÔNG ghi kho (P0-3; lượt chạy thử phục vụ S0a của ADR-0017).
 
 Chạy trong GitHub Actions (`.github/workflows/fetch_originals.yml`): tệp tải về và `manifest.json` được đưa lên artifact của
 lượt chạy; workflow chỉ có quyền đọc kho và không đẩy commit nào. Người muốn đưa một tệp vào kho tải artifact về rồi mở PR
@@ -9,25 +9,37 @@ Với mỗi URL công cụ ghi: URL gốc và URL cuối (sau chuyển hướng)
 khai sha256 mong đợi cho từng URL; lệch thì ghi lỗi.
 
 Đóng khi nghi ngờ:
-  - chỉ nhận `https://`; URL khác bị ghi lỗi và không được gọi;
+  - mỗi bước, gồm URL ban đầu và MỌI bước chuyển hướng, được kiểm TRƯỚC khi kết nối: chỉ `https://`, không hạ từ https
+    xuống scheme khác, không có thông tin đăng nhập trong URL, host phải nằm trong danh sách duyệt (mặc định ALLOW_HOSTS,
+    thêm bằng `--allow-host`), và mọi địa chỉ IP mà host phân giải ra phải là địa chỉ công khai (không loopback, mạng
+    riêng, link-local, dành riêng). Bước không đạt bị ghi lỗi và không được gọi;
+  - `--max-bytes` và `--timeout` phải dương;
   - mã khác 200, lỗi mạng, vượt giới hạn dung lượng, hay lệch sha256 mong đợi đều là lỗi; công cụ thoát mã 1 nếu có
     bất kỳ lỗi nào (nội dung trả về vẫn được lưu để làm bằng chứng, trừ khi vượt giới hạn dung lượng);
   - thư mục `--out` phải chưa tồn tại và phải nằm ngoài kho mã (không có đường nào ghi vào kho);
   - tên tệp chỉ giữ ký tự an toàn, không thể thoát khỏi thư mục `--out`.
 
+Đầu ra không ghi giá trị nhạy cảm: thông tin đăng nhập trong URL, giá trị tham số truy vấn có tên giống khóa bí mật (token,
+signature, key, …) và giá trị header Set-Cookie được thay bằng REDACTED ở manifest, summary và stdout.
+
+Trạng thái pháp lý (ADR-0017 QĐ-S9 mục 2): manifest ghi `legal_status` = CHUA_KIEM_DIEU_KHOAN cho mọi host đã gọi, kèm
+nguồn và thời điểm đối chiếu điều khoản (null khi chưa đối chiếu). Công cụ không tự ghi trạng thái "được phép".
+
 Danh sách URL: mỗi URL cách nhau bằng khoảng trắng, xuống dòng hoặc dấu phẩy; dòng bắt đầu bằng `#` là chú thích; một mục
 `sha256=<64 ký tự hex>` đứng ngay sau một URL là hash mong đợi của URL đó.
 
-Dùng: python tools/fetch_originals.py --urls DANH_SACH --out THU_MUC [--max-bytes N] [--timeout GIAY]
-Thoát: 0 khi mọi URL đạt; 1 khi có URL lỗi; 2 khi từ chối `--out` hoặc danh sách rỗng (không tạo gì)."""
+Dùng: python tools/fetch_originals.py --urls DANH_SACH --out THU_MUC [--max-bytes N] [--timeout GIAY] [--allow-host H ...]
+Thoát: 0 khi mọi URL đạt; 1 khi có URL lỗi; 2 khi từ chối `--out`, tham số sai hoặc danh sách rỗng (không tạo gì)."""
 from __future__ import annotations
 
 import argparse
 import hashlib
+import ipaddress
 import json
 import os
 import pathlib
 import re
+import socket
 import sys
 import urllib.error
 import urllib.parse
@@ -35,10 +47,82 @@ import urllib.request
 from datetime import datetime, timezone
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
-TOOL_VERSION = "1"
-USER_AGENT = "ttc-fetch-originals/1 (GitHub Actions; doc ban goc cong bo thong tin)"
+TOOL_VERSION = "2"
+USER_AGENT = "ttc-fetch-originals/2 (GitHub Actions; doc ban goc cong bo thong tin)"
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024
+# Host được duyệt mặc định: trang, API và kho tệp của HOSE; cổng văn bản pháp luật. Thêm host khác bằng --allow-host.
+ALLOW_HOSTS = ("www.hsx.vn", "api.hsx.vn", "staticfile.hsx.vn", "vbpl.vn")
+LEGAL_STATUS = "CHUA_KIEM_DIEU_KHOAN"
+LEGAL_NOTE = ("Chưa đối chiếu điều khoản sử dụng của trang nguồn về việc tải tự động. L-04 cho chép nguyên văn BCTC; điều đó "
+              "không thay cho kiểm điều khoản. ADR-0017 QĐ-S9 mục 2 chưa xong cho tới khi có nguồn và thời điểm đối chiếu.")
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
+_SECRET = re.compile(r"(token|sig|signature|key|auth|password|passwd|secret|credential|session|x-amz-|x-goog-)", re.I)
+
+
+def redact(url):
+    """URL an toàn để ghi: bỏ thông tin đăng nhập; giá trị tham số truy vấn có tên giống khóa bí mật thành REDACTED."""
+    if not isinstance(url, str):
+        return url
+    try:
+        p = urllib.parse.urlsplit(url)
+        port = p.port
+    except ValueError:
+        return "URL_KHONG_HOP_LE"
+    netloc = p.hostname or ""
+    if port:
+        netloc += f":{port}"
+    q = urllib.parse.parse_qsl(p.query, keep_blank_values=True)
+    query = urllib.parse.urlencode([(k, "REDACTED" if _SECRET.search(k) else v) for k, v in q]) if q else p.query
+    return urllib.parse.urlunsplit((p.scheme, netloc, p.path, query, ""))
+
+
+def url_problem(url, prev=None, *, allow_schemes=("https",), allow_hosts=ALLOW_HOSTS, allow_private=False,
+                resolve=socket.getaddrinfo):
+    """Lý do KHÔNG được kết nối tới `url` (bước đầu khi prev=None, hoặc bước chuyển hướng từ `prev`), hoặc None."""
+    try:
+        p = urllib.parse.urlsplit(url)
+        port = p.port
+    except ValueError as e:
+        return f"URL không hợp lệ: {e}"
+    scheme = p.scheme.lower()
+    if scheme not in allow_schemes:
+        return f"chỉ nhận {', '.join(x + '://' for x in allow_schemes)}; scheme '{scheme}' không được gọi"
+    if prev is not None and urllib.parse.urlsplit(prev).scheme.lower() == "https" and scheme != "https":
+        return f"chuyển hướng hạ từ https xuống {scheme}://, không được gọi"
+    if p.username is not None or p.password is not None:
+        return "URL chứa thông tin đăng nhập, không được gọi"
+    host = (p.hostname or "").lower().rstrip(".")
+    if not host:
+        return "URL không có host"
+    if host not in {h.lower() for h in allow_hosts}:
+        return f"host '{host}' không nằm trong danh sách duyệt, không được gọi"
+    if not allow_private:
+        try:
+            infos = resolve(host, port or (443 if scheme == "https" else 80), proto=socket.IPPROTO_TCP)
+        except OSError as e:
+            return f"không phân giải được host '{host}': {e}"
+        ips = {info[4][0] for info in infos}
+        if not ips:
+            return f"host '{host}' không có địa chỉ IP"
+        for ip in sorted(ips):
+            if not ipaddress.ip_address(ip.split("%", 1)[0]).is_global:
+                return f"host '{host}' phân giải ra địa chỉ không công khai {ip}, không được gọi"
+    return None
+
+
+class _GuardedRedirect(urllib.request.HTTPRedirectHandler):
+    """Kiểm mỗi bước chuyển hướng TRƯỚC khi urllib kết nối tới đích mới; không đạt thì dừng, không gọi đích."""
+
+    def __init__(self, policy, hops):
+        super().__init__()
+        self.policy, self.hops = policy, hops
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        why = url_problem(newurl, req.full_url, **self.policy)
+        self.hops.append({"from": redact(req.full_url), "to": redact(newurl), "code": code, "refused": why})
+        if why:
+            raise urllib.error.URLError(f"từ chối chuyển hướng: {why}")
+        return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
 def parse_url_list(text: str) -> list[dict]:
@@ -73,20 +157,29 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
+def _check_limits(max_bytes, timeout):
+    if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
+        raise ValueError(f"max_bytes phải là số nguyên dương, nhận {max_bytes!r}")
+    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not timeout > 0:
+        raise ValueError(f"timeout phải dương, nhận {timeout!r}")
+
+
 def fetch_one(entry: dict, index: int, files_dir: pathlib.Path, *, max_bytes: int, timeout: float,
-              allow_schemes=("https",), opener=None) -> dict:
+              allow_schemes=("https",), allow_hosts=ALLOW_HOSTS, allow_private=False, opener=None) -> dict:
+    _check_limits(max_bytes, timeout)
     url = entry["url"]
-    rec = {"index": index, "url": url, "expected_sha256": entry.get("expected_sha256"), "final_url": None,
-           "http_status": None, "reason": None, "headers": None, "server_date": None, "fetched_at_start": _now(),
-           "fetched_at_end": None, "sha256": None, "bytes": None, "file": None, "sha256_match": None, "ok": False,
-           "error": None}
-    scheme = urllib.parse.urlsplit(url).scheme.lower()
-    if scheme not in allow_schemes:
-        rec["error"] = f"chỉ nhận {', '.join(s + '://' for s in allow_schemes)}; URL có scheme '{scheme}' không được gọi"
+    rec = {"index": index, "url": redact(url), "expected_sha256": entry.get("expected_sha256"), "final_url": None,
+           "redirects": [], "http_status": None, "reason": None, "headers": None, "server_date": None,
+           "fetched_at_start": _now(), "fetched_at_end": None, "sha256": None, "bytes": None, "file": None,
+           "sha256_match": None, "ok": False, "error": None}
+    policy = {"allow_schemes": tuple(allow_schemes), "allow_hosts": tuple(allow_hosts), "allow_private": allow_private}
+    why = url_problem(url, **policy)
+    if why:
+        rec["error"] = why
         rec["fetched_at_end"] = _now()
         return rec
     req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    open_ = (opener or urllib.request.build_opener()).open
+    open_ = (opener or urllib.request.build_opener(_GuardedRedirect(policy, rec["redirects"]))).open
     body = b""
     try:
         try:
@@ -96,8 +189,8 @@ def fetch_one(entry: dict, index: int, files_dir: pathlib.Path, *, max_bytes: in
         with resp:
             rec["http_status"] = int(resp.status if hasattr(resp, "status") else resp.code)
             rec["reason"] = getattr(resp, "reason", None)
-            rec["final_url"] = resp.geturl()
-            rec["headers"] = [[k, v] for k, v in resp.headers.items()]
+            rec["final_url"] = redact(resp.geturl())
+            rec["headers"] = [[k, "REDACTED" if k.lower() == "set-cookie" else v] for k, v in resp.headers.items()]
             rec["server_date"] = resp.headers.get("Date")
             body = resp.read(max_bytes + 1)
     except Exception as e:                              # noqa: BLE001 — lỗi mạng, hết giờ, TLS: ghi lại, không ném
@@ -148,13 +241,19 @@ def run_info() -> dict:
 
 
 def fetch_all(entries: list[dict], out: pathlib.Path, *, max_bytes=DEFAULT_MAX_BYTES, timeout=60.0,
-              allow_schemes=("https",), opener=None) -> dict:
+              allow_schemes=("https",), allow_hosts=ALLOW_HOSTS, allow_private=False, opener=None) -> dict:
+    _check_limits(max_bytes, timeout)
     files_dir = out / "files"
     files_dir.mkdir(parents=True, exist_ok=False)
-    items = [fetch_one(e, i, files_dir, max_bytes=max_bytes, timeout=timeout, allow_schemes=allow_schemes, opener=opener)
+    items = [fetch_one(e, i, files_dir, max_bytes=max_bytes, timeout=timeout, allow_schemes=allow_schemes,
+                       allow_hosts=allow_hosts, allow_private=allow_private, opener=opener)
              for i, e in enumerate(entries, 1)]
+    hosts = sorted({urllib.parse.urlsplit(r["url"]).hostname or "" for r in items} - {""})
     manifest = {"tool": "tools/fetch_originals.py", "tool_version": TOOL_VERSION, "generated_at": _now(),
-                "run": run_info(), "user_agent": USER_AGENT, "max_bytes": max_bytes,
+                "run": run_info(), "user_agent": USER_AGENT, "max_bytes": max_bytes, "timeout": timeout,
+                "allow_hosts": sorted(allow_hosts),
+                "legal": [{"host": h, "legal_status": LEGAL_STATUS, "terms_source": None, "terms_checked_at": None,
+                           "note": LEGAL_NOTE} for h in hosts],
                 "all_ok": all(r["ok"] for r in items), "items": items}
     with open(out / "manifest.json", "x", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=1)
@@ -162,6 +261,8 @@ def fetch_all(entries: list[dict], out: pathlib.Path, *, max_bytes=DEFAULT_MAX_B
     for r in items:
         lines.append(f"| {r['index']} | {r['url']} | {r['http_status']} | {r['bytes']} | "
                      f"{(r['sha256'] or '')[:16]} | {r['sha256_match']} | {r['error'] or ''} |")
+    lines += ["", f"Trạng thái pháp lý của việc tải tự động: {LEGAL_STATUS} cho {', '.join(hosts) or 'không host nào'}. "
+              + LEGAL_NOTE]
     with open(out / "summary.md", "x", encoding="utf-8") as f:
         f.write("\n".join(lines) + "\n")
     return manifest
@@ -173,7 +274,13 @@ def main(argv=None) -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
     ap.add_argument("--timeout", type=float, default=60.0)
+    ap.add_argument("--allow-host", action="append", default=[], help="thêm host được duyệt (lặp lại được)")
     a = ap.parse_args(argv)
+    try:
+        _check_limits(a.max_bytes, a.timeout)
+    except ValueError as e:
+        print("TỪ CHỐI:", e, file=sys.stderr)
+        return 2
     out = pathlib.Path(a.out)
     why = out_problem(out)
     if why:
@@ -187,7 +294,9 @@ def main(argv=None) -> int:
     if not entries:
         print("TỪ CHỐI: danh sách URL rỗng", file=sys.stderr)
         return 2
-    m = fetch_all(entries, out, max_bytes=a.max_bytes, timeout=a.timeout)
+    print(f"{len(entries)} URL; host: " + ", ".join(sorted({urllib.parse.urlsplit(e['url']).hostname or '?' for e in entries})))
+    m = fetch_all(entries, out, max_bytes=a.max_bytes, timeout=a.timeout,
+                  allow_hosts=tuple(ALLOW_HOSTS) + tuple(h.lower() for h in a.allow_host))
     print((out / "summary.md").read_text(encoding="utf-8"))
     return 0 if m["all_ok"] else 1
 
