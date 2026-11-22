@@ -17,7 +17,7 @@ import argparse, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
 from . import data, features, regime, research, meta, knowledge, paper, attribution, report, llm_review
-from . import ledger, experts, facts, knowledge_notes
+from . import ledger, experts, facts, knowledge_notes, fwd
 
 MODES = ("auto", "ops", "research")
 
@@ -134,6 +134,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
 
     # PAPER + ATTRIBUTION
     nav, decision = paper.run(as_of, close, preds_today, registry, udates, events=mk["events"], frozen=skip)
+    fwd.run(as_of)                                        # F1b: sổ FWD theo phiên; chưa đăng ký thì không làm gì
     attr = attribution.run(close, bad)
     n_total = research.total_trials(ledger_df)            # kể cả lần thử đăng ký rồi bỏ dở (L-06)
 
