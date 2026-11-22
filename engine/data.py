@@ -393,20 +393,78 @@ def _universe_columns(columns, mode, hist, test_store):
         "trừ data.ingest_extra"]
 
 
-def _derivation_id(research_input, cut, docs, ev, universe=None):
+SESSION_MODES = ("keep", "calendar")
+UNANNOUNCED = "CHUA_CO_THONG_BAO"           # source_id của ngày lịch HOSE chưa có thông báo nghỉ lễ
+
+
+def non_session_days(dates, volume, root=None):
+    """Ngày KHÔNG phải phiên trên trục `dates` (E2c, QĐ-1 của ADR-0016) → dict:
+      - "calendar": ngày mà data/trading_calendar.csv ghi is_session=0, trong vùng lịch phủ. Lịch đọc bằng
+        risk_gate.load_calendar: tệp hỏng thì ValueError đi tiếp, không dự phòng âm thầm;
+      - "zero_volume": ngày NGOÀI vùng lịch phủ (hoặc khi không có tệp lịch) mà mọi mã trong `volume` (bảng khối lượng của
+        cả kho, ngày × mã) có khối lượng bằng 0 hoặc thiếu;
+      - "unannounced": ngày lịch ghi source_id=CHUA_CO_THONG_BAO nằm trong [ngày đầu, ngày cuối] của `dates`;
+      - "coverage": [ngày đầu, ngày cuối] của lịch, hoặc None khi không có tệp lịch.
+    Trong vùng lịch phủ chỉ lịch quyết định: ngày lịch ghi là phiên vẫn là phiên dù mọi mã có khối lượng 0."""
+    from . import risk_gate                     # risk_gate không import data: import tại chỗ, không tạo vòng
+    dates = pd.DatetimeIndex(sorted(set(pd.DatetimeIndex(dates))))
+    cal = risk_gate.load_calendar(_root(root))
+    lo = hi = None
+    if cal:
+        lo, hi = pd.Timestamp(min(cal)), pd.Timestamp(max(cal))
+    traded = volume.reindex(index=dates).fillna(0).ne(0).any(axis=1)
+    by_cal, by_vol = [], []
+    for d in dates:
+        if cal and lo <= d <= hi:
+            if cal[d.date().isoformat()] == 0:
+                by_cal.append(d)
+        elif not bool(traded.loc[d]):
+            by_vol.append(d)
+    unann = []
+    if cal and len(dates):
+        src = pd.read_csv(_root(root).joinpath(*risk_gate.CALENDAR), dtype=str, keep_default_na=False)
+        if "source_id" in src.columns:
+            days = pd.to_datetime(src.loc[src["source_id"] == UNANNOUNCED, "date"], format="%Y-%m-%d")
+            unann = sorted(d for d in days if dates[0] <= d <= dates[-1])
+    return {"calendar": by_cal, "zero_volume": by_vol, "unannounced": unann, "coverage": None if lo is None else [lo, hi]}
+
+
+def _iso(days):
+    return [str(pd.Timestamp(d).date()) for d in days]
+
+
+def _session_gaps(ns, dates):
+    """Ghi chú pit_gaps của chế độ sessions="calendar": phần trục phiên không theo lịch HOSE đã ghim."""
+    if ns["coverage"] is None:
+        out = ["không có data/trading_calendar.csv: trục phiên chỉ bỏ ngày mọi mã có khối lượng 0 hoặc thiếu"]
+    else:
+        lo, hi = ns["coverage"]
+        out = [f"lịch phiên HOSE đã ghim chỉ phủ {lo.date()} – {hi.date()}: ngoài vùng đó trục phiên bỏ ngày mọi mã có "
+               "khối lượng 0 hoặc thiếu (quy tắc thay thế, không phải lịch chính thức)"] \
+            if len(dates) and (dates[0] < lo or dates[-1] > hi) else []
+    if ns["unannounced"]:
+        out.append(f"{len(ns['unannounced'])} ngày trong khoảng dữ liệu lịch còn ghi {UNANNOUNCED} (chưa có thông báo "
+                   "nghỉ lễ của HOSE)")
+    return out
+
+
+def _derivation_id(research_input, cut, docs, ev, universe=None, sessions=None):
     """Định danh dẫn xuất chỉ phụ thuộc đầu vào và phiên bản mã: chế độ, ngày cắt, hash kho giá, hash CSV sự kiện, metadata
     các bản gốc đã dùng (chế độ legacy không dùng bản gốc nên không có), config (tệp và giá trị đang dùng), và dấu vân tay mã
     (code_fingerprint) ở trường code_commit của verified_adjust.derivation_manifest (ADR-0009). Chế độ rổ "historical" thêm
-    `universe` (chế độ và sha256 của data/vn30_history.csv); chế độ "config" giữ khóa cũ (universe nằm trong config)."""
+    `universe` (chế độ và sha256 của data/vn30_history.csv); chế độ "config" giữ khóa cũ (universe nằm trong config).
+    Chế độ trục phiên "calendar" thêm `sessions` (chế độ và sha256 của data/trading_calendar.csv); "keep" giữ khóa cũ."""
     m = va.derivation_manifest(root=config.ROOT, cfg=CFG, as_of=cut, docs=docs, ev=ev, code_commit=code_fingerprint())
     cfg_now = hashlib.sha256(json.dumps(CFG, sort_keys=True, ensure_ascii=False, default=str).encode()).hexdigest()
     key = {"research_input": research_input, "verified_derivation_id": m["derivation_id"], "config_values": cfg_now}
     if universe is not None:
         key["universe"] = universe
+    if sessions is not None:
+        key["sessions"] = sessions
     return "RI-" + hashlib.sha256(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
 
 
-def load_market(as_of=None, research_input="legacy", universe=None):
+def load_market(as_of=None, research_input="legacy", universe=None, sessions="keep"):
     """Bang gia DIEU CHINH point-in-time + co loi du lieu + bao cao chat luong.
     Tra ve dict: close, volume (dieu chinh), raw_close, bad (co loi), events, quality, flags.
 
@@ -415,7 +473,7 @@ def load_market(as_of=None, research_input="legacy", universe=None):
       - "verified": chỉ sự kiện cổ phiếu vào chuỗi kiểm chứng (engine.verified_adjust, bản gốc từ evidence_docs, ngày cắt là
         as_of hoặc phiên cuối) được áp hệ số; sự kiện không vào chuỗi không mang trạng thái APPLIED trong `events`. Thêm
         `exclude` (mặt nạ cửa sổ QĐ-3), `eligible` (có giá và không bị loại) và `event_checks` (bảng kiểm sự kiện).
-    Cả hai chế độ thêm: research_input, derivation_id, pit_label (luôn "RETROSPECTIVE" ở bản này), pit_gaps.
+    Cả hai chế độ thêm: research_input, derivation_id, pit_label, pit_gaps (xem cuối).
     Chế độ legacy không đọc manifest bản gốc, nên manifest hỏng không làm nó dừng; chế độ verified thì dừng.
 
     universe (E2b, QĐ-1 và QĐ-4 của ADR-0016) — rổ mã của bảng:
@@ -426,9 +484,24 @@ def load_market(as_of=None, research_input="legacy", universe=None):
         eligible (`quality.universe_unknown_before`). Tệp thiếu hoặc hỏng thì ném lỗi. Thêm khóa `eligible` (cả ở legacy)
         và `members`; `quality` thêm `universe_mode`, `members_without_prices`, `members_last_session`.
     Mọi chế độ: mã bị loại vì không có HƠN 250 dòng giá được liệt kê (mã → số dòng) ở `quality.dropped_short_history`
-    (khóa chỉ có khi danh sách khác rỗng); sự kiện quyền được lọc theo các mã có trong bảng trước adjust.build_events."""
+    (khóa chỉ có khi danh sách khác rỗng); sự kiện quyền được lọc theo các mã có trong bảng trước adjust.build_events.
+
+    sessions (E2c, QĐ-1 của ADR-0016) — trục ngày của bảng. Ngày không phải phiên: xem non_session_days (lịch HOSE
+    data/trading_calendar.csv trong vùng lịch phủ; ngoài vùng đó, ngày mọi mã trong kho có khối lượng 0 hoặc thiếu). Lịch hỏng
+    thì ném lỗi ở cả hai chế độ.
+      - "keep" (mặc định): trục ngày không đổi; `quality.sessions` chỉ liệt kê ngày không phải phiên (`dropped` = 0);
+      - "calendar": bỏ các ngày đó khỏi kho đã cắt as_of TRƯỚC khi dựng bảng, tính hệ số, mặt nạ cửa sổ QĐ-3 (đếm phiên trên
+        trục đã bỏ) và báo cáo chất lượng.
+    `quality.sessions` = {mode, calendar_coverage, non_session_calendar, non_session_zero_volume, dropped, unannounced}; ngày
+    `unannounced` là ngày lịch ghi CHUA_CO_THONG_BAO nằm trong khoảng dữ liệu. Khóa này không vào state/ENGINE_STATE.json
+    (engine/report.py), nên đầu ra vòng học ở chế độ mặc định không đổi.
+    pit_label = "POINT_IN_TIME" chỉ khi đủ ba: research_input="verified", universe "historical", sessions="calendar"; khi đó
+    thêm `pit_from` = ngày hiệu lực đầu tiên của data/vn30_history.csv. Mọi tổ hợp khác là "RETROSPECTIVE". pit_gaps luôn có:
+    các phần chưa theo thời điểm, và phạm vi của trục phiên ở chế độ "calendar"."""
     if research_input not in RESEARCH_INPUTS:
         raise ValueError(f"research_input phải là một trong {RESEARCH_INPUTS}, không phải {research_input!r}")
+    if sessions not in SESSION_MODES:
+        raise ValueError(f"sessions phải là một trong {SESSION_MODES}, không phải {sessions!r}")
     umode = universe_mode(universe)
     s = load_store()
     if s.empty:
@@ -438,6 +511,14 @@ def load_market(as_of=None, research_input="legacy", universe=None):
     hist = load_vn30_history(strict=not test_store) if umode == "historical" else None
     if as_of is not None:
         s = s[s.date <= pd.Timestamp(as_of)]
+    ns = non_session_days(s["date"], s.pivot(index="date", columns="ticker", values="volume"))   # lịch hỏng: lỗi
+    dropped = 0
+    if sessions == "calendar":                      # bỏ khỏi trục TRƯỚC mọi phép tính sau
+        off = set(ns["calendar"]) | set(ns["zero_volume"])
+        s = s[~s["date"].isin(off)]
+        dropped = len(off)
+        if s.empty:
+            raise RuntimeError("sessions='calendar': không còn phiên nào sau khi bỏ ngày không phải phiên")
     raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
     vol = s.pivot(index="date", columns="ticker", values="volume").sort_index()
     obs = s.pivot(index="date", columns="ticker", values="observed_at").sort_index()
@@ -465,6 +546,9 @@ def load_market(as_of=None, research_input="legacy", universe=None):
         members = membership(raw.index, hist).reindex(columns=raw.columns, fill_value=False)   # không gắn cờ, không dừng
         adj = adj.where(members)
     bad, rep, flags = adjust.quality(adj)
+    rep["sessions"] = {"mode": sessions, "calendar_coverage": None if ns["coverage"] is None else _iso(ns["coverage"]),
+                       "non_session_calendar": _iso(ns["calendar"]), "non_session_zero_volume": _iso(ns["zero_volume"]),
+                       "dropped": dropped, "unannounced": _iso(ns["unannounced"])}
     rep["events"] = events.status.value_counts().to_dict() if len(events) else {}
     rep["events_not_applied"] = [f"{e.ticker} {e.ex_date.date()} {e.type} ({e.source}): {e.status}"
                                  for e in events.itertuples() if e.status not in ("APPLIED", "CHUA_DEN_HAN",
@@ -489,21 +573,26 @@ def load_market(as_of=None, research_input="legacy", universe=None):
         rep["members_last_session"] = {"date": str(raw.index[-1].date()), "members": n_last, "with_prices": len(with_px)}
     out = {"close": close, "volume": volume, "raw_close": raw_out, "bad": bad,
            "events": events, "quality": rep, "flags": flags}
+    sgaps = ["trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE"] if sessions == "keep" else _session_gaps(ns, raw.index)
     if umode == "historical":
         gaps = [f"rổ theo thành viên VN30 từng ngày ({VN30_HISTORY}), chỉ có từ {rep['universe_unknown_before']}: trước "
-                "ngày đó không mã nào eligible",
-                "trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE"]
+                "ngày đó không mã nào eligible", *sgaps]
     else:
-        gaps = ["rổ theo cấu hình hiện tại (universe), chưa theo thành viên VN30 từng ngày", *ugaps,
-                "trục ngày chưa lọc ngày nghỉ theo lịch phiên HOSE"]
+        gaps = ["rổ theo cấu hình hiện tại (universe), chưa theo thành viên VN30 từng ngày", *ugaps, *sgaps]
     if research_input == "legacy":
         gaps.append("sự kiện quyền chưa kiểm: hệ số theo chuỗi điều chỉnh hiện hành, gồm sự kiện chưa đối chiếu bản gốc")
     uid = None if umode == "config" else {
         "mode": umode, "vn30_history_sha256": va.sha256_file(config.ROOT / VN30_HISTORY),
         "vn30_manifest_sha256": va.sha256_file(config.ROOT / VN30_MANIFEST) if (config.ROOT / VN30_MANIFEST).is_file() else None}
+    sid = None if sessions == "keep" else {
+        "mode": sessions, "trading_calendar_sha256": va.sha256_file(config.ROOT / "data/trading_calendar.csv")
+        if (config.ROOT / "data/trading_calendar.csv").is_file() else None}
+    pit = research_input == "verified" and umode == "historical" and sessions == "calendar"
     out.update(research_input=research_input, derivation_id=_derivation_id(research_input, cut, docs,
-                                                                             events if checks is None else checks, uid),
-               pit_label="RETROSPECTIVE", pit_gaps=gaps)
+                                                                             events if checks is None else checks, uid, sid),
+               pit_label="POINT_IN_TIME" if pit else "RETROSPECTIVE", pit_gaps=gaps)
+    if pit:
+        out["pit_from"] = rep["universe_unknown_before"]
     if checks is not None:
         exclude = window_exclude(raw.index, raw.columns, checks, *window_bounds())
         out.update(exclude=exclude, eligible=raw_out.notna() & ~exclude, event_checks=checks)
