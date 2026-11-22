@@ -178,3 +178,53 @@ def test_paper_rebalances_only_with_an_approved_model(tmp_path, monkeypatch):
 def test_tests_do_not_touch_the_repo():
     out = subprocess.check_output(["git", "status", "--porcelain", "--", "state", "paper"], cwd=REPO)
     assert out == b""
+
+
+# ---------- 5. Luồng chuẩn: cổng Owner chạy TRƯỚC quyết định sổ giấy (rà soát trước chấm, PR #79) ----------
+
+def _empty_cycle_inputs(close):
+    idx = pd.MultiIndex.from_product([close.index, close.columns], names=["date", "ticker"])
+    ds = pd.DataFrame({"y": np.nan}, index=idx)
+    allp = pd.DataFrame(columns=["date", "model_id", "ticker", "score"])
+    return ds, allp
+
+
+def test_stale_active_model_is_demoted_by_the_cycle_step_before_paper_decides(tmp_path, monkeypatch):
+    """state/model_registry.json còn mô hình ACTIVE cũ, YAML của Owner là models: []. Bước run_cycle chạy ngay trước sổ
+    giấy (knowledge.decay, gọi rank_active) phải hạ mô hình về WATCH; sổ giấy sau đó giữ tiền mặt."""
+    monkeypatch.setattr(knowledge, "ROOT", tmp_path)
+    (tmp_path / "state").mkdir()
+    (tmp_path / "state" / "MODEL_REGISTRY.yaml").write_text("models: []\n", encoding="utf-8")
+    reg = _reg(2, state="ACTIVE")
+    close, idx = _market()
+    ds, allp = _empty_cycle_inputs(close)
+    knowledge.decay(reg, allp, ds, str(idx[-1].date()))
+    assert {v["state"] for v in reg.values()} == {"WATCH"}
+    nav, decision = _paper(tmp_path, monkeypatch, reg)
+    assert decision["action"] == "NO_ACTION_CASH" and nav == config.CFG["paper"]["initial_cash"]
+
+
+def test_cycle_runs_the_owner_gate_before_the_paper_decision():
+    """Thứ tự trong engine.run_cycle.cycle: khi dữ liệu không đóng băng, decay (gọi rank_active, đọc YAML) chạy rồi lưu sổ
+    đăng ký TRƯỚC paper.run; khi đóng băng thì paper.run nhận frozen=skip và không ra quyết định."""
+    import inspect
+
+    from engine import run_cycle
+
+    src = inspect.getsource(run_cycle.cycle)
+    i_decay = src.index("alerts = knowledge.decay(registry, allp, ds, as_of)")
+    i_save = src.index("knowledge.save_registry(registry)")
+    i_paper = src.index("paper.run(as_of, close, preds_today, registry, udates")
+    assert i_decay < i_save < i_paper
+    assert "frozen=skip)" in src[i_paper:i_paper + 200]
+    assert "def decay(" in inspect.getsource(knowledge) and "rank_active(reg, as_of)" in inspect.getsource(knowledge.decay)
+
+
+def test_frozen_data_makes_no_paper_decision_even_with_a_stale_active_model(tmp_path, monkeypatch):
+    monkeypatch.setattr(config, "ROOT", tmp_path)
+    monkeypatch.setattr(paper, "ROOT", tmp_path)
+    close, idx = _market()
+    reg = _reg(1, state="ACTIVE")
+    preds = pd.DataFrame([(idx[-1], "M0", t, 1.0) for t in close.columns], columns=["date", "model_id", "ticker", "score"])
+    nav, decision = paper.run(str(idx[-1].date()), close, preds, reg, idx, frozen=True)
+    assert decision["action"] == "NO_DECISION_DATA_QUALITY"
