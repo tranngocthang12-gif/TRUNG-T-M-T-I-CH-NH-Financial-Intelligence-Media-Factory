@@ -134,7 +134,13 @@ def _legacy_reference(as_of=None):
 def _assert_legacy_unchanged(home, as_of=None):
     with patch.object(config, "ROOT", home), patch.object(adjust, "ROOT", home):
         new, old = data.load_market(as_of), _legacy_reference(as_of)
-    assert {k: _h(new[k]) for k in OLD_KEYS} == {k: _h(old[k]) for k in OLD_KEYS}
+    # E2c (Owner cho sửa assert, 22/11/2026): chế độ mặc định sessions="keep" thêm đúng một khóa quality.sessions (liệt kê
+    # ngày không phải phiên, không bỏ ngày nào); mọi phần khác vẫn so từng byte với bản trước E2a
+    q = dict(new["quality"])
+    sess = q.pop("sessions")
+    assert sess["mode"] == "keep" and sess["dropped"] == 0
+    cur = {**new, "quality": q}
+    assert {k: _h(cur[k]) for k in OLD_KEYS} == {k: _h(old[k]) for k in OLD_KEYS}
     assert set(new) == set(OLD_KEYS) | {"research_input", "derivation_id", "pit_label", "pit_gaps"}
     assert new["research_input"] == "legacy" and new["pit_label"] == "RETROSPECTIVE"
     assert any("sự kiện quyền chưa kiểm" in g for g in new["pit_gaps"])
