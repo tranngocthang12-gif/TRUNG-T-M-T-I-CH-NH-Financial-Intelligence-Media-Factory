@@ -31,7 +31,9 @@
         "path": "data/evidence/corporate_actions/hose-1753594/hose_news_1753594.json",
         "sha256": "6cdde4209e0c729f0ca73caad20cc3a5d7dacdab26cc1e610763fb1346accd21",
         "field": "data.postedDate",
-        "accessed_at": "2026-11-21T17:02:23Z"
+        "accessed_at": "2026-11-21T17:02:23Z",
+        "media_path": "data/evidence/corporate_actions/hose-1753594/hose_mediafiles_1753594.json",
+        "media_sha256": "17eccd201d3bac9ad88a4d7a9af7ef73d560c28fdffab1cd380667aee976bc8c"
       }
     },
     {
@@ -65,7 +67,9 @@
         "path": "data/evidence/corporate_actions/hose-1705374/hose_news_1705374.json",
         "sha256": "4f3a642abb3b534bf93327029d544720782ea11c5067f02772e251c38b7e6856",
         "field": "data.postedDate",
-        "accessed_at": "2026-11-21T17:02:27Z"
+        "accessed_at": "2026-11-21T17:02:27Z",
+        "media_path": "data/evidence/corporate_actions/hose-1705374/hose_mediafiles_1705374.json",
+        "media_sha256": "c5015b04029232a719a48bb3acabcee6d3253669eabe4a7aecc6f376536b3af4"
       }
     },
     {
@@ -99,7 +103,9 @@
         "path": "data/evidence/corporate_actions/hose-2497378/hose_news_2497378.json",
         "sha256": "bf30f2e05d5e61e5d72799baa31b327e6eb1a3866e42a495a594c3be47d48812",
         "field": "data.postedDate",
-        "accessed_at": "2026-11-21T17:02:00Z"
+        "accessed_at": "2026-11-21T17:02:00Z",
+        "media_path": "data/evidence/corporate_actions/hose-2497378/hose_mediafiles_2497378.json",
+        "media_sha256": "12eabce95864fd73af26de94aa7a75e4036cce81d2abb48ae6a4682390ce103e"
       }
     }
   ]

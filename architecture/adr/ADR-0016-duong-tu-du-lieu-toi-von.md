@@ -28,6 +28,7 @@
 | QĐ-6 | Mô hình chỉ lên ACTIVE khi Owner ghi mô hình đó vào `state/MODEL_REGISTRY.yaml` qua PR. |
 | QĐ-7 | Tiêu chí số của thang vốn theo mục "Thang vốn: tiêu chí số" bên dưới. |
 | QĐ-8 | Người chấm L-09 cho từng PR phải khác nhà cung cấp người viết: PR của Claude do ChatGPT hoặc Gemini chấm; PR của ChatGPT do Gemini hoặc Grok chấm. |
+| QĐ-9 | Ngày HOSE đăng tin được ghi vào `published_at` kể cả khi trùng ngày ký văn bản, khi máy kiểm được ngày đó từ metadata HOSE đã ghim trong kho (`tools/publication_proof.py`): tệp tin JSON và tệp danh sách đính kèm khớp sha256, id tin khớp `source_id`, `published_at` bằng đúng `data.postedDate` đổi theo UTC, đính kèm trỏ đúng PDF, ngày đăng không sớm hơn ngày ký, và ngày của (ngày đăng + 7 giờ) sớm hơn ngày không hưởng quyền. Ngày gõ tay, hoặc suy từ ngày ký, tên tệp hay ngày hưởng quyền, vẫn bị từ chối. |
 
 Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVERNOR_POLICY`; nguồn giá chính thức; bảo vệ `main` (P5).
 
@@ -44,6 +45,7 @@ Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVE
 | QĐ-6 | ACCEPTED | Owner | 21/11/2026 |
 | QĐ-7 | ACCEPTED | Owner | 21/11/2026 |
 | QĐ-8 | ACCEPTED | Owner | 21/11/2026 |
+| QĐ-9 | ACCEPTED | Owner | 22/11/2026 |
 
 Quy tắc:
 

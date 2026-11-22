@@ -85,8 +85,13 @@ class EvidenceSemanticsTests(unittest.TestCase):
             self.assertTrue(doc.get("signed_date_basis"), doc["source_id"])
 
     def test_published_at_needs_hose_publication_evidence(self):
-        """published_at chỉ được điền khi có metadata công bố của HOSE đã ghim (đường dẫn + sha256); không suy từ ngày ký
-        hay tên tệp. Chưa có thì published_at = null và published_at_status = CHUA_XAC_MINH."""
+        """published_at chỉ được điền khi tools/publication_proof.proof_errors kiểm được ngày đó từ metadata HOSE đã ghim (QĐ-9,
+        ADR-0016): JSON tin và JSON danh sách đính kèm (đường dẫn + sha256), không suy từ ngày ký hay tên tệp. Chưa có thì
+        published_at = null và published_at_status = CHUA_XAC_MINH."""
+        import sys
+        sys.path.insert(0, str(ROOT))
+        from tools.publication_proof import proof_errors
+
         for doc in _docs():
             sid = doc["source_id"]
             self.assertIn(doc.get("published_at_status"), ("DA_XAC_MINH", "CHUA_XAC_MINH"), sid)
@@ -96,11 +101,15 @@ class EvidenceSemanticsTests(unittest.TestCase):
                 continue
             self.assertEqual(doc["published_at_status"], "DA_XAC_MINH", sid)
             ev = doc.get("published_at_evidence") or {}
-            for key in ("path", "sha256", "field", "accessed_at"):
+            for key in ("path", "sha256", "field", "accessed_at", "media_path", "media_sha256"):
                 self.assertIn(key, ev, sid)
-            blob = (ROOT / ev["path"]).read_bytes()
-            self.assertEqual(hashlib.sha256(blob).hexdigest(), ev["sha256"], sid)
-            self.assertNotEqual(ev["path"], doc["path"], f"{sid}: ngày công bố không lấy từ chính văn bản")
+            for path_key, sha_key in (("path", "sha256"), ("media_path", "media_sha256")):
+                blob = (ROOT / ev[path_key]).read_bytes()
+                self.assertEqual(hashlib.sha256(blob).hexdigest(), ev[sha_key], sid)
+                self.assertNotEqual(ev[path_key], doc["path"], f"{sid}: ngày công bố không lấy từ chính văn bản")
+            self.assertEqual(proof_errors(doc, ROOT), [], sid)
+            bad = {**doc, "published_at": doc["signed_date"]}
+            self.assertTrue(proof_errors(bad, ROOT), f"{sid}: ngày ký gõ tay phải bị từ chối")
 
     def test_source_event_class_is_separate_from_technical_type(self):
         for doc in _docs():

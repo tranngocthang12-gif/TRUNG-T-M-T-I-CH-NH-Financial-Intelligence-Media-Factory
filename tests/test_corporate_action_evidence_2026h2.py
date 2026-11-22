@@ -17,6 +17,8 @@ import tempfile
 import unittest
 import urllib.parse
 
+from tools.publication_proof import proof_errors
+
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 MANIFEST = ROOT / "data" / "evidence" / "corporate_actions" / "EVIDENCE_MANIFEST_2026H2.json"
 FIRST_MANIFEST = ROOT / "data" / "evidence" / "corporate_actions" / "EVIDENCE_MANIFEST.json"
@@ -47,7 +49,8 @@ TECHNICAL = {"stock_split", "stock_dividend"}
 DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 REQUIRED = (
     "source_id", "url", "issuer", "signed_date", "published_at", "published_at_status",
-    "published_at_note", "publication_evidence", "accessed_at", "effective_date",
+    "published_at_note", "publication_evidence", "publication_evidence_sha256", "publication_media_evidence",
+    "publication_media_sha256", "accessed_at", "effective_date",
     "path", "sha256", "bytes", "ticker", "event_type", "event_type_status",
     "event_type_verbatim", "event_type_note", "official_ex_date", "official_record_date",
     "official_ratio", "official_ratio_text", "note",
@@ -91,32 +94,25 @@ def check_bytes(root, docs):
 
 
 def publication_errors(docs, root=ROOT):
-    """published_at chỉ hợp lệ khi có metadata đã ghim, và không được là ngày ký."""
+    """published_at chỉ hợp lệ khi tools/publication_proof.proof_errors đạt (QĐ-9, ADR-0016): metadata HOSE đã ghim chứng
+    minh đúng ngày đó, kể cả khi trùng ngày ký. Ngày gõ tay, hay suy từ ngày ký, tên tệp, ngày hưởng quyền đều bị từ chối."""
     errors = []
     for doc in docs:
         sid = doc.get("source_id")
         signed = doc.get("signed_date")
         if not isinstance(signed, str) or not DATE.fullmatch(signed):
             errors.append(f"{sid} thiếu signed_date")
-            signed = None
         pub = doc.get("published_at")
         status = doc.get("published_at_status")
-        evidence = doc.get("publication_evidence")
         if pub is None:
             if status != "CHUA_XAC_MINH":
                 errors.append(f"{sid} published_at null nhưng không ghi CHUA_XAC_MINH")
-            if evidence not in (None, ""):
+            if doc.get("publication_evidence") not in (None, ""):
                 errors.append(f"{sid} có publication_evidence trong khi published_at null")
             continue
-        day = str(pub)[:10]
-        if signed and day == signed:
-            errors.append(f"{sid} nhập ngày ký thay ngày công bố")
-        ev_path = evidence if isinstance(evidence, str) else ""
-        pinned = bool(ev_path) and ev_path != doc.get("path") and (pathlib.Path(root) / ev_path).is_file()
-        if not pinned:
-            errors.append(f"{sid} published_at không có metadata chính thức đã ghim và kiểm nội dung")
-        if status == "CHUA_XAC_MINH":
-            errors.append(f"{sid} vừa có published_at vừa ghi CHUA_XAC_MINH")
+        if status != "DA_XAC_MINH":
+            errors.append(f"{sid} có published_at nhưng không ghi DA_XAC_MINH")
+        errors += proof_errors(doc, root)
     return errors
 
 
@@ -128,9 +124,9 @@ def posted_iso(seconds):
 def hose_metadata_errors(doc, root=ROOT):
     """Ràng buộc ngày công bố của MỘT bản gốc với metadata HOSE đã ghim cạnh nó, cho cả hai lược đồ manifest.
 
-    Đòi: JSON tin và JSON danh sách tệp đính kèm có mặt, sha256 và số byte khớp note; id tin bằng số trong source_id, mã
-    bằng ticker; danh sách đính kèm có đúng một filePath trùng url bản gốc; published_at bằng đúng giá trị suy từ
-    data.postedDate theo luật D1 (trùng ngày ký thì None); published_at_status và trường chứng cứ khớp published_at."""
+    Đòi: JSON tin và JSON danh sách tệp đính kèm có mặt cạnh bản gốc, sha256 và số byte khớp note; published_at bằng đúng
+    data.postedDate đổi theo UTC (QĐ-9: kể cả khi trùng ngày ký); trường chứng cứ trỏ đúng hai tệp đó; và
+    tools/publication_proof.proof_errors đạt."""
     errors = []
     sid = str(doc.get("source_id"))
     nid = sid.split("-", 1)[1] if sid.startswith("hose-") else ""
@@ -162,7 +158,7 @@ def hose_metadata_errors(doc, root=ROOT):
     if isinstance(posted, bool) or not isinstance(posted, int):
         return errors + [f"{sid} JSON tin không có data.postedDate dạng số"]
     iso = posted_iso(posted)
-    expected = None if iso[:10] == doc.get("signed_date") else iso
+    expected = iso
     if doc.get("published_at") != expected:
         errors.append(f"{sid} published_at {doc.get('published_at')!r} khác giá trị suy từ data.postedDate {expected!r}")
     if doc.get("published_at_status") != ("DA_XAC_MINH" if expected else "CHUA_XAC_MINH"):
@@ -170,18 +166,15 @@ def hose_metadata_errors(doc, root=ROOT):
     if iso not in note:
         errors.append(f"{sid} note không ghi giờ đăng {iso}")
     if "publication_evidence" in doc:                                   # lược đồ 2026H2
-        if doc["publication_evidence"] != (news_rel if expected else None):
-            errors.append(f"{sid} publication_evidence không trỏ đúng JSON tin")
+        if (doc["publication_evidence"], doc.get("publication_media_evidence")) != (news_rel, media_rel):
+            errors.append(f"{sid} publication_evidence hoặc publication_media_evidence không trỏ đúng JSON đã ghim")
     else:                                                                # lược đồ manifest đầu
         ev = doc.get("published_at_evidence")
-        if expected:
-            good = (isinstance(ev, dict) and ev.get("path") == news_rel and ev.get("field") == "data.postedDate"
-                    and ev.get("sha256") == hashlib.sha256(blobs[news_rel]).hexdigest() and ev.get("accessed_at"))
-            if not good:
-                errors.append(f"{sid} published_at_evidence không khớp JSON tin đã ghim")
-        elif ev is not None:
-            errors.append(f"{sid} có published_at_evidence trong khi published_at null")
-    return errors
+        good = (isinstance(ev, dict) and ev.get("path") == news_rel and ev.get("media_path") == media_rel
+                and ev.get("field") == "data.postedDate" and ev.get("accessed_at"))
+        if not good:
+            errors.append(f"{sid} published_at_evidence không khớp JSON đã ghim")
+    return errors + proof_errors(doc, root)
 
 
 def all_twenty_docs():
@@ -272,12 +265,17 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
         signed_as_published = [dict(doc) for doc in docs]
         signed_as_published[0]["published_at"] = signed_as_published[0]["signed_date"]
         signed_errors = publication_errors(signed_as_published)
-        self.assertTrue(any("nhập ngày ký thay ngày công bố" in err for err in signed_errors))
+        self.assertTrue(any("khác data.postedDate" in err for err in signed_errors))
         other_day = [dict(doc) for doc in docs]
         other_day[0]["published_at"] = "2020-01-01"
-        other_day[0]["publication_evidence"] = None  # một ngày không kèm metadata đã ghim, dù bản gốc có hay chưa có
+        other_day[0]["publication_evidence"] = None  # một ngày không kèm metadata đã ghim
         other_errors = publication_errors(other_day)
-        self.assertTrue(any("không có metadata chính thức đã ghim" in err for err in other_errors))
+        self.assertTrue(any("thiếu đường dẫn JSON tin HOSE" in err for err in other_errors))
+        # QĐ-9: ngày HOSE đăng trùng ngày ký được nhận khi máy kiểm được từ metadata đã ghim.
+        same_day = [doc for doc in docs if doc["published_at"][:10] == doc["signed_date"]]
+        self.assertEqual(sorted(d["source_id"] for d in same_day),
+                         ["hose-2423183", "hose-2423661", "hose-2468381", "hose-2501920", "hose-2507504"])
+        self.assertEqual(publication_errors(same_day), [])
         vpb = next(doc for doc in docs if doc["source_id"] == "hose-2497757")
         self.assertEqual(vpb["signed_date"], "2026-09-16")
         self.assertEqual(publication_errors([vpb]), [])
@@ -370,7 +368,7 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
         self.assertEqual(len(docs), 20)
         for doc in docs:
             self.assertEqual(hose_metadata_errors(doc), [], doc["source_id"])
-        self.assertEqual(sum(1 for d in docs if d["published_at"]), 15)
+        self.assertEqual(sum(1 for d in docs if d["published_at"]), 20)
 
     def test_publication_binding_catches_independent_mutations(self):
         """Mỗi kiểu sửa sai dưới đây phải bị bắt bởi hose_metadata_errors, không chỉ bởi việc tệp có tồn tại."""
@@ -378,9 +376,9 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
 
         docs = all_twenty_docs()
         published = [d for d in docs if d["published_at"]]
-        same_day = [d for d in docs if not d["published_at"]]
+        same_day = [d for d in docs if d["published_at"][:10] == d["signed_date"]]
         self.assertEqual(len(same_day), 5)
-        # 1. Sửa riêng published_at (khác ngày ký), giữ đường dẫn chứng cứ và DA_XAC_MINH.
+        # 1. Sửa riêng published_at, giữ đường dẫn chứng cứ và DA_XAC_MINH.
         for doc in published:
             bad = copy.deepcopy(doc)
             bad["published_at"] = bad["published_at"][:-2] + ("00" if bad["published_at"][-2:] != "00" else "01")
@@ -395,25 +393,24 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
         rows = {(d["ticker"], d["official_ex_date"]): None for d in h2}
         self.assertIn("2020-01-02T03:04:05", tool.render(h2, rows))
         self.assertTrue(hose_metadata_errors(target))
-        # 3. Bản HOSE đăng cùng ngày ký không được tự nâng lên DA_XAC_MINH.
+        # 3. QĐ-9: bản HOSE đăng cùng ngày ký được nhận theo đúng giờ đăng; ngày ký gõ tay vẫn bị từ chối.
         for doc in same_day:
+            self.assertEqual(hose_metadata_errors(doc), [], doc["source_id"])
             bad = copy.deepcopy(doc)
-            posted = json.loads((ROOT / pathlib.Path(doc["path"]).parent / f"hose_news_{doc['source_id'][5:]}.json")
-                                .read_bytes())["data"]["postedDate"]
-            bad["published_at"], bad["published_at_status"] = posted_iso(posted), "DA_XAC_MINH"
-            if "publication_evidence" in bad:
-                bad["publication_evidence"] = str(pathlib.Path(doc["path"]).parent / f"hose_news_{doc['source_id'][5:]}.json")
+            bad["published_at"] = doc["signed_date"] + "T00:00:00"
             self.assertTrue(hose_metadata_errors(bad), doc["source_id"])
         # 4a. Trạng thái hoặc đường dẫn chứng cứ 2026H2 lệch với published_at, dù ngày đúng.
         h2_pub = next(d for d in _docs() if d["published_at"])
         for key, val in (("published_at_status", "CHUA_XAC_MINH"), ("publication_evidence", h2_pub["path"]),
-                         ("publication_evidence", None)):
+                         ("publication_evidence", None), ("publication_evidence_sha256", "0" * 64),
+                         ("publication_media_evidence", None), ("publication_media_sha256", "0" * 64)):
             bad = copy.deepcopy(h2_pub)
             bad[key] = val
             self.assertTrue(hose_metadata_errors(bad), (key, val))
         # 4. Chứng cứ manifest đầu trỏ sai hoặc sai sha256.
         first = next(d for d in _docs(FIRST_MANIFEST) if d["published_at"])
-        for key, val in (("sha256", "0" * 64), ("path", first["path"]), ("field", "data.createdDate")):
+        for key, val in (("sha256", "0" * 64), ("path", first["path"]), ("field", "data.createdDate"),
+                         ("media_sha256", "0" * 64), ("media_path", first["path"])):
             bad = copy.deepcopy(first)
             bad["published_at_evidence"][key] = val
             self.assertTrue(hose_metadata_errors(bad), key)
@@ -450,14 +447,69 @@ class CorporateActionEvidence2026H2Tests(unittest.TestCase):
             moved["published_at_note"] = a["published_at_note"].replace(
                 f"{len(m_orig)} byte, sha256 {hashlib.sha256(m_orig).hexdigest()}",
                 f"{len(m_new)} byte, sha256 {hashlib.sha256(m_new).hexdigest()}")
+            if "publication_media_sha256" in moved:
+                moved["publication_media_sha256"] = hashlib.sha256(m_new).hexdigest()
+            else:
+                moved["published_at_evidence"]["media_sha256"] = hashlib.sha256(m_new).hexdigest()
             errs = hose_metadata_errors(moved, root)
-            self.assertTrue(errs and all("tệp đính kèm" in e for e in errs), errs)
+            self.assertTrue(errs and all("đính kèm" in e for e in errs), errs)
             media_a.write_bytes(m_orig)
             other = (root / pathlib.Path(b["path"]).parent / f"hose_news_{b['source_id'][5:]}.json").read_bytes()
             (root / pathlib.Path(a["path"]).parent / f"hose_news_{a['source_id'][5:]}.json").write_bytes(other)
             errs = hose_metadata_errors(a, root)
             self.assertTrue(any("không khớp bản gốc" in e for e in errs), errs)
         self.assertEqual(before, subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT))
+
+    def test_qd9_proof_rejects_each_case(self):
+        """QĐ-9 (gói giao số 2, C5 mục 6): mỗi trường hợp sau phải ra lỗi từ tools/publication_proof.proof_errors."""
+        docs = all_twenty_docs()
+        a = next(d for d in _docs() if d["published_at"][:10] == d["signed_date"])   # một bản đăng trùng ngày ký
+        b = next(d for d in _docs() if d["source_id"] != a["source_id"])
+        self.assertEqual(proof_errors(a, ROOT), [])
+        # 1. Ngày gõ tay khác JSON.
+        self.assertTrue(proof_errors({**a, "published_at": a["published_at"][:-1] + "9"}, ROOT))
+        # 4. Danh sách đính kèm trỏ tới PDF khác (url bản gốc đổi).
+        self.assertTrue(any("đính kèm" in e for e in proof_errors({**a, "url": b["url"]}, ROOT)))
+        # 5. Ngày đăng sớm hơn ngày ký.
+        later = (dt.date.fromisoformat(a["signed_date"]) + dt.timedelta(days=1)).isoformat()
+        self.assertTrue(any("sớm hơn ngày ký" in e for e in proof_errors({**a, "signed_date": later}, ROOT)))
+        # 6. Ngày đăng cộng 7 giờ không sớm hơn ngày không hưởng quyền.
+        shifted = (dt.datetime.fromisoformat(a["published_at"]) + dt.timedelta(hours=7)).date().isoformat()
+        self.assertTrue(any("cộng 7 giờ" in e for e in proof_errors({**a, "official_ex_date": shifted}, ROOT)))
+        day_after = (dt.date.fromisoformat(shifted) + dt.timedelta(days=1)).isoformat()
+        self.assertEqual(proof_errors({**a, "official_ex_date": day_after}, ROOT), [])
+        with tempfile.TemporaryDirectory() as tmp:
+            root = pathlib.Path(tmp)
+            for d in (a, b):
+                shutil.copytree(ROOT / pathlib.Path(d["path"]).parent, root / pathlib.Path(d["path"]).parent)
+            self.assertEqual(proof_errors(a, root), [])
+            news = root / a["publication_evidence"]
+            orig = news.read_bytes()
+            # 2. JSON bị đổi một byte.
+            flipped = bytearray(orig)
+            flipped[len(flipped) // 2] ^= 0x01
+            news.write_bytes(bytes(flipped))
+            self.assertTrue(any("sha256" in e for e in proof_errors(a, root)))
+            # 3. JSON của tin khác (sha256 khai theo tệp mới, nên chỉ còn lỗi id/mã).
+            other = (root / b["publication_evidence"]).read_bytes()
+            news.write_bytes(other)
+            errs = proof_errors({**a, "publication_evidence_sha256": hashlib.sha256(other).hexdigest()}, root)
+            self.assertTrue(errs and all("id" in e or "mã" in e or "data.postedDate" in e for e in errs), errs)
+            self.assertTrue(any("khác số trong source_id" in e for e in errs))
+            # JSON cùng id nhưng sai mã chứng khoán (sha256 khai theo tệp mới).
+            nj = json.loads(orig)
+            nj["data"]["code"] = "XXX"
+            wrong = json.dumps(nj, ensure_ascii=False).encode()
+            news.write_bytes(wrong)
+            errs = proof_errors({**a, "publication_evidence_sha256": hashlib.sha256(wrong).hexdigest()}, root)
+            self.assertEqual(len(errs), 1)
+            self.assertIn("khác ticker", errs[0])
+            news.write_bytes(orig)
+        # Chứng cứ trỏ vào chính PDF bản gốc (kể cả khi sha256 khai khớp PDF) bị từ chối với lý do riêng.
+        pdf_sha = hashlib.sha256((ROOT / a["path"]).read_bytes()).hexdigest()
+        errs = proof_errors({**a, "publication_evidence": a["path"], "publication_evidence_sha256": pdf_sha}, ROOT)
+        self.assertTrue(any("chính bản gốc PDF" in e for e in errs), errs)
+        self.assertEqual(len(docs), 20)
 
     def test_flipping_one_byte_in_a_temp_copy_fails_and_repo_untouched(self):
         before = subprocess.check_output(["git", "status", "--porcelain"], cwd=ROOT)
