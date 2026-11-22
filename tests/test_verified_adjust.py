@@ -5,12 +5,15 @@ vào chuỗi kiểm chứng; (3) từng lý do bị cách ly; (4) cổng không 
 dẫn xuất xác định, không sửa kho raw và từ chối ghi vào thư mục dữ liệu. Không xác minh sự kiện thật nào của TCB/VCB/FPT."""
 from __future__ import annotations
 
+import copy
 import hashlib
 import json
 import os
 import pathlib
 import subprocess
 import sys
+import unicodedata
+from contextlib import contextmanager
 
 import numpy as np
 import pandas as pd
@@ -290,25 +293,26 @@ def test_tool_refuses_protected_output_dirs(tmp_path, sub):
 
 # ---------- 6. hồi quy phản biện L-09 (ChatGPT, PR #55, SHA ec47dc8): bốn phát hiện MEDIUM ----------------------------------
 
-# MEDIUM-1: loại sự kiện phải trùng đúng. Bản gốc stock_dividend không kiểm được sự kiện engine stock_split và ngược lại.
+# MEDIUM-1 (PR #55) đòi loại sự kiện trùng đúng. QĐ-2 của ADR-0016 (ACCEPTED 21/11/2026, LỆNH E1) thay bằng so theo LỚP:
+# chia tách và trả cổ tức bằng cổ phiếu cùng lớp STOCK, vì engine tính hệ số như nhau (adjust.STOCK).
 @pytest.mark.parametrize("engine_typ,doc_typ", [("stock_split", "stock_dividend"), ("stock_dividend", "stock_split")])
-def test_m1_event_type_mismatch_is_quarantined(tmp_path, engine_typ, doc_typ):
+def test_m1_e1_split_and_stock_dividend_are_one_stock_class(tmp_path, engine_typ, doc_typ):
     close, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK], typ=engine_typ), _none(), [_doc(tmp_path, typ=doc_typ)])
     r = ev.iloc[0]
-    assert r.status == "APPLIED"                                           # cùng mã, ngày, tỷ lệ: chỉ khác loại
-    assert r.verify_state == va.Q + "LOAI_SU_KIEN_LECH", r.verify_reason
-    assert not r.in_verified_chain and r.taints and r.evidence_id == "hose-test-1"
-    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()
+    assert r.status == "APPLIED" and r.verify_state == va.OK, r.verify_reason
+    assert r.in_verified_chain and not r.taints and r.evidence_id == "hose-test-1"
+    assert va.verified_factors(close.index, close.columns, ev)[0].iloc[0, 0] == pytest.approx(1 / RATIO)
 
 
-def test_m1_yahoo_already_adjusted_split_vs_dividend_document_is_quarantined(tmp_path):
-    """Đúng ca FPT thật: Yahoo ghi stock_split (giá nguồn đã chứa điều chỉnh), văn bản HOSE là stock_dividend."""
+def test_m1_e1_yahoo_already_adjusted_split_with_stock_dividend_document_verifies(tmp_path):
+    """Ca FPT thật: Yahoo ghi stock_split (giá nguồn đã chứa điều chỉnh), văn bản HOSE là stock_dividend: cùng lớp STOCK.
+    Mọi điều kiện khác (ngày công bố, tỷ lệ, ngày áp, giá liên tục, đủ phiên) vẫn phải đạt."""
     close = _close(ratio=1.0)
     yahoo = _ev("AAA", IDX[BRK], typ="stock_split", source="yahoo", status="TU_DONG")
     events = adjust.build_events(close, _obs(close, "2030-01-01"), _none(), yahoo)
     assert events.status.tolist() == ["DA_NAM_TRONG_GIA_NGUON"]
     ev = va.verify_events(events, close, [_doc(tmp_path, typ="stock_dividend")], evidence_root=tmp_path, as_of=AS_OF)
-    assert ev.verify_state.tolist() == [va.Q + "LOAI_SU_KIEN_LECH"] and not ev.in_verified_chain.any()
+    assert ev.verify_state.tolist() == [va.OK] and ev.in_verified_chain.all()
 
 
 def test_m1_same_type_document_preferred_over_other_type_at_same_distance(tmp_path):
@@ -687,3 +691,166 @@ def test_mc_applied_check_uses_close_not_the_events_table(tmp_path):
 def test_mc_applied_and_already_in_price_share_one_hypothesis_check():
     """Hai trạng thái dùng chung một hàm kiểm hai giả thuyết, tránh lệch logic."""
     assert va.EXPECTED_HYPOTHESIS == {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}
+
+
+# ---------- 8. LỆNH E1 (QĐ-2, QĐ-2a, ADR-0016): xếp lớp bản gốc bằng bảng ánh xạ đóng, tỷ lệ 7 chữ số thập phân ----------
+
+MAPPED = ["trả cổ tức bằng cổ phiếu", "Chi trả cổ tức bằng cổ phiếu", "  phát hành   cổ phiếu để trả cổ tức ",
+          unicodedata.normalize("NFD", "trả cổ tức bằng cổ phiếu")]
+
+
+@pytest.mark.parametrize("field", ["event_type_verbatim", "source_event_text"])
+@pytest.mark.parametrize("text", MAPPED, ids=["tra", "chi_tra_hoa", "phat_hanh_khoang_trang", "nfd"])
+def test_e1_empty_event_type_with_mapped_verbatim_verifies(tmp_path, field, text):
+    """Bản gốc event_type trống (như 17 bản 2026H2) được ghép và xếp lớp STOCK qua nguyên văn; chuẩn hóa NFC, chữ thường,
+    khoảng trắng."""
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path, typ=None, **{field: text})])
+    assert ev.verify_state.tolist() == [va.OK], ev.verify_reason.tolist()
+    assert ev.in_verified_chain.all() and ev.evidence_id.tolist() == ["hose-test-1"]
+
+
+# QĐ-2a: đúng bốn nguyên văn cổ phiếu thưởng và câu gộp đang có trong hai manifest, chép nguyên chữ hoa/thường như manifest.
+QD2A = [
+    ("event_type_verbatim", "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu"),  # 2026H2: VIC, SSI, BID, VIB
+    ("source_event_text", "Thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu"),  # TCB 2024
+    ("source_event_text", "Phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu"),  # FPT 2026
+    ("event_type_verbatim", "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu"),  # 2026H2: HDB×2, POW
+]
+
+
+@pytest.mark.parametrize("field,text", QD2A, ids=["thuong_2026h2", "thuong_tcb_2024", "thuong_fpt", "gop"])
+def test_e1_qd2a_bonus_and_combined_verbatims_verify(tmp_path, field, text):
+    """QĐ-2a: cổ phiếu thưởng (tăng vốn từ nguồn vốn chủ sở hữu) và câu gộp với cổ tức bằng cổ phiếu cùng lớp STOCK."""
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path, typ=None, **{field: text})])
+    assert ev.verify_state.tolist() == [va.OK], ev.verify_reason.tolist()
+    assert ev.in_verified_chain.all() and ev.evidence_id.tolist() == ["hose-test-1"]
+
+
+UNMAPPED = [
+    ("co_tuc_tien", "trả cổ tức bằng tiền"),
+    ("quyen_mua", "phát hành cổ phiếu cho cổ đông hiện hữu theo phương thức thực hiện quyền mua"),
+    ("esop", "phát hành cổ phiếu theo chương trình lựa chọn cho người lao động (ESOP)"),
+    ("rieng_le", "chào bán cổ phiếu riêng lẻ"),
+    ("thuong_kem_quyen_mua", "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu và phát hành quyền mua"),
+    ("tang_von_khong_ro_nguon", "phát hành cổ phiếu để tăng vốn cổ phần"),
+    ("rong", None),
+]
+
+
+@pytest.mark.parametrize("name,text", UNMAPPED, ids=[x[0] for x in UNMAPPED])
+def test_e1_unmapped_verbatim_is_quarantined_and_taints(tmp_path, name, text):
+    """QĐ-2, QĐ-2a: cổ tức tiền, phát hành quyền mua, ESOP, chào bán riêng lẻ và mọi nguyên văn ngoài bảng ánh xạ (kể cả
+    câu chỉ gần giống một dòng của bảng) ra LOAI_CHUA_ANH_XA. Ngày, tỷ lệ, bản gốc đều hợp lệ; chỉ loại không xếp được. Bản
+    gốc vẫn được ghép (evidence_id) và nhiễm ô."""
+    close, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path, typ=None, event_type_verbatim=text)])
+    r = ev.iloc[0]
+    assert r.verify_state == va.Q + "LOAI_CHUA_ANH_XA", r.verify_reason
+    assert not r.in_verified_chain and r.taints and r.evidence_id == "hose-test-1"
+    assert (va.verified_factors(close.index, close.columns, ev)[0].values == 1.0).all()
+
+
+def test_e1_event_type_takes_precedence_over_verbatim(tmp_path):
+    """event_type thuộc STOCK thì không xét nguyên văn (như VCB 2025: event_type stock_dividend)."""
+    d = _doc(tmp_path, typ="stock_dividend", source_event_text="một nguyên văn không có trong bảng")
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [d])
+    assert ev.verify_state.tolist() == [va.OK]
+
+
+def test_e1_explicit_cash_event_type_document_is_still_not_matched(tmp_path):
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [_doc(tmp_path, typ="cash_dividend",
+                                                                       event_type_verbatim="trả cổ tức bằng cổ phiếu")])
+    assert ev.verify_state.tolist() == [va.Q + "THIEU_BANG_CHUNG"] and ev.evidence_id.tolist() == [""]
+
+
+def test_e1_explicit_other_event_type_is_a_class_mismatch():
+    """Phòng thủ trong _judge: bản gốc có event_type khác lớp STOCK (ví dụ quyền mua) không bao giờ được chứng nhận."""
+    close = _close()
+    r = {"ticker": "AAA", "type": "stock_dividend", "ratio": RATIO, "status": "APPLIED", "trade_date": IDX[BRK]}
+    doc = {"event_type": "rights_issue", "event_type_verbatim": "trả cổ tức bằng cổ phiếu"}
+    with patch_doc_problem_ok():
+        state, reason, *_ = va._judge(r, doc, close, REPO, AS_OF)
+    assert state == va.Q + "LOAI_SU_KIEN_LECH", reason
+
+
+def test_e1_mapped_verbatim_does_not_skip_other_conditions(tmp_path):
+    for over, state in ((dict(published_at=None), "THIEU_NGAY_CONG_BO"), (dict(ratio=1.5), "TY_LE_LECH"),
+                        (dict(ex=IDX[BRK + 7]), "LECH_NGAY")):
+        d = _doc(tmp_path, typ=None, event_type_verbatim="trả cổ tức bằng cổ phiếu", **over)
+        _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [d])
+        assert ev.verify_state.tolist() == [va.Q + state], (over, ev.verify_reason.tolist())
+
+
+@pytest.mark.parametrize("doc_ratio,ok", [(1.4463658403, True), (1.44636584, True), (1.4463658, True),
+                                          (1.44636585, False), (1.4463659, False), (1.4463657, False)])
+def test_e1_ratio_is_compared_at_seven_decimals(tmp_path, doc_ratio, ok):
+    """Ca CTG 2025 thật: văn bản 1,4463658403, Yahoo 1.4463658 (CSV ghi 1.4463658000000001). Làm tròn HALF_UP tới 7 chữ
+    số thập phân rồi so; lệch ở chữ số thứ 7 vẫn là TY_LE_LECH."""
+    r = 1.4463658
+    close = _close(ratio=r)
+    _, _, ev = _run(tmp_path, _ev("AAA", IDX[BRK], ratio=1.4463658000000001), _none(), [_doc(tmp_path, ratio=doc_ratio)],
+                    close=close)
+    assert (ev.verify_state.iloc[0] == va.OK) is ok, ev.verify_reason.tolist()
+    if not ok:
+        assert ev.verify_state.iloc[0] == va.Q + "TY_LE_LECH"
+
+
+def test_e1_manifest_documents_are_not_modified(tmp_path):
+    d = _doc(tmp_path, typ=None, event_type_verbatim="Trả cổ tức bằng cổ phiếu")
+    before = copy.deepcopy(d)
+    _run(tmp_path, _ev("AAA", IDX[BRK]), _none(), [d])
+    assert d == before
+
+
+def test_e1_mapping_table_is_closed_and_normalised():
+    """Bảng ánh xạ ghim cứng: đổi bảng phải sửa test này, nên đi qua PR và L-09 (QĐ-2, QĐ-2a)."""
+    assert va.STOCK_VERBATIM == frozenset({
+        "trả cổ tức bằng cổ phiếu", "chi trả cổ tức bằng cổ phiếu", "phát hành cổ phiếu để trả cổ tức",
+        "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+        "thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+        "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu",
+        "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu"})
+    assert all(t == va._norm_text(t) for t in va.STOCK_VERBATIM)
+    assert va.RATIO_DECIMALS == 7 and va.Q + "LOAI_CHUA_ANH_XA" in va.STATES
+
+
+def test_e1_mapping_table_rows_are_exactly_verbatims_from_the_two_manifests():
+    """Bảng chỉ chứa nguyên văn đang có trong hai manifest (không tự đặt câu), và sau QĐ-2a mọi bản gốc của hai manifest
+    xếp được lớp STOCK."""
+    docs = va.load_evidence([REPO / "data/evidence/corporate_actions/EVIDENCE_MANIFEST.json",
+                             REPO / "data/evidence/corporate_actions/EVIDENCE_MANIFEST_2026H2.json"])
+    seen = {va._norm_text(d.get(f)) for d in docs for f in va.VERBATIM_FIELDS if isinstance(d.get(f), str)}
+    assert va.STOCK_VERBATIM <= seen
+    assert [d["source_id"] for d in docs if va._doc_class(d)[0] != "STOCK"] == []
+
+
+def test_e1_real_repo_nothing_enters_chain_without_publication_date():
+    """Kho thật, chỉ đọc: mọi sự kiện vào chuỗi phải có bản gốc mang published_at. Khi mọi published_at còn trống (trước
+    D1) thì 0 sự kiện vào chuỗi."""
+    from engine import data
+    s = data.load_store(root=REPO)
+    raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
+    obs = s.pivot(index="date", columns="ticker", values="observed_at").sort_index()
+    keep = raw.columns[raw.notna().sum() > 250]
+    raw, obs = raw[keep], obs[keep]
+    events = adjust.build_events(raw, obs, adjust.load_manual(), adjust.load_yahoo())
+    mans = [REPO / "data/evidence/corporate_actions/EVIDENCE_MANIFEST.json",
+            REPO / "data/evidence/corporate_actions/EVIDENCE_MANIFEST_2026H2.json"]
+    docs = va.load_evidence(mans)
+    ev = va.verify_events(events, raw, docs, evidence_root=REPO, as_of=raw.index.max())
+    assert set(ev.verify_state) <= set(va.STATES)
+    published = {d["source_id"] for d in docs if d.get("published_at")}
+    chain = ev[ev.in_verified_chain]
+    assert set(chain.evidence_id) <= published
+    if not published:
+        assert len(chain) == 0
+
+
+@contextmanager
+def patch_doc_problem_ok():
+    """Cho _judge bỏ qua kiểm tệp bản gốc trong test phòng thủ (chỉ dùng ở test gọi thẳng _judge)."""
+    orig = va._doc_problem
+    va._doc_problem = lambda d, base: None
+    try:
+        yield
+    finally:
+        va._doc_problem = orig
