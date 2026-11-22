@@ -8,10 +8,14 @@ biên độ giá sau điều chỉnh nằm trong sàn. Đó là nguyên nhân m�
 
 Cổng này dựng một chuỗi RIÊNG. Một sự kiện cổ phiếu chỉ vào chuỗi đó khi đủ cả chín điều kiện:
   1. có bản gốc đã ghim trong manifest (source_id, url, issuer, path, sha256 đều là chuỗi không rỗng), tệp tồn tại, đúng
-     sha256 và số byte; loại sự kiện in trên văn bản (`event_type`) TRÙNG ĐÚNG loại của sự kiện engine (không coi
-     `stock_split` và `stock_dividend` là một);
+     sha256 và số byte; bản gốc thuộc lớp STOCK như sự kiện engine (QĐ-2 và QĐ-2a, ADR-0016: chia tách, trả cổ tức bằng cổ
+     phiếu và cổ phiếu thưởng cùng một lớp vì engine tính hệ số như nhau). Bản gốc thuộc lớp STOCK khi `event_type` thuộc
+     `adjust.STOCK`, hoặc khi `event_type` trống và nguyên văn loại (`event_type_verbatim`, không có thì `source_event_text`)
+     nằm trong bảng ánh xạ đóng STOCK_VERBATIM; nguyên văn ngoài bảng thì CÁCH LY LOAI_CHUA_ANH_XA. Nguyên văn trong manifest
+     không bị sửa;
   2. có ngày công bố (`published_at`) hợp lệ: có mặt, không muộn hơn ngày cắt `as_of`, sớm hơn ngày không hưởng quyền;
-  3. tỷ lệ in trên văn bản (`official_ratio`) là số hữu hạn dương và trùng tỷ lệ của sự kiện;
+  3. tỷ lệ in trên văn bản (`official_ratio`) là số hữu hạn dương và trùng tỷ lệ của sự kiện khi làm tròn tới RATIO_DECIMALS
+     = 7 chữ số thập phân;
   4. NGÀY GIAO DỊCH mà engine đang áp sự kiện trùng ngày giao dịch của ngày không hưởng quyền chính thức;
   5. không có sự kiện nào khác của cùng bản gốc được engine áp ở ngày khác; "cùng bản gốc" xét theo cả `source_id` lẫn
      sha256 của tệp, nên đổi hay bỏ `source_id` không lách được kiểm tra này;
@@ -42,6 +46,8 @@ from __future__ import annotations
 import hashlib
 import json
 import pathlib
+import unicodedata
+from decimal import ROUND_HALF_UP, Decimal
 
 import numpy as np
 import pandas as pd
@@ -54,7 +60,27 @@ NO_DATA = ("KHONG_CO_MA", "CHUA_DEN_HAN", "NGOAI_DU_LIEU")                   # k
 VERIFIABLE = ("APPLIED", "DA_NAM_TRONG_GIA_NGUON")                           # danh sách cho phép: chỉ hai trạng thái này được kiểm
 DOC_REQUIRED = ("source_id", "url", "issuer", "path", "sha256")
 WINDOW_DAYS = 45          # bản gốc phải có ngày không hưởng quyền cách ngày engine không quá ngần này ngày lịch
-RATIO_TOL = 1e-9
+# Tỷ lệ so ở 7 chữ số thập phân: đó là độ chính xác của data/derived/yahoo_actions.csv (ví dụ CTG 2025: Yahoo 1.4463658,
+# văn bản 1,4463658403). So chặt hơn thì một sự kiện đúng bị loại chỉ vì nguồn làm tròn; so lỏng hơn thì tỷ lệ sai lọt qua.
+RATIO_DECIMALS = 7
+# QĐ-2 và QĐ-2a (ADR-0016): bảng ánh xạ ĐÓNG từ nguyên văn loại sự kiện trên bản gốc sang lớp STOCK. Chỉ gồm đúng các nguyên
+# văn đã gặp trong hai manifest của ba loại: trả cổ tức bằng cổ phiếu (QĐ-2); phát hành cổ phiếu để tăng vốn từ nguồn vốn
+# chủ sở hữu, tức cổ phiếu thưởng (QĐ-2a); câu gộp cổ tức bằng cổ phiếu với tăng vốn từ nguồn vốn chủ sở hữu (QĐ-2a). Không
+# có: cổ tức tiền, phát hành quyền mua, ESOP, chào bán riêng lẻ. Mọi nguyên văn ngoài bảng ra LOAI_CHUA_ANH_XA. Đổi bảng phải
+# qua PR và L-09. So sau khi chuẩn hóa: Unicode NFC, chữ thường (casefold), gộp khoảng trắng.
+STOCK_VERBATIM = frozenset({
+    # QĐ-2: trả cổ tức bằng cổ phiếu
+    "trả cổ tức bằng cổ phiếu",
+    "chi trả cổ tức bằng cổ phiếu",
+    "phát hành cổ phiếu để trả cổ tức",
+    # QĐ-2a: cổ phiếu thưởng (tăng vốn từ nguồn vốn chủ sở hữu)
+    "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+    "thực hiện phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu",
+    "phát hành cổ phiếu để tăng vốn cổ phần từ nguồn vốn chủ sở hữu cho cổ đông hiện hữu",
+    # QĐ-2a: câu gộp cổ tức bằng cổ phiếu với tăng vốn từ nguồn vốn chủ sở hữu
+    "trả cổ tức bằng cổ phiếu và phát hành tăng vốn từ nguồn vốn chủ sở hữu",
+})
+VERBATIM_FIELDS = ("event_type_verbatim", "source_event_text")
 
 OK = "DA_KIEM_CHUNG"
 NA_NODATA = "KHONG_ANH_HUONG"
@@ -64,7 +90,7 @@ STATES = (OK, NA_NODATA, NA_CASH, Q + "THIEU_BANG_CHUNG", Q + "BANG_CHUNG_HONG",
           Q + "CONG_BO_SAU_NGAY_CAT", Q + "CONG_BO_SAU_NGAY_HUONG_QUYEN", Q + "TY_LE_LECH", Q + "LECH_NGAY",
           Q + "XUNG_DOT_NGAY", Q + "GIA_KHONG_KHOP_TY_LE", Q + "LOAI_SU_KIEN_LECH",
           Q + "TRANG_THAI_ENGINE_KHONG_HOP_LE", Q + "GIA_CHUA_LIEN_TUC", Q + "GIA_KHONG_CHUNG_MINH_HE_SO",
-          Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN", Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN")
+          Q + "GIA_GAY_TRUOC_NGAY_HUONG_QUYEN", Q + "THIEU_GIA_TRUOC_NGAY_HUONG_QUYEN", Q + "LOAI_CHUA_ANH_XA")
 # trạng thái engine → giả thuyết giá phải được chứng minh; trạng thái cách ly khi không chứng minh được
 EXPECTED_HYPOTHESIS = {"APPLIED": "CAN_HE_SO", "DA_NAM_TRONG_GIA_NGUON": "DA_DIEU_CHINH"}
 HYPOTHESIS_FAIL_STATE = {"CAN_HE_SO": Q + "GIA_KHONG_CHUNG_MINH_HE_SO", "DA_DIEU_CHINH": Q + "GIA_CHUA_LIEN_TUC"}
@@ -124,19 +150,46 @@ def _doc_problem(d, base):
     return None
 
 
-def _match(ticker, ex_date, typ, docs):
-    """Bản gốc cổ phiếu của cùng mã có ngày không hưởng quyền gần ngày của sự kiện nhất, trong WINDOW_DAYS ngày lịch.
+def _norm_text(x) -> str:
+    return " ".join(unicodedata.normalize("NFC", x).casefold().split()) if isinstance(x, str) else ""
 
-    Bản gốc khác loại vẫn được ghép (ưu tiên bản cùng loại khi cùng khoảng cách) để `_judge` CÁCH LY với lý do rõ ràng
-    và để bản gốc đó vẫn tham gia kiểm tra trùng ngày, thay vì bị bỏ qua lặng lẽ."""
+
+def _doc_class(d):
+    """(lớp, mô tả) của bản gốc: "STOCK", "OTHER" (event_type khác lớp STOCK) hoặc "UNMAPPED" (event_type trống và
+    nguyên văn loại không có trong STOCK_VERBATIM). Chỉ đọc, không sửa bản gốc."""
+    et = d.get("event_type")
+    if et in STOCK:
+        return "STOCK", f"event_type {et}"
+    if isinstance(et, str) and et.strip():
+        return "OTHER", f"event_type {et}"
+    for f in VERBATIM_FIELDS:
+        v = d.get(f)
+        if isinstance(v, str) and v.strip():
+            if _norm_text(v) in STOCK_VERBATIM:
+                return "STOCK", f"{f} '{v}' thuộc bảng ánh xạ STOCK"
+            return "UNMAPPED", f"{f} '{v}' không có trong bảng ánh xạ đóng STOCK_VERBATIM"
+    return "UNMAPPED", "event_type trống và không có nguyên văn loại sự kiện"
+
+
+def _ratio_key(x) -> Decimal:
+    return Decimal(repr(float(x))).quantize(Decimal(1).scaleb(-RATIO_DECIMALS), rounding=ROUND_HALF_UP)
+
+
+def _match(ticker, ex_date, typ, docs):
+    """Bản gốc của cùng mã có ngày không hưởng quyền gần ngày của sự kiện nhất, trong WINDOW_DAYS ngày lịch.
+
+    Nhận bản gốc lớp STOCK và bản gốc có `event_type` trống (xếp lớp bằng nguyên văn ở `_judge`); bản gốc có `event_type`
+    thuộc loại khác (ví dụ cổ tức tiền) không được ghép. Cùng khoảng cách thì ưu tiên bản lớp STOCK, rồi bản cùng loại.
+    Bản gốc chưa ánh xạ vẫn được ghép để `_judge` CÁCH LY với lý do rõ ràng và để nó tham gia kiểm tra trùng ngày."""
     best = None
     for d in docs:
-        if d.get("ticker") != ticker or d.get("event_type") not in STOCK:
+        et = d.get("event_type")
+        if d.get("ticker") != ticker or (et not in STOCK and isinstance(et, str) and et.strip()):
             continue
         od = _ts(d.get("official_ex_date"))
         if pd.isna(od) or pd.isna(ex_date):
             continue
-        key = (abs((od - ex_date).days), d.get("event_type") != typ)
+        key = (abs((od - ex_date).days), _doc_class(d)[0] != "STOCK", et != typ)
         if key[0] <= WINDOW_DAYS and (best is None or key < best[0]):
             best = (key, d)
     return best[1] if best else None
@@ -189,9 +242,12 @@ def _judge(r, d, close, base, as_of):
     bad = _doc_problem(d, base)
     if bad:
         return Q + "BANG_CHUNG_HONG", bad, pd.NaT, np.nan
-    if d.get("event_type") != r["type"]:
-        return (Q + "LOAI_SU_KIEN_LECH", f"văn bản là {d.get('event_type')}, engine ghi sự kiện là {r['type']}; "
-                "không coi hai loại là một", pd.NaT, np.nan)
+    cls, cdesc = _doc_class(d)
+    if cls == "UNMAPPED":
+        return Q + "LOAI_CHUA_ANH_XA", f"{cdesc}; không xếp được bản gốc vào lớp STOCK (QĐ-2, QĐ-2a)", pd.NaT, np.nan
+    if cls != "STOCK" or r["type"] not in STOCK:
+        return (Q + "LOAI_SU_KIEN_LECH", f"bản gốc ({cdesc}) và sự kiện engine ({r['type']}) không cùng lớp STOCK",
+                pd.NaT, np.nan)
     pub, off = _ts(d.get("published_at")), _ts(d.get("official_ex_date"))
     if pd.isna(pub):
         return Q + "THIEU_NGAY_CONG_BO", "bản gốc không có published_at; không lấy ngày hưởng quyền thay ngày công bố", pd.NaT, np.nan
@@ -203,8 +259,9 @@ def _judge(r, d, close, base, as_of):
     fo, fv = _positive_number(ro), _positive_number(rv)
     if fo is None or fv is None:
         return Q + "TY_LE_LECH", f"tỷ lệ không hợp lệ (văn bản {ro!r}, sự kiện {rv!r}); phải là số hữu hạn dương", pd.NaT, np.nan
-    if not abs(fo - fv) <= RATIO_TOL:
-        return Q + "TY_LE_LECH", f"tỷ lệ in trên văn bản {ro} khác tỷ lệ sự kiện {rv}", pd.NaT, np.nan
+    if _ratio_key(fo) != _ratio_key(fv):
+        return (Q + "TY_LE_LECH", f"tỷ lệ in trên văn bản {ro} khác tỷ lệ sự kiện {rv} ở {RATIO_DECIMALS} chữ số thập phân "
+                f"({_ratio_key(fo)} và {_ratio_key(fv)})", pd.NaT, np.nan)
     sess = close[r["ticker"]].dropna().index
     pos = int(sess.searchsorted(off))
     if pos >= len(sess):
