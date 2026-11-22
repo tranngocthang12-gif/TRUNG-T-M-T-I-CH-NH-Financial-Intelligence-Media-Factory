@@ -10,7 +10,7 @@
 - `published_at` theo QĐ-9 (ADR-0016): lấy giây Unix `data.postedDate` của tin HOSE, viết ISO 8601 theo phép đổi chuẩn của Unix (UTC), không gắn múi giờ; chỉ nhận khi `tools/publication_proof.py` kiểm được từ metadata HOSE đã ghim, kể cả khi trùng ngày ký.
 - MCH: `postedDate` = 1785522230 → 2026-07-31T18:23:50, trùng ngày ký 2026-07-31; được nhận theo QĐ-9. Đọc theo giờ Việt Nam (+7 giờ) là 2026-08-01T01:23:50, vẫn trước ngày không hưởng quyền 10/08/2026. Cả 3 sự kiện đều có ngày công bố.
 
-**Cách đọc PDF:** PDF là ảnh quét, không có lớp chữ. Ngày, tỷ lệ và lý do do Claude (Anthropic) đọc từ ảnh; **chưa có ghế khác nhà cung cấp đối chiếu**. Bảng «Đối chiếu ảnh quét» dưới đây ghi từng trường cần kiểm, theo vị trí trên trang 1 của mỗi PDF.
+**Cách đọc PDF:** PDF là ảnh quét, không có lớp chữ. Ngày, tỷ lệ và lý do do Claude (Anthropic) đọc từ ảnh. **ChatGPT (OpenAI) đã đối chiếu trực quan trang 1 của ba PDF (BSR, MCH, TCX) ngày 22/11/2026** trong các bản chấm L-09 của PR #78 ([vòng 2](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/78#issuecomment-7072805055), [lượt chấm hoàn tất](https://github.com/tranngocthang12-gif/TRUNG-T-M-T-I-CH-NH-Financial-Intelligence-Media-Factory/pull/78#issuecomment-7072923697)); kết quả khớp mọi trường trong bảng «Đối chiếu ảnh quét» dưới đây, ghi theo vị trí trên trang 1 của mỗi PDF.
 
 ## Sự kiện tìm được
 
@@ -23,19 +23,19 @@
 - Hai dòng cổ tức tiền có `official_ratio` để trống, vì cổ tức tiền không phải hệ số giá.
 - Mỗi bản gốc được ghim kèm JSON tin HOSE và JSON danh sách tệp đính kèm. Tên PDF trong danh sách tệp đính kèm trùng đúng `url` của bản gốc.
 
-## Đối chiếu ảnh quét (trang 1 mỗi PDF; cần ghế khác nhà cung cấp kiểm và ghi tên)
+## Đối chiếu ảnh quét (trang 1 mỗi PDF; ChatGPT (OpenAI) đã đối chiếu trực quan ngày 22/11/2026, khớp mọi trường)
 
 | PDF (sha256 16 ký tự đầu) | Trường | Dòng in trên trang 1 (Claude đọc) | Người kiểm khác nhà cung cấp |
 |---|---|---|---|
-| hose-2475353 BSR (6730fa375a2e3af1) | Số, ngày ký | góc trái «Số: 1434/TB-SGDHCM»; góc phải «ngày 29 tháng 06 năm 2026» | chưa có |
-| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 11/08/2026»; «Ngày đăng ký cuối cùng: 12/08/2026» | chưa có |
-| | Lý do, tỷ lệ | «Chi trả cổ tức năm 2025 bằng tiền»; «Tỷ lệ thực hiện: 3%/mệnh giá (1 cổ phiếu nhận được 300 đồng)»; «Ngày thanh toán: 11/09/2026» | chưa có |
-| hose-2485688 MCH (6e5e9809f5dc28b9) | Số, ngày ký | «Số: 1643/TB-SGDHCM»; «ngày 31 tháng 07 năm 2026» | chưa có |
-| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 10/08/2026»; «Ngày đăng ký cuối cùng: 11/08/2026» | chưa có |
-| | Lý do, tỷ lệ | «Tạm ứng cổ tức đợt 1 năm 2026 bằng tiền»; «Tỷ lệ thực hiện: 20%/mệnh giá (01 cổ phiếu được nhận 2.000 đồng)»; «Ngày thanh toán: 19/08/2026» | chưa có |
-| hose-2496161 TCX (3c5406e70b0380ec) | Số, ngày ký | «Số: 1860/TB-SGDHCM»; «ngày 10 tháng 09 năm 2026» | chưa có |
-| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 17/09/2026»; «Ngày đăng ký cuối cùng: 18/09/2026» | chưa có |
-| | Lý do, tỷ lệ | «Trả cổ tức bằng cổ phiếu năm 2025»; «Tỷ lệ thực hiện: 5:1 (Người sở hữu 05 cổ phiếu được nhận 01 cổ phiếu mới)»; «Số lượng cổ phiếu dự kiến phát hành: 554.890.665 cổ phiếu» | chưa có |
+| hose-2475353 BSR (6730fa375a2e3af1) | Số, ngày ký | góc trái «Số: 1434/TB-SGDHCM»; góc phải «ngày 29 tháng 06 năm 2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 11/08/2026»; «Ngày đăng ký cuối cùng: 12/08/2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| | Lý do, tỷ lệ | «Chi trả cổ tức năm 2025 bằng tiền»; «Tỷ lệ thực hiện: 3%/mệnh giá (1 cổ phiếu nhận được 300 đồng)»; «Ngày thanh toán: 11/09/2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| hose-2485688 MCH (6e5e9809f5dc28b9) | Số, ngày ký | «Số: 1643/TB-SGDHCM»; «ngày 31 tháng 07 năm 2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 10/08/2026»; «Ngày đăng ký cuối cùng: 11/08/2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| | Lý do, tỷ lệ | «Tạm ứng cổ tức đợt 1 năm 2026 bằng tiền»; «Tỷ lệ thực hiện: 20%/mệnh giá (01 cổ phiếu được nhận 2.000 đồng)»; «Ngày thanh toán: 19/08/2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| hose-2496161 TCX (3c5406e70b0380ec) | Số, ngày ký | «Số: 1860/TB-SGDHCM»; «ngày 10 tháng 09 năm 2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| | Ngày GDKHQ, ĐKCC | «Ngày giao dịch không hưởng quyền: 17/09/2026»; «Ngày đăng ký cuối cùng: 18/09/2026» | ChatGPT (OpenAI), 22/11/2026: khớp |
+| | Lý do, tỷ lệ | «Trả cổ tức bằng cổ phiếu năm 2025»; «Tỷ lệ thực hiện: 5:1 (Người sở hữu 05 cổ phiếu được nhận 01 cổ phiếu mới)»; «Số lượng cổ phiếu dự kiến phát hành: 554.890.665 cổ phiếu» | ChatGPT (OpenAI), 22/11/2026: khớp |
 
 ## Mã chưa tìm thấy thông báo
 
