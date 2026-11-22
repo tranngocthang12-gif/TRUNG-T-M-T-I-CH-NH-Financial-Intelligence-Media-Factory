@@ -13,7 +13,8 @@ from engine import verified_adjust as va
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LIM = {"max_weight": 0.20, "max_participation": 0.10, "max_exit_days": 3, "adv_sessions": 20,
-       "quarantine_sessions_before": 21, "quarantine_sessions_after": 120}
+       "quarantine_sessions_before": 21, "quarantine_sessions_after": 120,
+       "max_drawdown": 0.15}    # R1b (fixture): config.yaml paper.risk_limits có thêm max_drawdown; check() không đọc khóa này
 NAV = 1_000_000_000.0
 T5 = ["A", "B", "C", "D", "E"]
 
@@ -457,6 +458,10 @@ def test_pending_buys_blocked_when_limits_break_before_the_fill(tmp_path, monkey
     def between(r):
         monkeypatch.setitem(config.CFG["paper"], "risk_limits", bad)
     st, dec, trd, t1 = _two_sessions(tmp_path, monkeypatch, between)
+    if bad is None:     # R1b (Owner cho sửa assert ca này, 22/11/2026): thiếu cả khối thì cũng thiếu max_drawdown, phiên khớp
+        unv = dec[(dec.date == t1) & (dec.action == "DRAWDOWN_UNVERIFIED")]       # ghi thêm DRAWDOWN_UNVERIFIED
+        assert len(unv) == 1 and "max_drawdown" in unv.models.item()
+        dec = dec[dec.action != "DRAWDOWN_UNVERIFIED"]
     _no_buy(st, dec, trd, t1, "risk_limits" if bad is None else ("TODO" if bad.get("max_weight") == "TODO" else "adv_sessions"))
 
 

@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
-      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes test_governance test_timing_lock test_source_original test_directional_accuracy test_measurement_integration test_scorecard_refresh test_b1_engine_bridge test_verified_adjust test_corporate_action_evidence test_corporate_action_evidence_2026h2 test_vn30_history test_forecast_candidates test_pit001_audit test_price_integrity_b1 test_fetch_originals test_corporate_action_evidence_vn30_bo_sung test_trading_calendar test_model_gate test_risk_gate test_research_input_verified test_session_robot test_universe_modes"
+      UNITTEST: "test_laws_validate test_ledger_compat test_ledger_resolution test_knowledge_notes test_governance test_timing_lock test_source_original test_directional_accuracy test_measurement_integration test_scorecard_refresh test_b1_engine_bridge test_verified_adjust test_corporate_action_evidence test_corporate_action_evidence_2026h2 test_vn30_history test_forecast_candidates test_pit001_audit test_price_integrity_b1 test_fetch_originals test_corporate_action_evidence_vn30_bo_sung test_trading_calendar test_model_gate test_risk_gate test_research_input_verified test_session_robot test_universe_modes test_drawdown_lock"
       SCRIPTS: "test_no_lookahead test_adjustment test_ingest_errors test_ledger_pipeline test_quality_gate test_llm_review_budget"
     steps:
       - uses: actions/checkout@v4
