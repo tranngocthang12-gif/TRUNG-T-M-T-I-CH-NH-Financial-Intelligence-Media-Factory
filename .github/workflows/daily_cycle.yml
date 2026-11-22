@@ -1,16 +1,24 @@
 name: Vong hoc hang tuan
 
-# ARCHITECTURE v3.0 §4.3 + ADR-0003: engine la doi chung am, chay HANG TUAN (thu Sau 16:30 gio VN) de so lan thu
-# khong phinh nguong Bonferroni; ingest tai bu moi phien tu ngay cuoi trong kho nen khong mat du lieu.
+# QĐ-10 (ADR-0016): robot chay MOI PHIEN HOSE cho phan van hanh (tai gia, dinh gia so giay, cong rui ro, ghi quyet dinh);
+# buoc nghien cuu (dang ky va chay lan thu L-06, thang hang, theo doi suy giam) van chi o phien thu Sau, 6 lan thu, de so
+# lan thu khong phinh nguong Bonferroni (ARCHITECTURE v3.0 §4.3 + ADR-0003). Che do do DU LIEU quyet dinh, khong theo dong
+# ho may chay: engine.run_cycle --mode auto xet phien moi nhat co gia (thu Sau chua xu ly -> research, ngay khac -> ops, da
+# xu ly -> chi lam moi scorecard). Ngay nghi khong co gia moi nen roi vao nhanh "da xu ly".
+# Ba dong lich (16:30, 20:17, 23:47 gio VN): hai dong sau la du phong khi GitHub tre hoac bo luot; luot sau gap phien da xu
+# ly thi khong lam gi. Ingest tai bu moi phien tu ngay cuoi trong kho nen khong mat du lieu.
 # L-06: TTC_REGISTRY_PUSH=1 -> moi lan thu duoc DAY len main (tools/registry_push.py) TRUOC khi chay backtest. Vong hoc hong
 # giua chung thi dang ky cua lan thu do van nam tren main, lan sau khong dung lai ma thu va van dem no vao so lan thu.
+# Giu nguyen name: cua workflow vi ledger_audit.yml bam theo ten nay.
 on:
   schedule:
-    - cron: "30 9 * * 5"
+    - cron: "30 9 * * 1-5"
+    - cron: "17 13 * * 1-5"
+    - cron: "47 16 * * 1-5"
   workflow_dispatch:
     inputs:
       trials:
-        description: "So thu nghiem nghien cuu"
+        description: "0 = van hanh (ops), 1 = nghien cuu 1 lan thu (research)"
         required: true
         default: "1"
 
@@ -28,8 +36,8 @@ jobs:
     timeout-minutes: 90
     steps:
       # Fail closed BEFORE checkout, installs, ingestion, registry writes, or API use.
-      # Scheduled weekly research remains at 6 trials; manual recovery is limited to 1.
-      # Manual runs on non-main refs fail before checkout, installs, or writes.
+      # Scheduled runs pick the mode from data (engine.run_cycle --mode auto): Friday session -> 6 trials, other -> ops.
+      # Manual runs: main only; trials 0 (ops) or 1 (research, 1 trial). Non-main refs fail before checkout, installs, writes.
       - name: Xac nhan so lan thu truoc khi chay
         env:
           EVENT_NAME: ${{ github.event_name }}
@@ -37,18 +45,18 @@ jobs:
           REQUESTED_TRIALS: ${{ github.event.inputs.trials }}
         run: |
           if [ "$EVENT_NAME" = "schedule" ]; then
-            echo "effective_trials=6 (scheduled)"
+            echo "effective_trials=auto (scheduled)"
           elif [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             # Only main can run with write-permissions / L-06 registry push.
             if [ "$EVENT_REF" != "refs/heads/main" ]; then
               echo "::error::Manual dispatch must use main; got ref '$EVENT_REF'."
               exit 1
             fi
-            if [ "$REQUESTED_TRIALS" != "1" ]; then
-              echo "::error::Manual dispatch chi duoc trials=1; nhan '$REQUESTED_TRIALS'. Can Owner duyet va PR policy rieng neu muon doi."
+            if [ "$REQUESTED_TRIALS" != "0" ] && [ "$REQUESTED_TRIALS" != "1" ]; then
+              echo "::error::Manual dispatch chi duoc trials=0 (ops) hoac 1 (research); nhan '$REQUESTED_TRIALS'. Can Owner duyet va PR policy rieng neu muon doi."
               exit 1
             fi
-            echo "effective_trials=1 (manual)"
+            echo "effective_trials=$REQUESTED_TRIALS (manual)"
           else
             echo "::error::Unexpected event: $EVENT_NAME"
             exit 1
@@ -74,10 +82,19 @@ jobs:
           TTC_REGISTRY_PUSH: "1"
           TTC_PROVENANCE_ONLINE: "1"
           GITHUB_TOKEN: ${{ github.token }}
-          TRIALS: ${{ github.event_name == 'schedule' && '6' || github.event.inputs.trials }}
+          EVENT_NAME: ${{ github.event_name }}
+          TRIALS: ${{ github.event.inputs.trials }}
         run: |
-          case "$TRIALS" in ''|*[!0-9]*) echo "trials phai la so nguyen khong am: '$TRIALS'"; exit 1;; esac
-          python -m engine.run_cycle --source live --trials "$TRIALS"
+          if [ "$EVENT_NAME" = "schedule" ]; then
+            python -m engine.run_cycle --source live --mode auto
+          else
+            case "$TRIALS" in
+              0) MODE=ops ;;
+              1) MODE=research ;;
+              *) echo "trials chi nhan 0 (ops) hoac 1 (research): '$TRIALS'"; exit 1 ;;
+            esac
+            python -m engine.run_cycle --source live --mode "$MODE" --trials "$TRIALS"
+          fi
       - name: Kiem lai sau khi chay (ket qua trai luat thi khong ghi vao main)
         # Hau kiem nghiem: reports/scorecard.json vua sinh phai khop so dong + sha256 cua Ledger, Resolution, bang chung cong bo,
         # lich, va ngay gia moi nhat (kho cu + tep thang, ADR-0006). Lech la loi: khong ghi scorecard sai len main.
@@ -87,7 +104,7 @@ jobs:
           git config user.name "ttc-engine"
           git config user.email "ttc-engine@users.noreply.github.com"
           git add -A data state research knowledge paper reports fact ledger memory library/notes
-          git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F)"
+          git diff --cached --quiet || git commit -m "Vong hoc $(date -u +%F) run ${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
           # Robot có thể đã đẩy Ledger lên main trong lúc vòng học chạy. Sau rebase, scorecard của snapshot cũ là STALE.
           # Sinh lại từ sổ mới, hậu kiểm FRESH, rồi mới push. Tối đa 5 lần. Lệch sau khi làm mới thì dừng, không đẩy bản cũ.
           for i in 1 2 3 4 5; do
@@ -99,7 +116,7 @@ jobs:
             python -m engine.run_cycle --scorecard-only --source store || exit 1
             python tools/validate.py --require-fresh-scorecard || exit 1
             git add reports/scorecard.json
-            git diff --cached --quiet || git commit -m "scorecard: lam moi theo so sau khi dong bo main"
+            git diff --cached --quiet || git commit -m "scorecard: lam moi theo so sau khi dong bo main run ${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}"
             git push && exit 0
             sleep $(( i * 10 ))
           done
