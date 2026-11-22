@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import time
 
 import pytest
 
@@ -51,6 +52,17 @@ class _H(http.server.BaseHTTPRequestHandler):
             self.send_response(302)
             self.send_header("Location", f"http://localhost:{OTHER['port']}/doc.pdf")
             self.end_headers()
+        elif p == "/slow":
+            self.send_response(200)
+            self.send_header("Content-Length", str(20 * 70000))
+            self.end_headers()
+            try:
+                for _ in range(20):
+                    self.wfile.write(b"s" * 70000)
+                    self.wfile.flush()
+                    time.sleep(0.15)
+            except (BrokenPipeError, ConnectionResetError):
+                pass
         elif p.startswith("/cookie"):
             self.send_response(200)
             self.send_header("Set-Cookie", "phien=bi-mat-123")
@@ -275,7 +287,7 @@ def test_first_hop_policy_refuses_without_calling(url, word, tmp_path):
 
 
 @pytest.mark.parametrize("kw", [{"max_bytes": 0}, {"max_bytes": -2}, {"max_bytes": 1.5}, {"timeout": 0}, {"timeout": -1},
-                                {"timeout": float("nan")}])
+                                {"timeout": float("nan")}, {"deadline": 0}, {"deadline": -1}, {"deadline": float("inf")}])
 def test_limits_must_be_positive(kw, tmp_path):
     with pytest.raises(ValueError):
         fo.fetch_all([_e("https://www.hsx.vn/x")], tmp_path / "o", **kw)
@@ -285,7 +297,7 @@ def test_limits_must_be_positive(kw, tmp_path):
 def test_cli_refuses_non_positive_limits_and_creates_nothing(tmp_path):
     urls = tmp_path / "u.txt"
     urls.write_text("https://www.hsx.vn/x\n", encoding="utf-8")
-    for args in (["--max-bytes", "-2"], ["--max-bytes", "0"], ["--timeout", "0"], ["--timeout", "-5"]):
+    for args in (["--max-bytes", "-2"], ["--max-bytes", "0"], ["--timeout", "0"], ["--timeout", "-5"], ["--deadline", "0"]):
         out = tmp_path / ("o" + "_".join(args))
         r = _cli("--urls", str(urls), "--out", str(out), *args)
         assert r.returncode == 2 and not out.exists(), args
@@ -325,3 +337,21 @@ def test_smoke_list_covers_s0a_index_and_a_quarterly_report_on_approved_hosts():
 def test_workflow_does_not_print_the_raw_url_list():
     wf = (REPO / ".github" / "workflows" / "fetch_originals.yml").read_text(encoding="utf-8")
     assert 'cat "$RUNNER_TEMP/urls.txt"' not in wf
+
+
+def test_slow_download_past_the_deadline_is_an_error_and_nothing_saved(server, tmp_path):
+    out = tmp_path / "o"
+    t0 = time.monotonic()
+    r = _run([_e(f"{server}/slow")], out, deadline=0.5)["items"][0]
+    assert not r["ok"] and "thời hạn" in r["error"] and r["file"] is None and r["sha256"] is None
+    assert time.monotonic() - t0 < 2.5
+    assert not any((out / "files").iterdir())
+
+
+def test_progress_is_written_per_url_as_it_finishes(server, tmp_path, capsys):
+    out = tmp_path / "o"
+    m = _run([_e(f"{server}/doc.pdf"), _e(f"{server}/forbidden")], out)
+    lines = [json.loads(x) for x in (out / "progress.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert [x["index"] for x in lines] == [1, 2] and lines == m["items"]
+    printed = capsys.readouterr().out
+    assert "[1/2]" in printed and "[2/2]" in printed and "LỖI" in printed

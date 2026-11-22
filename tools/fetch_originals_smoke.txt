@@ -8,7 +8,7 @@ https://staticfile.hsx.vn/Uploads/News/9453a4a7eeee428383139145a5221681/20240613
 # S0a — chỉ mục công bố thông tin chung của HOSE: mọi tin trong một ngày đã qua, trang 1. JSON có paging.totalCount và
 # paging.totalPages, nên kiểm được việc tải đủ trang (ADR-0017, mục "Chỉ mục đầy đủ").
 https://api.hsx.vn/n/api/v1/1/news?pageIndex=1&pageSize=50&startDate=2026-10-27&endDate=2026-10-27
-# S0a — danh sách BCTC theo mã của HOSE (ACB, id chứng khoán 2784; mediafiles loại 5 là báo cáo tài chính), năm 2026.
-https://api.hsx.vn/m/api/v1/1/mediafiles/5/2784?pageIndex=1&pageSize=10&year=2026
-# S0a — một BCTC quý từ HOSE: ACB, BCTC hợp nhất quý 3/2026 (mục đầu của danh sách trên).
-https://staticfile.hsx.vn/Uploads/UploadDocuments/2508608/20261027%20-%20ACB%20-%20BCTC%20hop%20nhat%20Quy%203%20nam%202026.pdf
+# S0a — danh sách BCTC theo mã của HOSE (VIC, id chứng khoán 2239; mediafiles loại 5 là báo cáo tài chính), năm 2026.
+https://api.hsx.vn/m/api/v1/1/mediafiles/5/2239?pageIndex=1&pageSize=10&year=2026
+# S0a — một BCTC quý từ HOSE: VIC, BCTC riêng quý 3/2026 (1,4 MB; tệp BCTC 8,3 MB của ACB tải quá 20 phút ở lượt trước).
+https://staticfile.hsx.vn/Uploads/UploadDocuments/2509789/20261030%20-%20VIC%20-%20BCTC%20rieng%20Q3-2026.pdf

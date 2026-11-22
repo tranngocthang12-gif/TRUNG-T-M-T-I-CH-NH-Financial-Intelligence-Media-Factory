@@ -13,7 +13,8 @@ khai sha256 mong đợi cho từng URL; lệch thì ghi lỗi.
     xuống scheme khác, không có thông tin đăng nhập trong URL, host phải nằm trong danh sách duyệt (mặc định ALLOW_HOSTS,
     thêm bằng `--allow-host`), và mọi địa chỉ IP mà host phân giải ra phải là địa chỉ công khai (không loopback, mạng
     riêng, link-local, dành riêng). Bước không đạt bị ghi lỗi và không được gọi;
-  - `--max-bytes` và `--timeout` phải dương;
+  - `--max-bytes`, `--timeout` (mỗi lần đọc socket) và `--deadline` (tổng thời gian cho một URL) phải dương; quá
+    `--deadline` thì dừng URL đó, ghi lỗi, không lưu phần đã tải;
   - mã khác 200, lỗi mạng, vượt giới hạn dung lượng, hay lệch sha256 mong đợi đều là lỗi; công cụ thoát mã 1 nếu có
     bất kỳ lỗi nào (nội dung trả về vẫn được lưu để làm bằng chứng, trừ khi vượt giới hạn dung lượng);
   - thư mục `--out` phải chưa tồn tại và phải nằm ngoài kho mã (không có đường nào ghi vào kho);
@@ -28,7 +29,11 @@ nguồn và thời điểm đối chiếu điều khoản (null khi chưa đối
 Danh sách URL: mỗi URL cách nhau bằng khoảng trắng, xuống dòng hoặc dấu phẩy; dòng bắt đầu bằng `#` là chú thích; một mục
 `sha256=<64 ký tự hex>` đứng ngay sau một URL là hash mong đợi của URL đó.
 
-Dùng: python tools/fetch_originals.py --urls DANH_SACH --out THU_MUC [--max-bytes N] [--timeout GIAY] [--allow-host H ...]
+Mỗi URL xong là ghi ngay một dòng vào `progress.jsonl` và in một dòng tiến độ (đã che giá trị nhạy cảm), nên nếu lượt chạy
+bị dừng giữa chừng thì vẫn còn bằng chứng của các URL đã xong.
+
+Dùng: python tools/fetch_originals.py --urls DANH_SACH --out THU_MUC [--max-bytes N] [--timeout GIAY] [--deadline GIAY]
+      [--allow-host H ...]
 Thoát: 0 khi mọi URL đạt; 1 khi có URL lỗi; 2 khi từ chối `--out`, tham số sai hoặc danh sách rỗng (không tạo gì)."""
 from __future__ import annotations
 
@@ -41,6 +46,7 @@ import pathlib
 import re
 import socket
 import sys
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -50,6 +56,8 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 TOOL_VERSION = "2"
 USER_AGENT = "ttc-fetch-originals/2 (GitHub Actions; doc ban goc cong bo thong tin)"
 DEFAULT_MAX_BYTES = 50 * 1024 * 1024
+DEFAULT_DEADLINE = 600.0
+CHUNK = 64 * 1024
 # Host được duyệt mặc định: trang, API và kho tệp của HOSE; cổng văn bản pháp luật. Thêm host khác bằng --allow-host.
 ALLOW_HOSTS = ("www.hsx.vn", "api.hsx.vn", "staticfile.hsx.vn", "vbpl.vn")
 LEGAL_STATUS = "CHUA_KIEM_DIEU_KHOAN"
@@ -157,16 +165,33 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
 
 
-def _check_limits(max_bytes, timeout):
+def _check_limits(max_bytes, timeout, deadline=DEFAULT_DEADLINE):
     if isinstance(max_bytes, bool) or not isinstance(max_bytes, int) or max_bytes <= 0:
         raise ValueError(f"max_bytes phải là số nguyên dương, nhận {max_bytes!r}")
-    if isinstance(timeout, bool) or not isinstance(timeout, (int, float)) or not timeout > 0:
-        raise ValueError(f"timeout phải dương, nhận {timeout!r}")
+    for name, v in (("timeout", timeout), ("deadline", deadline)):
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not v > 0 or v == float("inf"):
+            raise ValueError(f"{name} phải là số dương hữu hạn, nhận {v!r}")
+
+
+def _read_body(resp, max_bytes, deadline, start):
+    """Đọc từng khúc; quá `deadline` giây kể từ `start` thì ném TimeoutError. Đọc tối đa max_bytes + 1 byte."""
+    chunks, total = [], 0
+    while total <= max_bytes:
+        if time.monotonic() - start > deadline:
+            raise TimeoutError(f"vượt thời hạn {deadline:g} giây cho một URL sau {total} byte; không lưu")
+        b = resp.read(min(CHUNK, max_bytes + 1 - total))
+        if not b:
+            break
+        chunks.append(b)
+        total += len(b)
+    return b"".join(chunks)
 
 
 def fetch_one(entry: dict, index: int, files_dir: pathlib.Path, *, max_bytes: int, timeout: float,
-              allow_schemes=("https",), allow_hosts=ALLOW_HOSTS, allow_private=False, opener=None) -> dict:
-    _check_limits(max_bytes, timeout)
+              deadline=DEFAULT_DEADLINE, allow_schemes=("https",), allow_hosts=ALLOW_HOSTS, allow_private=False,
+              opener=None) -> dict:
+    _check_limits(max_bytes, timeout, deadline)
+    start = time.monotonic()
     url = entry["url"]
     rec = {"index": index, "url": redact(url), "expected_sha256": entry.get("expected_sha256"), "final_url": None,
            "redirects": [], "http_status": None, "reason": None, "headers": None, "server_date": None,
@@ -192,7 +217,7 @@ def fetch_one(entry: dict, index: int, files_dir: pathlib.Path, *, max_bytes: in
             rec["final_url"] = redact(resp.geturl())
             rec["headers"] = [[k, "REDACTED" if k.lower() == "set-cookie" else v] for k, v in resp.headers.items()]
             rec["server_date"] = resp.headers.get("Date")
-            body = resp.read(max_bytes + 1)
+            body = _read_body(resp, max_bytes, deadline, start)
     except Exception as e:                              # noqa: BLE001 — lỗi mạng, hết giờ, TLS: ghi lại, không ném
         rec["error"] = f"{type(e).__name__}: {e}"[:500]
         rec["fetched_at_end"] = _now()
@@ -241,16 +266,24 @@ def run_info() -> dict:
 
 
 def fetch_all(entries: list[dict], out: pathlib.Path, *, max_bytes=DEFAULT_MAX_BYTES, timeout=60.0,
-              allow_schemes=("https",), allow_hosts=ALLOW_HOSTS, allow_private=False, opener=None) -> dict:
-    _check_limits(max_bytes, timeout)
+              deadline=DEFAULT_DEADLINE, allow_schemes=("https",), allow_hosts=ALLOW_HOSTS, allow_private=False,
+              opener=None) -> dict:
+    _check_limits(max_bytes, timeout, deadline)
     files_dir = out / "files"
     files_dir.mkdir(parents=True, exist_ok=False)
-    items = [fetch_one(e, i, files_dir, max_bytes=max_bytes, timeout=timeout, allow_schemes=allow_schemes,
-                       allow_hosts=allow_hosts, allow_private=allow_private, opener=opener)
-             for i, e in enumerate(entries, 1)]
+    items = []
+    with open(out / "progress.jsonl", "x", encoding="utf-8") as prog:
+        for i, e in enumerate(entries, 1):
+            r = fetch_one(e, i, files_dir, max_bytes=max_bytes, timeout=timeout, deadline=deadline,
+                          allow_schemes=allow_schemes, allow_hosts=allow_hosts, allow_private=allow_private, opener=opener)
+            items.append(r)
+            prog.write(json.dumps(r, ensure_ascii=False) + "\n")
+            prog.flush()
+            print(f"[{i}/{len(entries)}] {r['url']} HTTP {r['http_status']} {r['bytes']} byte "
+                  f"{'OK' if r['ok'] else 'LỖI: ' + str(r['error'])}", flush=True)
     hosts = sorted({urllib.parse.urlsplit(r["url"]).hostname or "" for r in items} - {""})
     manifest = {"tool": "tools/fetch_originals.py", "tool_version": TOOL_VERSION, "generated_at": _now(),
-                "run": run_info(), "user_agent": USER_AGENT, "max_bytes": max_bytes, "timeout": timeout,
+                "run": run_info(), "user_agent": USER_AGENT, "max_bytes": max_bytes, "timeout": timeout, "deadline": deadline,
                 "allow_hosts": sorted(allow_hosts),
                 "legal": [{"host": h, "legal_status": LEGAL_STATUS, "terms_source": None, "terms_checked_at": None,
                            "note": LEGAL_NOTE} for h in hosts],
@@ -274,10 +307,11 @@ def main(argv=None) -> int:
     ap.add_argument("--out", required=True)
     ap.add_argument("--max-bytes", type=int, default=DEFAULT_MAX_BYTES)
     ap.add_argument("--timeout", type=float, default=60.0)
+    ap.add_argument("--deadline", type=float, default=DEFAULT_DEADLINE, help="tổng thời gian tối đa cho một URL (giây)")
     ap.add_argument("--allow-host", action="append", default=[], help="thêm host được duyệt (lặp lại được)")
     a = ap.parse_args(argv)
     try:
-        _check_limits(a.max_bytes, a.timeout)
+        _check_limits(a.max_bytes, a.timeout, a.deadline)
     except ValueError as e:
         print("TỪ CHỐI:", e, file=sys.stderr)
         return 2
@@ -294,8 +328,9 @@ def main(argv=None) -> int:
     if not entries:
         print("TỪ CHỐI: danh sách URL rỗng", file=sys.stderr)
         return 2
-    print(f"{len(entries)} URL; host: " + ", ".join(sorted({urllib.parse.urlsplit(e['url']).hostname or '?' for e in entries})))
-    m = fetch_all(entries, out, max_bytes=a.max_bytes, timeout=a.timeout,
+    print(f"{len(entries)} URL; host: " + ", ".join(sorted({urllib.parse.urlsplit(e['url']).hostname or '?' for e in entries})),
+          flush=True)
+    m = fetch_all(entries, out, max_bytes=a.max_bytes, timeout=a.timeout, deadline=a.deadline,
                   allow_hosts=tuple(ALLOW_HOSTS) + tuple(h.lower() for h in a.allow_host))
     print((out / "summary.md").read_text(encoding="utf-8"))
     return 0 if m["all_ok"] else 1

@@ -30,7 +30,7 @@ jobs:
   fetch:
     name: Tai ban goc vao artifact
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
         with:
@@ -51,7 +51,7 @@ jobs:
           # Khong in nguyen danh sach URL vao log (co the chua token); cong cu chi in so URL va ten host.
           grep -cv '^[[:space:]]*\(#\|$\)' "$RUNNER_TEMP/urls.txt" || true
       - name: Tai (cong cu chi dung thu vien chuan cua Python)
-        run: python tools/fetch_originals.py --urls "$RUNNER_TEMP/urls.txt" --out "$RUNNER_TEMP/ban_goc"
+        run: python -u tools/fetch_originals.py --urls "$RUNNER_TEMP/urls.txt" --out "$RUNNER_TEMP/ban_goc" --deadline 900
       - name: Dua tep va manifest len artifact cua luot chay
         if: always()
         uses: actions/upload-artifact@v4
