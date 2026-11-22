@@ -7,6 +7,8 @@ data:
   start: "2016-01-01"
   store: data/store/prices.csv.gz        # kho cũ, ĐÓNG BĂNG từ ADR-0006 — không ghi lại
   store_dir: data/store/prices          # ADR-0006: dòng mới, mỗi tháng giao dịch một tệp CSV, chỉ nối thêm
+  ingest_extra: [BSR, LPB, MCH, TCX, VPL] # E2b (QĐ-4): CHỈ TẢI GIÁ thêm các mã này (thành viên VN30 theo kỳ, ngoài `universe`)
+                                          # cho chế độ universe="historical"; không vào bảng mặc định (universe="config")
 universe_basis: CURRENT     # ADR-0008: danh sách dưới là VN30 HIỆN TẠI dùng cho toàn bộ lịch sử → báo cáo gắn nhãn thiên lệch sống sót
 universe: [ACB, BCM, BID, BVH, CTG, FPT, GAS, GVR, HDB, HPG, MBB, MSN, MWG, PLX, POW,
            SAB, SHB, SSB, SSI, STB, TCB, TPB, VCB, VHM, VIB, VIC, VJC, VNM, VPB, VRE]

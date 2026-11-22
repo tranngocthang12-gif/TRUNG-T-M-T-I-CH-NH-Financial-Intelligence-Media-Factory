@@ -305,7 +305,6 @@ def test_c2_verified_research_input_ignores_event_published_after_decision_date(
     assert "APPLIED" not in _status(mk["events"], IDX[OFF])
 
 
-@pytest.mark.xfail(reason="PRICE_WINDOW_COVERAGE: mã thiếu lịch sử bị loại im lặng khỏi panel (load_market keep > 250)", **XF)
 def test_c3_ticker_dropped_for_short_history_is_reported(tmp_path):
     close = _walk()
     close["EEE"] = np.nan
@@ -314,7 +313,6 @@ def test_c3_ticker_dropped_for_short_history_is_reported(tmp_path):
     assert "EEE" in mk["close"].columns or "EEE" in json.dumps(mk["quality"], default=str)
 
 
-@pytest.mark.xfail(reason="ENGINE_UNIVERSE_MODE: engine không đọc data/vn30_history.csv (ADR-0008, cần PR riêng)", **XF)
 def test_c4_historical_universe_excludes_ticker_after_exit(tmp_path):
     rows = ["effective_date,ticker,action,source_id"] + [f"{IDX[0].date()},{t},ADD,fx" for t in TICKERS] + \
            [f"{IDX[350].date()},DDD,REMOVE,fx"]
