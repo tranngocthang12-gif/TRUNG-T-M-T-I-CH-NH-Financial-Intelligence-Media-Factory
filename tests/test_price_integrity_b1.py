@@ -321,7 +321,6 @@ def test_c4_historical_universe_excludes_ticker_after_exit(tmp_path):
     assert mk["close"]["DDD"].loc[IDX[351]:].isna().all()
 
 
-@pytest.mark.xfail(reason="Lịch phiên: ngày nghỉ có dòng giá (volume 0, giá không đổi) bị tính là phiên giao dịch", **XF)
 def test_c5_non_trading_rows_are_not_counted_as_sessions(tmp_path):
     close, vol = _walk(), pd.DataFrame(1e6, index=IDX, columns=TICKERS)
     ghost = IDX[200:205]                                                  # năm ngày nghỉ lễ giả: giá giữ nguyên, volume 0
