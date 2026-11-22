@@ -14,7 +14,7 @@
 
 | Mã | Quyết định |
 |---|---|
-| QĐ-G0 | Owner không áp cột "quá 3 tuần → chỉ giữ Ledger" của G0. Phạm vi v3.0 tiếp tục. Cột đó hết hiệu lực từ ngày Owner gộp ADR này. Các điều kiện dừng đo được sau đây tiếp tục áp dụng, không nới: (1) mốc xét lại 31/03/2027 của ADR-0002; (2) theo ADR-0016, D0 của FWD-001 chưa có tới 05/03/2027 thì báo Owner, và sau 12 kỳ không sổ bóng nào đạt thì ghi NO_EDGE; (3) cột "Dừng/đảo khi" của hàng G1 ở §8: dưới 20 dự báo mỗi tháng thì hạ độ khó câu hỏi. |
+| QĐ-G0 | Owner không áp cột "quá 3 tuần → chỉ giữ Ledger" của G0. Phạm vi v3.0 tiếp tục. Cột đó hết hiệu lực từ ngày Owner gộp ADR này. Các điều kiện dừng đo được sau đây tiếp tục áp dụng, không nới: (1) mốc xét lại 31/03/2027 của ADR-0002; (2) theo ADR-0016: D0 của FWD-001 chưa có tới 05/03/2027 thì báo Owner; sau 12 kỳ, không sổ bóng nào PASS thì FWD-001 ghi NO_EDGE (mục «Giao thức FWD-001 (QĐ-11)»); NO_EDGE cho cả không gian 13 × 3 trên VN30 chỉ ghi khi đồng thời không sổ bóng nào đạt và đợt 2 không có đặc tả qua bậc 2 (mục «Điều kiện dừng và đảo»); (3) cột "Dừng/đảo khi" của hàng G1 ở §8: dưới 20 dự báo mỗi tháng thì hạ độ khó câu hỏi. |
 
 ## Trạng thái từng quyết định
 
