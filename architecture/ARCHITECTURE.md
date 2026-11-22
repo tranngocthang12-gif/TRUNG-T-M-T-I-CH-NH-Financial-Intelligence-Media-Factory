@@ -73,7 +73,7 @@ ADR-0016 (ACCEPTED 21–22/11/2026) là đường từ dữ liệu tới vốn: 
 
 ### 4.4 Sổ chấm nhanh SCN-001
 
-ADR-0017 (ACCEPTED 21/11/2026): phép thử SCN-001 dự báo chỉ tiêu và sự kiện doanh nghiệp từ văn bản công bố thông tin, sổ riêng trong `experiments/SCN-001/`, không dùng Ledger, không tính vào mẫu 194 cặp. Trạng thái các việc của pha 0 (S0a…S0g) ghi ở `state/PROJECT_STATE.yaml`.
+ADR-0017 (ACCEPTED 21/11/2026): phép thử SCN-001 dự báo chỉ tiêu và sự kiện doanh nghiệp từ văn bản công bố thông tin, sổ riêng trong `experiments/SCN-001/`, không dùng Ledger, không tính vào mẫu 194 cặp.
 
 ## 5. Nửa HỌC (Thư viện + Học viện) — ghế thi công, không phải MINH TRÍ
 
