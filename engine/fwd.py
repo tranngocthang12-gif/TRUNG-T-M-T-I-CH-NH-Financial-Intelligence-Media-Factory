@@ -8,8 +8,9 @@ Chưa đăng ký — không có dòng `kind: "forward_test"` với `trial_id` b�
   - nav.csv: NAV cuối phiên từng sổ; `stale` = mã đang giữ được định giá theo giá gốc gần nhất (STALE_PRICE);
   - trades.csv: BUY, SELL, CASH_DIVIDEND, STOCK_ADJUST (kèm khóa sự kiện `event`, giá trị đã áp `value`, cờ CA_UNVERIFIED,
     CA_LATE), và lệnh không khớp: UNFILLED_LIMIT_UP, UNFILLED_LIMIT_DOWN, STALE_PRICE, UNFILLED_RISK_GATE;
-  - decisions.csv: DECIDE (danh mục mục tiêu từng sổ và dữ liệu lúc quyết định, QĐ-11a mục 8), LATE_VOID, D0_LATE,
-    VERIFY_WAIT, WAIT_PRICES, DRAWDOWN_BREACH, PIT_REJECTED, SPEC_INVALID, ERROR;
+  - decisions.csv: DECIDE (danh mục mục tiêu từng sổ và dữ liệu lúc quyết định, QĐ-11a mục 8), RISK_GATE (đủ đầu vào và kết
+    luận của mỗi lần gọi cổng R1a, cùng sha256 các tệp đầu vào), LATE_VOID, D0_LATE, VERIFY_WAIT, WAIT_PRICES,
+    DRAWDOWN_BREACH, PIT_REJECTED, SPEC_INVALID, ERROR;
   - periods.csv: mỗi kỳ một dòng (k, phiên quyết định, phiên khớp, SEALED hoặc LATE_VOID);
   - drawdown.csv: sụt giảm từng phiên từng sổ (hàm thuần risk_gate.drawdown_path, chế độ chỉ ghi nhận).
 
@@ -20,13 +21,16 @@ Luật (mục của QĐ-11a trong ngoặc):
   - Phiên (1): risk_gate.session_axis(ngày của kho giá, lịch, until=as_of), bỏ ngày CHUA_CO_THONG_BAO và ngày ngoài vùng lịch
     mà không thành viên rổ nào có giá (danh sách của load_market). Có giá = dòng giá với khối lượng > 0.
   - Tuần tự từng phiên sau phiên đã xử lý gần nhất (2): xác minh niêm phong quyết định phiên trước → sự kiện quyền cho vị thế
-    giữ từ trước phiên → khớp → định giá → đo sụt giảm → quyết định (chỉ ở phiên tái cơ cấu). Mỗi phiên ghi xong mới lưu
-    state.json, nên lần chạy dừng giữa chừng không ghi trùng.
+    giữ từ trước phiên → khớp → định giá → đo sụt giảm → quyết định (chỉ ở phiên tái cơ cấu). Mỗi phiên ghi qua nhật ký
+    journal.json (các byte sẽ nối vào từng CSV và state.json mới, ghi nguyên tử trước); lần chạy sau thấy nhật ký thì ghi
+    nốt phần còn thiếu, nên bị ngắt ở bất kỳ bước ghi nào cũng không có dòng trùng hay dòng dở (finish_journal).
   - Niêm phong lúc khớp (3): lệnh của quyết định phiên t chỉ khớp ở đóng cửa phiên t+1, khi hàm xác minh (mặc định
     `github_run`, API GitHub) cho biết lượt chạy ghi quyết định là `.github/workflows/daily_cycle.yml` trên `main`, sự kiện
-    `schedule` hoặc `workflow_dispatch`, kết luận `success`, kết thúc trước hạn (seal_deadline_local, giờ VN) của phiên t+1.
-    Không xác minh được (lỗi API, lượt chưa xong) → VERIFY_WAIT, dừng trước t+1, thử lại lần chạy sau. Lượt không hợp lệ
-    hoặc trễ → LATE_VOID: không sổ nào đổi danh mục theo quyết định đó.
+    `schedule` hoặc `workflow_dispatch`, kết luận `success`, kết thúc trước hạn (seal_deadline_local, giờ VN) của phiên t+1;
+    VÀ lịch sử git của nhánh đang chạy cho thấy commit đưa ĐÚNG dòng DECIDE đó (run_id, danh mục trùng lệnh đang chờ) vào
+    decisions.csv mang "run <run_id>" trong thông điệp và có giờ commit nằm trong lượt chạy. Không xác minh được (lỗi API,
+    lượt chưa xong, thiếu lịch sử git, kho nông) → VERIFY_WAIT, dừng trước t+1, thử lại lần chạy sau. Lượt không hợp lệ, trễ,
+    hay không có bằng chứng commit → LATE_VOID: không sổ nào đổi danh mục theo quyết định đó.
   - Khóa biên độ: paper.locked trên bảng giá đã điều chỉnh của chế độ verified (hệ số va.verified_factors như load_market),
     trên trục phiên, không che theo rổ (mã rời rổ vẫn được xét khi bán); lệnh không khớp thử lại phiên sau.
   - Không quyết định muộn (4): phiên tái cơ cấu (D0 thực tế + period_sessions × k) chỉ ra quyết định khi là phiên mới nhất có
@@ -48,15 +52,20 @@ Luật (mục của QĐ-11a trong ngoặc):
   - Cổng R1a (QĐ-5a): risk_gate.check lúc quyết định và lúc khớp lệnh mua, cùng ngữ nghĩa với paper.run (FAIL lúc quyết định
     → mục tiêu = vị thế đang giữ; mã bị loại không mua; FAIL lúc khớp → không mua mã nào; mã bị từ chối không thử lại). Sổ
     FWD không có trạng thái đóng băng dữ liệu: cổng nhận frozen=False.
-`replay(root, spec, until)` dựng lại các sổ từ D0 chỉ bằng danh mục mục tiêu đã ghi (DECIDE), periods.csv, các dòng áp sự
-kiện đã ghi, giá trong kho và luật trên; riêng cổng R1a ở phiên khớp dùng các dòng UNFILLED_RISK_GATE đã ghi (xem replay).
+`replay(root, spec, until)` dựng lại các sổ từ D0 tới phiên robot đã ghi xong, bằng danh mục mục tiêu đã niêm phong, các
+dòng áp sự kiện đã ghi, giá trong kho và luật trên; cổng R1a ở phiên khớp được tính lại từ đầu vào ở dòng RISK_GATE (xem
+replay).
 """
 from __future__ import annotations
 
+import csv
+import hashlib
 import json
 import math
 import os
 import pathlib
+import re
+import subprocess
 from datetime import datetime, timedelta, timezone
 
 import pandas as pd
@@ -88,6 +97,20 @@ COLS = {
     "drawdown.csv": ["date", "book", "nav", "peak", "drawdown", "verified"],
 }
 CA_SIDES = ("CASH_DIVIDEND", "STOCK_ADJUST")
+JOURNAL = "journal.json"
+STATE = "state.json"
+
+
+class JournalConflict(RuntimeError):
+    """Tệp CSV không khớp nhật ký ghi dở: không đoán, không ghi thêm gì (dừng, chờ người xem)."""
+
+
+class ReplayMismatch(ValueError):
+    """Dòng đã ghi của robot không khớp phép tính lại của replay."""
+
+
+class _Wait(Exception):
+    """Chưa đủ bằng chứng để xác minh niêm phong (thiếu lịch sử git, API): VERIFY_WAIT, thử lại lần chạy sau."""
 
 
 # ---------- đăng ký, đặc tả ----------
@@ -151,12 +174,74 @@ def book_dir(root, trial_id):
     return pathlib.Path(root).joinpath(*DIR, trial_id)
 
 
-def _append(d, name, rows):
-    if not rows:
-        return
+def _atomic_write(p, text):
+    tmp = p.with_name(p.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, p)
+
+
+def _append_bytes(p, b):
+    with open(p, "ab") as f:
+        f.write(b)
+
+
+def _drop_journal(p):
+    p.unlink()
+
+
+def _state_text(st):
+    return json.dumps(st, ensure_ascii=False, indent=2, sort_keys=True)
+
+
+def _commit(d, rows, state=None):
+    """Ghi một phiên (hoặc một dòng lẻ) qua nhật ký, để lần chạy bị ngắt giữa chừng không để lại dòng trùng hay dòng dở.
+    1. journal.json (ghi nguyên tử) chứa, cho từng CSV, kích thước tệp trước khi ghi và ĐÚNG các byte sẽ nối thêm, cùng
+       state.json mới (None: không đổi trạng thái);
+    2. nối các byte vào từng CSV; 3. ghi state.json (nguyên tử); 4. xóa journal.json.
+    Lần chạy sau thấy journal.json thì finish_journal ghi nốt phần còn thiếu, không ghi lại phần đã có."""
     d.mkdir(parents=True, exist_ok=True)
-    p = d / name
-    pd.DataFrame(rows, columns=COLS[name]).to_csv(p, mode="a", header=not p.exists(), index=False)
+    parts = {}
+    for name in COLS:
+        if rows.get(name):
+            f = d / name
+            off = f.stat().st_size if f.exists() else 0
+            parts[name] = {"offset": off, "text": pd.DataFrame(rows[name], columns=COLS[name]).to_csv(
+                index=False, header=off == 0, lineterminator="\n")}
+    if not parts and state is None:
+        return
+    j = {"parts": parts, "state": state}
+    _atomic_write(d / JOURNAL, json.dumps(j, ensure_ascii=False))
+    finish_journal(d, j)
+
+
+def finish_journal(d, j=None):
+    """Hoàn tất nhật ký ghi dở → True; không có nhật ký → False. Mỗi CSV phải có kích thước từ `offset` tới `offset` + số
+    byte cần nối, và phần đã có phải trùng đầu của các byte đó (ghi dở); khi đó chỉ nối phần còn thiếu. Khác đi thì
+    JournalConflict (không ghi thêm gì)."""
+    jp = d / JOURNAL
+    if j is None:
+        if not jp.exists():
+            return False
+        j = json.loads(jp.read_text(encoding="utf-8"))
+    for name in COLS:
+        part = j["parts"].get(name)
+        if part is None:
+            continue
+        f, b, off = d / name, part["text"].encode("utf-8"), int(part["offset"])
+        cur = f.stat().st_size if f.exists() else 0
+        if not off <= cur <= off + len(b):
+            raise JournalConflict(f"{name}: kích thước {cur} byte ngoài khoảng của nhật ký [{off}, {off + len(b)}]")
+        if cur > off:
+            with open(f, "rb") as fh:
+                fh.seek(off)
+                if fh.read() != b[:cur - off]:
+                    raise JournalConflict(f"{name}: phần đã ghi sau byte {off} khác nội dung của nhật ký")
+        if cur < off + len(b):
+            _append_bytes(f, b[cur - off:])
+    if j["state"] is not None:
+        _atomic_write(d / STATE, _state_text(j["state"]))
+    _drop_journal(jp)
+    return True
 
 
 def _read(d, name):
@@ -192,27 +277,86 @@ def _aware(x):
 
 
 def _drow(date, action, **kw):
+    if "note" in kw:                                    # một dòng CSV mỗi bản ghi (đối chiếu dòng quyết định với git)
+        kw["note"] = " ".join(str(kw["note"]).split())
     return {"date": date, "action": action, **kw}
 
 
 # ---------- xác minh niêm phong ----------
 
 def github_run(run_id):
-    """Hàm xác minh mặc định: lượt chạy "<GITHUB_RUN_ID>.<GITHUB_RUN_ATTEMPT>" theo API GitHub → {finished_at, path, branch,
-    event, conclusion}. Lượt chưa kết thúc hay lỗi mạng: ném lỗi (nơi gọi ghi VERIFY_WAIT)."""
+    """Hàm xác minh mặc định: lượt chạy "<GITHUB_RUN_ID>.<GITHUB_RUN_ATTEMPT>" theo API GitHub → {started_at, finished_at,
+    path, branch, event, conclusion}. Lượt chưa kết thúc hay lỗi mạng: ném lỗi (nơi gọi ghi VERIFY_WAIT)."""
     rid, _, att = str(run_id).partition(".")
     r = risk_gate.github_api(f"actions/runs/{rid}/attempts/{att}" if att else f"actions/runs/{rid}")
     if r.get("status") != "completed":
         raise RuntimeError(f"lượt chạy {run_id} chưa kết thúc (status {r.get('status')!r})")
-    return {"finished_at": r.get("updated_at"), "path": r.get("path"), "branch": r.get("head_branch"),
-            "event": r.get("event"), "conclusion": r.get("conclusion")}
+    return {"started_at": r.get("run_started_at"), "finished_at": r.get("updated_at"), "path": r.get("path"),
+            "branch": r.get("head_branch"), "event": r.get("event"), "conclusion": r.get("conclusion")}
 
 
-def _seal(info, s, local):
-    """→ ("SEALED" | "LATE_VOID", lý do). Thông tin thiếu giờ kết thúc (hay không phải dict): ném lỗi → VERIFY_WAIT."""
-    if not isinstance(info, dict) or not info.get("finished_at"):
-        raise ValueError(f"API không trả giờ kết thúc của lượt chạy ({info!r})")
-    fin, dl = _aware(info["finished_at"]), _deadline(s, local)
+def _git(root, *args):
+    return subprocess.run(["git", *args], cwd=str(root), capture_output=True, text=True, encoding="utf-8", timeout=60)
+
+
+def _decision_line(d, p):
+    """Dòng CSV nguyên văn của quyết định đang chờ `p` trong decisions.csv → (dòng, None) hoặc (None, lý do). Phải có đúng
+    một dòng DECIDE cùng phiên, cùng kỳ; run_id và danh mục mục tiêu của dòng phải trùng lệnh đang chờ trong state.json."""
+    f = d / "decisions.csv"
+    lines = f.read_text(encoding="utf-8").splitlines() if f.exists() else []
+    if not lines:
+        return None, "decisions.csv không có dòng quyết định"
+    head, hits = next(csv.reader([lines[0]])), []
+    for line in lines[1:]:
+        r = dict(zip(head, next(csv.reader([line]))))
+        if r.get("action") == "DECIDE" and r.get("date") == p["t"] and r.get("k") == str(p["k"]):
+            hits.append((line, r))
+    if len(hits) != 1:
+        return None, f"decisions.csv có {len(hits)} dòng DECIDE kỳ {p['k']} phiên {p['t']}, cần đúng 1"
+    line, r = hits[0]
+    if r.get("run_id") != p["run_id"]:
+        return None, f"run_id của dòng quyết định ({r.get('run_id')}) khác lệnh đang chờ ({p['run_id']})"
+    try:
+        tg = json.loads(r.get("targets") or "")
+    except ValueError:
+        return None, "danh mục mục tiêu của dòng quyết định không đọc được"
+    if tg != p["targets"]:
+        return None, "danh mục mục tiêu của dòng quyết định khác lệnh đang chờ trong state.json"
+    return line, None
+
+
+def _decision_commit(root, rel, line, run_id):
+    """Commit trên lịch sử của HEAD (nhánh main của lượt chạy robot) đã đưa ĐÚNG dòng quyết định `line` vào `rel`, và thông
+    điệp của nó mang mã lượt chạy "run <run_id>" (daily_cycle.yml ghi "run ${GITHUB_RUN_ID}.${GITHUB_RUN_ATTEMPT}") →
+    ((sha, giờ commit), None) hoặc (None, lý do). Không đọc được lịch sử git hay kho nông → _Wait."""
+    r = _git(root, "rev-parse", "--is-shallow-repository")
+    if r.returncode != 0:
+        raise _Wait("không đọc được lịch sử git của kho")
+    if r.stdout.strip() == "true":
+        raise _Wait("kho nông (shallow clone): thiếu lịch sử git để xác minh commit của quyết định")
+    r = _git(root, "log", "--reverse", "--format=%H", f"-S{line}", "HEAD", "--", rel)
+    if r.returncode != 0:
+        raise _Wait(f"git log lỗi: {r.stderr.strip()[:200]}")
+    sha = None
+    for c in r.stdout.split():
+        f = _git(root, "show", f"{c}:{rel}")
+        if f.returncode == 0 and line in f.stdout.splitlines():
+            sha = c
+            break
+    if sha is None:
+        return None, "dòng quyết định không nằm trong commit nào trên lịch sử của nhánh đang chạy"
+    msg = _git(root, "show", "-s", "--format=%B", sha).stdout
+    if not re.search(rf"\brun {re.escape(str(run_id))}(?![\d.])", msg):
+        return None, f"commit {sha[:7]} đưa dòng quyết định vào không mang mã lượt chạy {run_id}"
+    return (sha, _aware(_git(root, "show", "-s", "--format=%cI", sha).stdout.strip())), None
+
+
+def _seal(info, s, local, proof=None, proof_why=None):
+    """→ ("SEALED" | "LATE_VOID", lý do). `proof` = (sha, giờ commit) của commit đưa dòng quyết định lên nhánh main, hoặc None
+    với lý do `proof_why`. Thông tin lượt chạy thiếu giờ bắt đầu hay kết thúc (hay không phải dict): ném lỗi → VERIFY_WAIT."""
+    if not isinstance(info, dict) or not info.get("finished_at") or not info.get("started_at"):
+        raise ValueError(f"API không trả giờ bắt đầu và giờ kết thúc của lượt chạy ({info!r})")
+    start, fin, dl = _aware(info["started_at"]), _aware(info["finished_at"]), _deadline(s, local)
     bad = []
     if str(info.get("path") or "").split("@")[0] != WORKFLOW:
         bad.append(f"workflow {info.get('path')!r} khác {WORKFLOW}")
@@ -222,11 +366,17 @@ def _seal(info, s, local):
         bad.append(f"sự kiện {info.get('event')!r} không thuộc {list(RUN_EVENTS)}")
     if info.get("conclusion") != "success":
         bad.append(f"kết luận {info.get('conclusion')!r} khác success")
+    if proof is None:
+        bad.append(proof_why or "không có bằng chứng commit của quyết định")
+    elif not start <= proof[1] <= fin:
+        bad.append(f"commit {proof[0][:7]} lúc {proof[1].isoformat()} nằm ngoài lượt chạy "
+                   f"[{start.isoformat()}, {fin.isoformat()}]")
     if bad:
-        return "LATE_VOID", "lượt chạy không hợp lệ: " + "; ".join(bad)
+        return "LATE_VOID", "chưa niêm phong: " + "; ".join(bad)
     if fin >= dl:
         return "LATE_VOID", f"lượt chạy kết thúc {fin.isoformat()} không trước hạn {dl.isoformat()}"
-    return "SEALED", f"lượt chạy kết thúc {fin.isoformat()} trước hạn {dl.isoformat()}"
+    return "SEALED", (f"lượt chạy kết thúc {fin.isoformat()} trước hạn {dl.isoformat()}; commit {proof[0]} lúc "
+                      f"{proof[1].isoformat()} đưa dòng quyết định lên nhánh main")
 
 
 # ---------- dữ liệu thị trường của một lần chạy ----------
@@ -243,7 +393,7 @@ class _Ctx:
         s = data.load_store(root=self.root)
         s = s[s.date <= t0]
         self.raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
-        vol = s.pivot(index="date", columns="ticker", values="volume").sort_index()
+        self.vol = vol = s.pivot(index="date", columns="ticker", values="volume").sort_index()
         self.cal = risk_gate.load_calendar(self.root)
         axis = risk_gate.session_axis(list(self.raw.index) if len(self.raw) else [t0], self.cal, until=t0)
         q = self.mk["quality"]["sessions"]
@@ -267,6 +417,7 @@ class _Ctx:
             r = r * F
         self.adj = r.ffill(limit=5)
         self._snap = {}
+        self._inputs = None
 
     def priced(self, t, s):
         return t in self.ok.columns and bool(self.ok.at[s, t])
@@ -294,6 +445,39 @@ class _Ctx:
             snap["price"] = {t: p for t in key[1] if (p := self.price(t, s)) is not None}
             self._snap[key] = snap
         return self._snap[key]
+
+    def inputs(self):
+        """sha256 của các tệp quyết định cửa sổ cách ly và trục phiên của cổng R1a tại lúc chạy: manifest bản gốc sự kiện
+        quyền, bảng sự kiện nhập tay và của Yahoo, lịch phiên, rổ theo ngày. Kiểm toán dựng lại đầu vào cổng từ đúng các tệp
+        này ở commit của lượt chạy."""
+        if self._inputs is None:
+            cfg = config.CFG["corporate_actions"]
+            files = sorted(self.root.joinpath(*data.EVIDENCE_DIR).glob("EVIDENCE_MANIFEST*.json"))
+            files += [self.root / cfg["manual"], self.root / cfg["yahoo_cache"], self.root.joinpath(*risk_gate.CALENDAR),
+                      self.root / data.VN30_HISTORY]
+            self._inputs = {f.relative_to(self.root).as_posix(): (va.sha256_file(f) if f.is_file() else None)
+                            for f in files}
+        return self._inputs
+
+    def adv(self, s, tickers):
+        """Giá trị giao dịch bình quân tính lại từ giá và khối lượng gốc của kho tới phiên s (như market_snapshot)."""
+        lim = config.CFG["paper"].get("risk_limits") or {}
+        raw, vol = self.raw.loc[:s], self.vol.loc[:s]
+        axis = risk_gate.session_axis(raw.index, self.cal, until=s)
+        return risk_gate.adv_values(raw, vol, axis, list(tickers), int(lim.get("adv_sessions", 20)))
+
+    def gate(self, stage, book, s, targets, nav, positions, rows, k=""):
+        """risk_gate.check với thị trường tại phiên s; ghi một dòng RISK_GATE vào decisions.csv (`rows`) mang ĐỦ đầu vào của
+        hàm thuần check (mục tiêu, NAV, vị thế, giới hạn, thị trường) và dấu vân tay tệp đầu vào → kết quả check."""
+        lim = config.CFG["paper"].get("risk_limits")
+        market = self.market(s, list(targets) + list(positions))
+        g = risk_gate.check(list(targets), {"nav": nav, "positions": dict(positions)}, market, lim)
+        rec = {"stage": stage, "targets": list(targets), "nav": nav, "positions": dict(positions), "limits": lim,
+               "market": market, "verdict": g["verdict"], "excluded": g["excluded"], "reasons": g["reasons"],
+               "inputs": self.inputs()}
+        rows.append(_drow(_iso(s), "RISK_GATE", book=book, k=k, note=f"{stage}: {g['verdict']}",
+                          targets=json.dumps(rec, ensure_ascii=False, sort_keys=True)))
+        return g
 
 
 # ---------- luật một sổ (dùng chung cho run và replay) ----------
@@ -336,10 +520,10 @@ def _legs(book, k, targets, bk, nav, price, spec):
     return {t: w for t, w in want.items() if w != pos.get(t, 0)}
 
 
-def _fill(book, bk, order, s, ctx, rows, refused_by_gate=None):
+def _fill(book, bk, order, s, ctx, rows, gate):
     """Khớp lệnh `order` = {"targets", "legs"} của một sổ ở đóng cửa phiên s → lệnh còn chờ (thử lại phiên sau) hoặc None.
-    refused_by_gate(sổ, phiên) → tập mã cổng R1a đã từ chối mua (replay đọc từ dòng UNFILLED_RISK_GATE đã ghi); None: chạy
-    cổng (robot)."""
+    gate(sổ, phiên, mục tiêu, NAV, vị thế) → kết quả risk_gate.check cho lệnh mua (robot: chạy cổng và ghi đầu vào; replay:
+    tính lại check từ đầu vào đã ghi, đối chiếu giá và giá trị giao dịch bình quân với kho)."""
     c, lot = config.CFG["costs"], int(config.CFG["lot_size"])
     si, legs, targets = _iso(s), order["legs"], order["targets"]
     up, down = ctx.locks(s)
@@ -374,12 +558,8 @@ def _fill(book, bk, order, s, ctx, rows, refused_by_gate=None):
         trade(t, "SELL", qty, p, qty * p0 * c["slippage"] + qty * p * (c["sell_fee"] + c["sell_tax"]))
     buys = [t for t in sorted(legs) if (legs[t] - bk["positions"].get(t, 0)) // lot * lot > 0]
     refused = set()
-    if buys and refused_by_gate is not None:
-        refused = set(buys) & set(refused_by_gate(book, si))
-    elif buys:                      # R1a: lệnh mua qua lại cổng ở chính phiên khớp, sau lệnh bán, với mọi vị thế còn lại
-        nav = _value(bk, lambda x: ctx.price(x, s))
-        g = risk_gate.check(list(targets), {"nav": nav, "positions": dict(bk["positions"])},
-                            ctx.market(s, list(targets) + list(bk["positions"])), config.CFG["paper"].get("risk_limits"))
+    if buys:                        # R1a: lệnh mua qua lại cổng ở chính phiên khớp, sau lệnh bán, với mọi vị thế còn lại
+        g = gate(book, s, list(targets), _value(bk, lambda x: ctx.price(x, s)), dict(bk["positions"]))
         refused = set(buys) if g["verdict"] == "FAIL" else set(g["excluded"]) & set(buys)
     for t in buys:                  # mã bị cổng từ chối: không mua, không thử lại
         if t in refused:
@@ -467,10 +647,9 @@ def _corporate_actions(st, ctx, s, books, hist, out):
     st["seen"] = sorted(seen)
 
 
-def _targets(ctx, st, s, k, books, scorer):
-    """Mục tiêu từng sổ ở phiên quyết định s (kỳ k), sau cổng R1a → ({sổ: [mã]}, ghi chú cổng)."""
+def _targets(ctx, st, s, k, books, scorer, rows):
+    """Mục tiêu từng sổ ở phiên quyết định s (kỳ k), sau cổng R1a (dòng RISK_GATE vào `rows`) → ({sổ: [mã]}, ghi chú cổng)."""
     elig, members, notes, out = ctx.eligible(s), ctx.members(s), [], {}
-    lim = config.CFG["paper"].get("risk_limits")
     for b in books:
         bk = st["books"][b]
         held = {t: sh for t, sh in bk["positions"].items() if sh}
@@ -485,7 +664,7 @@ def _targets(ctx, st, s, k, books, scorer):
         if tg:                      # R1a lúc quyết định: FAIL → giữ nguyên vị thế; mã bị loại không mua
             nav = _value(bk, lambda x: ctx.price(x, s))
             keep = {t: sh for t, sh in held.items() if t in tg}
-            g = risk_gate.check(tg, {"nav": nav, "positions": keep}, ctx.market(s, tg + list(held)), lim)
+            g = ctx.gate("decide", b, s, tg, nav, keep, rows, k=k)
             if g["verdict"] == "FAIL" or g["excluded"]:
                 tg = sorted(held) if g["verdict"] == "FAIL" else [t for t in tg if t not in g["excluded"] or t in held]
                 notes.append(f"{b}: cổng rủi ro {g['verdict']}: " + "; ".join(g["reasons"]))
@@ -509,16 +688,23 @@ def run(as_of, root=None, test_id=TEST_ID, verify=None, scorer=None, now=None, r
                                                        f"{os.environ.get('GITHUB_RUN_ATTEMPT') or '1'}"
                                                        if os.environ.get("GITHUB_RUN_ID") else None))
     except Exception as e:                  # noqa: BLE001 — ghi lỗi vào sổ; phiên dở dang không được lưu
-        _append(d, "decisions.csv", [_drow(t0, "ERROR", note=f"{type(e).__name__}: {str(e)[:300]}")])
-        return {"trial_id": test_id, "processed": [], "stopped": "ERROR", "error": f"{type(e).__name__}: {e}"}
+        err = f"{type(e).__name__}: {e}"
+        try:
+            finish_journal(d)               # phiên đã vào nhật ký thì ghi nốt trước, để dòng ERROR không chen vào giữa
+        except Exception as e2:             # noqa: BLE001 — nhật ký không khớp tệp: không ghi gì thêm
+            return {"trial_id": test_id, "processed": [], "stopped": "JOURNAL_CONFLICT",
+                    "error": f"{err}; {type(e2).__name__}: {e2}"}
+        _commit(d, {"decisions.csv": [_drow(t0, "ERROR", note=err[:300])]})
+        return {"trial_id": test_id, "processed": [], "stopped": "ERROR", "error": err}
 
 
 def _run(spec, d, root, test_id, t0, verify, scorer, now, run_id):
+    finish_journal(d)                       # lần chạy trước bị ngắt giữa lúc ghi: ghi nốt phiên đó (JournalConflict: dừng)
     why = spec_problem(spec)
     if why:
-        _append(d, "decisions.csv", [_drow(t0, "SPEC_INVALID", note=why)])
+        _commit(d, {"decisions.csv": [_drow(t0, "SPEC_INVALID", note=why)]})
         return {"trial_id": test_id, "processed": [], "stopped": "SPEC_INVALID"}
-    p_state = d / "state.json"
+    p_state = d / STATE
     books = [b for b in BOOKS if b in spec["books"] and (b in CONTROL or scorer is not None)]
     st = json.loads(p_state.read_text(encoding="utf-8")) if p_state.exists() else _new_state(test_id, spec, books)
     if st.get("done"):
@@ -527,23 +713,24 @@ def _run(spec, d, root, test_id, t0, verify, scorer, now, run_id):
         st["books"].setdefault(b, _new_state(test_id, spec, [b])["books"][b])
     ctx = _Ctx(root, t0)
     if ctx.mk["pit_label"] != PIT_REQUIRED:
-        _append(d, "decisions.csv", [_drow(t0, "PIT_REJECTED", derivation_id=ctx.mk.get("derivation_id", ""),
-                                           note=f"pit_label {ctx.mk['pit_label']!r} khác {PIT_REQUIRED!r}: không xử lý phiên "
-                                                f"nào; " + "; ".join(ctx.mk.get("pit_gaps") or []))])
+        _commit(d, {"decisions.csv": [_drow(t0, "PIT_REJECTED", derivation_id=ctx.mk.get("derivation_id", ""),
+                                            note=f"pit_label {ctx.mk['pit_label']!r} khác {PIT_REQUIRED!r}: không xử lý phiên "
+                                                 f"nào; " + "; ".join(ctx.mk.get("pit_gaps") or []))]})
         return {"trial_id": test_id, "processed": [], "stopped": "PIT_REJECTED"}
     hashes = {"vn30_history_sha256": va.sha256_file(root / data.VN30_HISTORY),
               "trading_calendar_sha256": va.sha256_file(root.joinpath(*risk_gate.CALENDAR))
               if root.joinpath(*risk_gate.CALENDAR).is_file() else ""}
     hist, done, stopped = _history(d), [], None
     period, n_periods, local = int(spec["period_sessions"]), int(spec["periods"]), spec["seal_deadline_local"]
+    rel = "/".join((*DIR, test_id, "decisions.csv"))
     todo = [s for s in ctx.sessions if s >= pd.Timestamp(spec["d0"])
             and (st["last"] is None or s > pd.Timestamp(st["last"]))]
     for s in todo:
         si = _iso(s)
         if not bool(ctx.session_ok.get(s, False)):
-            _append(d, "decisions.csv", [_drow(si, "WAIT_PRICES", note=f"phiên {si} có trong lịch nhưng kho chưa có giá của "
-                                                                       "thành viên rổ nào: dừng trước phiên này, thử lại lần "
-                                                                       "chạy sau (QĐ-11a mục 5)")])
+            _commit(d, {"decisions.csv": [_drow(si, "WAIT_PRICES", note=f"phiên {si} có trong lịch nhưng kho chưa có giá "
+                                                                        "của thành viên rổ nào: dừng trước phiên này, thử lại "
+                                                                        "lần chạy sau (QĐ-11a mục 5)")]})
             stopped = "WAIT_PRICES"
             break
         out = {name: [] for name in COLS}
@@ -554,15 +741,22 @@ def _run(spec, d, root, test_id, t0, verify, scorer, now, run_id):
             elif not p.get("run_id"):
                 seal = ("LATE_VOID", "quyết định không có mã lượt chạy GitHub Actions: không niêm phong được")
             else:
-                try:
-                    seal = _seal(verify(p["run_id"]), s, local)
-                except Exception as e:      # noqa: BLE001 — không xác minh được: dừng trước phiên khớp
-                    _append(d, "decisions.csv", [_drow(si, "VERIFY_WAIT", k=p["k"], run_id=p["run_id"],
-                                                       note=f"chưa xác minh được lượt chạy {p['run_id']} của quyết định "
-                                                            f"phiên {p['t']}: {type(e).__name__}: {str(e)[:200]}; dừng "
-                                                            "trước phiên khớp, thử lại lần chạy sau (QĐ-11a mục 3)")])
-                    stopped = "VERIFY_WAIT"
-                    break
+                line, why = _decision_line(d, p)
+                if line is None:                                 # dòng quyết định không khớp lệnh đang chờ: không niêm phong
+                    seal = ("LATE_VOID", "chưa niêm phong: " + why)
+                else:
+                    try:
+                        info = verify(p["run_id"])
+                        proof, why = _decision_commit(root, rel, line, p["run_id"])
+                        seal = _seal(info, s, local, proof, why)
+                    except Exception as e:  # noqa: BLE001 — không xác minh được: dừng trước phiên khớp
+                        _commit(d, {"decisions.csv": [_drow(
+                            si, "VERIFY_WAIT", k=p["k"], run_id=p["run_id"],
+                            note=f"chưa xác minh được lượt chạy {p['run_id']} của quyết định phiên {p['t']}: "
+                                 f"{type(e).__name__}: {str(e)[:200]}; dừng trước phiên khớp, thử lại lần chạy sau "
+                                 "(QĐ-11a mục 3)")]})
+                        stopped = "VERIFY_WAIT"
+                        break
         _corporate_actions(st, ctx, s, books, hist, out)                         # 1. sự kiện quyền
         finish = False
         if seal is not None:                                                     # 2. niêm phong
@@ -588,7 +782,9 @@ def _run(spec, d, root, test_id, t0, verify, scorer, now, run_id):
             finish = k >= n_periods
         for b in books:                                                          # khớp (và thử lại lệnh còn chờ)
             if st["open"].get(b):
-                st["open"][b] = _fill(b, st["books"][b], st["open"][b], s, ctx, out["trades.csv"])
+                st["open"][b] = _fill(b, st["books"][b], st["open"][b], s, ctx, out["trades.csv"],
+                                      lambda book, day, tg, nav, pos: ctx.gate("fill", book, day, tg, nav, pos,
+                                                                               out["decisions.csv"]))
         for r in out["trades.csv"]:
             if r["side"] in ("BUY", "SELL"):
                 _record(hist, r)
@@ -632,7 +828,7 @@ def _run(spec, d, root, test_id, t0, verify, scorer, now, run_id):
                                                       decided_at=now.isoformat(), deadline=dl.isoformat(), note=late))
                     st["pending"], st["k"] = {"k": due, "t": si, "run_id": None, "targets": {}, "void": late}, due + 1
                 else:
-                    tg, notes = _targets(ctx, st, s, due, books, scorer)
+                    tg, notes = _targets(ctx, st, s, due, books, scorer, out["decisions.csv"])
                     out["decisions.csv"].append(_drow(
                         si, "DECIDE", k=due, run_id=run_id or "", decided_at=now.isoformat(), deadline=dl.isoformat(),
                         derivation_id=ctx.mk["derivation_id"], targets=json.dumps(tg, ensure_ascii=False, sort_keys=True),
@@ -642,12 +838,9 @@ def _run(spec, d, root, test_id, t0, verify, scorer, now, run_id):
                         st["anchor"], st["count"] = si, 0
                     else:
                         st["k"] = due + 1
-        for name in COLS:
-            _append(d, name, out[name])
         st["last"] = si
         st["done"] = finish
-        d.mkdir(parents=True, exist_ok=True)
-        p_state.write_text(json.dumps(st, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+        _commit(d, out, st)                 # các CSV và state.json của phiên: qua nhật ký, không trùng khi bị ngắt
         done.append(si)
         if finish:
             stopped = "DONE"
@@ -658,29 +851,58 @@ def _run(spec, d, root, test_id, t0, verify, scorer, now, run_id):
 # ---------- dựng lại ----------
 
 def replay(root, spec, until):
-    """Dựng lại các sổ từ D0 đã đăng ký tới phiên `until` chỉ bằng danh mục mục tiêu đã ghi (DECIDE), periods.csv, các dòng
-    áp sự kiện quyền đã ghi (CASH_DIVIDEND, STOCK_ADJUST), giá trong kho và luật của mô-đun → bảng (date, book, nav), cùng
-    cách làm tròn với nav.csv. Không ghi tệp nào.
-    Cổng R1a ở phiên khớp KHÔNG tính lại: kết quả cổng phụ thuộc bảng sự kiện và bản gốc tại lúc robot chạy (sự kiện biết muộn,
-    bản gốc ghim sau làm đổi cửa sổ cách ly), nên replay dùng các dòng UNFILLED_RISK_GATE robot đã ghi. Mọi phần khác (lệnh,
-    khóa biên độ, thiếu giá, giới hạn tiền mặt, phí, định giá) tính lại từ giá trong kho."""
+    """Dựng lại các sổ từ D0 đã đăng ký tới phiên `until`, nhưng không quá phiên cuối robot đã ghi xong (`last` của
+    state.json; phiên có nhật ký ghi dở không tính) → bảng (date, book, nav), cùng cách làm tròn với nav.csv. Không ghi tệp.
+    Dùng: danh mục mục tiêu đã niêm phong (DECIDE và periods.csv), các dòng áp sự kiện quyền đã ghi, giá trong kho, luật của
+    mô-đun. Cổng R1a ở phiên khớp được TÍNH LẠI bằng hàm thuần risk_gate.check từ đầu vào robot đã ghi ở dòng RISK_GATE:
+    mục tiêu, NAV và vị thế phải trùng trạng thái replay đang dựng, giá và giá trị giao dịch bình quân phải trùng phép tính lại
+    từ kho, kết luận phải trùng; khác thì ReplayMismatch. Riêng cửa sổ cách ly lấy từ dòng đã ghi, kèm sha256 các tệp đầu
+    vào (manifest bản gốc, bảng sự kiện, lịch, rổ) để kiểm toán dựng lại ở commit của lượt chạy."""
     root = pathlib.Path(root)
     d = book_dir(root, spec["trial_id"])
+    p_state = d / STATE
+    last = json.loads(p_state.read_text(encoding="utf-8")).get("last") if p_state.exists() else None
+    if last is None:
+        return pd.DataFrame(columns=["date", "book", "nav"])
+    upto = min(pd.Timestamp(until), pd.Timestamp(last))
     dec = _read(d, "decisions.csv")
-    dec = dec[dec["action"] == "DECIDE"]
-    targets = {(int(r.k), r.date): json.loads(r.targets) for r in dec.itertuples(index=False)}
+    targets = {(int(r.k), r.date): json.loads(r.targets) for r in dec[dec["action"] == "DECIDE"].itertuples(index=False)}
+    gates = {}
+    for r in dec[dec["action"] == "RISK_GATE"].itertuples(index=False):
+        rec = json.loads(r.targets)
+        if rec.get("stage") == "fill":
+            gates.setdefault((r.date, r.book), []).append(rec)
     fills = {r.fill_session: (int(r.k), r.status, r.decision_session)
              for r in _read(d, "periods.csv").itertuples(index=False)}
     trd = _read(d, "trades.csv")
     ca = trd[trd["side"].isin(CA_SIDES)]
-    gate = {}
-    for r in trd[trd["side"] == "UNFILLED_RISK_GATE"].itertuples(index=False):
-        gate.setdefault((r.book, r.date), set()).add(r.asset)
     books = [b for b in BOOKS if any(b in v for v in targets.values())] or [b for b in CONTROL if b in spec["books"]]
-    ctx = _Ctx(root, until)
+    ctx = _Ctx(root, upto)
     cap = float(spec["capital"])
     state = {b: {"cash": cap, "positions": {}} for b in books}
     orders, out, scratch = {}, [], []
+
+    def gate(book, s, tg, nav, pos):
+        si = _iso(s)
+        recs = gates.get((si, book)) or []
+        if not recs:
+            raise ReplayMismatch(f"{si} {book}: có lệnh mua nhưng không có dòng RISK_GATE nào của phiên khớp")
+        rec = recs.pop(0)
+        if rec["targets"] != list(tg) or rec["positions"] != dict(pos) or rec["nav"] != nav:
+            raise ReplayMismatch(f"{si} {book}: mục tiêu, vị thế hay NAV ở dòng RISK_GATE khác trạng thái dựng lại")
+        m = rec["market"]
+        for t, p in (m.get("price") or {}).items():
+            if ctx.price(t, s) != p:
+                raise ReplayMismatch(f"{si} {book}: giá {t} ở dòng RISK_GATE ({p}) khác giá gốc trong kho ({ctx.price(t, s)})")
+        if (m.get("adv_value") or m.get("adv_problem")) and rec.get("limits"):
+            adv, _ = ctx.adv(s, list(m.get("adv_value") or {}) + list(m.get("adv_problem") or {}))
+            if adv != (m.get("adv_value") or {}):
+                raise ReplayMismatch(f"{si} {book}: giá trị giao dịch bình quân ở dòng RISK_GATE khác phép tính lại từ kho")
+        g = risk_gate.check(rec["targets"], {"nav": rec["nav"], "positions": rec["positions"]}, m, rec["limits"])
+        if g["verdict"] != rec["verdict"] or g["excluded"] != rec["excluded"]:
+            raise ReplayMismatch(f"{si} {book}: kết luận cổng ghi ({rec['verdict']}) khác check tính lại ({g['verdict']})")
+        return g
+
     for s in ctx.sessions:
         if s < pd.Timestamp(spec["d0"]):
             continue
@@ -701,8 +923,7 @@ def replay(root, spec, until):
                 orders[b] = {"targets": list(tg), "legs": legs} if legs else None
         for b in books:
             if orders.get(b):
-                orders[b] = _fill(b, state[b], orders[b], s, ctx, scratch,
-                                  refused_by_gate=lambda book, day: gate.get((book, day), set()))
+                orders[b] = _fill(b, state[b], orders[b], s, ctx, scratch, gate)
         for b in books:
             out.append({"date": si, "book": b, "nav": round(_value(state[b], lambda x: ctx.price(x, s)), 0)})
         if fin is not None and fin[0] >= int(spec["periods"]):

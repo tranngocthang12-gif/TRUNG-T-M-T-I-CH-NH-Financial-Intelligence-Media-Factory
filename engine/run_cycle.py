@@ -286,6 +286,9 @@ def main():
             st = load_json("state/ENGINE_STATE.json", {})
             st["data_ingest"] = ing
             save_json("state/ENGINE_STATE.json", st)
+        # F1b (Owner xác nhận 23/11/2026): sổ FWD đang chờ (VERIFY_WAIT, WAIT_PRICES) thì lượt dự phòng thử lại; không chờ gì
+        # thì fwd.run không ghi byte nào. Không chạy nghiên cứu, sổ giấy, sổ mô hình.
+        fwd.run(newest)
         # Giá không đổi không có nghĩa Ledger không đổi. Chỉ viết lại scorecard; không mở trial.
         if refresh_scorecard_report(newest) != 0:
             raise SystemExit(1)

@@ -3,14 +3,18 @@
 Fixture tổng hợp: 7 mã (AAA…GGG) trong kho giá, lịch phiên HOSE giả phủ cả khoảng dữ liệu, rổ theo ngày (AAA…FFF từ đầu;
 phiên R1: FFF rời rổ, GGG vào rổ), sự kiện quyền nhập tay. Đặc tả đăng ký trong research/trial_registry.jsonl của thư mục tạm;
 để test ngắn, kỳ dài 3 phiên và có 2 kỳ (quyết định k = 0, 1, 2 ở D0, D0+3, D0+6; phép thử xong ở phiên khớp D0+7).
-Robot chạy "từng ngày" bằng as_of tăng dần; hàm xác minh lượt chạy là bản giả (không mạng). config.ROOT và adjust.ROOT được vá.
+Robot chạy "từng ngày" bằng as_of tăng dần; hàm xác minh lượt chạy là bản giả (không mạng). Thư mục tạm là một kho git: sau
+mỗi lượt, Robot commit như daily_cycle.yml ("Vong hoc <ngày> run <GITHUB_RUN_ID>.<ATTEMPT>", giờ commit trong lượt chạy).
+config.ROOT và adjust.ROOT được vá.
 """
 from __future__ import annotations
 
 import ast
 import hashlib
 import json
+import os
 import pathlib
+import subprocess
 import sys
 
 import numpy as np
@@ -53,9 +57,25 @@ def _write_events(home, rows=()):
     _ev(rows).to_csv(p, index=False)
 
 
-def _home(tmp, close=None, vol=None, drop=(), events=(), calendar=True, unann=(), register=True, **spec):
-    """Kho tạm. drop: các (ngày, mã) không có dòng giá (mã None = mọi mã); unann: ngày lịch ghi CHUA_CO_THONG_BAO."""
+def _git(home, *a, when=None):
+    env = {**os.environ, "GIT_AUTHOR_NAME": "robot", "GIT_AUTHOR_EMAIL": "robot@example.invalid",
+           "GIT_COMMITTER_NAME": "robot", "GIT_COMMITTER_EMAIL": "robot@example.invalid"}
+    if when:
+        env.update(GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
+    return subprocess.run(["git", *a], cwd=home, env=env, check=True, capture_output=True, text=True).stdout
+
+
+def _commit_all(home, msg, when):
+    _git(home, "add", "-A")
+    if subprocess.run(["git", "diff", "--cached", "--quiet"], cwd=home).returncode:
+        _git(home, "commit", "-q", "-m", msg, when=when)
+
+
+def _home(tmp, close=None, vol=None, drop=(), events=(), calendar=True, unann=(), holidays=(), register=True, **spec):
+    """Kho tạm (kho git). drop: các (ngày, mã) không có dòng giá (mã None = mọi mã); unann: ngày lịch ghi
+    CHUA_CO_THONG_BAO; holidays: ngày nghỉ trong lịch (is_session = 0)."""
     home = pathlib.Path(tmp)
+    home.mkdir(parents=True, exist_ok=True)
     close = _prices() if close is None else close
     vol = pd.DataFrame(1e6, index=IDX, columns=TICK) if vol is None else vol
     gone = {(pd.Timestamp(d), t) for d, t in drop}
@@ -69,10 +89,10 @@ def _home(tmp, close=None, vol=None, drop=(), events=(), calendar=True, unann=()
     pd.DataFrame(columns=adjust.EV_COLS).to_csv(p, index=False)
     (home / "data").mkdir(parents=True, exist_ok=True)
     if calendar:
-        un = {pd.Timestamp(d) for d in unann}
+        un, hol = {pd.Timestamp(d) for d in unann}, {pd.Timestamp(d) for d in holidays}
         lines = ["date,is_session,source_id"]
         for d in pd.date_range("2025-01-01", "2026-12-31", freq="D"):
-            lines.append(f"{d.date()},0,WEEKEND" if d.weekday() >= 5 else
+            lines.append(f"{d.date()},0,WEEKEND" if d.weekday() >= 5 else f"{d.date()},0,fx-hol" if d in hol else
                          f"{d.date()},1,{data.UNANNOUNCED if d in un else 'HOSE_DEFAULT'}")
         (home / "data" / "trading_calendar.csv").write_text("\n".join(lines) + "\n", encoding="utf-8")
     hist = "effective_date,ticker,action,source_id\n" + "".join(f"{S[0]},{t},ADD,fx-0\n" for t in TICK[:6])
@@ -85,7 +105,15 @@ def _home(tmp, close=None, vol=None, drop=(), events=(), calendar=True, unann=()
     if register:
         lines.append(json.dumps({**SPEC, **spec}))
     reg.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if not (home / ".git").exists():
+        _git(home, "init", "-q")
+    _commit_all(home, "fixture", "2026-01-01T00:00:00+00:00")
     return home
+
+
+def _use(monkeypatch, home):
+    monkeypatch.setattr(config, "ROOT", home)
+    monkeypatch.setattr(adjust, "ROOT", home)
 
 
 @pytest.fixture
@@ -109,11 +137,14 @@ class Robot:
             raise x
         return x
 
-    def day(self, i, now=None, **info):
+    def day(self, i, now=None, commit=True, **info):
         rid = f"{i}.1"
-        self.runs[rid] = {**OK, "finished_at": f"{S[i]}T11:30:00Z", **info}
-        return fwd.run(S[i], root=self.home, verify=self.verify, scorer=self.scorer, run_id=rid,
-                       now=now or f"{S[i]}T11:00:00Z")
+        self.runs[rid] = {**OK, "started_at": f"{S[i]}T11:00:00Z", "finished_at": f"{S[i]}T11:30:00Z", **info}
+        res = fwd.run(S[i], root=self.home, verify=self.verify, scorer=self.scorer, run_id=rid,
+                      now=now or f"{S[i]}T11:00:00Z")
+        if commit:                                          # như daily_cycle.yml: commit mang mã lượt chạy, trong lượt chạy
+            _commit_all(self.home, f"Vong hoc {S[i]} run {rid}", f"{S[i]}T11:20:00+00:00")
+        return res
 
     def days(self, a, b):
         for i in range(a, b + 1):
@@ -124,9 +155,11 @@ def _dir(home):
     return fwd.book_dir(home, "FWD-001")
 
 
-def _csv(home, name):
+def _csv(home, name, gates=False):
+    """Bảng CSV của sổ; decisions.csv bỏ các dòng RISK_GATE trừ khi gates=True."""
     p = _dir(home) / name
-    return pd.read_csv(p, dtype=str, keep_default_na=False) if p.exists() else pd.DataFrame(columns=fwd.COLS[name])
+    t = pd.read_csv(p, dtype=str, keep_default_na=False) if p.exists() else pd.DataFrame(columns=fwd.COLS[name])
+    return t if name != "decisions.csv" or gates else t[t.action != "RISK_GATE"].reset_index(drop=True)
 
 
 def _state(home):
@@ -153,7 +186,7 @@ def _pos(home, book, upto):
 
 def _snapshot(root):
     return {p.relative_to(root).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(root.rglob("*")) if p.is_file()}
+            for p in sorted(root.rglob("*")) if p.is_file() and ".git" not in p.relative_to(root).parts}
 
 
 # ---------- 1. chưa đăng ký ----------
@@ -173,17 +206,28 @@ def test_unregistered_creates_no_file_and_changes_no_byte(env):
     assert fwd.load_registration(home, "FWD-001") is None and fwd.load_registration(home, "FWD-002")["trial_id"] == "FWD-002"
 
 
-def test_run_cycle_calls_fwd_once_after_the_paper_book_in_both_modes():
-    """Lệnh: engine/run_cycle.py chỉ thêm một lời gọi fwd.run sau paper.run, ở cả ops và research (cùng một đường chạy)."""
+def test_run_cycle_calls_fwd_after_the_paper_book_and_in_the_backup_branch_only():
+    """Lệnh F1b: một lời gọi fwd.run sau paper.run, chung cho ops và research. Owner xác nhận 23/11/2026: thêm đúng một lời gọi
+    ở nhánh «phiên mới nhất đã xử lý» của main; đường --scorecard-only không gọi fwd.run."""
     tree = ast.parse((REPO / "engine" / "run_cycle.py").read_text(encoding="utf-8"))
+
+    def fwd_calls(node):
+        return [n for n in ast.walk(node) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
+                and isinstance(n.func.value, ast.Name) and n.func.value.id == "fwd"]
+    assert len(fwd_calls(tree)) == 2
     cyc = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "cycle")
-    calls = [n for n in ast.walk(cyc) if isinstance(n, ast.Call) and isinstance(n.func, ast.Attribute)
-             and isinstance(n.func.value, ast.Name) and n.func.value.id == "fwd"]
+    calls = fwd_calls(cyc)
     assert len(calls) == 1 and calls[0].func.attr == "run" and [ast.unparse(a) for a in calls[0].args] == ["as_of"]
     top = [n for n in cyc.body if isinstance(n, (ast.Expr, ast.Assign))]
     i_fwd = next(i for i, n in enumerate(top) if "fwd.run(" in ast.unparse(n))
     i_paper = next(i for i, n in enumerate(top) if "paper.run(" in ast.unparse(n))
     assert i_fwd == i_paper + 1                                          # ngay sau paper.run, ngoài mọi nhánh if ops
+    main = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == "main")
+    ifs = [n for n in ast.walk(main) if isinstance(n, ast.If)]
+    backup = next(n for n in ifs if ast.unparse(n.test) == "sel is None")
+    score = next(n for n in ifs if ast.unparse(n.test) == "a.scorecard_only")
+    assert [ast.unparse(c) for c in fwd_calls(backup)] == ["fwd.run(newest)"] and fwd_calls(score) == []
+    assert len(fwd_calls(main)) == 1
 
 
 # ---------- 2. ba sổ đối chứng (mục 1, 2 của giao thức) ----------
@@ -574,3 +618,293 @@ def test_running_the_same_session_twice_writes_nothing_new(env):
     rb.days(D0, D0 + 1)
     snap = _snapshot(_dir(home))
     assert rb.day(D0 + 1)["processed"] == [] and _snapshot(_dir(home)) == snap
+
+
+# ---------- 10. ghi phiên qua nhật ký: bị ngắt ở bất kỳ bước ghi nào (bản chấm L-09 PR #95 vòng 1, BLOCKER 1) ----------
+
+class Killed(BaseException):
+    """Tiến trình bị giết: không đi qua `except Exception` của fwd.run."""
+
+
+def _crash_at(monkeypatch, at, partial=False, exc=Killed):
+    """Ngắt ở lần ghi thứ `at` trong chuỗi: ghi journal.json (1) → nối từng CSV (2…) → ghi state.json → xóa journal.json.
+    partial=True: lần nối CSV đó chỉ ghi được nửa số byte."""
+    n = {"i": 0}
+    append, atomic, drop = fwd._append_bytes, fwd._atomic_write, fwd._drop_journal
+
+    def hit():
+        n["i"] += 1
+        return n["i"] == at
+
+    def _append(p, b):
+        if hit():
+            if partial:
+                append(p, b[:len(b) // 2])
+            raise exc(f"ngắt khi nối {p.name}")
+        append(p, b)
+
+    def _atomic(p, text):
+        if hit():
+            raise exc(f"ngắt khi ghi {p.name}")
+        atomic(p, text)
+
+    def _drop(p):
+        if hit():
+            raise exc("ngắt khi xóa nhật ký")
+        drop(p)
+    monkeypatch.setattr(fwd, "_append_bytes", _append)
+    monkeypatch.setattr(fwd, "_atomic_write", _atomic)
+    monkeypatch.setattr(fwd, "_drop_journal", _drop)
+
+
+def _files(home):
+    return {p.name: p.read_bytes() for p in sorted(_dir(home).iterdir())}
+
+
+def test_a_session_killed_at_any_write_is_completed_once_on_the_next_run(tmp_path, monkeypatch):
+    """Phiên D0+1 (khớp lệnh D0) ghi 5 CSV. Ngắt ở từng bước: trước nhật ký, trước/giữa từng CSV, trước state.json, trước khi
+    xóa nhật ký; rồi chạy lại (cục bộ: nhật ký còn; như Actions: kho trở về commit trước). Kết quả trùng từng byte với lượt
+    không bị ngắt; không dòng trùng; replay khớp."""
+    clean = _home(tmp_path / "clean")
+    _use(monkeypatch, clean)
+    rb = Robot(clean)
+    rb.days(D0, D0 + 2)
+    ref = _files(clean)
+    assert set(ref) == {"decisions.csv", "drawdown.csv", "nav.csv", "periods.csv", "state.json", "trades.csv"}
+    cases = [(at, False, "local") for at in range(1, 9)] + [(2, True, "local"), (6, True, "local"), (4, True, "reset")]
+    for n, (at, partial, how) in enumerate(cases):
+        home = _home(tmp_path / f"c{n}")
+        _use(monkeypatch, home)
+        rb = Robot(home)
+        rb.day(D0)
+        with monkeypatch.context() as m:
+            _crash_at(m, at, partial)
+            with pytest.raises(Killed):
+                rb.day(D0 + 1, commit=False)
+        if how == "reset":                                  # Actions: lượt bị giết không commit; lượt sau lấy main
+            _git(home, "reset", "-q", "--hard")
+            _git(home, "clean", "-qfd")
+        assert fwd.replay(home, SPEC, S[D0 + 1]).date.max() == S[D0] or at >= 8    # phiên dở không vào replay
+        rb.day(D0 + 1)
+        rb.day(D0 + 2)
+        assert _files(home) == ref, (at, partial, how)
+        nav = _csv(home, "nav.csv")
+        assert not nav.duplicated(["date", "book"]).any()
+        assert fwd.replay(home, SPEC, S[D0 + 2]).astype(str).reset_index(drop=True).equals(
+            nav[["date", "book", "nav"]].reset_index(drop=True))
+
+
+def test_an_error_while_writing_completes_the_session_before_the_error_row(env, monkeypatch):
+    home = _home(env)
+    rb = Robot(home)
+    rb.day(D0)
+    with monkeypatch.context() as m:
+        _crash_at(m, 3, exc=OSError)                                       # lỗi đĩa khi nối CSV thứ hai
+        res = rb.day(D0 + 1)
+    assert res["stopped"] == "ERROR" and not (_dir(home) / fwd.JOURNAL).exists()
+    dec = _csv(home, "decisions.csv")
+    assert dec[dec.action == "ERROR"].date.tolist() == [S[D0 + 1]] and dec.action.tolist()[-1] == "ERROR"
+    rb.day(D0 + 2)
+    nav = _csv(home, "nav.csv")
+    assert not nav.duplicated(["date", "book"]).any() and nav.date.unique().tolist() == S[D0:D0 + 3]
+    assert set(_csv(home, "trades.csv").query("side == 'BUY'").date) == {S[D0 + 1]}
+
+
+@pytest.mark.parametrize("how", ["extra_line", "same_size_edit", "truncated"])
+def test_a_file_that_does_not_match_the_pending_journal_stops_everything(env, monkeypatch, how):
+    home = _home(env)
+    rb = Robot(home)
+    rb.day(D0)
+    with monkeypatch.context() as m:
+        _crash_at(m, 3)                                     # nav.csv đã nối đủ, trades.csv chưa
+        with pytest.raises(Killed):
+            rb.day(D0 + 1, commit=False)
+    f = _dir(home) / "nav.csv"
+    if how == "extra_line":
+        with open(f, "a", encoding="utf-8") as fh:
+            fh.write("dòng lạ\n")
+    elif how == "truncated":                                # tệp ngắn hơn vị trí nhật ký bắt đầu ghi
+        off = json.loads((_dir(home) / fwd.JOURNAL).read_text(encoding="utf-8"))["parts"]["nav.csv"]["offset"]
+        f.write_bytes(f.read_bytes()[:off - 5])
+    else:                                                   # sửa một chữ số của phần đã nối, giữ nguyên độ dài
+        b = bytearray(f.read_bytes())
+        i = b.rindex(b"FWD-CASH,") - 2
+        b[i] = ord("7") if b[i] != ord("7") else ord("8")
+        f.write_bytes(bytes(b))
+    snap = _snapshot(_dir(home))
+    res = rb.day(D0 + 1, commit=False)
+    assert res["stopped"] == "JOURNAL_CONFLICT" and _snapshot(_dir(home)) == snap
+
+
+# ---------- 11. niêm phong: bằng chứng commit của dòng quyết định (BLOCKER 2) ----------
+
+def _rewrite_decide(home, drop_aaa_in_state):
+    """Sửa tay dòng DECIDE của D0 (bỏ AAA khỏi FWD-EW); tùy chọn sửa cả lệnh đang chờ trong state.json cho khớp."""
+    f = _dir(home) / "decisions.csv"
+    lines = f.read_text(encoding="utf-8").split("\n")
+    i = next(k for k, x in enumerate(lines) if ",DECIDE," in x)
+    assert lines[i].count('[""AAA"", ') >= 1
+    lines[i] = lines[i].replace('""FWD-EW"": [""AAA"", ', '""FWD-EW"": [', 1)
+    f.write_text("\n".join(lines), encoding="utf-8")
+    if drop_aaa_in_state:
+        st = _state(home)
+        st["pending"]["targets"]["FWD-EW"].remove("AAA")
+        (_dir(home) / "state.json").write_text(json.dumps(st, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
+
+
+@pytest.mark.parametrize("tamper, why", [
+    ("message", "không mang mã lượt chạy 285.1"),             # commit đưa dòng vào là của lượt khác
+    ("late_commit", "nằm ngoài lượt chạy"),                   # commit đúng mã lượt nhưng sau khi lượt đã kết thúc
+    ("row", "khác lệnh đang chờ"),                            # dòng quyết định bị sửa sau commit
+    ("row_and_state", "không mang mã lượt chạy 285.1"),       # sửa cả dòng và state, commit tay
+])
+def test_a_decision_without_a_matching_commit_of_its_run_is_not_sealed(env, tamper, why):
+    home = _home(env)
+    rb = Robot(home)
+    rb.day(D0)
+    if tamper == "message":
+        _git(home, "commit", "-q", "--amend", "-m", f"Vong hoc {S[D0]} run 999.1", when=f"{S[D0]}T11:20:00+00:00")
+    elif tamper == "late_commit":
+        _git(home, "commit", "-q", "--amend", "-m", f"Vong hoc {S[D0]} run {D0}.1", when=f"{S[D0]}T12:00:00+00:00")
+    else:
+        _rewrite_decide(home, tamper == "row_and_state")
+        _commit_all(home, "sửa tay", f"{S[D0]}T11:25:00+00:00")
+    rb.day(D0 + 1)
+    late = _csv(home, "decisions.csv").query("action == 'D0_LATE'")
+    assert late.date.tolist() == [S[D0 + 1]] and why in late.note.item()
+    assert _csv(home, "trades.csv").empty and _csv(home, "periods.csv").empty
+
+
+def test_without_git_history_the_seal_waits(env, monkeypatch, tmp_path_factory):
+    home = _home(env)
+    rb = Robot(home)
+    rb.day(D0)
+    shallow = tmp_path_factory.mktemp("nong") / "kho"
+    subprocess.run(["git", "clone", "-q", "--depth", "1", f"file://{home}", str(shallow)], check=True, capture_output=True)
+    _use(monkeypatch, shallow)
+    res = fwd.run(S[D0 + 1], root=shallow, verify=rb.verify, run_id=f"{D0 + 1}.1", now=f"{S[D0 + 1]}T11:00:00Z")
+    assert res["stopped"] == "VERIFY_WAIT" and "kho nông" in _csv(shallow, "decisions.csv").note.iloc[-1]
+    _use(monkeypatch, home)
+    import shutil
+    shutil.rmtree(home / ".git")
+    assert rb.day(D0 + 1, commit=False)["stopped"] == "VERIFY_WAIT"
+    assert "không đọc được lịch sử git" in _csv(home, "decisions.csv").note.iloc[-1]
+
+
+# ---------- 12. lượt dự phòng (BLOCKER 3; Owner xác nhận 23/11/2026) ----------
+
+def test_a_backup_run_with_nothing_pending_changes_no_byte_and_keeps_the_run_id(env):
+    off = IDX[D0 + 2]
+    vol = pd.DataFrame(1e6, index=IDX, columns=TICK)
+    vol.loc[off] = 0.0
+    home = _home(env, vol=vol, holidays=[off])
+    rb = Robot(home)
+    rb.day(D0)
+    snap = _snapshot(_dir(home))
+    assert fwd.run(S[D0], root=home, verify=rb.verify, run_id=f"{D0}.2", now=f"{S[D0]}T13:00:00Z")["processed"] == []
+    assert _snapshot(_dir(home)) == snap and _state(home)["pending"]["run_id"] == f"{D0}.1"     # không quyết định thứ hai
+    rb.day(D0 + 1)
+    snap = _snapshot(_dir(home))
+    for i in (D0 + 1, D0 + 2):                                               # cùng phiên; ngày nghỉ (kho có dòng KL 0)
+        fwd.run(S[i], root=home, verify=rb.verify, run_id=f"{i}.2", now=f"{S[i]}T13:00:00Z")
+        assert _snapshot(_dir(home)) == snap, S[i]
+
+
+def test_a_backup_run_of_run_cycle_retries_fwd_without_rerunning_research_or_the_paper_book(env, monkeypatch):
+    from engine import paper, run_cycle
+    home = _home(env, drop=[(IDX[i], None) for i in range(D0 + 2, len(IDX))])     # kho tới phiên D0+1
+    rb = Robot(home)
+    rb.day(D0)
+    real = rb.runs[f"{D0}.1"]
+    rb.runs[f"{D0}.1"] = OSError("API GitHub lỗi")
+    assert rb.day(D0 + 1)["stopped"] == "VERIFY_WAIT"                       # lượt đầu của phiên D0+1
+    rb.runs[f"{D0}.1"] = real
+    (home / "state").mkdir(exist_ok=True)
+    (home / "state" / "ENGINE_STATE.json").write_text(json.dumps({"as_of": S[D0 + 1]}), encoding="utf-8")
+    monkeypatch.setattr(run_cycle, "cycle", lambda *a, **k: pytest.fail("lượt dự phòng không chạy lại vòng học"))
+    monkeypatch.setattr(paper, "run", lambda *a, **k: pytest.fail("lượt dự phòng không chạy sổ giấy"))
+    monkeypatch.setattr(run_cycle, "refresh_scorecard_report", lambda *a, **k: 0)
+    monkeypatch.setattr(fwd, "github_run", rb.verify)
+    monkeypatch.delenv("GITHUB_RUN_ID", raising=False)
+    monkeypatch.setattr(sys, "argv", ["run_cycle", "--mode", "auto", "--source", "store", "--no-llm"])
+    run_cycle.main()
+    buys = _csv(home, "trades.csv").query("side == 'BUY'")
+    assert set(buys.date) == {S[D0 + 1]} and len(buys) == 12 and _state(home)["last"] == S[D0 + 1]
+    assert _csv(home, "periods.csv").fill_session.tolist() == [S[D0 + 1]]
+    assert not (home / "paper" / "nav.csv").exists()
+
+
+def test_scorecard_only_does_not_call_fwd(env, monkeypatch):
+    from engine import run_cycle
+    monkeypatch.setattr(fwd, "run", lambda *a, **k: pytest.fail("--scorecard-only không gọi fwd.run"))
+    monkeypatch.setattr(run_cycle, "refresh_scorecard_report", lambda *a, **k: 0)
+    monkeypatch.setattr(sys, "argv", ["run_cycle", "--scorecard-only", "--as-of", S[D0]])
+    with pytest.raises(SystemExit) as e:
+        run_cycle.main()
+    assert e.value.code == 0
+
+
+# ---------- 13. replay chỉ tới phiên robot đã ghi xong (BLOCKER 4) ----------
+
+def test_replay_stops_at_the_last_session_the_robot_completed(env):
+    home = _home(env, drop=[(IDX[D0 + 3], None)])
+    rb = Robot(home)
+    rb.day(D0)
+    real = rb.runs[f"{D0}.1"]
+    rb.runs[f"{D0}.1"] = OSError("API GitHub lỗi")
+    rb.day(D0 + 1)                                                           # VERIFY_WAIT: D0+1 chưa xử lý
+    nav = _csv(home, "nav.csv")[["date", "book", "nav"]]
+    got = fwd.replay(home, SPEC, S[D0 + 1]).astype(str)
+    assert got.date.unique().tolist() == [S[D0]] and got.equals(nav)
+    rb.runs[f"{D0}.1"] = real
+    rb.day(D0 + 2)
+    assert rb.day(D0 + 4)["stopped"] == "WAIT_PRICES"                        # D0+3 không có giá
+    nav = _csv(home, "nav.csv")[["date", "book", "nav"]].reset_index(drop=True)
+    got = fwd.replay(home, SPEC, S[D0 + 4]).astype(str).reset_index(drop=True)
+    assert got.date.max() == S[D0 + 2] and got.equals(nav)
+
+
+# ---------- 14. bằng chứng của cổng R1a (CẦN LÀM RÕ của bản chấm) ----------
+
+def _gate_rows(home):
+    t = _csv(home, "decisions.csv", gates=True)
+    return t[t.action == "RISK_GATE"]
+
+
+def _edit_gate(home, date, book, change):
+    f = _dir(home) / "decisions.csv"
+    t = pd.read_csv(f, dtype=str, keep_default_na=False)
+    i = t.index[(t.action == "RISK_GATE") & (t.date == date) & (t.book == book) & t.note.str.startswith("fill")][0]
+    rec = json.loads(t.at[i, "targets"])
+    change(rec)
+    t.at[i, "targets"] = json.dumps(rec, ensure_ascii=False, sort_keys=True)
+    t.to_csv(f, index=False)
+
+
+def test_every_gate_call_records_its_inputs_and_replay_recomputes_the_verdict(env):
+    home = _home(env)
+    Robot(home).days(D0, D0 + 4)
+    g = _gate_rows(home)
+    assert set(zip(g.date, g.book, g.note)) >= {(S[D0], "FWD-EW", "decide: PASS"), (S[D0], "FWD-HOLD", "decide: PASS"),
+                                                (S[D0 + 1], "FWD-EW", "fill: PASS"), (S[D0 + 1], "FWD-HOLD", "fill: PASS")}
+    rec = json.loads(g[(g.date == S[D0 + 1]) & (g.book == "FWD-EW")].targets.item())
+    assert set(rec) >= {"stage", "targets", "nav", "positions", "limits", "market", "verdict", "excluded", "inputs"}
+    assert set(rec["inputs"]) >= {"data/trading_calendar.csv", "data/vn30_history.csv",
+                                  config.CFG["corporate_actions"]["manual"]}
+    assert set(rec["market"]["adv_value"]) == set(TICK[:6]) and rec["market"]["quarantined"] == {}
+    nav = _csv(home, "nav.csv")[["date", "book", "nav"]].reset_index(drop=True)
+    assert fwd.replay(home, SPEC, S[D0 + 4]).astype(str).reset_index(drop=True).equals(nav)
+
+
+@pytest.mark.parametrize("change, why", [
+    (lambda r: r.update(verdict="FAIL"), "kết luận cổng"),                               # kết luận ghi khác check
+    (lambda r: r["market"]["adv_value"].update(AAA=1.0), "giá trị giao dịch bình quân"),   # đầu vào ADV bịa
+    (lambda r: r["market"]["price"].update(AAA=1.0), "giá AAA"),                         # giá bịa
+    (lambda r: r.update(nav=r["nav"] + 1), "NAV"),                                       # NAV khác trạng thái dựng lại
+])
+def test_replay_rejects_a_tampered_gate_record(env, change, why):
+    home = _home(env)
+    Robot(home).days(D0, D0 + 2)
+    _edit_gate(home, S[D0 + 1], "FWD-EW", change)
+    with pytest.raises(fwd.ReplayMismatch, match=why):
+        fwd.replay(home, SPEC, S[D0 + 2])
