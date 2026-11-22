@@ -3,8 +3,8 @@
 - Ngày: 2026-11-21
 - Trạng thái: **PROPOSED — CHƯA HIỆU LỰC**. Chỉ là hồ sơ quyết định để phản biện và Owner cân nhắc; không thay đổi ARCHITECTURE v3.0.
 - Người đề xuất / soạn chữ: ChatGPT (OpenAI), theo yêu cầu Owner tổng hợp chuỗi thảo luận về AI đầu tư, phản biện mù, xác suất, vĩ mô và tối ưu vốn.
-- Người chấm (L-09): **chưa có**; phải là ghế khác nhà cung cấp người viết, nhận xét đúng commit.
-- Owner duyệt (L-10): **chưa**; chỉ có hiệu lực nếu Owner phê duyệt và gộp PR sau L-09.
+- Người chấm (L-09): xem bình luận L-09 của PR #68; Claude (Anthropic), khác nhà cung cấp với người viết.
+- Owner duyệt (L-10): **chưa**. Gộp PR này chỉ đưa văn bản lên `main` ở trạng thái **PROPOSED**; **ACCEPTED** chỉ được ghi bằng một PR riêng khi Owner quyết định, qua L-09 và Owner gộp.
 - Mốc bằng chứng đọc: main tại commit **1d2f5c58acbeb3155118babc92bbb1bc9e06b382** (2026-11-20); các số bên dưới là trạng thái tại mốc này, không phải chỉ số hiện thời bất biến.
 - Tính chất: bổ sung nguyên tắc lựa chọn năng lực và thiết kế thí nghiệm tương lai, **không** bổ sung model, API, hệ thống điều phối, dữ liệu, quyền giao dịch hay công tắc vốn vào runtime.
 
@@ -26,8 +26,6 @@ Tuyệt đối không dựng “Multi-AI OS” hoặc orchestrator độc lập 
 - **Nửa CHỨNG MINH**: nguồn dữ liệu có bản gốc → giả thuyết được đăng ký → baseline → đánh giá ngoài mẫu → Ledger/scorecard/negative findings. Engine định lượng hiện nay là đối chứng âm; không đổi không gian 13 feature × 3 model, không đổi top-5/horizon 20 phiên chỉ bằng ADR này.
 - **Nửa HỌC**: tài liệu gốc và trích nguyên văn đã CITED → trích đặc trưng định tính *có thể kiểm toán* (ví dụ thay đổi kế toán, khoản thu bất thường, rủi ro pháp lý) → kiểm tra người/thuật toán. LLM không được nhớ giá, EPS, nợ, lãi suất hay tự tạo số liệu; số liệu đến từ parser/nguồn bảng và được xác minh. Bản DRAFT hoặc không có ngày công bố không vào quyết định.
 - **Nửa QUẢN TRỊ**: L-01…L-10, Risk/Capital/Human Gate, source provenance, quyền từ chối/giữ tiền mặt. Không mở API trả phí và không thêm ghế chính thức chỉ vì đề xuất phản biện mù.
-
-Đối với UNIVERSAL ML FACTORY, hình thức tái dùng là **Universal Core → Task Template (ranking/probabilistic forecasting) → Vietnam Equities Domain Adapter**. Core giữ hợp đồng, versioning, chống leakage, baseline, huấn luyện, score, monitoring, retraining gate; adapter miền giữ HOSE, giá trần/sàn, lô, thuế/phí, corporate actions, thanh khoản, ngày công bố và ngành. Không nhúng luật HOSE vào Universal Core. Đây là ranh giới thiết kế tương lai, chưa phải mã đã triển khai.
 
 ## 3. Bốn năng lực nghiên cứu được nhận, kèm giới hạn
 
@@ -58,6 +56,8 @@ Khi chuẩn bị phép thử mới, đăng ký trước và đóng băng trong t
 
 ## 5. Khoảng trống đã đọc trên main — không diễn giải thành kết quả đầu tư
 
+Tình trạng sau mốc ghim: xem `reports/PIT-001_20261121.json` và danh mục việc của ADR-0016. Các số dưới đây chỉ đúng tại commit đã ghim, không tự cập nhật theo `main`.
+
 Tại commit ghim:
 - reports/scorecard.json ngày 20/11/2026 ghi **6 dự báo, 0 resolved, 0 timing_valid**, 3 cặp A/B; chỉ 1 cặp bất đồng thô và chính cặp đó bị chặn tính năng lực vì chứng cứ thời điểm (legacy_unproven). Mẫu 194 cặp bất đồng hợp lệ **không được đổi**.
 - state/ENGINE_STATE.json ngày 20/11/2026 ghi **222 trials, 0 model ACTIVE, paper_nav 1.000.000.000 (vốn giấy khởi tạo), max drawdown giấy 0**. Chưa có minh chứng alpha thực tế.
@@ -71,15 +71,23 @@ Các bản ghi trên chứng minh nhu cầu sửa **chất lượng đo lường
 
 ## 6. Roadmap cổng điều kiện — không xây module nếu đầu vào chưa đạt
 
+### Quan hệ với ADR-0016 và ADR-0017 (đã ACCEPTED)
+
+- ADR-0015 vẫn là **PROPOSED, chưa hiệu lực**, chỉ giải thích nguyên tắc kiểm chứng; không mở đường điều hành hay bảng tiêu chí thăng bậc thứ hai. Nếu có khác biệt về quyết định, cổng, thang vốn, lịch triển khai hay quyền mở việc thì **ADR-0016 và ADR-0017 đang ACCEPTED được áp dụng**. Không dùng ADR-0015 để thay thế hai ADR đó.
+- **PIT-001 đã thực hiện**, bằng `tools/pit001_audit.py` và `reports/PIT-001_20261121.json`; kết luận **NOT_READY**, không phải đã đạt cổng PIT. Các việc khắc phục tiếp theo chỉ theo lệnh/phạm vi riêng được Owner duyệt.
+- Hai hàng **BASELINE-001** và **PAPER/RISK** dưới đây là diễn giải của phép thử **FWD-001** theo **QĐ-5, ADR-0016**, không phải hai chương trình hay hai điều kiện mở vốn mới.
+- **EDGE-001**, **FORECAST-001** và **PORTFOLIO/HUMAN** chỉ là **nguyên tắc nghiên cứu**, không phát lệnh, không khởi tạo thí nghiệm, không mở gate độc lập. Tiêu chí nâng bậc và trình tự bắt buộc theo mục **"Thang vốn: tiêu chí số" của ADR-0016**; cơ chế SCN-001 theo **ADR-0017** độc lập, không bị ADR-0015 thay đổi.
+- Bảng sau chỉ lưu mục đích thẩm định đã đề xuất tại mốc ghim; **không tự chứng minh READY**, không thay thế quyết định Owner hay cổng có hiệu lực.
+
 | Cổng | Việc được phép chuẩn bị | Bằng chứng bắt buộc để đi tiếp |
 |---|---|---|
-| PIT-001 (NGAY; chỉ đọc) | Lập ma trận thiếu/đủ lịch sử VN30, đối chiếu source và CSV, PDF HOSE, kiểm quyền TCB/VCB, so actual universe engine với tuyên bố báo cáo | Bản kiểm toán có đường dẫn, hash, phạm vi ngày, trạng thái UNKNOWN; không sửa source/engine/config |
+| PIT-001 (đã chạy; NOT_READY) | Lập ma trận thiếu/đủ lịch sử VN30, đối chiếu source và CSV, PDF HOSE, kiểm quyền TCB/VCB, so actual universe engine với tuyên bố báo cáo | Bản kiểm toán có đường dẫn, hash, phạm vi ngày, trạng thái UNKNOWN; không sửa source/engine/config |
 | G1 HIỆN HÀNH | Thu nguồn, phản biện ghi chú, dự báo A/B và đối chiếu dấu nhận theo luật | Điều kiện thoát G1 của §8; nguồn nguyên bản, lịch công bố, số dự báo hợp lệ; không gọi 6 dự báo hiện có là đã chấm |
-| BASELINE-001 (sau quyết định phạm vi riêng) | Đặc tả một thí nghiệm 20 phiên dùng cùng dữ liệu, phí, lot, universe, benchmark, bộ negative controls | Đăng ký trước L-06, chứng minh PIT/khả năng khớp, test leakage; không đổi frozen_space bất hợp lệ |
-| EDGE-001 (chỉ nếu BASELINE-001 đủ bằng chứng) | Đánh giá thêm giá trị của đặc trưng doanh nghiệp/LLM đã CITED so với baseline; ablation có và không LLM | Có cải thiện ngoài mẫu với kiểm soát multiple testing, nguồn truy xuất được, kiểm tra sai phạm; thua/không rõ thì không promote |
-| FORECAST-001 (không mặc định) | Dự báo phân phối/hiệu chuẩn với hợp đồng target riêng | Brier/quantile/coverage ngoài mẫu cải thiện hơn baseline; không suy xác suất từ score xếp hạng |
-| PAPER/RISK (đã có, không tăng quyền) | Stress test khớp lệnh, chi phí, thanh khoản, regime; giữ mặc định CASH khi không đủ model | So kết quả giấy và backtest, biến động alpha, tail risk, giới hạn được Owner quy định và đủ nguồn |
-| PORTFOLIO/HUMAN (HOÃN) | Sau alpha được xác nhận, mới xét optimizer, CVaR, phân bổ vốn danh nghĩa và đối chứng người | Bằng chứng tăng giá trị *so với phân bổ đơn giản* trên tương lai; luật/quyền/Owner gate, ADR riêng |
+| BASELINE-001 (tham chiếu FWD-001, ADR-0016) | Đặc tả một thí nghiệm 20 phiên dùng cùng dữ liệu, phí, lot, universe, benchmark, bộ negative controls | Đăng ký trước L-06, chứng minh PIT/khả năng khớp, test leakage; không đổi frozen_space bất hợp lệ |
+| EDGE-001 (nguyên tắc, chưa mở việc) | Đánh giá thêm giá trị của đặc trưng doanh nghiệp/LLM đã CITED so với baseline; ablation có và không LLM | Có cải thiện ngoài mẫu với kiểm soát multiple testing, nguồn truy xuất được, kiểm tra sai phạm; thua/không rõ thì không promote |
+| FORECAST-001 (nguyên tắc, chưa mở việc) | Dự báo phân phối/hiệu chuẩn với hợp đồng target riêng | Brier/quantile/coverage ngoài mẫu cải thiện hơn baseline; không suy xác suất từ score xếp hạng |
+| PAPER/RISK (tham chiếu FWD-001; R1/R1a/R1b theo PR riêng) | Stress test khớp lệnh, chi phí, thanh khoản, regime; giữ mặc định CASH khi không đủ model | So kết quả giấy và backtest, biến động alpha, tail risk, giới hạn được Owner quy định và đủ nguồn |
+| PORTFOLIO/HUMAN (HOÃN; không mở việc) | Sau alpha được xác nhận, mới xét optimizer, CVaR, phân bổ vốn danh nghĩa và đối chứng người | Bằng chứng tăng giá trị *so với phân bổ đơn giản* trên tương lai; luật/quyền/Owner gate, ADR riêng |
 
 Bài toán **engine kịch bản** đang bị hoãn bởi ADR-0005 và điều kiện mở lại đã sửa trong **ADR-0007**: phán quyết cố định mẫu A/B với 194 cặp bất đồng thuộc phép thử + **ít nhất 10 ghi chú CITED**. ADR-0015 không tạo đường vòng để mở sớm. Portfolio optimizer/CVaR cũng đã hoãn tại ADR-0008 cho tới khi có lợi thế. Không coi bảng này là quyền khởi chạy các công việc bị hoãn.
 
@@ -107,11 +115,11 @@ Bài toán **engine kịch bản** đang bị hoãn bởi ADR-0005 và điều k
 
 Đây là một đề xuất chưa hiệu lực nên có thể đóng PR mà không tác động runtime. Nếu Owner sau này chấp nhận:
 - Sau **hai kỳ rà soát quý** đầu tiên, nếu kế hoạch này không tạo được một đánh giá baseline ngoài mẫu có nguồn, hoặc gây thêm số thành phần vận hành mà không nâng chất lượng kiểm định, đề nghị Owner dừng mở rộng và giữ duy nhất PIT + Ledger + baseline.
-- Nếu có xung đột bằng chứng với ADR-0005/0007/0008/0009 hoặc cổng L-01…L-10, phần triển khai liên quan **mặc định dừng**, không âm thầm ghi đè ADR cũ.
+- Nếu có xung đột bằng chứng với ADR-0005/0007/0008/0009, ADR-0016/0017 đang ACCEPTED hoặc cổng L-01…L-10, phần triển khai liên quan **mặc định dừng**, không âm thầm ghi đè quyết định có hiệu lực.
 - Bất kỳ nâng cấp model, universe, optimization hay deployment đều có ADR/PR riêng, L-09 khác nhà cung cấp và Owner gộp; rollback phải giữ nguyên kết quả âm và lịch sử dữ liệu.
 
 ## 10. Ảnh hưởng dự kiến tới kiến trúc hiệu lực (CHỈ SAU KHI DUYỆT)
 
-Sau khi qua L-09 và Owner phê duyệt, chỉ cần một đoạn ngắn bổ sung ở architecture/ARCHITECTURE.md §4.3 hoặc §8, trỏ tới ADR-0015 để xác nhận: **phát triển theo bằng chứng ngoài mẫu; PIT và baseline trước; xác suất, phản biện và portfolio optimization là năng lực có cổng, không được tự sinh thêm runtime hay quyền vốn**. Không có ARCHITECTURE v4, không sửa các ADR đang ACCEPTED.
+Chỉ nếu một PR riêng sau này được Owner phê duyệt để đưa ADR-0015 thành ACCEPTED, mới xem xét một đoạn ngắn bổ sung ở architecture/ARCHITECTURE.md §4.3 hoặc §8, trỏ tới ADR-0015 để xác nhận: **phát triển theo bằng chứng ngoài mẫu; PIT và baseline trước; xác suất, phản biện và portfolio optimization là năng lực có cổng, không được tự sinh thêm runtime hay quyền vốn**. Không có ARCHITECTURE v4, không sửa các ADR đang ACCEPTED.
 
-**Việc đầu tiên theo đề xuất: PIT-001, báo cáo kiểm toán chỉ đọc và ma trận nguồn/bản gốc; không “mở một AI mới”.**
+**PIT-001 đã có báo cáo NOT_READY; các việc tiếp theo tuân theo ADR-0016/0017 và PR/lệnh riêng, không “mở một AI mới”.**
