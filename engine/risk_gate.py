@@ -171,7 +171,7 @@ def adv_values(raw, vol, axis, tickers, n):
 NAV_FILE = ("paper", "nav.csv")
 
 
-def read_nav_history(root, as_of, nav_now, *, last_date, initial_cash, since=None):
+def read_nav_history(root, as_of, nav_now, *, last_date, initial_cash, since=None, lower_bound=False):
     """→ (danh sách NAV để tính đỉnh, kết thúc bằng `nav_now`; hoặc None, lý do). CHỈ ĐỌC paper/nav.csv dưới `root`.
 
     - Chỉ dùng dòng có ngày TRƯỚC as_of (dòng của chính as_of là `nav_now`; dòng sau as_of bị bỏ khi chạy lại phiên cũ).
@@ -180,16 +180,20 @@ def read_nav_history(root, as_of, nav_now, *, last_date, initial_cash, since=Non
       [vốn ban đầu `initial_cash`, nav_now].
     - Mất lịch sử: sổ ghi đã chạy tới `last_date` < as_of mà không có nav.csv, hoặc nav.csv không có dòng của `last_date`.
       Hỏng: không đọc được, thiếu cột, ngày sai dạng, NAV không phải số dương hữu hạn. Cả hai trả None.
-    - `since`: ngày Owner gỡ khóa rủi ro gần nhất (engine.paper); chỉ dùng dòng từ ngày đó, và không thêm vốn ban đầu."""
+    - `since`: ngày Owner gỡ khóa rủi ro gần nhất (engine.paper); chỉ dùng dòng từ ngày đó, và không thêm vốn ban đầu.
+    - `lower_bound=True` (chỉ để dò chạm ngưỡng): mất lịch sử thì vẫn trả các dòng hợp lệ còn lại (không thêm vốn ban đầu),
+      kèm lý do mất. Các dòng còn lại là NAV thật của sổ, nên đỉnh thật không thấp hơn chúng và sụt giảm đo được là CẬN DƯỚI
+      của sụt giảm thật: chạm ngưỡng trên đó là chạm thật. Không dùng cách này để cho PASS. Tệp hỏng vẫn trả None."""
     t0 = pd.Timestamp(as_of).normalize()
     last = pd.Timestamp(last_date) if last_date is not None else None
     if isinstance(initial_cash, bool) or not isinstance(initial_cash, (int, float)) or not math.isfinite(initial_cash) \
             or initial_cash <= 0:
         return None, f"vốn ban đầu paper.initial_cash không hợp lệ ({initial_cash!r})"
     p = pathlib.Path(root).joinpath(*NAV_FILE)
+    lost = None
     if not p.exists():
         if last is not None and last < t0:
-            return None, f"không có paper/nav.csv trong khi sổ đã chạy tới phiên {last.date()} — mất lịch sử NAV"
+            lost = f"không có paper/nav.csv trong khi sổ đã chạy tới phiên {last.date()} — mất lịch sử NAV"
         dates, navs = pd.DatetimeIndex([]), np.array([], dtype=float)
     else:
         try:
@@ -199,15 +203,17 @@ def read_nav_history(root, as_of, nav_now, *, last_date, initial_cash, since=Non
         except Exception as e:              # noqa: BLE001 — mọi lỗi đọc đều là lịch sử hỏng
             return None, f"paper/nav.csv hỏng ({type(e).__name__}) — không đo được sụt giảm từ đỉnh"
         if last is not None and last < t0 and not (dates == last).any():
-            return None, f"paper/nav.csv thiếu dòng của phiên đã xử lý gần nhất {last.date()} — mất lịch sử NAV"
+            lost = f"paper/nav.csv thiếu dòng của phiên đã xử lý gần nhất {last.date()} — mất lịch sử NAV"
+    if lost and not lower_bound:
+        return None, lost
     prior = dates < t0
     if since is not None:
         prior &= dates >= pd.Timestamp(since)
     vals = navs[np.asarray(prior)]
     if not (np.isfinite(vals) & (vals > 0)).all():
         return None, "paper/nav.csv có NAV không phải số dương hữu hạn — không đo được sụt giảm từ đỉnh"
-    base = [float(initial_cash)] if since is None and not np.asarray(dates < t0).any() else []
-    return base + [float(x) for x in vals] + [float(nav_now)], None
+    base = [float(initial_cash)] if since is None and not lost and not np.asarray(dates < t0).any() else []
+    return base + [float(x) for x in vals] + [float(nav_now)], lost
 
 
 def _drawdown(nav_history, nav):

@@ -10,7 +10,15 @@ ghi quyết định RISK_CASH_WAIT_OWNER, đặt lệnh bán hết cho phiên sa
 được giữ và thử lại tới khi xong (kể cả khi khóa sàn), mỗi kỳ tái cơ cấu chỉ ghi lại RISK_CASH_WAIT_OWNER, không chấm mô hình,
 không mở vị thế mới; NAV phục hồi cũng không gỡ khóa. Chỉ Owner gỡ: ghi đúng ngày `risk_lock.since` vào
 config.yaml paper.risk_lock_release (đi PR, Owner gộp). Gỡ xong thì ghi RISK_LOCK_RELEASED_BY_OWNER và tính lại đỉnh NAV từ
-phiên gỡ (`risk_lock_released.on`)."""
+phiên gỡ (`risk_lock_released.on`).
+
+Sổ có thể không chạy mỗi phiên (vòng học chạy hằng tuần). Trước khi khớp lệnh, sổ định giá vị thế đang giữ ở TỪNG phiên của
+bảng giá nằm giữa lần chạy trước và as_of (nav_between_runs) và đo sụt giảm ở từng phiên đó; chạm ngưỡng thì khóa ngay, trước
+khi khớp. Các NAV giữa hai lần chạy chỉ dùng để đo, không ghi vào paper/nav.csv.
+
+Lệnh mua đang chờ phải qua lại cổng rủi ro (risk_gate.check) ở chính phiên khớp, với NAV, lịch sử NAV, giới hạn và dữ liệu thị
+trường của phiên đó. Cổng FAIL (kể cả vì mất lịch sử NAV hay giới hạn hỏng) thì không mua mã nào; mã bị cách ly thì không mua
+mã đó. Lệnh mua bị chặn ghi UNFILLED_RISK_GATE và quyết định RISK_GATE_BLOCK_BUY, không thử lại; lệnh bán vẫn khớp."""
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
 from . import adjust, risk_gate
@@ -60,6 +68,20 @@ def apply_corporate_actions(st, events, as_of, d):
             _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": e.ticker, "side": "STOCK_ADJUST",
                                          "quantity": new - sh, "price": 0, "fees": 0})
 
+def nav_between_runs(close, st, prev_last, as_of):
+    """[(ngày ISO, NAV)] của vị thế đang giữ tại mỗi phiên của bảng giá nằm GIỮA lần chạy trước và as_of (không gồm hai đầu).
+    NAV không đo được (thiếu giá) thì bỏ phiên đó."""
+    if prev_last is None:
+        return []
+    lo, hi = pd.Timestamp(prev_last), pd.Timestamp(as_of)
+    out = []
+    for s in close.index[(close.index > lo) & (close.index < hi)]:
+        row = close.loc[s]
+        v = st["cash"] + sum(sh * row.get(t, np.nan) for t, sh in st["positions"].items())
+        if np.isfinite(v):
+            out.append((str(s.date()), float(v)))
+    return out
+
 def owner_release(st, d):
     """Gỡ khóa rủi ro khi Owner ghi đúng ngày bắt đầu khóa vào config.yaml paper.risk_lock_release. → True nếu đã gỡ."""
     lock, rel = st.get("risk_lock"), CFG["paper"].get("risk_lock_release")
@@ -83,6 +105,32 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
     apply_corporate_actions(st, events, as_of, d)
     st["last_date"] = d
     owner_release(st, d)
+    lim = P.get("risk_limits")
+    rel_on = (st.get("risk_lock_released") or {}).get("on")
+    # 0) Sụt giảm ở các phiên giữa lần chạy trước và as_of: đo trước khi khớp lệnh.
+    mids = [(s_, v) for s_, v in nav_between_runs(close, st, prev_last, as_of) if rel_on is None or s_ >= rel_on]
+    locked_now = False
+    base, _ = risk_gate.read_nav_history(ROOT, as_of, 0.0, last_date=prev_last, initial_cash=P["initial_cash"], since=rel_on,
+                                         lower_bound=True)
+    if base is not None and not st.get("risk_lock"):
+        seq = base[:-1]
+        for s_, v in mids:
+            why = risk_gate.breach(seq + [v], v, lim)
+            if why:
+                st["risk_lock"] = {"since": d, "reason": f"{why} ở phiên {s_}, giữa hai lần chạy sổ giấy"}
+                locked_now = True
+                break
+            seq.append(v)
+    if locked_now and st["positions"] and st["pending"] is None:
+        st["pending"] = []                                  # bán hết ngay ở phiên khớp này, như khi chạy mỗi phiên
+
+    def history(nav_now, lower_bound=False):
+        """Lịch sử NAV để đo tại as_of: các dòng trước as_of, các phiên giữa hai lần chạy, rồi NAV hiện tại. lower_bound=True
+        chỉ dùng để dò chạm ngưỡng (xem risk_gate.read_nav_history)."""
+        h, why = risk_gate.read_nav_history(ROOT, as_of, nav_now, last_date=prev_last, initial_cash=P["initial_cash"],
+                                            since=rel_on, lower_bound=lower_bound)
+        return (None, why) if h is None else (h[:-1] + [v for _, v in mids] + h[-1:], None)
+
     # 1) Khớp lệnh đã quyết định phiên trước. Đang khóa rủi ro thì mục tiêu luôn rỗng: chỉ bán, không mua.
     if st["pending"] is not None and not frozen:
         target = [] if st.get("risk_lock") else st["pending"]
@@ -104,6 +152,21 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
         nav = st["cash"] + sum(s * px[t] for t, s in st["positions"].items())
         buys = [t for t in target if t not in st["positions"] and pd.notna(px.get(t))]
         per = nav / max(1, len(target)) * 0.995
+        if buys:        # R1: lệnh mua chờ qua lại cổng rủi ro ở chính phiên khớp, với dữ liệu của phiên này
+            h, hw = history(nav)
+            g = risk_gate.check(target, {"nav": nav, "positions": st["positions"]},
+                                {**risk_gate.market_snapshot(as_of, target, lim, root=ROOT, frozen=frozen, nav_history=h,
+                                                             nav_history_problem=hw),
+                                 "price": {t: float(px[t]) for t in px.index if pd.notna(px[t])}}, lim)
+            stop = set(buys) if g["verdict"] == "FAIL" else set(g["excluded"]) & set(buys)
+            if stop:
+                for t in [t for t in buys if t in stop]:
+                    _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "UNFILLED_RISK_GATE",
+                                                 "quantity": 0, "price": round(float(px[t]), 2), "fees": 0})
+                _append("paper/decisions.csv", {"date": d, "action": "RISK_GATE_BLOCK_BUY",
+                                                "targets": ";".join(t for t in buys if t in stop),
+                                                "models": f"cổng rủi ro ở phiên khớp {g['verdict']}: " + "; ".join(g["reasons"])})
+                buys = [t for t in buys if t not in stop]
         for t in [t for t in buys if t in up]:              # khóa trần: không mua được, giữ lại và thử phiên sau
             blocked.append(t)
             _append("paper/trades.csv", {"date": d, "mode": "PAPER", "asset": t, "side": "UNFILLED_LIMIT_UP",
@@ -126,12 +189,9 @@ def run(as_of, close, preds_today, reg, udates, events=None, frozen=False):
     _append("paper/nav.csv", {"date": d, "nav": round(nav, 0), "cash": round(st["cash"], 0),
                               "n_positions": len(st["positions"])})
     # 2b) Sụt giảm NAV từ đỉnh: đo MỖI phiên định giá, không chờ kỳ tái cơ cấu (R1).
-    lim = P.get("risk_limits")
-    hist, hist_why = risk_gate.read_nav_history(ROOT, as_of, nav, last_date=prev_last, initial_cash=P["initial_cash"],
-                                                since=(st.get("risk_lock_released") or {}).get("on"))
-    locked_now = False
+    hist, hist_why = history(nav)
     if not st.get("risk_lock"):
-        why = risk_gate.breach(hist, nav, lim)
+        why = risk_gate.breach(history(nav, lower_bound=True)[0], nav, lim)
         if why:
             st["risk_lock"] = {"since": d, "reason": why}
             locked_now = True

@@ -383,8 +383,9 @@ def test_no_lock_and_no_state_change_below_the_threshold(tmp_path, monkeypatch):
 
 
 def test_locked_book_never_fills_a_buy_left_in_pending(tmp_path, monkeypatch):
-    """Khóa còn đó mà pending còn mã mua (ví dụ trạng thái ghi từ trước): bước khớp lệnh vẫn coi mục tiêu là rỗng."""
-    st = {"cash": 1e9, "positions": {}, "pending": ["H", "G"], "last_rebalance": "2026-02-26", "costs_paid": 0.0,
+    """Khóa còn đó mà pending còn mã mua (ví dụ trạng thái ghi từ trước): bước khớp lệnh vẫn coi mục tiêu là rỗng. Năm mã
+    mỗi mã 19,9% nên cổng ở phiên khớp sẽ PASS: chỉ khóa chặn lệnh mua."""
+    st = {"cash": 1e9, "positions": {}, "pending": list("HGFED"), "last_rebalance": "2026-02-26", "costs_paid": 0.0,
           "n_rebalance": 0, "last_date": "2026-02-26", "risk_lock": {"since": "2026-02-20", "reason": "thử"}}
     (tmp_path / "paper").mkdir(parents=True)
     pd.DataFrame({"date": ["2026-02-26"], "nav": [1e9], "cash": [1e9], "n_positions": [0]}).to_csv(
@@ -418,6 +419,27 @@ def test_nav_history_lost_when_the_last_processed_session_has_no_row(tmp_path, r
     assert h is None and "mất lịch sử NAV" in why and "2026-02-27" in why
     g = _check(market=_market(nav_history=h, nav_history_problem=why))
     assert g["verdict"] == "FAIL" and "mất lịch sử NAV" in g["reasons"][0] and not g["cash_wait_owner"]
+
+
+def test_lost_nav_history_still_gives_a_lower_bound_for_breach_detection(tmp_path):
+    _nav_csv(tmp_path, [("2026-02-20", 1.2e9, 0, 5), ("2026-02-25", 1e9, 1e9, 0)])
+    assert rg.read_nav_history(tmp_path, "2026-03-02", 1e9, last_date="2026-02-27", initial_cash=1e9)[0] is None
+    h, why = rg.read_nav_history(tmp_path, "2026-03-02", 1e9, last_date="2026-02-27", initial_cash=1e9, lower_bound=True)
+    assert h == [1.2e9, 1e9, 1e9] and "mất lịch sử NAV" in why and rg.breach(h, 1e9, LIM)
+    (tmp_path / "paper" / "nav.csv").unlink()                  # mất cả tệp: không thêm vốn ban đầu, không có gì để so
+    h, why = rg.read_nav_history(tmp_path, "2026-03-02", 5e8, last_date="2026-02-27", initial_cash=1e9, lower_bound=True)
+    assert h == [5e8] and "mất lịch sử NAV" in why
+    (tmp_path / "paper" / "nav.csv").write_text("date,nav\n2026-02-20,abc\n", encoding="utf-8")
+    assert rg.read_nav_history(tmp_path, "2026-03-02", 5e8, last_date=None, initial_cash=1e9, lower_bound=True)[0] is None
+
+
+def test_paper_locks_on_a_breach_proven_by_the_rows_left_after_history_loss(tmp_path, monkeypatch):
+    """Sổ đã chạy tới 2026-02-26 nhưng nav.csv chỉ còn dòng 1,2 tỷ (2026-01-05): mất lịch sử, cổng không PASS được; nhưng
+    ngay dòng còn lại đã cho thấy sụt 16,67% ≥ 15%, nên khóa."""
+    st = {"cash": 1e9, "positions": {}, "pending": None, "last_rebalance": None, "costs_paid": 0.0, "n_rebalance": 0,
+          "last_date": "2026-02-26"}
+    d, s, _ = _run_paper(tmp_path, monkeypatch, volume=1e6, nav_hist=[1.2e9], state=st)
+    assert d["action"] == "RISK_CASH_WAIT_OWNER" and "16.67%" in s["risk_lock"]["reason"]
 
 
 def test_nav_history_ignores_rows_after_as_of(tmp_path):
@@ -633,6 +655,165 @@ def test_corrupt_calendar_makes_the_snapshot_fail_instead_of_falling_back(tmp_pa
 
 def test_config_has_no_owner_release_by_default():
     assert config.CFG["paper"]["risk_lock_release"] is None
+
+
+# ---------- 12. Vòng chấm 2 (L-09), lỗi 1: lệnh mua chờ qua lại cổng ở phiên khớp ----------
+
+def _two_sessions(root, monkeypatch, between=None):
+    """Phiên T = idx[38]: cổng PASS, REBALANCE, đặt lệnh mua chờ. `between(root)` đổi dữ liệu. Phiên T+1 = idx[39]: khớp."""
+    monkeypatch.setattr(config, "ROOT", root)
+    monkeypatch.setattr(paper, "ROOT", root)
+    idx, tickers = _store(root, volume=1e6)
+    close = pd.DataFrame({t: [10_000.0 + 100 * j + 10 * i for i in range(len(idx))] for j, t in enumerate(tickers)}, index=idx)
+    reg = {"M": {"state": "ACTIVE", "backtest": {"ic_t": 3.0}}}
+    for i in (38, 39):
+        preds = pd.DataFrame([(idx[i], "M", t, float(k)) for k, t in enumerate(tickers)],
+                             columns=["date", "model_id", "ticker", "score"])
+        _, decision = paper.run(str(idx[i].date()), close, preds, reg, idx)
+        if i == 38:
+            assert decision["action"] == "REBALANCE" and decision["targets"] == "H;G;F;E;D"
+            if between is not None:
+                between(root)
+    st = json.loads((root / "paper" / "state.json").read_text(encoding="utf-8"))
+    return st, _read(root, "decisions.csv"), _read(root, "trades.csv"), str(idx[39].date())
+
+
+def test_pending_buys_fill_when_the_gate_still_passes(tmp_path, monkeypatch):
+    st, dec, trd, t1 = _two_sessions(tmp_path, monkeypatch)
+    assert sorted(trd[(trd.date == t1) & (trd.side == "BUY")].asset) == list("DEFGH") and len(dec) == 1
+
+
+def _no_buy(st, dec, trd, t1, why):
+    assert trd[trd.side == "BUY"].empty and st["positions"] == {} and st["pending"] is None
+    assert sorted(trd[(trd.date == t1) & (trd.side == "UNFILLED_RISK_GATE")].asset) == list("DEFGH")
+    row = dec[dec.date == t1]
+    assert row.action.tolist() == ["RISK_GATE_BLOCK_BUY"] and why in row.models.item(), row.models.item()
+
+
+def test_pending_buys_blocked_when_nav_history_is_lost_before_the_fill(tmp_path, monkeypatch):
+    st, dec, trd, t1 = _two_sessions(tmp_path, monkeypatch, lambda r: (r / "paper" / "nav.csv").unlink())
+    _no_buy(st, dec, trd, t1, "mất lịch sử NAV")
+    assert "risk_lock" not in st                               # không đo được thì không mua, không tự bán hết
+
+
+@pytest.mark.parametrize("bad", [None, {**LIM, "max_drawdown": "TODO"}, {**LIM, "adv_sessions": 0}])
+def test_pending_buys_blocked_when_limits_break_before_the_fill(tmp_path, monkeypatch, bad):
+    def between(r):
+        monkeypatch.setitem(config.CFG["paper"], "risk_limits", bad)
+    st, dec, trd, t1 = _two_sessions(tmp_path, monkeypatch, between)
+    _no_buy(st, dec, trd, t1, "risk_limits" if bad is None else ("TODO" if bad.get("max_drawdown") == "TODO" else "adv_sessions"))
+
+
+def test_pending_buys_blocked_when_liquidity_data_breaks_before_the_fill(tmp_path, monkeypatch):
+    def between(r):
+        store = r / config.CFG["data"]["store_dir"] / "2026-01.csv"
+        df = pd.read_csv(store)
+        df.loc[(df.ticker == "F") & (df.date == df.date.max()), "volume"] = np.nan
+        df.to_csv(store, index=False)
+    st, dec, trd, t1 = _two_sessions(tmp_path, monkeypatch, between)
+    _no_buy(st, dec, trd, t1, "F: thiếu giá trị giao dịch bình quân")
+
+
+def _quarantine_g(monkeypatch, max_weight=None):
+    def between(r):
+        k = pd.Timestamp("2026-02-27")
+        rows = pd.DataFrame({"ticker": ["G"], "type": ["stock_split"], "ex_date": [k], "trade_date": [k],
+                             "verify_state": [va.Q + "THIEU_BANG_CHUNG"], "in_verified_chain": [False]})
+        monkeypatch.setattr(va, "verify_events", lambda *a, **kw: rows)
+        if max_weight is not None:
+            monkeypatch.setitem(config.CFG["paper"], "risk_limits", dict(LIM, max_weight=max_weight))
+    return between
+
+
+def test_newly_quarantined_ticker_at_the_fill_reweighs_the_rest_like_the_decision_gate(tmp_path, monkeypatch):
+    """G vào cửa sổ cách ly ở phiên khớp. Còn 4 mã thì mỗi mã 24,9% > 20%: cổng FAIL như lúc quyết định, không mua mã nào."""
+    st, dec, trd, t1 = _two_sessions(tmp_path, monkeypatch, _quarantine_g(monkeypatch))
+    _no_buy(st, dec, trd, t1, "loại G")
+    assert "tỷ trọng 24.88%" in dec[dec.date == t1].models.item()
+
+
+def test_newly_quarantined_ticker_at_the_fill_is_dropped_and_the_rest_fill(tmp_path, monkeypatch):
+    st, dec, trd, t1 = _two_sessions(tmp_path, monkeypatch, _quarantine_g(monkeypatch, max_weight=0.3))
+    assert sorted(trd[(trd.date == t1) & (trd.side == "BUY")].asset) == list("DEFH")
+    assert trd[trd.side == "UNFILLED_RISK_GATE"].asset.tolist() == ["G"] and "G" not in st["positions"]
+    row = dec[dec.date == t1]
+    assert row.action.tolist() == ["RISK_GATE_BLOCK_BUY"] and row.targets.item() == "G" and "PASS" in row.models.item()
+
+
+# ---------- 13. Vòng chấm 2, lỗi 2: sụt giảm ở các phiên giữa hai lần chạy (vòng học chạy hằng tuần) ----------
+
+def _held_book(root, monkeypatch, a_path, last_i=34, as_i=38, pending=None, lock=None, nav_rows=None):
+    """Sổ giữ 100.000 cổ phiếu A, không tiền mặt. Lần chạy trước ở idx[last_i]; lần này ở idx[as_i]; giá A theo a_path từ
+    idx[last_i]. Các mã khác phẳng."""
+    monkeypatch.setattr(config, "ROOT", root)
+    monkeypatch.setattr(paper, "ROOT", root)
+    idx, tickers = _store(root, volume=1e9)
+    close = pd.DataFrame({t: 10_000.0 for t in tickers}, index=idx)
+    close.loc[idx[last_i:last_i + len(a_path)], "A"] = a_path
+    close.loc[idx[last_i + len(a_path):], "A"] = a_path[-1]
+    (root / "paper").mkdir(parents=True, exist_ok=True)
+    st = {"cash": 0.0, "positions": {"A": 100_000}, "pending": pending, "last_rebalance": str(idx[last_i].date()),
+          "costs_paid": 0.0, "n_rebalance": 1, "last_date": str(idx[last_i].date())}
+    if lock:
+        st["risk_lock"] = lock
+    (root / "paper" / "state.json").write_text(json.dumps(st), encoding="utf-8")
+    rows = nav_rows or [(str(idx[last_i].date()), 100_000 * a_path[0])]
+    pd.DataFrame(rows, columns=["date", "nav"]).assign(cash=0, n_positions=1).to_csv(root / "paper" / "nav.csv", index=False)
+    preds = pd.DataFrame([(idx[as_i], "M", t, float(k)) for k, t in enumerate(tickers)],
+                         columns=["date", "model_id", "ticker", "score"])
+    _, decision = paper.run(str(idx[as_i].date()), close, preds, {"M": {"state": "ACTIVE", "backtest": {"ic_t": 3.0}}}, idx)
+    st = json.loads((root / "paper" / "state.json").read_text(encoding="utf-8"))
+    trd = _read(root, "trades.csv") if (root / "paper" / "trades.csv").exists() else pd.DataFrame(columns=["side", "asset"])
+    return decision, st, trd, idx
+
+
+DIP = [10_000.0, 9_350.0, 8_750.0, 8_200.0, 8_450.0, 8_700.0]          # giá A từ idx[34] (thứ Sáu) tới idx[39] (thứ Sáu)
+
+
+def test_drawdown_between_two_weekly_runs_locks_before_any_fill(tmp_path, monkeypatch):
+    """Lần chạy trước thứ Sáu 2026-02-20 (NAV 1 tỷ). Thứ Tư 2026-02-25 sụt 18%; thứ Sáu 2026-02-27 hồi còn sụt 13%."""
+    d, st, trd, idx = _held_book(tmp_path, monkeypatch, DIP, as_i=39, pending=["B"])
+    assert d["action"] == "RISK_CASH_WAIT_OWNER" and 1 - DIP[-1] / DIP[0] < 0.15
+    assert "18.00% ≥ ngưỡng 15.00% ở phiên 2026-02-25, giữa hai lần chạy" in st["risk_lock"]["reason"]
+    assert st["risk_lock"]["since"] == "2026-02-27"
+    assert trd[trd.side == "BUY"].empty and trd[trd.side == "SELL"].asset.tolist() == ["A"] and st["positions"] == {}
+
+
+def test_drawdown_between_runs_also_sells_when_nothing_was_pending(tmp_path, monkeypatch):
+    d, st, trd, _ = _held_book(tmp_path, monkeypatch, DIP, as_i=39)
+    assert d["action"] == "RISK_CASH_WAIT_OWNER" and trd.side.tolist() == ["SELL"] and st["positions"] == {}
+
+
+def test_drawdown_between_runs_is_caught_even_when_the_last_nav_row_is_lost(tmp_path, monkeypatch):
+    """nav.csv thiếu dòng của lần chạy trước 2026-02-20 nhưng còn dòng 1 tỷ ngày 2026-02-13: vẫn đủ chứng minh chạm ngưỡng."""
+    d, st, trd, _ = _held_book(tmp_path, monkeypatch, DIP, as_i=39, nav_rows=[("2026-02-13", 1e9)])
+    assert d["action"] == "RISK_CASH_WAIT_OWNER" and "ở phiên 2026-02-25, giữa hai lần chạy" in st["risk_lock"]["reason"]
+
+
+def test_no_lock_when_no_session_between_runs_breaches(tmp_path, monkeypatch):
+    d, st, trd, _ = _held_book(tmp_path, monkeypatch, [10_000.0, 9_350.0, 8_750.0, 8_700.0, 8_700.0, 8_700.0], as_i=39)
+    assert "risk_lock" not in st and d is None and trd.empty                  # sâu nhất 13%: dưới ngưỡng
+
+
+@pytest.mark.parametrize("path,where", [
+    ([10_000.0, 10_600.0, 11_200.0, 10_450.0, 9_750.0, 9_500.0, 9_600.0], "ở phiên 2026-02-26, giữa hai lần chạy"),
+    ([10_000.0, 10_600.0, 11_200.0, 10_450.0, 9_750.0, 9_700.0, 9_500.0], None)])
+def test_peak_inside_the_gap_counts(tmp_path, monkeypatch, path, where):
+    """Đỉnh 11.200 nằm giữa hai lần chạy, chỉ sụt 5% so với NAV đã ghi. Ca 1: sụt 15,2% so với đỉnh đó ở 2026-02-26 (giữa hai
+    lần chạy). Ca 2: các phiên giữa chưa chạm; chính phiên chạy 2026-02-27 sụt 15,2% so với đỉnh giữa hai lần chạy."""
+    d, st, trd, _ = _held_book(tmp_path, monkeypatch, path, last_i=33, as_i=39)
+    assert d["action"] == "RISK_CASH_WAIT_OWNER" and "15.18% ≥ ngưỡng 15.00%" in st["risk_lock"]["reason"]
+    assert (where in st["risk_lock"]["reason"]) if where else ("giữa hai lần chạy" not in st["risk_lock"]["reason"])
+
+
+def test_sessions_before_an_owner_release_do_not_relock(tmp_path, monkeypatch):
+    """Khóa từ 2026-02-13, vị thế còn giữ. Owner gỡ ở lần chạy 2026-02-27. Giữa hai lần chạy giá lên đỉnh rồi rơi 18%: các
+    phiên đó trước phiên gỡ, nên không khóa lại."""
+    monkeypatch.setitem(config.CFG["paper"], "risk_lock_release", "2026-02-13")
+    path = [10_000.0, 10_600.0, 11_200.0, 10_450.0, 9_800.0, 9_200.0, 9_200.0, 9_200.0, 9_200.0, 9_200.0]
+    d, st, trd, idx = _held_book(tmp_path, monkeypatch, path, last_i=30, as_i=39, pending=[],
+                                 lock={"since": "2026-02-13", "reason": "thử"})
+    assert "risk_lock" not in st and st["risk_lock_released"] == {"since": "2026-02-13", "on": "2026-02-27"}
 
 
 def test_tests_do_not_touch_the_repo():
