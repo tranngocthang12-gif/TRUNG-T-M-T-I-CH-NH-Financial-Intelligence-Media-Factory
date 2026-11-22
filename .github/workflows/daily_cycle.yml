@@ -3,8 +3,8 @@ name: Vong hoc hang tuan
 # QĐ-10 (ADR-0016): robot chay MOI PHIEN HOSE cho phan van hanh (tai gia, dinh gia so giay, cong rui ro, ghi quyet dinh);
 # buoc nghien cuu (dang ky va chay lan thu L-06, thang hang, theo doi suy giam) van chi o phien thu Sau, 6 lan thu, de so
 # lan thu khong phinh nguong Bonferroni (ARCHITECTURE v3.0 §4.3 + ADR-0003). Che do do DU LIEU quyet dinh, khong theo dong
-# ho may chay: engine.run_cycle --mode auto xet phien moi nhat co gia (thu Sau chua xu ly -> research, ngay khac -> ops, da
-# xu ly -> chi lam moi scorecard). Ngay nghi khong co gia moi nen roi vao nhanh "da xu ly".
+# ho may chay: luot theo lich goi vong hoc voi --mode auto, xet phien moi nhat co gia (thu Sau chua xu ly -> research,
+# ngay khac -> ops, da xu ly -> chi lam moi scorecard). Ngay nghi khong co gia moi nen roi vao nhanh "da xu ly".
 # Ba dong lich (16:30, 20:17, 23:47 gio VN): hai dong sau la du phong khi GitHub tre hoac bo luot; luot sau gap phien da xu
 # ly thi khong lam gi. Ingest tai bu moi phien tu ngay cuoi trong kho nen khong mat du lieu.
 # L-06: TTC_REGISTRY_PUSH=1 -> moi lan thu duoc DAY len main (tools/registry_push.py) TRUOC khi chay backtest. Vong hoc hong
@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 90
     steps:
       # Fail closed BEFORE checkout, installs, ingestion, registry writes, or API use.
-      # Scheduled runs pick the mode from data (engine.run_cycle --mode auto): Friday session -> 6 trials, other -> ops.
+      # Scheduled runs pick the mode from data (--mode auto): Friday session -> research, 6 trials; other sessions -> ops.
       # Manual runs: main only; trials 0 (ops) or 1 (research, 1 trial). Non-main refs fail before checkout, installs, writes.
       - name: Xac nhan so lan thu truoc khi chay
         env:

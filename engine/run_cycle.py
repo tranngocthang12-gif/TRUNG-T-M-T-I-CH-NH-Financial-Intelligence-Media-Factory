@@ -118,7 +118,10 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
         preds_today, alerts = pd.DataFrame(columns=["date", "model_id", "ticker", "score"]), []
     else:
         preds_today, allp = knowledge.live_predict(ds, registry, as_of, udates)
-        alerts = [] if ops else knowledge.decay(registry, allp, ds, as_of)       # ops: không theo dõi suy giảm
+        if ops:
+            alerts = []                                  # ops: không theo dõi suy giảm (decay chỉ ở lượt research)
+        else:
+            alerts = knowledge.decay(registry, allp, ds, as_of)
     knowledge.save_registry(registry)
 
     # PAPER + ATTRIBUTION
