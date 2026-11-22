@@ -62,6 +62,8 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # R1b: gỡ khóa sụt giảm cần lịch sử git đầy đủ (git log -G risk_lock_release)
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"

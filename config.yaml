@@ -77,6 +77,12 @@ paper:
     adv_sessions: 20            # số phiên tính giá trị giao dịch bình quân
     quarantine_sessions_before: 21   # QĐ-3: loại mã khi phiên t ∈ [k − 21, k + 120] phiên quanh phiên áp dụng k
     quarantine_sessions_after: 120   # của một sự kiện cổ phiếu đang bị cách ly; đếm phiên theo lịch HOSE
+    max_drawdown: 0.15          # R1b, O-R của Owner: sụt giảm NAV từ đỉnh ≥ 15% ở một phiên → khóa, bán hết, chờ Owner gỡ.
+                                # Không thuộc cổng R1a (LIMIT_KEYS); thiếu hoặc hỏng thì sổ ghi DRAWDOWN_UNVERIFIED, không mua mới
+  # R1b: chỉ Owner gỡ khóa sụt giảm. Ghi ĐÚNG ngày risk_lock.since (YYYY-MM-DD) trong paper/state.json, qua PR do chủ kho gộp
+  # vào main; robot xác minh người gộp qua API GitHub. null = không gỡ. Giá trị cũ không gỡ được khóa sau (since khác).
+  # Còn vị thế đang thanh lý thì chưa gỡ; gỡ ở lần chạy đầu tiên sau khi bán hết.
+  risk_lock_release: null
 llm_review:
   enabled: true
   model: claude-sonnet-5

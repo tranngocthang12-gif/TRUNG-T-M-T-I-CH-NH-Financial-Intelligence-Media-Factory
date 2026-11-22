@@ -14,7 +14,14 @@ Giới hạn thiếu, còn chữ TODO hoặc không phải số hợp lệ thì 
 thí nghiệm danh nghĩa, không phải khẩu vị rủi ro của Owner.
 
 engine.paper gọi cổng ở hai thời điểm: lúc ra quyết định và lúc khớp lệnh mua đang chờ. Cổng không theo dõi giữa các lần chạy,
-không ép bán hay giảm vị thế đang giữ, và không có ngắt khi sụt giảm NAV (việc đó là R1b).
+không ép bán hay giảm vị thế đang giữ.
+
+Ngắt khi sụt giảm NAV (R1b; QĐ-5, QĐ-5a của ADR-0016; quyết định O-R của Owner, ngưỡng 15%) KHÔNG nằm trong `check` và không
+thêm `max_drawdown` vào LIMIT_KEYS (R1a giữ nguyên). Mô-đun này chỉ cung cấp:
+  - `drawdown_problem`: ngưỡng `paper.risk_limits.max_drawdown` dùng được hay không;
+  - `drawdown_path`: HÀM THUẦN đo sụt giảm từng phiên, dùng chung cho sổ giấy chính (khóa) và sổ FWD ở F1b (chỉ ghi nhận);
+  - `release_check`: điều kiện Owner gỡ khóa (giá trị `paper.risk_lock_release` và người gộp PR là chủ kho, qua API GitHub).
+engine.paper giữ trạng thái đo, khóa và thanh lý.
 
 `market_snapshot` (CHỈ ĐỌC kho giá, manifest bằng chứng, lịch phiên HOSE) dựng đầu vào thị trường cho `check`.
 
@@ -25,11 +32,16 @@ cứu, KHÔNG phải bằng chứng PIT, và không được dùng làm bằng c
 """
 from __future__ import annotations
 
+import json
 import math
+import os
 import pathlib
+import subprocess
+import urllib.request
 
 import numpy as np
 import pandas as pd
+import yaml
 
 LIMIT_KEYS = ("max_weight", "max_participation", "max_exit_days", "adv_sessions",
               "quarantine_sessions_before", "quarantine_sessions_after")
@@ -281,3 +293,154 @@ def market_snapshot(as_of, tickers, limits, *, root, frozen):
         snap["adv_value"], snap["quarantined"] = {}, None
         snap["errors"].append(f"{type(e).__name__}: {e}")
     return snap
+
+
+# ---------- R1b: ngắt khi sụt giảm NAV ----------
+
+def drawdown_problem(limits):
+    """Lý do ngưỡng `max_drawdown` không dùng được (thiếu, TODO, không phải số trong (0, 1)), hoặc None."""
+    v = limits.get("max_drawdown") if isinstance(limits, dict) else None
+    if isinstance(v, str) and "TODO" in v.upper():
+        return "max_drawdown còn TODO"
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not 0 < v < 1:
+        return f"max_drawdown thiếu hoặc không phải số trong (0, 1) ({v!r})"
+    return None
+
+
+def drawdown_path(navs, peak, threshold, peak_date=None):
+    """Đo sụt giảm từng phiên (HÀM THUẦN). `navs`: [(phiên, NAV hoặc None)] theo thứ tự thời gian; `peak`: đỉnh hiện có;
+    `threshold`: ngưỡng sụt giảm. Sụt giảm = 1 − NAV / đỉnh, đỉnh cập nhật khi NAV vượt đỉnh.
+
+    Gặp phiên có NAV là None thì DỪNG ở phiên đó (`stopped_at`), không bỏ qua phiên đó để đo phiên sau.
+    → {"rows": [{date, nav, peak, drawdown, verified}] của các phiên đã đo, "breach": dòng đầu tiên có sụt giảm ≥ ngưỡng hoặc
+       None, "stopped_at": phiên không đo được hoặc None, "peak", "peak_date"}."""
+    if not (isinstance(peak, (int, float)) and math.isfinite(peak) and peak > 0):
+        raise ValueError(f"đỉnh NAV phải là số dương hữu hạn ({peak!r})")
+    rows, first, stop = [], None, None
+    for s, nav in navs:
+        if nav is None:
+            stop = s
+            break
+        if nav > peak:
+            peak, peak_date = float(nav), s
+        dd = 1.0 - float(nav) / peak
+        row = {"date": s, "nav": float(nav), "peak": float(peak), "drawdown": dd, "verified": True}
+        rows.append(row)
+        if first is None and dd >= threshold - EPS:
+            first = row
+    return {"rows": rows, "breach": first, "stopped_at": stop, "peak": float(peak), "peak_date": peak_date}
+
+
+def _release_value(doc):
+    """paper.risk_lock_release của một config.yaml đã đọc, dạng chuỗi (None khi không có). Chuỗi: ngày YAML không ngoặc
+    (date) và có ngoặc (str) là cùng một giá trị, như phép so `str(release_value) != since` của release_check."""
+    paper = doc.get("paper") if isinstance(doc, dict) else None
+    v = paper.get("risk_lock_release") if isinstance(paper, dict) else None
+    return None if v is None else str(v)
+
+
+def git_last_release_commit(root):
+    """→ (sha, giá trị, None) của commit mới nhất ĐỔI GIÁ TRỊ `paper.risk_lock_release` trong config.yaml, cùng giá trị
+    commit đó đặt; hoặc (None, None, lý do): kho nông (thiếu lịch sử), không có commit nào như vậy, config.yaml ở một commit
+    không đọc được (YAML hỏng: không đoán, giữ khóa), git lỗi.
+
+    Duyệt `git log -- config.yaml` từ mới tới cũ; với mỗi commit, đọc YAML của config.yaml ở commit đó và ở commit cha thứ
+    nhất (commit gốc, hoặc commit cha chưa có tệp: giá trị None) rồi so giá trị. Commit chỉ sửa chú thích, khoảng trắng,
+    ngoặc kép hay khóa khác — kể cả dòng có chữ `risk_lock_release` — không phải lần đổi giá trị (bản chấm L-09 PR #91 vòng 2)."""
+    def git(*args):
+        return subprocess.run(["git", *args], cwd=str(root), capture_output=True, text=True, encoding="utf-8", timeout=30)
+    r = git("rev-parse", "--is-shallow-repository")
+    if r.returncode != 0:
+        return None, None, "không đọc được lịch sử git"
+    if r.stdout.strip() == "true":
+        return None, None, "kho nông (shallow clone): thiếu lịch sử git để xác minh commit gỡ khóa"
+    r = git("log", "--format=%H %P", "--", "config.yaml")
+    if r.returncode != 0:
+        return None, None, "không đọc được lịch sử git của config.yaml"
+    seen = {}
+
+    def value(rev):
+        if rev not in seen:
+            t = git("ls-tree", "--name-only", rev, "--", "config.yaml")
+            if t.returncode != 0:
+                raise ValueError(f"không đọc được cây của commit {rev[:7]}")
+            if not t.stdout.strip():
+                seen[rev] = None
+            else:
+                f = git("show", f"{rev}:config.yaml")
+                if f.returncode != 0:
+                    raise ValueError(f"không đọc được config.yaml ở commit {rev[:7]}")
+                try:
+                    seen[rev] = _release_value(yaml.safe_load(f.stdout))
+                except yaml.YAMLError as e:
+                    raise ValueError(f"config.yaml ở commit {rev[:7]} không phải YAML hợp lệ ({type(e).__name__})") from e
+        return seen[rev]
+
+    try:
+        for line in r.stdout.splitlines():
+            if not line.strip():
+                continue
+            sha, *parents = line.split()
+            new = value(sha)
+            if new != (value(parents[0]) if parents else None):
+                return sha, new, None
+    except (ValueError, subprocess.SubprocessError, OSError) as e:
+        return None, None, str(e)
+    return None, None, "không tìm thấy commit nào đổi giá trị paper.risk_lock_release trong config.yaml"
+
+
+def github_api(path):
+    """GET https://api.github.com/repos/{GITHUB_REPOSITORY}/{path} với GITHUB_TOKEN. Lỗi thì ném ra (nơi gọi giữ khóa)."""
+    repo, token = os.environ.get("GITHUB_REPOSITORY"), os.environ.get("GITHUB_TOKEN")
+    if not repo or not token:
+        raise RuntimeError("thiếu GITHUB_REPOSITORY hoặc GITHUB_TOKEN")
+    req = urllib.request.Request(f"https://api.github.com/repos/{repo}/{path}",
+                                 headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+                                          "User-Agent": "ttc-engine"})
+    with urllib.request.urlopen(req, timeout=30) as r:
+        return json.loads(r.read().decode("utf-8"))
+
+
+def release_check(lock, release_value, *, root, git=None, api=None, owner=None):
+    """Owner gỡ khóa sụt giảm được không → (True, căn cứ) hoặc (False, lý do); (False, None) khi chưa đặt giá trị gỡ.
+
+    Đủ cả hai điều kiện mới gỡ:
+      1. `paper.risk_lock_release` bằng đúng `risk_lock.since`;
+      2. commit mới nhất ĐỔI GIÁ TRỊ `paper.risk_lock_release` trong config.yaml đặt đúng giá trị `risk_lock.since`, thuộc
+         một PR đã gộp vào `main`, và người gộp (`merged_by`) là chủ kho (`owner`, mặc định biến môi trường
+         GITHUB_REPOSITORY_OWNER), xác minh qua API GitHub (`commits/{sha}/pulls` rồi `pulls/{số}`). Commit mới hơn chỉ
+         sửa chú thích có tên field không thay được commit đổi giá trị.
+    `git(root)` → (sha, giá trị, lý do) và `api(path)` → JSON được truyền vào để test; mặc định git_last_release_commit,
+    github_api.
+    Mọi lỗi (kho nông, không mạng, không token, API lỗi) đều là (False, lý do): giữ khóa."""
+    if release_value is None:
+        return False, None
+    since = str(lock.get("since"))
+    if str(release_value) != since:
+        return False, f"paper.risk_lock_release = {release_value} khác risk_lock.since = {since}"
+    owner = owner if owner is not None else os.environ.get("GITHUB_REPOSITORY_OWNER")
+    if not owner:
+        return False, "thiếu GITHUB_REPOSITORY_OWNER (chủ kho) để đối chiếu người gộp"
+    git = git or git_last_release_commit
+    api = api or github_api
+    try:
+        sha, value, why = git(root)
+        if not sha:
+            return False, why or "không xác định được commit gỡ khóa"
+        if value != since:
+            return False, (f"commit {sha[:7]} (lần đổi giá trị paper.risk_lock_release mới nhất) đặt {value}, khác "
+                           f"risk_lock.since = {since}")
+        pulls = api(f"commits/{sha}/pulls") or []
+        merged = [p for p in pulls if p.get("merged_at") and (p.get("base") or {}).get("ref") == "main"]
+        if not merged:
+            return False, f"commit {sha[:7]} đổi giá trị risk_lock_release không thuộc PR nào đã gộp vào main"
+        who = []
+        for p in merged:
+            pr = api(f"pulls/{p['number']}") or {}
+            login = (pr.get("merged_by") or {}).get("login")
+            if pr.get("merged") and pr.get("merged_at") and login == owner:
+                return True, f"PR #{p['number']} gộp vào main bởi chủ kho {login}, commit {sha[:7]}"
+            who.append(f"#{p['number']}: {login}")
+        return False, f"người gộp không phải chủ kho {owner} ({', '.join(who)})"
+    except Exception as e:                  # noqa: BLE001 — không xác minh được thì giữ khóa
+        return False, f"không xác minh được qua API GitHub ({type(e).__name__}: {str(e)[:120]})"

@@ -814,7 +814,12 @@ class RiskAndBiasTests(unittest.TestCase):
         (self.tmp / "paper").mkdir()
         (self.tmp / "paper" / "state.json").write_text(json.dumps({
             "cash": 500_000_000, "positions": {"CCC": 1000}, "pending": ["AAA", "BBB"], "last_rebalance": None,
-            "costs_paid": 0.0, "n_rebalance": 0, "last_date": str(d[1].date())}), encoding="utf-8")
+            "costs_paid": 0.0, "n_rebalance": 0, "last_date": str(d[1].date()),
+            # R1b (fixture): trạng thái đo sụt giảm của sổ này; thiếu thì đỉnh khởi tạo là paper.initial_cash (1 tỷ) và sổ
+            # 510 triệu bị coi là đã sụt 49%
+            "dd": {"peak": 510_000_000.0, "peak_date": str(d[1].date()), "checked_through": str(d[1].date()),
+                   "runs": [{"date": str(d[1].date()), "positions": {"CCC": 1000}, "cash": 500_000_000}]}}),
+            encoding="utf-8")
         # R1a: lệnh mua chờ qua cổng rủi ro ở phiên khớp. Cổng cần kho giá đủ adv_sessions (20) phiên có khối lượng để đo
         # thanh khoản: dựng 25 phiên tới d[-1], cùng giá với bảng close. Mục tiêu chỉ 2 mã nên mỗi mã nhận NAV/2 × 0,995 =
         # 49,75%, vượt 20% mặc định: đặt max_weight 0,5 riêng cho test này, vừa đủ cho kịch bản. Các giới hạn khác giữ mặc định.
