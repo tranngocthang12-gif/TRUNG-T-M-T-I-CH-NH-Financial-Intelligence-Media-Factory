@@ -13,7 +13,7 @@ from engine import verified_adjust as va
 
 REPO = pathlib.Path(__file__).resolve().parents[1]
 LIM = {"max_weight": 0.20, "max_participation": 0.10, "max_exit_days": 3, "max_drawdown": 0.15, "adv_sessions": 20,
-       "quarantine_window_days": 45}
+       "quarantine_sessions_before": 21, "quarantine_sessions_after": 120}
 NAV = 1_000_000_000.0
 T5 = ["A", "B", "C", "D", "E"]
 
@@ -99,16 +99,57 @@ def test_quarantine_not_checked_fails():
 
 
 def test_snapshot_window_for_quarantined_events(tmp_path, monkeypatch):
-    """market_snapshot chỉ loại mã có sự kiện CACH_LY_* có ngày giao dịch trong quarantine_window_days ngày tới as_of."""
-    _store(tmp_path, volume=1e6)
+    """market_snapshot loại mã theo cửa sổ QĐ-3 quanh sự kiện cổ phiếu chưa vào chuỗi kiểm chứng, kể cả sự kiện sau t đã
+    có trong bảng sự kiện; sự kiện đã vào chuỗi không loại. Cửa sổ thu nhỏ (−2/+5 phiên) cho dễ đọc."""
+    idx, _ = _store(tmp_path, volume=1e6)                 # 40 phiên, phiên cuối idx[39] = 2026-02-27
     as_of = pd.Timestamp("2026-03-02")
-    rows = pd.DataFrame({"ticker": ["A", "B", "C", "D"], "type": ["stock_split"] * 4,
-                         "trade_date": pd.to_datetime(["2026-02-20", "2026-01-05", "2026-02-25", "2026-03-03"]),
-                         "verify_state": [va.Q + "THIEU_BANG_CHUNG", va.Q + "THIEU_BANG_CHUNG", va.OK, va.Q + "LECH_NGAY"]})
-    monkeypatch.setattr(va, "verify_events", lambda *a, **k: rows)
-    snap = rg.market_snapshot(as_of, ["A", "B", "C", "D"], LIM, root=tmp_path, frozen=False, nav_now=NAV)
-    assert list(snap["quarantined"]) == ["A"], snap
-    assert set(snap["adv_value"]) == {"A", "B", "C", "D"} and snap["nav_history"] == [NAV]
+    lim = dict(LIM, quarantine_sessions_before=2, quarantine_sessions_after=5)
+    k = [idx[36], idx[30], idx[37], pd.Timestamp("2026-03-03"), pd.Timestamp("2026-03-05")]
+    rows = pd.DataFrame({"ticker": list("ABCDE"), "type": ["stock_split"] * 5, "ex_date": k,
+                         "trade_date": k[:3] + [pd.NaT, pd.NaT],
+                         "verify_state": [va.Q + "THIEU_BANG_CHUNG", va.Q + "THIEU_BANG_CHUNG", va.OK,
+                                          va.NA_NODATA, va.NA_NODATA],
+                         "in_verified_chain": [False, False, True, False, False]})
+    monkeypatch.setattr(va, "verify_events", lambda *a, **kw: rows)
+    snap = rg.market_snapshot(as_of, list("ABCDE"), lim, root=tmp_path, frozen=False, nav_now=NAV)
+    # A: 3 phiên sau k (≤ 5) → loại. B: 9 phiên sau → không. C: đã vào chuỗi → không.
+    # D: k = 2026-03-03, 2 phiên sau phiên cuối → t ở 2 phiên trước k (≤ 2) → loại. E: 4 phiên trước k → không.
+    assert sorted(snap["quarantined"]) == ["A", "D"], snap
+    assert "3 phiên sau" in snap["quarantined"]["A"] and "2 phiên trước" in snap["quarantined"]["D"]
+    assert set(snap["adv_value"]) == set("ABCDE") and snap["nav_history"] == [NAV]
+
+
+AXIS = pd.bdate_range("2025-01-01", periods=400)
+
+
+@pytest.mark.parametrize("offset,hit", [(120, True), (121, False), (0, True), (-21, True), (-22, False)])
+def test_qd3_window_boundaries(offset, hit):
+    k = AXIS[100]
+    t = AXIS[100 + offset]
+    got = rg.quarantine_window_hits(t, AXIS, [("X", k, "sự kiện")], 21, 120)
+    assert ("X" in got) is hit, (offset, got)
+
+
+def test_qd3_counts_sessions_without_calendar_holidays():
+    """Đếm phiên bỏ ngày lịch HOSE ghi is_session=0 (ví dụ ngày «ma» trong kho giá)."""
+    k, t = AXIS[100], AXIS[221]                           # 121 ngày của bảng giá sau k: ngoài cửa sổ
+    assert rg.quarantine_window_hits(t, rg.session_axis(AXIS), [("X", k, "s")], 21, 120) == {}
+    holiday = AXIS[150].date().isoformat()
+    axis = rg.session_axis(AXIS, {holiday: 0})            # bỏ một ngày nghỉ giữa k và t → còn 120 phiên
+    assert len(axis) == len(AXIS) - 1
+    assert "X" in rg.quarantine_window_hits(t, axis, [("X", k, "s")], 21, 120)
+    # Ngày lịch không phủ hoặc ghi 1 thì giữ nguyên.
+    assert len(rg.session_axis(AXIS, {holiday: 1})) == len(AXIS)
+
+
+def test_qd3_future_event_counts_calendar_sessions_after_the_last_price_date():
+    axis = AXIS[:200]
+    t = axis[-1]
+    future = pd.bdate_range(t + pd.Timedelta(days=1), periods=30)
+    assert "X" in rg.quarantine_window_hits(t, axis, [("X", future[20], "s")], 21, 120)      # 21 phiên trước k
+    assert rg.quarantine_window_hits(t, axis, [("X", future[21], "s")], 21, 120) == {}        # 22 phiên trước k
+    cal = {future[3].date().isoformat(): 0}               # một ngày nghỉ HOSE giữa t và k: k gần thêm một phiên
+    assert "X" in rg.quarantine_window_hits(t, axis, [("X", future[21], "s")], 21, 120, cal)
 
 
 def test_snapshot_failure_leaves_inputs_empty_so_check_fails(tmp_path, monkeypatch):
@@ -153,6 +194,8 @@ def test_fraction_limits_must_be_below_one(key):
 def test_limits_not_a_dict_fail_and_config_defaults_are_valid():
     assert _check(limits=None)["verdict"] == "FAIL"
     assert rg.limits_problem(dict(LIM, adv_sessions=20.5))
+    assert rg.limits_problem(dict(LIM, quarantine_sessions_before=21.5))
+    assert rg.limits_problem(dict(LIM, quarantine_sessions_after=120.5))
     assert config.CFG["paper"]["risk_limits"] == LIM and rg.limits_problem(config.CFG["paper"]["risk_limits"]) is None
 
 

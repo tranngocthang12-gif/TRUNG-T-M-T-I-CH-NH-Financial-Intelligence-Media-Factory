@@ -169,6 +169,16 @@ def test_paper_holds_cash_when_no_model_is_approved(tmp_path, monkeypatch):
 
 
 def test_paper_rebalances_only_with_an_approved_model(tmp_path, monkeypatch):
+    """Có mô hình được duyệt thì sổ giấy cân bằng lại. Cổng rủi ro của R1 (engine/risk_gate.py) cần giá và khối lượng gốc
+    trong kho giá dưới ROOT để đo thanh khoản: dựng một kho hợp lệ trong thư mục tạm, cùng giá với bảng `close` của test
+    và khối lượng lớn. Cổng vẫn chạy đủ điều kiện như thật; test không tắt, không đi vòng, không nới cổng."""
+    close, _ = _market()
+    rows = [{"date": d.date().isoformat(), "ticker": t, "open": float(close.at[d, t]), "high": float(close.at[d, t]),
+             "low": float(close.at[d, t]), "close": float(close.at[d, t]), "volume": 10_000_000.0,
+             "observed_at": "2026-03-01", "source": "test"} for d in close.index for t in close.columns]
+    store = tmp_path / config.CFG["data"]["store_dir"] / "2026-01.csv"
+    store.parent.mkdir(parents=True)
+    pd.DataFrame(rows).to_csv(store, index=False)
     reg = _reg(2)
     knowledge.rank_active(reg, "2026-11-20", approved=frozenset({"M1"}))
     _, decision = _paper(tmp_path, monkeypatch, reg)

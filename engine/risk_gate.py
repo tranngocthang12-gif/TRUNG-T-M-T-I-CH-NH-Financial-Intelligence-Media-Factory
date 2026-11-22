@@ -6,8 +6,9 @@ không ghi tệp, không gọi mạng. FAIL thì sổ không mở vị thế m�
   2. số phiên thoát vị thế = giá trị vị thế / (max_participation × giá trị giao dịch bình quân adv_sessions phiên)
      ≤ max_exit_days; thiếu giá trị giao dịch bình quân thì không đo được, nên FAIL;
   3. sụt giảm NAV từ đỉnh ≥ max_drawdown thì về tiền mặt và chờ Owner (mục tiêu rỗng);
-  4. mã có sự kiện quyền bị cách ly (trạng thái CACH_LY_* của engine.verified_adjust) có ngày giao dịch trong
-     quarantine_window_days ngày lịch trước lúc quyết định bị loại khỏi mục tiêu, rồi mới xét 1 và 2;
+  4. cửa sổ loại mã theo QĐ-3 (ADR-0016): mã bị loại khỏi mục tiêu khi phiên quyết định t nằm trong
+     [k − quarantine_sessions_before, k + quarantine_sessions_after] phiên, với k là phiên áp dụng của một sự kiện cổ phiếu
+     đang bị cách ly (chưa vào chuỗi verified-adjusted của engine.verified_adjust); rồi mới xét 1 và 2;
   5. dữ liệu bị đóng băng thì không ra quyết định.
 Giới hạn thiếu, còn chữ TODO hoặc không phải số hợp lệ thì FAIL. Giá trị mặc định ở config.yaml (paper.risk_limits) là tham số
 thí nghiệm danh nghĩa, không phải khẩu vị rủi ro của Owner.
@@ -23,7 +24,9 @@ import pathlib
 import numpy as np
 import pandas as pd
 
-LIMIT_KEYS = ("max_weight", "max_participation", "max_exit_days", "max_drawdown", "adv_sessions", "quarantine_window_days")
+LIMIT_KEYS = ("max_weight", "max_participation", "max_exit_days", "max_drawdown", "adv_sessions",
+              "quarantine_sessions_before", "quarantine_sessions_after")
+INT_KEYS = ("adv_sessions", "quarantine_sessions_before", "quarantine_sessions_after")
 FRACTION_KEYS = ("max_weight", "max_participation", "max_drawdown")
 BUY_BUDGET = 0.995          # cùng hệ số engine.paper dùng khi chia vốn cho mã mới: nav / số mã × 0,995
 EPS = 1e-12
@@ -41,9 +44,68 @@ def limits_problem(limits):
             return f"giới hạn {k} thiếu hoặc không phải số dương hữu hạn ({v!r})"
         if k in FRACTION_KEYS and v >= 1:
             return f"giới hạn {k} phải nhỏ hơn 1 ({v!r})"
-    if int(limits["adv_sessions"]) != limits["adv_sessions"]:
-        return "giới hạn adv_sessions phải là số nguyên"
+    for k in INT_KEYS:
+        if int(limits[k]) != limits[k]:
+            return f"giới hạn {k} phải là số nguyên"
     return None
+
+
+def session_axis(price_dates, calendar=None):
+    """Trục phiên: các ngày của bảng giá, bỏ ngày mà lịch phiên HOSE (data/trading_calendar.csv) ghi is_session=0, khi lịch
+    có và phủ ngày đó. `calendar`: {ngày ISO: 0 hoặc 1} hoặc None."""
+    days = pd.DatetimeIndex(sorted(set(pd.to_datetime(list(price_dates)))))
+    if calendar:
+        days = days[[calendar.get(d.date().isoformat(), 1) != 0 for d in days]]
+    return days
+
+
+def _future_sessions(after, until, calendar=None):
+    """Các phiên sau ngày `after` tới hết ngày `until`: theo lịch HOSE ở ngày lịch phủ, ngoài ra theo thứ Hai–thứ Sáu."""
+    out = []
+    for d in pd.date_range(after + pd.Timedelta(days=1), until, freq="D"):
+        flag = calendar.get(d.date().isoformat()) if calendar else None
+        if flag == 1 or (flag is None and d.weekday() < 5):
+            out.append(d)
+    return out
+
+
+def quarantine_window_hits(t, axis, events, before, after, calendar=None) -> dict:
+    """{mã: lý do} cho mã có ít nhất một sự kiện k với t trong [k − before, k + after] phiên (hàm thuần).
+
+    `axis`: trục phiên tới t (session_axis). `events`: [(mã, ngày áp dụng k, mô tả)]. Vị trí của t là phiên cuối ≤ t; vị trí
+    của k là phiên đầu ≥ k. Sự kiện sau ngày cuối của trục được đếm tiếp bằng _future_sessions; sự kiện trước ngày đầu của
+    trục được đếm lùi theo thứ Hai–thứ Sáu."""
+    t = pd.Timestamp(t)
+    axis = pd.DatetimeIndex(axis)
+    axis = axis[axis <= t]
+    if not len(axis):
+        return {}
+    pos_t = len(axis) - 1
+    hits = {}
+    for ticker, k, desc in events:
+        k = pd.Timestamp(k)
+        if k > axis[-1]:
+            pos_k = pos_t + len(_future_sessions(axis[-1], k - pd.Timedelta(days=1), calendar)) + 1
+        elif k < axis[0]:
+            pos_k = -len(pd.bdate_range(k, axis[0] - pd.Timedelta(days=1)))
+        else:
+            pos_k = int(axis.searchsorted(k))
+        if pos_k - before <= pos_t <= pos_k + after:
+            gap = pos_t - pos_k
+            where = f"{gap} phiên sau" if gap >= 0 else f"{-gap} phiên trước"
+            hits.setdefault(ticker, f"{desc}; phiên quyết định ở {where} phiên áp dụng {k.date()} "
+                                    f"(cửa sổ −{before}/+{after} phiên, QĐ-3)")
+    return hits
+
+
+def load_calendar(root):
+    """{ngày ISO: is_session} từ data/trading_calendar.csv dưới root, hoặc None khi không có tệp hay tệp hỏng."""
+    p = pathlib.Path(root) / "data" / "trading_calendar.csv"
+    try:
+        cal = pd.read_csv(p, dtype={"date": str})
+        return {d: int(x) for d, x in zip(cal["date"], cal["is_session"])}
+    except Exception:                       # noqa: BLE001 — không có lịch thì đếm theo ngày của bảng giá
+        return None
 
 
 def check(targets, book, market, limits) -> dict:
@@ -122,8 +184,9 @@ def market_snapshot(as_of, tickers, limits, *, root, frozen, nav_now):
     """Đầu vào thị trường cho `check`, CHỈ ĐỌC từ kho giá, manifest bằng chứng và paper/nav.csv dưới `root`.
 
     - adv_value: bình quân giá × khối lượng GỐC (không điều chỉnh) của adv_sessions phiên gần nhất có dòng giá tới as_of;
-    - quarantined: mã có sự kiện cổ phiếu CACH_LY_* theo engine.verified_adjust, ngày giao dịch trong quarantine_window_days
-      ngày lịch tới as_of;
+    - quarantined: cửa sổ QĐ-3 quanh sự kiện cổ phiếu đang bị cách ly, tức chưa vào chuỗi verified-adjusted
+      (engine.verified_adjust; gồm CACH_LY_* và sự kiện chưa tới hạn đã có trong bảng sự kiện tại as_of), đếm phiên theo
+      session_axis với lịch HOSE data/trading_calendar.csv;
     - nav_history: cột nav của paper/nav.csv cộng NAV hiện tại.
     Lỗi đọc dữ liệu không ném ra ngoài: phần đó để trống, và `check` sẽ FAIL vì thiếu dữ liệu."""
     from . import adjust, data, verified_adjust as va
@@ -149,13 +212,16 @@ def market_snapshot(as_of, tickers, limits, *, root, frozen, nav_now):
             ev = adjust.build_events(raw, obs, man[man.ticker.isin(raw.columns)], yh[yh.ticker.isin(raw.columns)])
             docs = va.load_evidence(sorted((root / "data" / "evidence" / "corporate_actions").glob("EVIDENCE_MANIFEST*.json")))
             chk = va.verify_events(ev, raw, docs, evidence_root=root, as_of=t0)
-            lo = t0 - pd.Timedelta(days=float(limits["quarantine_window_days"]))
-            snap["quarantined"] = {}
-            q = chk[chk.verify_state.str.startswith(va.Q) & chk.trade_date.notna() & (chk.trade_date > lo)
-                    & (chk.trade_date <= t0) & chk.ticker.isin(list(tickers))]
+            cal = load_calendar(root)
+            q = chk[chk.type.isin(adjust.STOCK) & ~chk.in_verified_chain.astype(bool) & chk.ticker.isin(list(tickers))]
+            items = []
             for r in q.itertuples(index=False):
-                snap["quarantined"].setdefault(r.ticker, f"sự kiện {r.type} ngày {pd.Timestamp(r.trade_date).date()} "
-                                                         f"bị cách ly ({r.verify_state})")
+                k = r.trade_date if pd.notna(r.trade_date) else r.ex_date
+                if pd.notna(k):
+                    items.append((r.ticker, k, f"sự kiện {r.type} ngày {pd.Timestamp(k).date()} bị cách ly ({r.verify_state})"))
+            snap["quarantined"] = quarantine_window_hits(t0, session_axis(raw.index, cal), items,
+                                                         int(limits["quarantine_sessions_before"]),
+                                                         int(limits["quarantine_sessions_after"]), cal)
     except Exception as e:                  # noqa: BLE001 — thiếu kho hay manifest hỏng: để trống, check sẽ FAIL
         snap["errors"].append(f"{type(e).__name__}: {e}")
     try:

@@ -74,7 +74,8 @@ paper:
     max_exit_days: 3            # số phiên tối đa để thoát vị thế
     max_drawdown: 0.15          # sụt giảm NAV từ đỉnh: chạm ngưỡng thì về tiền mặt và chờ Owner
     adv_sessions: 20            # số phiên tính giá trị giao dịch bình quân
-    quarantine_window_days: 45  # sự kiện quyền bị cách ly trong ngần này ngày lịch trước lúc quyết định thì loại mã
+    quarantine_sessions_before: 21   # QĐ-3: loại mã khi phiên quyết định t ∈ [k − 21, k + 120] phiên quanh phiên áp dụng k
+    quarantine_sessions_after: 120   # của một sự kiện cổ phiếu đang bị cách ly; đếm phiên theo lịch HOSE
 llm_review:
   enabled: true
   model: claude-sonnet-5
