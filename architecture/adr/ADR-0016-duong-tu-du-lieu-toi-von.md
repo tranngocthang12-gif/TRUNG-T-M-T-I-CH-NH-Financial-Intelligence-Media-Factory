@@ -29,6 +29,9 @@
 | QĐ-7 | Tiêu chí số của thang vốn theo mục "Thang vốn: tiêu chí số" bên dưới. |
 | QĐ-8 | Người chấm L-09 cho từng PR phải khác nhà cung cấp người viết: PR của Claude do ChatGPT hoặc Gemini chấm; PR của ChatGPT do Gemini hoặc Grok chấm. |
 | QĐ-9 | Ngày HOSE đăng tin được ghi vào `published_at` kể cả khi trùng ngày ký văn bản, khi máy kiểm được ngày đó từ metadata HOSE đã ghim trong kho (`tools/publication_proof.py`): tệp tin JSON và tệp danh sách đính kèm khớp sha256, id tin khớp `source_id`, `published_at` bằng đúng `data.postedDate` đổi theo UTC, đính kèm trỏ đúng PDF, ngày đăng không sớm hơn ngày ký, và ngày của (ngày đăng + 7 giờ) sớm hơn ngày không hưởng quyền. Ngày gõ tay, hoặc suy từ ngày ký, tên tệp hay ngày hưởng quyền, vẫn bị từ chối. |
+| QĐ-5a | Trong FWD-001, cổng R1a áp cho mọi sổ. Ngưỡng sụt giảm NAV 15% ở các sổ FWD chỉ để ghi nhận (`DRAWDOWN_BREACH`); không khóa và không bán. Ngắt thật (khóa, bán hết, chỉ Owner gỡ) do R1b hiện thực, áp cho sổ giấy chính (sổ của mô hình Owner duyệt ACTIVE) và mọi sổ gắn vốn thật. R1b phải gộp trước khi đăng ký FWD-001. Quyết định này thay phần "ngưỡng sụt giảm" của QĐ-5 đối với các sổ FWD. |
+| QĐ-10 | Robot vòng học chạy mỗi phiên HOSE (thứ Hai đến thứ Sáu, bỏ ngày nghỉ theo `data/trading_calendar.csv`) cho các bước: tải giá, định giá sổ giấy, cổng rủi ro, ghi quyết định của sổ. Bước nghiên cứu (đăng ký và chạy lần thử L-06, thăng hạng và theo dõi suy giảm mô hình) vẫn chỉ chạy thứ Sáu, 6 lần thử mỗi tuần; chạy tay tối đa 1 lần thử. Không gian 13 × 3 và ngưỡng theo số lần thử không đổi. Đây vẫn là robot và các đường ghi mà ADR-0013 đã ghi nhận; không thêm đường ghi `main` mới. |
+| QĐ-11 | Phép thử FWD-001 chạy theo mục "Giao thức FWD-001" của ADR này. Dòng đăng ký L-06 của FWD-001 phải chép đúng các tham số đó. |
 
 Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVERNOR_POLICY`; nguồn giá chính thức; bảo vệ `main` (P5).
 
@@ -46,6 +49,9 @@ Cổng Owner đang treo từ trước, không đổi: ký `OWNER_MISSION`; `GOVE
 | QĐ-7 | ACCEPTED | Owner | 21/11/2026 |
 | QĐ-8 | ACCEPTED | Owner | 21/11/2026 |
 | QĐ-9 | ACCEPTED | Owner | 22/11/2026 |
+| QĐ-5a | ACCEPTED | Owner | 22/11/2026 |
+| QĐ-10 | ACCEPTED | Owner | 22/11/2026 |
+| QĐ-11 | ACCEPTED | Owner | 22/11/2026 |
 
 Quy tắc:
 
@@ -73,6 +79,37 @@ Quy tắc:
   - Con số này chỉ minh họa. Nó không phải tiêu chí, không phải bằng chứng, và không được dùng để mở cổng vốn.
 - Qua bước 3 → 4 nghĩa là hệ thống vận hành đúng và không có dấu hiệu xấu, không phải lợi thế đã được xác nhận.
 - Ở bậc 4, Owner tự đặt lệnh trong tài khoản của mình. Hệ thống không gửi lệnh (`autonomous_order_execution: false` giữ nguyên). Vị thế thật không vào kho (L-03).
+
+## Giao thức FWD-001 (QĐ-11)
+
+1. **Năm sổ, mỗi sổ 10 tỷ đồng danh nghĩa.** Đây là tham số thí nghiệm, không phải vốn thật (L-03). Mức 10 tỷ để phần dư do làm tròn lô 100 cổ phiếu không quá khoảng 7% mỗi vị thế ở sổ chia đều.
+   - `FWD-EW`: chia đều cho mọi thành viên đủ điều kiện tại phiên quyết định; tái cơ cấu mỗi kỳ.
+   - `FWD-HOLD`: mua chia đều tại D0 rồi giữ. Chỉ bán mã rời rổ; tiền bán giữ ở tiền mặt. Không mua mã mới vào rổ.
+   - `FWD-CASH`: giữ tiền mặt.
+   - `FWD-S1`, `FWD-S2`: sổ bóng theo QĐ-5. Mỗi kỳ chọn 5 mã điểm cao nhất trong các thành viên đủ điều kiện.
+   - "Đủ điều kiện" tại một phiên: là thành viên rổ VN30 đã ghim tại phiên đó, có giá, và không nằm trong cửa sổ cách ly của QĐ-3.
+2. **Chia vốn.** Mỗi mã mục tiêu nhận min(NAV / số mã mục tiêu, 20% NAV) × 0,995. Phần còn lại giữ tiền mặt. Sổ bóng có ít hơn 5 mã đủ điều kiện vẫn mua, không vượt giới hạn tỷ trọng.
+3. **Dữ liệu và khớp lệnh.**
+   - Định giá, chọn mã và khớp lệnh dùng chuỗi đã kiểm, rổ theo ngày và lịch phiên (`research_input="verified"`, `universe="historical"`, `sessions="calendar"`).
+   - Quyết định ở đóng cửa phiên t, khớp ở đóng cửa phiên t+1.
+   - Phí, thuế, trượt giá, lô, khóa trần và khóa sàn như sổ giấy hiện có. Cổ tức tiền mặt ghi vào tiền mặt như sổ giấy hiện có.
+   - Sổ bóng huấn luyện trên chuỗi đã kiểm có mặt nạ cửa sổ, rổ theo cấu hình, chỉ dùng dữ liệu tới phiên t. Phần huấn luyện này mang nhãn RETROSPECTIVE.
+4. **Kỳ.** D0 là phiên quyết định đầu tiên. Mỗi kỳ 20 phiên HOSE theo lịch đã ghim. Lợi suất kỳ k của một sổ là NAV tại đóng cửa phiên khớp của kỳ k+1 chia NAV tại đóng cửa phiên khớp của kỳ k, trừ 1. Phép thử gồm đúng 12 kỳ.
+5. **Niêm phong.**
+   - Quyết định của phiên tái cơ cấu t phải nằm trong một commit trên `main` do lượt chạy GitHub Actions của robot ghi, và lượt chạy đó phải kết thúc trước 09:00 giờ Việt Nam của phiên kế, theo giờ của API GitHub. `tools/fwd_audit.py` đối chiếu.
+   - Trễ: ở phiên đó không sổ nào đổi danh mục, ghi `LATE_VOID`. Kỳ đó vẫn được tính với danh mục đang giữ; không tái cơ cấu bù.
+   - D0 trễ thì D0 dời sang phiên kế.
+   - Có hơn 2 kỳ `LATE_VOID` trong 12 kỳ thì phán quyết là INCONCLUSIVE.
+6. **Thước đo chính.** d_k = lợi suất ròng kỳ k của sổ bóng trừ lợi suất ròng kỳ k của `FWD-EW`, với k = 1…12.
+7. **Phán quyết.** Ra một lần, sau kỳ 12.
+   - Với mỗi sổ bóng: kiểm định t một mẫu, hai phía, cho trung bình của d (11 bậc tự do). Hiệu chỉnh Holm trên 2 giá trị p ở mức 5%.
+   - PASS: giả thuyết trung bình bằng 0 bị bác bỏ và trung bình của d lớn hơn 0.
+   - Mọi trường hợp khác: KHÔNG ĐẠT.
+   - Không sổ bóng nào PASS thì FWD-001 ghi NO_EDGE, như mục "Điều kiện dừng và đảo".
+   - Báo cáo kèm, không dùng để phán quyết: kiểm định dấu; so với `FWD-HOLD` và `FWD-CASH`; số lần `DRAWDOWN_BREACH`.
+   - 12 kỳ là mẫu nhỏ. Nếu độ lệch chuẩn của d là 3% mỗi kỳ (giả định, chưa đo), mức vượt trội trung bình phải khoảng 2,2% mỗi kỳ thì khả năng PASS mới đạt 50%, và khoảng 3% mỗi kỳ thì mới đạt 80%. PASS không phải điều kiện đủ để lên bậc vốn.
+8. **Không đổi luật giữa chừng.** Sổ nằm công khai trên `main` nên kết quả từng kỳ ai cũng xem được. Không tham số nào của mục này được đổi sau khi đăng ký. Muốn đổi thì đăng ký phép thử mới với D0 mới.
+9. **Đăng ký.** Dòng `kind: "forward_test"` trong `research/trial_registry.jsonl` ghi mã `FWD-001`, D0, năm sổ, đặc tả của S1 và S2, và sha256 của mục này tại commit Owner gộp.
 
 ## Điều kiện dừng và đảo
 
