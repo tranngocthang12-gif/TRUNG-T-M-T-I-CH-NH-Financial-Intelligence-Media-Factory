@@ -8,6 +8,9 @@
     tệp thiếu hoặc hỏng thì lỗi, không tự chuyển sang "config";
   - mã bị loại vì không có hơn 250 dòng giá được liệt kê kèm số dòng; sự kiện quyền của mã không có trong bảng bị lọc
     trước adjust.build_events.
+Kho "vận hành" trong test là kho có dòng mang nhãn nguồn thật ("yahoo"); kho "thử nghiệm" là kho mà mọi dòng mang nhãn
+data.TEST_SOURCES ("fixture", "synthetic"). Chỉ kho thử nghiệm được hai ngoại lệ (bản chấm L-09 PR #89 vòng 1): chế độ "config"
+khi kho không có mã nào của universe, và hợp đồng rổ lịch sử rút gọn (không đòi 30 mã và bản gốc ghim).
 Fixture ghi vào thư mục tạm (config.ROOT và adjust.ROOT được vá); test trên kho thật chỉ đọc.
 """
 from __future__ import annotations
@@ -43,14 +46,14 @@ def _walk(cols, seed=7):
     return pd.DataFrame(20000.0 * np.cumprod(1 + r, axis=0), index=IDX, columns=list(cols))
 
 
-def _rows(close):
+def _rows(close, source="fixture"):
     out = []
     for d in close.index:
         for t in close.columns:
             p = close.at[d, t]
             if pd.notna(p):
                 out.append({"date": d.strftime("%Y-%m-%d"), "ticker": t, "open": p, "high": p, "low": p, "close": p,
-                            "volume": 1e6, "observed_at": OBS, "source": "fixture"})
+                            "volume": 1e6, "observed_at": OBS, "source": source})
     return pd.DataFrame(out, columns=data.COLS)
 
 
@@ -59,9 +62,9 @@ def _cash(ticker, at, amount=500.0):
                           "source": "yahoo", "source_status": "TU_DONG", "note": ""}], columns=adjust.EV_COLS)
 
 
-def _home(tmp, close, manual=None, yahoo=None, history=None):
+def _home(tmp, close, manual=None, yahoo=None, history=None, source="fixture"):
     tmp = pathlib.Path(tmp)
-    assert data.save_store(_rows(close), root=tmp) > 0
+    assert data.save_store(_rows(close, source), root=tmp) > 0
     for key, df in (("manual", NONE if manual is None else manual), ("yahoo_cache", NONE if yahoo is None else yahoo)):
         p = tmp / config.CFG["corporate_actions"][key]
         p.parent.mkdir(parents=True, exist_ok=True)
@@ -175,12 +178,34 @@ def test_default_mode_ignores_extra_tickers_in_the_store_byte_for_byte(tmp_path)
     assert _same(_market(dirty, universe="config"), b)
 
 
-def test_store_without_any_universe_ticker_keeps_its_tickers_but_not_ingest_extra(tmp_path):
-    home = _home(tmp_path, _walk(["AAA", "BBB", "BSR"]))
+def test_test_store_without_any_universe_ticker_keeps_its_tickers_but_not_ingest_extra(tmp_path):
+    home = _home(tmp_path, _walk(["AAA", "BBB", "BSR"]))                   # nhãn "fixture": kho thử nghiệm
     mk = _market(home)
     assert list(mk["close"].columns) == ["AAA", "BBB"]
-    assert any("kho không có mã nào của universe" in g for g in mk["pit_gaps"])
-    assert not any("kho không có mã nào" in g for g in _market(_home(tmp_path / "u", _walk(U)))["pit_gaps"])
+    assert any("kho thử nghiệm" in g and "không có mã nào của universe" in g for g in mk["pit_gaps"])
+    assert not any("kho thử nghiệm" in g for g in _market(_home(tmp_path / "u", _walk(U)))["pit_gaps"])
+    for label in ("synthetic", "FIXTURE"):
+        assert data.is_test_store(pd.DataFrame({"source": [label, "fixture"]}))
+
+
+def test_operational_store_without_any_universe_ticker_fails_closed(tmp_path):
+    """Bản chấm vòng 1, BLOCKER 1: kho vận hành chỉ có AAA và ZZZ (ngoài universe và ingest_extra) → chế độ "config" dừng."""
+    home = _home(tmp_path, _walk(["AAA", "ZZZ"]), source="yahoo")
+    with pytest.raises(ValueError, match="không có mã nào thuộc universe"):
+        _market(home)
+    with pytest.raises(ValueError, match="không có mã nào thuộc universe"):
+        _market(home, universe="config")
+    mixed = _home(tmp_path / "m", _walk(["AAA", "ZZZ"]))                   # chỉ một dòng mang nhãn nguồn thật là đủ
+    nxt = (IDX[-1] + pd.offsets.BDay(1)).strftime("%Y-%m-%d")                # phiên mới: kho chỉ ghi thêm
+    assert data.save_store(pd.DataFrame([{"date": nxt, "ticker": "ZZZ", "open": 1.0, "high": 1.0, "low": 1.0,
+                                          "close": 1.0, "volume": 1.0, "observed_at": OBS, "source": "yahoo"}]),
+                           root=mixed) == 1
+    with pytest.raises(ValueError, match="không có mã nào thuộc universe"):
+        _market(mixed)
+    assert not data.is_test_store(pd.DataFrame({"source": ["fixture", "yahoo"]}))
+    assert not data.is_test_store(pd.DataFrame({"source": []}))
+    ok = _home(tmp_path / "ok", _walk(U).join(_walk(["AAA", "ZZZ"], seed=3)), source="yahoo")
+    assert list(_market(ok)["close"].columns) == U                         # có mã universe: lọc chặt, AAA/ZZZ không vào
 
 
 def test_real_store_default_is_byte_identical_to_main_reference():
@@ -287,12 +312,124 @@ def test_universe_basis_historical_is_the_default_historical_mode(tmp_path):
     "effective_date,ticker,action,source_id\n2023-05-24,ACB,ADD,fx\n2023-06-01,ACB,ADD,fx\n",  # ADD mã đang có mặt
     "effective_date,ticker,action,source_id\n2023-05-24,ACB,ADD,fx\n2023-05-24,ACB,ADD,fx\n",  # trùng dòng cùng ngày
     "effective_date,ticker,action,source_id\n2023-05-24,,ADD,fx\n",        # ô trống
+    "effective_date,ticker,action\n2023-05-24,ACB,ADD\n",                   # thiếu cột source_id
+    "effective_date,ticker,action,source_id\n2023-05-24,ACB,ADD,\n",        # source_id trống
+    "effective_date,ticker,action,source_id\n2023-05-24,acb,ADD,fx\n",      # mã không đúng dạng
+    "ticker,effective_date,action,source_id\nACB,2023-05-24,ADD,fx\n",      # sai thứ tự cột
 ])
 def test_historical_broken_file_raises_and_does_not_fall_back(tmp_path, text):
     home = _home(tmp_path, _walk(U), history=text)
     with pytest.raises(ValueError):
         _market(home, universe="historical")
     _market(home)                                                          # chế độ mặc định không đọc tệp này
+
+
+# ---------- 4b. hợp đồng nguồn của rổ lịch sử ở kho vận hành (bản chấm vòng 1, BLOCKER 2) ----------
+
+T30 = list(config.CFG["universe"])                                         # 30 mã, đúng dạng [A-Z0-9]{3}
+D0, D1 = IDX[100].date(), IDX[300].date()
+
+
+def _prod_history(tmp, rows=None, docs=None, members_after=None, skip_files=False):
+    """Rổ 30 mã có manifest và bản gốc ghim trong thư mục tạm, như hợp đồng của tests/test_vn30_history.py."""
+    tmp = pathlib.Path(tmp)
+    rows = rows if rows is not None else ([(D0, t, "ADD", "fx-1") for t in T30]
+                                          + [(D1, T30[29], "REMOVE", "fx-2"), (D1, "BSR", "ADD", "fx-2")])
+    (tmp / "data").mkdir(parents=True, exist_ok=True)
+    (tmp / data.VN30_HISTORY).write_text("effective_date,ticker,action,source_id\n"
+                                         + "".join(f"{d},{t},{a},{sid}\n" for d, t, a, sid in rows), encoding="utf-8")
+    ev = tmp / "data" / "evidence" / "vn30_reviews"
+    ev.mkdir(parents=True, exist_ok=True)
+    after = members_after or {"fx-1": sorted(T30), "fx-2": sorted(T30[:29] + ["BSR"])}
+    out = []
+    for sid, day in (("fx-1", D0), ("fx-2", D1)):
+        blob = json.dumps({"fixture": sid}).encode()
+        if not skip_files:
+            (ev / f"{sid}.json").write_bytes(blob)
+        out.append({"source_id": sid, "effective_date": str(day), "path": f"data/evidence/vn30_reviews/{sid}.json",
+                    "sha256": hashlib.sha256(blob).hexdigest(), "bytes": len(blob), "members_after": after[sid]})
+    (ev / "EVIDENCE_MANIFEST.json").write_text(json.dumps({"source_documents": docs if docs is not None else out}),
+                                               encoding="utf-8")
+    return tmp
+
+
+def _prod_home(tmp, **kw):
+    home = _home(tmp, _walk(T30[:3]).join(_walk(["BSR"], seed=5)), source="yahoo")
+    return _prod_history(home, **kw)
+
+
+def test_operational_store_loads_a_history_that_meets_the_source_contract(tmp_path):
+    mk = _market(_prod_home(tmp_path), universe="historical")
+    assert mk["quality"]["members_last_session"]["members"] == 30
+    assert mk["close"].loc[:IDX[299], "BSR"].isna().all() and mk["close"].loc[IDX[300]:, "BSR"].notna().all()
+
+
+def _bad_rows(kind):
+    base = [(D0, t, "ADD", "fx-1") for t in T30] + [(D1, T30[29], "REMOVE", "fx-2"), (D1, "BSR", "ADD", "fx-2")]
+    if kind == "unknown_source":
+        return base[:-1] + [(D1, "BSR", "ADD", "hose-khong-co")]
+    if kind == "twenty_nine":
+        return base[:-1]                                                   # REMOVE không kèm ADD: còn 29 mã
+    if kind == "wrong_day":
+        return [(D0, t, "ADD", "fx-1") for t in T30] + [(IDX[301].date(), T30[29], "REMOVE", "fx-2"),
+                                                        (IDX[301].date(), "BSR", "ADD", "fx-2")]
+    raise AssertionError(kind)
+
+
+@pytest.mark.parametrize("kind, kw, match", [
+    ("unknown_source", lambda: {"rows": _bad_rows("unknown_source")}, "không có trong"),
+    ("twenty_nine", lambda: {"rows": _bad_rows("twenty_nine")}, "đúng 30"),
+    ("wrong_day", lambda: {"rows": _bad_rows("wrong_day")}, "khác ngày hiệu lực"),
+    ("members_after", lambda: {"members_after": {"fx-1": sorted(T30), "fx-2": sorted(T30)}}, "members_after"),
+    ("missing_file", lambda: {"skip_files": True}, "thiếu tệp bản gốc"),
+    ("empty_manifest", lambda: {"docs": []}, "không có trong"),
+])
+def test_operational_store_rejects_a_history_that_breaks_the_source_contract(tmp_path, kind, kw, match):
+    home = _prod_home(tmp_path, **kw())
+    with pytest.raises(ValueError, match=match):
+        _market(home, universe="historical")
+    _market(home)                                                          # chế độ mặc định không đọc tệp rổ
+
+
+def test_operational_store_rejects_tampered_evidence_and_missing_manifest(tmp_path):
+    home = _prod_home(tmp_path)
+    f = home / "data" / "evidence" / "vn30_reviews" / "fx-2.json"
+    f.write_bytes(f.read_bytes().replace(b"fx-2", b"fx-9"))                # cùng số byte, khác sha256
+    with pytest.raises(ValueError, match="sha256"):
+        _market(home, universe="historical")
+    (home / data.VN30_MANIFEST).unlink()
+    with pytest.raises(ValueError, match="thiếu manifest"):
+        _market(home, universe="historical")
+
+
+def test_operational_store_rejects_the_relaxed_fixture_history(tmp_path):
+    """Rổ 4 mã, source_id "fx", không manifest: kho thử nghiệm nhận (fixture c4), kho vận hành từ chối."""
+    close = _walk(U).join(_walk(["BSR"], seed=5))
+    assert "universe_mode" in _market(_home(tmp_path / "t", close, history=_history(HIST)), universe="historical")["quality"]
+    with pytest.raises(ValueError, match="đúng 30"):
+        _market(_home(tmp_path / "p", close, history=_history(HIST), source="yahoo"), universe="historical")
+
+
+def test_real_history_meets_the_strict_contract():
+    h = data.load_vn30_history(strict=True)
+    assert list(h.columns) == data.VN30_COLUMNS and h["source_id"].str.len().gt(0).all()
+
+
+# ---------- 4c. chất lượng dữ liệu chỉ xét ô thành viên (bản chấm vòng 1, mục CẦN LÀM RÕ) ----------
+
+def test_historical_quality_ignores_moves_outside_membership(tmp_path):
+    close = _walk(U).join(_walk(["BSR", "ZZZ"], seed=5))
+    close.iloc[-5:, close.columns.get_loc(U[2])] *= 1.30                   # U[2] đã ra rổ từ IDX[300]: tăng 30% không có sự kiện
+    close.iloc[200:, close.columns.get_loc("BSR")] *= 1.30                 # BSR chưa vào rổ (vào từ IDX[250])
+    close.iloc[-3:, close.columns.get_loc(U[0])] *= 1.30                   # U[0] là thành viên: phải bị gắn cờ
+    home = _home(tmp_path, close, history=_history(HIST))
+    h = _market(home, universe="historical")
+    flagged = {(f["date"], f["ticker"]) for f in h["flags"]}
+    assert {t for _, t in flagged} == {U[0]} and (str(IDX[-3].date()), U[0]) in flagged
+    assert not h["bad"][U[2]].any() and not h["bad"]["BSR"].any()
+    c = _market(home)                                                      # chế độ config: U[2] vẫn trong universe
+    assert (str(IDX[-5].date()), U[2]) in {(f["date"], f["ticker"]) for f in c["flags"]}
+    assert h["quality"]["flagged_window"] < c["quality"]["flagged_window"]
 
 
 def test_historical_missing_file_raises(tmp_path):
