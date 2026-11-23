@@ -17,7 +17,7 @@ import argparse, json
 import numpy as np, pandas as pd
 from .config import CFG, ROOT, path, load_json, save_json
 from . import data, features, regime, research, meta, knowledge, paper, attribution, report, llm_review
-from . import ledger, experts, facts, knowledge_notes
+from . import ledger, experts, facts, knowledge_notes, fwd
 
 MODES = ("auto", "ops", "research")
 
@@ -134,6 +134,7 @@ def cycle(as_of=None, trials=None, write_report=True, use_llm=True, seed=None, l
 
     # PAPER + ATTRIBUTION
     nav, decision = paper.run(as_of, close, preds_today, registry, udates, events=mk["events"], frozen=skip)
+    fwd.run(as_of)                                        # F1b: sổ FWD theo phiên; chưa đăng ký thì không làm gì
     attr = attribution.run(close, bad)
     n_total = research.total_trials(ledger_df)            # kể cả lần thử đăng ký rồi bỏ dở (L-06)
 
@@ -285,6 +286,9 @@ def main():
             st = load_json("state/ENGINE_STATE.json", {})
             st["data_ingest"] = ing
             save_json("state/ENGINE_STATE.json", st)
+        # F1b (Owner xác nhận 23/11/2026): sổ FWD đang chờ (VERIFY_WAIT, WAIT_PRICES) thì lượt dự phòng thử lại; không chờ gì
+        # thì fwd.run không ghi byte nào. Không chạy nghiên cứu, sổ giấy, sổ mô hình.
+        fwd.run(newest)
         # Giá không đổi không có nghĩa Ledger không đổi. Chỉ viết lại scorecard; không mở trial.
         if refresh_scorecard_report(newest) != 0:
             raise SystemExit(1)
