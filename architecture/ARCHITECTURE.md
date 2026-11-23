@@ -1,6 +1,6 @@
 # TRUNG TÂM TÀI CHÍNH — ARCHITECTURE v3.0 (bản hợp nhất, duy nhất có hiệu lực)
 
-Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0002, ADR-0003 và ADR-0004 (ACCEPTED 17/11/2026), ADR-0005, ADR-0006 và ADR-0007 (ACCEPTED 17/11/2026), ADR-0008 (ACCEPTED 18/11/2026, căn cứ Owner gộp PR #31), ADR-0009 (ACCEPTED 18/11/2026, PR #32 đã L-09; điều 7 chưa đổi engine), ADR-0019 (ACCEPTED 23/11/2026, đổi phạm vi). Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010, hiệu lực khi Owner gộp). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập cho bản gốc — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
+Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0002, ADR-0003 và ADR-0004 (ACCEPTED 17/11/2026), ADR-0005, ADR-0006 và ADR-0007 (ACCEPTED 17/11/2026), ADR-0008 (ACCEPTED 18/11/2026, căn cứ Owner gộp PR #31), ADR-0009 (ACCEPTED 18/11/2026, PR #32 đã L-09; điều 7 chưa đổi engine), ADR-0019 (ACCEPTED 23/11/2026, đổi phạm vi), ADR-0020 (ACCEPTED 24/11/2026, ghế phân tích và phiếu máy). Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010, hiệu lực khi Owner gộp). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập cho bản gốc — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
 Bản này **thay thế** v0.1, v0.2, v1.0, v2.0, v2.1, v2.2. Các bản cũ giữ nguyên chỗ nhưng được liệt kê là SUPERSEDED trong `architecture/ARCHIVE.md`, không xóa (luật INVALIDATED không xóa); `tools/validate.py` từ chối bất kỳ `ARCHITECTURE_v*.md` nào không có trong danh sách đó. Từ đây chỉ một tệp kiến trúc có hiệu lực; thay đổi đi qua ADR (`architecture/adr/`), mỗi ADR có điều kiện hoàn tác (L-07).
 
 > KHÔNG XÂY AI ĐOÁN THỊ TRƯỜNG. XÂY MỘT HỆ THỐNG biết thu thập bằng chứng, biết nghi ngờ chính nó, biết đo lường độ không chắc chắn, biết quản trị rủi ro, biết học từ kết quả, và biết cải thiện cách nó học.
@@ -25,6 +25,8 @@ ADR-0019 đổi mục đích của dự án: giúp Owner phân tích một mã c
 | §8 | Thay bằng đường thi công ba bước và thước đo của QĐ-P14. Các mốc G1–G4, 194 bất đồng, mốc 31/03/2027 và điều kiện dừng của FWD-001 không còn áp dụng; điều kiện hoàn tác của ADR-0019 thay chỗ |
 | §9 | Giữ các dòng về L-02, L-03, L-05, L-06, L-07, L-08. Hai dòng về Ledger và về A–B ngừng cùng phép thử |
 | §10 | Không đổi |
+
+**Từ ADR-0020 (24/11/2026).** Việc phân tích một mã do ghế phân tích của dự án làm theo `docs/QUY_TRINH_HO_SO_MA.md`, bằng công cụ ở `tools/hoso/`. Một bản phân tích chỉ là hồ sơ mã của dự án khi có phiếu máy ĐẠT đi kèm. Hồ sơ, tệp gốc và sổ số liệu nằm ngoài kho. ADR-0020 đổi thứ tự thi công của QĐ-P14: mẫu và máy kiểm trích dẫn vào kho ngay; thước đo thêm điều kiện hồ sơ đầu tiên có phiếu máy ĐẠT.
 
 ## 0. Điều gì đổi so với v2.2, và vì sao
 

@@ -3,6 +3,8 @@
 
 > **Phạm vi từ ADR-0019 (23/11/2026):** dự án giúp Owner phân tích một mã cổ phiếu và giữ kỷ luật đầu tư; Owner quyết định và tự đặt lệnh. Dự án không chứng minh thắng thị trường, không so với AI ngoài dự án, không đưa lời khuyên mua, bán hay nắm giữ. Đọc `architecture/adr/ADR-0019-doi-pham-vi-phan-tich-va-ky-luat.md` trước các mục dưới đây; chỗ nào tệp này khác ADR-0019 thì ADR-0019 có hiệu lực. `governance/OWNER_MISSION.md` và `governance/GOVERNOR_POLICY.yaml` không còn là đầu vào; AI không điền hai tệp này.
 
+> **Ghế phân tích từ ADR-0020 (24/11/2026):** hồ sơ mã làm theo `docs/QUY_TRINH_HO_SO_MA.md` bằng công cụ ở `tools/hoso/`; một bản phân tích chỉ là sản phẩm của dự án khi có phiếu máy ĐẠT. Chỉ dẫn cho phiên Claude trong Project: `docs/CHI_DAN_PROJECT.md`. Hồ sơ thật, tệp gốc và sổ số liệu không vào kho.
+
 Bạn là ghế đang làm việc trong TRUNG TÂM TÀI CHÍNH theo lệnh Owner.
 Bạn KHÔNG phải chatbot đoán thị trường. Sáu tháng đầu không có Orchestrator độc lập: Owner, GitHub Actions và ghế thi công theo lệnh là đủ (`architecture/ARCHITECTURE.md` §2).
 
@@ -24,6 +26,7 @@ Bạn KHÔNG phải chatbot đoán thị trường. Sáu tháng đầu không c�
 9. `library/INFORMATION_MAP.md` — bản đồ thông tin cần có
 10. `contracts/` — khuôn đầu ra có hiệu lực. `orchestrator/ORCHESTRATOR.md`, `orchestrator/AUTO_MODE.md`, `media/MEDIA_OS.md`, `architecture/engines/` và `experts/` là đồ trước v3.0: được giữ để tra cứu, không phải lệnh đang làm theo. ARCHITECTURE §2: không có Orchestrator trong 6 tháng đầu. Media hoãn (§6). Đừng đọc các tệp đó rồi điều phối hay viết Media.
 11. `docs/HUONG_DAN_VAN_HANH.md` — cách ghi dự báo A/B, phân định, chấm PR (các việc Owner làm tay)
+12. `docs/QUY_TRINH_HO_SO_MA.md` — quy trình làm hồ sơ mã của ghế phân tích (ADR-0020)
 
 ## Nguyên lý cốt lõi
 

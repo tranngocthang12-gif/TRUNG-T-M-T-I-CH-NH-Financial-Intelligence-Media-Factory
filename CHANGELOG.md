@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-11-24 — ADR-0020: ghế phân tích của dự án và phiếu máy cho hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+- Theo lệnh Owner ngày 24/11/2026 (00:48 và 00:54) và gói giao Claude Code số 6. ADR-0020 ACCEPTED 24/11/2026, hiệu lực khi Owner gộp PR này.
+- 22 tệp mới chép đúng từng byte từ gói giao (tách bằng đoạn Python ở mục F; sha256 từng tệp khớp dòng `BEGIN FILE` và bảng ở mục C): `architecture/adr/ADR-0020-ghe-phan-tich-va-phieu-may.md`; `docs/QUY_TRINH_HO_SO_MA.md` (quy trình tám bước); `docs/CHI_DAN_PROJECT.md` (chỉ dẫn cho phiên Claude trong Project); `tools/hoso/` (nhận tệp, kiểm sổ số liệu, kiểm trích dẫn, kiểm luật và khung, gài lỗi, phiếu máy; chỉ thư viện chuẩn của Python); `tests/test_hoso.py`; `templates/hoso/` (lệnh mẫu và ví dụ số liệu bịa của một doanh nghiệp không có thật); `templates/ky_luat/MAU_KY_LUAT_TRONG.md` (bộ mẫu kỷ luật trống, QĐ-P8).
+- `.github/workflows/tests.yml`: thêm `test_hoso` vào cuối `UNITTEST`. `architecture/adr/README.md`: thêm dòng ADR-0020. `architecture/ARCHITECTURE.md`: dòng trạng thái thêm ADR-0020; đoạn «Từ ADR-0020» chèn sau bảng «Phạm vi hiệu lực từ ADR-0019», trước §0. Chữ của §0–§10 và của ADR-0001…ADR-0019 giữ nguyên. `BOOT.md`: khối ADR-0020 ngay sau khối ADR-0019; thêm dòng 12 trỏ `docs/QUY_TRINH_HO_SO_MA.md` vào thứ tự đọc bắt buộc, không đánh số lại.
+- `state/PROJECT_STATE.yaml`: trọng tâm, việc còn mở (sửa dòng đã cũ: PR #115 và PR #116 đã gộp ngày 23/11/2026, `main` `0362196`), phiên gần nhất, khoảng trống kế tiếp theo ADR-0020. `phase` và `deployment_level` không đổi.
+- Không sửa tệp có sẵn nào của `tools/`. Không chạm `governance/`, `ledger/`, `paper/`, `research/`, `data/`, `contracts/`, `experts/`, `library/`, `engine/`, `config.yaml`, `requirements.txt`. Không đưa hồ sơ mã thật, tệp gốc thật hay tên mã của hồ sơ đầu tiên vào kho.
+
 ## 2026-11-23 — ADR-0019: đổi phạm vi sang phân tích một mã cổ phiếu và kỷ luật đầu tư — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 23/11/2026 (18:05 đổi mục đích dự án; 18:38 triển khai ngay) và gói giao Claude Code số 5. Chỉ đổi chữ, không đổi mã.
 - `architecture/adr/ADR-0019-doi-pham-vi-phan-tich-va-ky-luat.md` (mới, chép nguyên văn). ACCEPTED 23/11/2026, hiệu lực khi Owner gộp PR này; QĐ-P12 và QĐ-P13 là mặc định của kiến trúc sư, Owner đổi được trước khi gộp.
