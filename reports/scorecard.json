@@ -1,16 +1,17 @@
 {
-  "as_of": "2026-11-20",
-  "total_predictions": 6,
+  "as_of": "2026-11-23",
+  "total_predictions": 16,
   "resolved": 0,
   "void_data_error": 0,
   "issue_forecasts": {
-    "total": 6,
+    "total": 16,
     "counts": {
-      "recorded": 6,
-      "timing_valid": 0,
+      "recorded": 16,
+      "timing_valid": 10,
       "resolved": 0,
       "resolved_timing_valid": 0,
       "by_timing_status": {
+        "eligible": 10,
         "legacy_unproven": 6
       }
     },
@@ -18,27 +19,27 @@
     "timing_verification_source": "github_api",
     "by_seat": {
       "A": {
-        "n": 3,
+        "n": 8,
         "resolved": 0,
         "void": 0,
-        "pending": 3
+        "pending": 8
       },
       "B": {
-        "n": 3,
+        "n": 8,
         "resolved": 0,
         "void": 0,
-        "pending": 3
+        "pending": 8
       }
     },
     "scores": {},
     "ab": {
-      "pairs": 3,
+      "pairs": 8,
       "unpaired": 0,
       "not_same_day": 0,
-      "disagreements": 1,
+      "disagreements": 2,
       "disagreements_out_of_scope": 0,
-      "disagreements_all": 1,
-      "disagreement_rate": 0.333,
+      "disagreements_all": 2,
+      "disagreement_rate": 0.25,
       "disagreements_resolved": 0,
       "disagreements_void": 0,
       "inconsistent_outcomes": 0,
@@ -46,15 +47,15 @@
       "a_accuracy": null,
       "target_disagreements": 194,
       "fixed_sample": {
-        "n": 1,
+        "n": 2,
         "resolved": 0,
         "void": 0,
-        "open": 1,
+        "open": 2,
         "a_correct": 0,
         "p_value_void_as_a_wrong": null,
         "p_value_void_as_a_right": null
       },
-      "verdict": "CHƯA ĐỦ MẪU (0/194 cặp bất đồng đầu tiên đã phân định hoặc VOID; đã ghi 1 cặp)",
+      "verdict": "CHƯA ĐỦ MẪU (0/194 cặp bất đồng đầu tiên đã phân định hoặc VOID; đã ghi 2 cặp)",
       "timing": {
         "blocked_pairs": 1,
         "reasons": {
@@ -106,14 +107,14 @@
   },
   "procedures": {},
   "freshness": {
-    "report_as_of": "2026-11-20",
-    "generated_at": "2026-11-20T14:43:27Z",
-    "source_commit": "1d869378d1c037cc4b692728315260b4d46cbb6f",
-    "data_as_of": "2026-11-20",
+    "report_as_of": "2026-11-23",
+    "generated_at": "2026-11-23T21:34:51Z",
+    "source_commit": "03621961e1d389499f20156026145e34e018ba7f",
+    "data_as_of": "2026-11-23",
     "sources": {
       "ledger/predictions.jsonl": {
-        "rows": 6,
-        "sha256": "5c2ed6f6bbffe06fea967ca52cd660f2ef02c5039e7920bb8c2e7a0794908ce9"
+        "rows": 16,
+        "sha256": "4770d6f743ca6a018892063bb5c262b07a456e3fa1e56bc1cc147c715616d067"
       },
       "ledger/resolutions.jsonl": {
         "rows": 0,
@@ -124,8 +125,8 @@
         "sha256": null
       },
       "governance/release_calendar.jsonl": {
-        "rows": 0,
-        "sha256": null
+        "rows": 9,
+        "sha256": "fe4e6c6e7ff8d209876651e2cbf68ec63a0b5c3f99dde81c7e717a4a90d0b066"
       }
     },
     "capability_scores_emitted": false,
