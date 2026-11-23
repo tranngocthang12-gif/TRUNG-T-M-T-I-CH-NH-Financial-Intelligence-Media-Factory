@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 90
     steps:
       # Fail closed BEFORE checkout, installs, ingestion, registry writes, or API use.
-      # Scheduled runs pick the mode from data (--mode auto): Friday session -> research, 6 trials; other sessions -> ops.
+      # Scheduled runs pick the mode from data (--mode auto): Friday session -> research, 0 trials (research.trials_per_cycle, ADR-0019 QD-P11); other sessions -> ops.
       # Manual runs: main only; trials 0 (ops) or 1 (research, 1 trial). Non-main refs fail before checkout, installs, writes.
       - name: Xac nhan so lan thu truoc khi chay
         env:

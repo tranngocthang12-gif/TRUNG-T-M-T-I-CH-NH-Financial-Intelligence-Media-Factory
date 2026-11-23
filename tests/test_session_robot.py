@@ -116,6 +116,18 @@ def _state(home):
     return json.loads((home / "state" / "ENGINE_STATE.json").read_text(encoding="utf-8"))
 
 
+def _set_trials_per_cycle(home, n):
+    """Fixture: đặt research.trials_per_cycle trong config.yaml của kho tạm. ADR-0019 QĐ-P11 đặt số này về 0 ở kho thật;
+    các test về cơ chế ops/research (ops không đụng tệp nghiên cứu, auto không xử lý lại) cần một lượt thứ Sáu có lần thử
+    để có tệp nghiên cứu mà so."""
+    p = home / "config.yaml"
+    lines = p.read_text(encoding="utf-8").split("\n")
+    hit = [i for i, ln in enumerate(lines) if ln.startswith("  trials_per_cycle:")]
+    assert len(hit) == 1, hit
+    lines[hit[0]] = f"  trials_per_cycle: {n}"
+    p.write_text("\n".join(lines), encoding="utf-8")
+
+
 def _csv_dates(home, rel):
     p = home / rel
     return pd.read_csv(p)["date"].astype(str).tolist() if p.is_file() else []
@@ -176,18 +188,19 @@ def machine_clock(ts):
 class SelectModeTests(unittest.TestCase):
     """Chọn chế độ chỉ từ dữ liệu: phiên mới nhất có giá (`newest`) và ENGINE_STATE.as_of (`last`)."""
 
-    def test_six_trials_unchanged(self):
-        self.assertEqual(int(CFG["research"]["trials_per_cycle"]), 6)
+    def test_trials_per_cycle_is_zero_adr_0019(self):
+        """ADR-0019 QĐ-P11: lượt thử hằng tuần ngừng (trước đây 6)."""
+        self.assertEqual(int(CFG["research"]["trials_per_cycle"]), 0)
 
     def test_auto_monday_unprocessed_is_ops_even_when_machine_clock_says_friday(self):
         with machine_clock(f"{FRI} 16:30"):
             self.assertEqual(run_cycle.select_mode("auto", MON_BEFORE, "2023-01-20"), ("ops", 0))
 
-    def test_auto_friday_unprocessed_is_research_six_trials_even_on_saturday_clock(self):
+    def test_auto_friday_unprocessed_is_research_zero_trials_even_on_saturday_clock(self):
         for clock in (f"{SAT} 00:47", f"{SAT} 10:00", f"{MON_AFTER} 09:00", f"{FRI} 16:30"):
             with self.subTest(clock=clock), machine_clock(clock):
-                self.assertEqual(run_cycle.select_mode("auto", FRI, "2023-01-26"), ("research", 6))
-                self.assertEqual(run_cycle.select_mode("auto", FRI, None), ("research", 6))
+                self.assertEqual(run_cycle.select_mode("auto", FRI, "2023-01-26"), ("research", 0))
+                self.assertEqual(run_cycle.select_mode("auto", FRI, None), ("research", 0))
 
     def test_auto_already_processed_does_nothing(self):
         with machine_clock(f"{SAT} 10:00"):
@@ -360,17 +373,24 @@ class SessionRobotEngineTests(unittest.TestCase):
         self.assertEqual(_csv_dates(home, "paper/decisions.csv")[-1], MON_BEFORE)
         self.assertTrue(self._first_line(home, MON_BEFORE).endswith(" — chế độ ops"))
 
-    def test_auto_friday_unprocessed_runs_research_with_six_trials_on_saturday_clock_then_not_again(self):
+    def test_auto_friday_unprocessed_runs_research_with_zero_trials_on_saturday_clock_then_not_again(self):
+        """ADR-0019 QĐ-P11: lượt thứ Sáu theo lịch vẫn chọn chế độ research từ dữ liệu (đồng hồ máy là thứ Bảy) nhưng với 0
+        lần thử: không gọi register_trial, không thêm dòng nào vào research/trials.csv hay research/trial_registry.jsonl.
+        Kho tạm mang sẵn bản sao hai sổ thử của kho thật, để «không thêm dòng» được kiểm từng byte."""
         home = self._home("fri")
+        books = ("research/trials.csv", "research/trial_registry.jsonl")
+        for rel in books:
+            (home / rel).parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy(ROOT / rel, home / rel)
+        seeded = {rel: (home / rel).read_bytes() for rel in books}
+        self.assertTrue(all(seeded.values()))
         code, out, calls = _drive(home, {"argv": ["--source", "store", "--mode", "auto", "--no-llm"],
                                          "clock": f"{SAT} 10:00"})
         self.assertEqual(code, 0, out)
         st = _state(home)
         self.assertEqual((st["as_of"], st["mode"], st["research_as_of"]), (FRI, "research", FRI))
-        self.assertEqual(calls.get("register_trial"), 6)
-        trials = pd.read_csv(home / "research" / "trials.csv")
-        self.assertEqual(len(trials), 6)
-        self.assertEqual(set(trials["cycle_date"].astype(str)), {FRI})
+        self.assertEqual(calls.get("register_trial", 0), 0)
+        self.assertEqual({rel: (home / rel).read_bytes() for rel in books}, seeded)
         self.assertTrue(self._first_line(home, FRI).endswith(" — chế độ research"))
         # Lượt dự phòng (20:17, 23:47 hay sau nửa đêm) gặp phiên thứ Sáu đã xử lý: không nghiên cứu lại.
         before, state_before = _research_snapshot(home), _state(home)
@@ -396,6 +416,7 @@ class SessionRobotEngineTests(unittest.TestCase):
 
     def test_ops_leaves_research_files_byte_identical_and_still_runs_paper_book(self):
         home = self._home("long")
+        _set_trials_per_cycle(home, 6)          # ADR-0019 đặt kho thật về 0; cần tệp nghiên cứu để so (fixture)
         code, out, calls = _drive(home, {"argv": ["--source", "store", "--mode", "auto", "--as-of", FRI, "--no-llm"]})
         self.assertEqual(code, 0, out)
         self.assertEqual(calls.get("register_trial"), 6)
@@ -452,6 +473,7 @@ class SessionRobotEngineTests(unittest.TestCase):
         """Bản chấm L-09 PR #88 vòng 1: sau lượt research phiên FRI, auto với --as-of về thứ Sáu cũ hơn, hay auto --force
         cùng phiên hoặc phiên sau, đều dừng: register_trial không được gọi và không tệp nào trong kho bị ghi."""
         home = self._home("long")
+        _set_trials_per_cycle(home, 6)          # ADR-0019 đặt kho thật về 0; cần một lượt research có lần thử (fixture)
         code, out, calls = _drive(home, {"argv": ["--source", "store", "--mode", "auto", "--as-of", FRI, "--no-llm"]})
         self.assertEqual((code, calls.get("register_trial")), (0, 6), out)
         before = self._all_files(home)
