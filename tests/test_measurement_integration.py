@@ -197,7 +197,7 @@ class Test4LegacyReplay(_Repo):
         self.assertEqual([r["id"] for r in legacy], [f"F-{n}" for n in range(37, 43)])
         self.assertTrue(all(ledger_intake.is_legacy_timing_row(r) for r in legacy))
         self.assertEqual(ledger_intake.ledger_errors(pred, ledger_intake.load_rows(ROOT / "ledger" / "resolutions.jsonl"),
-                                                     calendar=[]), [])
+                                                     calendar=ledger_intake.load_calendar(ROOT)), [])
         # Sau cả luồng nhận mới trên bản sao, sáu dòng đầu vẫn trùng từng byte với kho thật
         self.assertEqual(self.forecast(61)[0], 0)
         lines = [l for l in (self.repo / "ledger" / "predictions.jsonl").read_bytes().split(b"\n") if l.strip()]

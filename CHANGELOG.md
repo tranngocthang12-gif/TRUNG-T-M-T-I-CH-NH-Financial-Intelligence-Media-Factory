@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-11-23 — ADR-0019: đổi phạm vi sang phân tích một mã cổ phiếu và kỷ luật đầu tư — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+- Theo lệnh Owner ngày 23/11/2026 (18:05 đổi mục đích dự án; 18:38 triển khai ngay) và gói giao Claude Code số 5. Chỉ đổi chữ, không đổi mã.
+- `architecture/adr/ADR-0019-doi-pham-vi-phan-tich-va-ky-luat.md` (mới, chép nguyên văn). ACCEPTED 23/11/2026, hiệu lực khi Owner gộp PR này; QĐ-P12 và QĐ-P13 là mặc định của kiến trúc sư, Owner đổi được trước khi gộp.
+- `architecture/adr/README.md`: thêm dòng ADR-0019. `architecture/ARCHITECTURE.md`: dòng trạng thái thêm ADR-0019; mục «Phạm vi hiệu lực từ ADR-0019 (23/11/2026)» chèn trước §0. Chữ của §0–§10 giữ nguyên. `BOOT.md`: khối phạm vi ngay sau tiêu đề.
+- `state/PROJECT_STATE.yaml`: trọng tâm, việc còn mở, phiên gần nhất và khoảng trống kế tiếp theo ADR-0019. `phase` và `deployment_level` không đổi.
+- Ngừng theo QĐ-P11 nghĩa là không làm việc mới và không dùng đầu ra làm căn cứ. Không xóa mã, không xóa tệp, không sửa sổ đã ghi, không sửa chữ ADR-0001…ADR-0018. Không chạm `governance/`, `ledger/`, `paper/`, `research/trials.csv`, `research/trial_registry.jsonl`, `data/`, `contracts/`, `experts/`, `library/`, `engine/`, `tools/`, `config.yaml`.
+- Lượt thử hằng tuần (`research.trials_per_cycle`) đặt về 0 bằng PR riêng, gộp sau PR này.
+- Ngoài lệnh, Owner chọn ngày 23/11/2026: `tests/test_measurement_integration.py` sửa một dòng có sẵn đỏ trên `main` từ commit robot «ledger: forecast #105» (`d8c60d6`). Test truyền lịch công bố rỗng (`calendar=[]`) khi chạy lại luật nhận trên sổ thật, trong khi F-105…F-114 trỏ tới lịch đã ghim; nay truyền `ledger_intake.load_calendar(ROOT)` như `tools/laws_checks.py`. Assert giữ nguyên. Cùng dòng sửa có trong PR tắt lượt thử hằng tuần.
+
 ## 2026-11-19 — Đồng bộ trạng thái thư viện 1/40 và giấy vận hành — Grok (xAI) soạn
 - `architecture/ARCHITECTURE.md` §8 và `state/PROJECT_STATE.yaml` hết câu thư viện 0/40. Hiện trạng: 1/40, Luật Kế toán 88/2015 `SOURCED`, ghi chú KN-T2 vẫn `DRAFT`, chưa `CITED`, G1 chưa đạt. Không đổi checksum, không đổi `DRAFT`, không viết lại quyết định ADR-0012/0013.
 - `BOOT.md` không còn gọi ghế đang làm việc là Intelligence Orchestrator. Scorecard là bản dẫn xuất: Ledger có thẩm quyền; `STALE`/`ABSENT` không dùng để kết luận năng lực; `INVALID` dừng; không lấy `total_predictions: 0` của bản cũ để phủ nhận F-37–F-42. Không tự sinh scorecard.
