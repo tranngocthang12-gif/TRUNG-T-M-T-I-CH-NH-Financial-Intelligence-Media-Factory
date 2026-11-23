@@ -1,11 +1,30 @@
 # TRUNG TÂM TÀI CHÍNH — ARCHITECTURE v3.0 (bản hợp nhất, duy nhất có hiệu lực)
 
-Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0002, ADR-0003 và ADR-0004 (ACCEPTED 17/11/2026), ADR-0005, ADR-0006 và ADR-0007 (ACCEPTED 17/11/2026), ADR-0008 (ACCEPTED 18/11/2026, căn cứ Owner gộp PR #31), ADR-0009 (ACCEPTED 18/11/2026, PR #32 đã L-09; điều 7 chưa đổi engine). Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010, hiệu lực khi Owner gộp). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập cho bản gốc — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
+Ngày: 22/10/2026 · Kiến trúc sư trưởng: Claude · Owner: Trần Ngọc Thắng · Trạng thái: ACCEPTED (Owner gộp PR #3 ngày 24/10/2026); sửa đổi bởi ADR-0002, ADR-0003 và ADR-0004 (ACCEPTED 17/11/2026), ADR-0005, ADR-0006 và ADR-0007 (ACCEPTED 17/11/2026), ADR-0008 (ACCEPTED 18/11/2026, căn cứ Owner gộp PR #31), ADR-0009 (ACCEPTED 18/11/2026, PR #32 đã L-09; điều 7 chưa đổi engine), ADR-0019 (ACCEPTED 23/11/2026, đổi phạm vi). Ghế thi công: Grok (xAI), Owner lập 18/11/2026 (ADR-0010, hiệu lực khi Owner gộp). Do Claude soạn một mình theo lệnh Owner 22/10/2026 (giai đoạn xây kiến trúc); chưa có phản biện độc lập cho bản gốc — xem `governance/ARCHITECT_HANDOFF_20261022.md` mục 4.
 Bản này **thay thế** v0.1, v0.2, v1.0, v2.0, v2.1, v2.2. Các bản cũ giữ nguyên chỗ nhưng được liệt kê là SUPERSEDED trong `architecture/ARCHIVE.md`, không xóa (luật INVALIDATED không xóa); `tools/validate.py` từ chối bất kỳ `ARCHITECTURE_v*.md` nào không có trong danh sách đó. Từ đây chỉ một tệp kiến trúc có hiệu lực; thay đổi đi qua ADR (`architecture/adr/`), mỗi ADR có điều kiện hoàn tác (L-07).
 
 > KHÔNG XÂY AI ĐOÁN THỊ TRƯỜNG. XÂY MỘT HỆ THỐNG biết thu thập bằng chứng, biết nghi ngờ chính nó, biết đo lường độ không chắc chắn, biết quản trị rủi ro, biết học từ kết quả, và biết cải thiện cách nó học.
 
 ---
+
+## Phạm vi hiệu lực từ ADR-0019 (23/11/2026)
+
+ADR-0019 đổi mục đích của dự án: giúp Owner phân tích một mã cổ phiếu và giữ kỷ luật đầu tư. Owner quyết định và tự đặt lệnh. Dự án không còn tìm cách chứng minh thắng thị trường hay hơn AI ngoài dự án. Chỗ nào các mục dưới đây khác ADR-0019 thì ADR-0019 có hiệu lực. Chữ của §0–§10 được giữ nguyên để tra cứu.
+
+| Mục | Từ ADR-0019 |
+|---|---|
+| §1 | Giữ tinh hoa (2): tri thức có địa chỉ nguồn. Tinh hoa (1) đổi thành: mỗi luận điểm trong hồ sơ có điều kiện sai và ngày xem lại (QĐ-P9). Tinh hoa (3) không còn là mục tiêu. L-05 và L-06 vẫn là luật; không mở việc mới thuộc tinh hoa (4) và (5) |
+| §2 | Thay bằng "ba sản phẩm, một phòng tập, một nền" (QĐ-P2) |
+| §3 | Vai các ghế theo QĐ-P15. Kênh, L-09 và L-10 giữ nguyên. Nhóm B ngừng sau khi 16 dự báo đang mở được phân định |
+| §4.1, §4.2 | Ngừng (QĐ-P11). 16 dự báo đang mở được phân định nốt, sau đó không mở dự báo mới (QĐ-P12) |
+| §4.3 | Máy dò tín hiệu và lượt thử hằng tuần ngừng. FWD-001 không đăng ký. Thang vốn của ADR-0016 ngừng áp dụng. Giữ kho giá, cổng chứng cứ sự kiện quyền, lịch phiên |
+| §4.4 | Phần phán quyết của SCN-001 ngừng. Thiết kế thẻ đọc giữ cho việc đọc soi chi tiết (QĐ-P6) |
+| §5 | Thư viện giữ, là nền dữ kiện (QĐ-P4), mở theo nhu cầu của hồ sơ. Học viện với bài thi A so với B ngừng |
+| §6 | Luật, cổng L-09 và `tools/validate.py` giữ nguyên. Mọi công tắc tiền và API vẫn `false`. Thang vốn 0–6, `OWNER_MISSION.md` và `GOVERNOR_POLICY.yaml` không còn là đầu vào. Media ngoài phạm vi |
+| §7 | Giữ nguyên. Không mở API trả phí |
+| §8 | Thay bằng đường thi công ba bước và thước đo của QĐ-P14. Các mốc G1–G4, 194 bất đồng, mốc 31/03/2027 và điều kiện dừng của FWD-001 không còn áp dụng; điều kiện hoàn tác của ADR-0019 thay chỗ |
+| §9 | Giữ các dòng về L-02, L-03, L-05, L-06, L-07, L-08. Hai dòng về Ledger và về A–B ngừng cùng phép thử |
+| §10 | Không đổi |
 
 ## 0. Điều gì đổi so với v2.2, và vì sao
 

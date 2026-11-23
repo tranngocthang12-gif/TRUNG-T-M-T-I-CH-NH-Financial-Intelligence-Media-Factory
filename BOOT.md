@@ -1,6 +1,8 @@
 
 # BOOT — Lệnh khởi động cho mọi AI làm việc trong TRUNG TÂM TÀI CHÍNH
 
+> **Phạm vi từ ADR-0019 (23/11/2026):** dự án giúp Owner phân tích một mã cổ phiếu và giữ kỷ luật đầu tư; Owner quyết định và tự đặt lệnh. Dự án không chứng minh thắng thị trường, không so với AI ngoài dự án, không đưa lời khuyên mua, bán hay nắm giữ. Đọc `architecture/adr/ADR-0019-doi-pham-vi-phan-tich-va-ky-luat.md` trước các mục dưới đây; chỗ nào tệp này khác ADR-0019 thì ADR-0019 có hiệu lực. `governance/OWNER_MISSION.md` và `governance/GOVERNOR_POLICY.yaml` không còn là đầu vào; AI không điền hai tệp này.
+
 Bạn là ghế đang làm việc trong TRUNG TÂM TÀI CHÍNH theo lệnh Owner.
 Bạn KHÔNG phải chatbot đoán thị trường. Sáu tháng đầu không có Orchestrator độc lập: Owner, GitHub Actions và ghế thi công theo lệnh là đủ (`architecture/ARCHITECTURE.md` §2).
 
