@@ -70,7 +70,7 @@ Dùng khuôn đã có: `dossier`, `research_report`, `valuation_case`, `hypothes
 
 Luật của hồ sơ:
 
-- Mục 8 ghi khoảng giá trị ước tính theo từng giả định, không kèm hành động.
+- Mục 8 (định giá theo khoảng) chỉ viết sau khi Owner sửa L-02 (QĐ-P13).
 - Mục 10 không sinh tín hiệu.
 - Hồ sơ kết bằng danh sách CHƯA BIẾT, không kết bằng việc nên làm gì.
 - Không lập hội đồng tác tử. Các vai trong `experts/investment/` là các mục của hồ sơ.
@@ -118,7 +118,7 @@ Một ghế khác hãng với ghế viết hồ sơ đọc hồ sơ và tài li�
 | 2. Phản biện | Ghế khác hãng | Lập luận, điều chưa chứng minh |
 | 3. Hậu kiểm | Thời gian | Tới ngày xem lại: điều kiện sai có xảy ra không |
 
-- Mỗi hồ sơ gài một lỗi cố ý để xem ghế phản biện có bắt được không.
+- Mỗi hồ sơ gài một lỗi cố ý để xem ghế phản biện có bắt được không. Lỗi này được ghi riêng và gỡ khỏi hồ sơ trước khi giao Owner dùng; bản Owner dùng không còn lỗi thử.
 - Owner tự mở ba con số bất kỳ trong tài liệu gốc ở mỗi hồ sơ.
 - Hậu kiểm ghi ĐÚNG, SAI hoặc CHƯA RÕ cho từng luận điểm. Kết quả dùng để sửa cách phân tích, không dùng để tuyên bố thắng thị trường.
 
@@ -158,15 +158,15 @@ Sàn Zero là phòng tập kỷ luật trên chỉ số mô phỏng. Mã do Owne
 
 ### QĐ-P13 — L-02 và nơi đặt hồ sơ
 
-PR này không sửa `governance/LAWS.md`. L-02 hiện chỉ cho xuất dự báo xác suất về sự kiện và chỉ tiêu. Cho tới khi Owner tự sửa L-02 để cho phép ghi khoảng giá trị kèm giả định và không kèm hành động, hồ sơ mã (kể cả mục 8) nằm ở nơi riêng tư của Owner và không vào kho.
+PR này không sửa `governance/LAWS.md`. L-02 áp cho mọi đầu ra của hệ thống, kể cả đầu ra chỉ gửi riêng cho Owner, và hiện chỉ cho xuất dự báo xác suất về sự kiện và chỉ tiêu. Cho tới khi Owner tự sửa L-02 để cho phép ghi khoảng giá trị kèm giả định và không kèm hành động: hệ thống chỉ chuẩn bị dữ kiện và nội dung nằm trong phạm vi L-02; chưa viết, chưa gửi mục 8 hay bất kỳ khoảng giá trị, giá mục tiêu nào, kể cả ở nơi riêng tư của Owner. Hồ sơ mã nằm ở nơi riêng tư của Owner và không vào kho.
 
 ### QĐ-P14 — Đường thi công và thước đo
 
 1. ADR này và PR tắt lượt thử hằng tuần.
-2. Một hồ sơ chạy trọn cho một mã do Owner chọn: hồ sơ mười hai mục, bản phản biện của ghế khác hãng, bộ mẫu kỷ luật trống. Làm bằng tay, chưa cần mã mới.
+2. Một hồ sơ chạy trọn cho một mã do Owner chọn: hồ sơ mười hai mục (mục 8 chỉ viết sau khi Owner sửa L-02, QĐ-P13), bản phản biện của ghế khác hãng, bộ mẫu kỷ luật trống. Làm bằng tay, chưa cần mã mới.
 3. Sau khi Owner đã dùng hồ sơ đầu tiên: chốt mẫu vào kho, viết máy kiểm trích dẫn, xét xóa phần mã đã ngừng.
 
-Thước đo của ADR này: có một hồ sơ trọn vẹn cho một mã, đã qua phản biện khác hãng, Owner đã đọc. Trước mốc đó không mở việc nào ngoài ba bước trên.
+Thước đo của ADR này: có một hồ sơ trọn vẹn cho một mã trong phạm vi L-02 đang hiệu lực (QĐ-P13), đã qua phản biện khác hãng, Owner đã đọc. Trước mốc đó không mở việc nào ngoài ba bước trên.
 
 ### QĐ-P15 — Vai các ghế
 
