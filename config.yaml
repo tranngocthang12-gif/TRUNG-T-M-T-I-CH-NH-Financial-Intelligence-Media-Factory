@@ -34,7 +34,7 @@ quality:                   # kiểm tra chất lượng: biến động vượt 
   feature_lookback: 121    # feature của một mã bị loại nếu có cờ lỗi trong ngần này phiên gần nhất
   flags_file: data/derived/quality_flags.csv
 research:
-  trials_per_cycle: 6
+  trials_per_cycle: 0          # ADR-0019 QĐ-P11: ngừng lượt thử hằng tuần (trước đây 6); lượt thứ Sáu theo lịch không đăng ký lần thử nào
   min_train_days: 500
   test_days: 120
   top_k: 5
