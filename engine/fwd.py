@@ -55,11 +55,14 @@ Luật (mục của QĐ-11a trong ngoặc):
   - Cổng R1a (QĐ-5a): risk_gate.check lúc quyết định và lúc khớp lệnh mua, cùng ngữ nghĩa với paper.run (FAIL lúc quyết định
     → mục tiêu = vị thế đang giữ; mã bị loại không mua; FAIL lúc khớp → không mua mã nào; mã bị từ chối không thử lại). Sổ
     FWD không có trạng thái đóng băng dữ liệu: cổng nhận frozen=False. Thị trường là risk_gate.market_snapshot tại phiên,
-    trừ giá (giá gốc của phiên) và giá trị giao dịch bình quân: cửa sổ adv_sessions phiên tính trên trục phiên FWD ở mục
-    (1), nên ngày không phải phiên (kể cả ngày CHUA_CO_THONG_BAO kho không có dòng nào) không làm cửa sổ có phiên trống.
+    trừ ba phần tính lại trên trục phiên FWD ở mục (1), để ngày không phải phiên (kể cả ngày CHUA_CO_THONG_BAO kho không có
+    dòng nào) không được đếm: giá (giá gốc của phiên); giá trị giao dịch bình quân (adv_sessions phiên cuối của trục); cửa sổ
+    cách ly QĐ-3 [k − quarantine_sessions_before, k + quarantine_sessions_after] quanh sự kiện cổ phiếu chưa vào chuỗi
+    verified-adjusted (xem _Ctx.quarantine). Ngày sau phiên đang xét đếm theo lịch HOSE, ngày CHUA_CO_THONG_BAO không tính
+    (chưa biết có giá hay không; không tính thì cửa sổ trước sự kiện dài hơn hoặc bằng thực tế: fail-closed).
 `replay(root, spec, until)` dựng lại các sổ từ D0 tới phiên robot đã ghi xong, bằng danh mục mục tiêu đã niêm phong, các
-dòng áp sự kiện đã ghi, giá trong kho và luật trên; cổng R1a ở phiên khớp được tính lại từ đầu vào ở dòng RISK_GATE (xem
-replay).
+dòng áp sự kiện đã ghi, giá trong kho và luật trên; cổng R1a ở phiên khớp được tính lại từ đầu vào ở dòng RISK_GATE, kể cả
+cửa sổ cách ly của sự kiện đã tới phiên áp dụng (xem replay).
 """
 from __future__ import annotations
 
@@ -401,6 +404,7 @@ class _Ctx:
         self.mk = data.load_market(_iso(t0), **MARKET)
         s = data.load_store(root=self.root)
         s = s[s.date <= t0]
+        self._store = s
         self.raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
         self.vol = vol = s.pivot(index="date", columns="ticker", values="volume").sort_index()
         self.cal = risk_gate.load_calendar(self.root)
@@ -416,6 +420,9 @@ class _Ctx:
         # lịch ghi is_session=1, kể cả ngày CHUA_CO_THONG_BAO mà kho không có dòng nào (load_market không liệt kê ngày đó).
         unann = self.unannounced()
         self.sessions = [d for d in axis0 if not (d in unann and not bool(priced0[d]))]
+        # Lịch đếm phiên SAU phiên đang xét trong cửa sổ cách ly: ngày CHUA_CO_THONG_BAO chưa biết có giá nên không tính.
+        un = {_iso(d) for d in unann}
+        self.qcal = {d: (0 if d in un else x) for d, x in self.cal.items()} if self.cal else None
         idx = pd.DatetimeIndex(self.sessions)
         self.ok = ok0.reindex(idx)
         self.last = self.raw.where(has).ffill().reindex(idx, method="ffill")   # giá gốc gần nhất ≤ phiên
@@ -432,6 +439,7 @@ class _Ctx:
             r = r * F
         self.adj = r.ffill(limit=5)
         self._snap = {}
+        self._qitems = {}
         self._inputs = None
 
     def unannounced(self):
@@ -463,15 +471,59 @@ class _Ctx:
         return paper.locked(self.adj, s)
 
     def market(self, s, tickers):
+        """Thị trường cho risk_gate.check tại phiên s: market_snapshot, rồi tính lại giá, giá trị giao dịch bình quân (adv) và
+        cửa sổ cách ly (quarantine) trên trục phiên FWD. Lỗi khi tính lại: như market_snapshot, để trống và ghi `errors`,
+        check FAIL."""
         key = (s, tuple(sorted(set(tickers))))
         if key not in self._snap:
             lim = config.CFG["paper"].get("risk_limits")
             snap = risk_gate.market_snapshot(s, list(key[1]), lim, root=self.root, frozen=False)
             snap["price"] = {t: p for t in key[1] if (p := self.price(t, s)) is not None}
-            if not snap["errors"] and risk_gate.limits_problem(lim) is None:     # cửa sổ ADV trên trục phiên FWD (adv)
-                snap["adv_value"], snap["adv_problem"] = self.adv(s, list(key[1]))
-            self._snap[key] = snap
+            items = []
+            if not snap["errors"] and risk_gate.limits_problem(lim) is None:
+                try:
+                    snap["adv_value"], snap["adv_problem"] = self.adv(s, list(key[1]))
+                    items, snap["quarantined"] = self.quarantine(s, list(key[1]))
+                except Exception as e:      # noqa: BLE001 — như market_snapshot: để trống, check FAIL
+                    items, snap["adv_value"], snap["quarantined"] = [], {}, None
+                    snap["errors"].append(f"{type(e).__name__}: {e}")
+            self._snap[key], self._qitems[key] = snap, items
         return self._snap[key]
+
+    def axis_to(self, s):
+        """Trục phiên FWD tới hết phiên s."""
+        return pd.DatetimeIndex([d for d in self.sessions if d <= s])
+
+    def quarantine(self, s, tickers):
+        """Cửa sổ cách ly QĐ-3 tại phiên s → (sự kiện [(mã, ngày áp dụng k, mô tả)], {mã: lý do}).
+
+        Sự kiện: như risk_gate.market_snapshot, xét tại s — sự kiện cổ phiếu chưa vào chuỗi verified-adjusted của các mã
+        `tickers`, dựng bằng kho giá tới s (adjust.build_events) và bản gốc tại s (verify_events, as_of=s); k là ngày giao dịch
+        không hưởng quyền, không có thì ngày GDKHQ. Cửa sổ: window(s, sự kiện), đếm trên trục phiên FWD."""
+        st = self._store[self._store.date <= s]
+        raw = st.pivot(index="date", columns="ticker", values="close").sort_index()
+        obs = st.pivot(index="date", columns="ticker", values="observed_at").sort_index()
+        man, yh = adjust.load_manual(), adjust.load_yahoo()
+        ev = adjust.build_events(raw, obs, man[man.ticker.isin(raw.columns)], yh[yh.ticker.isin(raw.columns)])
+        docs = va.load_evidence(sorted(self.root.joinpath(*data.EVIDENCE_DIR).glob("EVIDENCE_MANIFEST*.json")))
+        chk = va.verify_events(ev, raw, docs, evidence_root=self.root, as_of=s)
+        q = chk[chk.type.isin(adjust.STOCK) & ~chk.in_verified_chain.astype(bool) & chk.ticker.isin(list(tickers))]
+        items = []
+        for r in q.itertuples(index=False):
+            k = r.trade_date if pd.notna(r.trade_date) else r.ex_date
+            if pd.notna(k):
+                why = f"sự kiện {r.type} ngày {pd.Timestamp(k).date()} bị cách ly ({r.verify_state})"
+                items.append([r.ticker, _iso(k), why])
+        return items, self.window(s, items)
+
+    def window(self, s, items):
+        """{mã: lý do} cho mã có sự kiện k với s ∈ [k − quarantine_sessions_before, k + quarantine_sessions_after] phiên
+        (risk_gate.quarantine_window_hits). Vị trí của s và của k ≤ s: trên trục phiên FWD tới s (QĐ-11a mục 1). k sau s: đếm
+        các ngày sau s theo lịch `qcal`, tức lịch HOSE với ngày CHUA_CO_THONG_BAO tính là không phải phiên (fail-closed)."""
+        lim = config.CFG["paper"]["risk_limits"]
+        return risk_gate.quarantine_window_hits(s, self.axis_to(s), [tuple(i) for i in items],
+                                                int(lim["quarantine_sessions_before"]),
+                                                int(lim["quarantine_sessions_after"]), self.qcal)
 
     def inputs(self):
         """sha256 của các tệp quyết định cửa sổ cách ly và trục phiên của cổng R1a tại lúc chạy: manifest bản gốc sự kiện
@@ -493,18 +545,19 @@ class _Ctx:
         dòng nào; cửa sổ khi đó có một phiên trống và cổng FAIL suốt adv_sessions phiên."""
         lim = config.CFG["paper"].get("risk_limits") or {}
         raw, vol = self.raw.loc[:s], self.vol.loc[:s]
-        axis = pd.DatetimeIndex([d for d in self.sessions if d <= s])
-        return risk_gate.adv_values(raw, vol, axis, list(tickers), int(lim.get("adv_sessions", 20)))
+        return risk_gate.adv_values(raw, vol, self.axis_to(s), list(tickers), int(lim.get("adv_sessions", 20)))
 
     def gate(self, stage, book, s, targets, nav, positions, rows, k=""):
         """risk_gate.check với thị trường tại phiên s; ghi một dòng RISK_GATE vào decisions.csv (`rows`) mang ĐỦ đầu vào của
-        hàm thuần check (mục tiêu, NAV, vị thế, giới hạn, thị trường) và dấu vân tay tệp đầu vào → kết quả check."""
+        hàm thuần check (mục tiêu, NAV, vị thế, giới hạn, thị trường), các sự kiện cách ly đã xét (quarantine_events) và dấu
+        vân tay tệp đầu vào → kết quả check."""
         lim = config.CFG["paper"].get("risk_limits")
         market = self.market(s, list(targets) + list(positions))
         g = risk_gate.check(list(targets), {"nav": nav, "positions": dict(positions)}, market, lim)
+        items = self._qitems[(s, tuple(sorted(set(list(targets) + list(positions)))))]
         rec = {"stage": stage, "targets": list(targets), "nav": nav, "positions": dict(positions), "limits": lim,
-               "market": market, "verdict": g["verdict"], "excluded": g["excluded"], "reasons": g["reasons"],
-               "inputs": self.inputs()}
+               "market": market, "quarantine_events": items, "verdict": g["verdict"], "excluded": g["excluded"],
+               "reasons": g["reasons"], "inputs": self.inputs()}
         rows.append(_drow(_iso(s), "RISK_GATE", book=book, k=k, note=f"{stage}: {g['verdict']}",
                           targets=json.dumps(rec, ensure_ascii=False, sort_keys=True)))
         return g
@@ -890,8 +943,10 @@ def replay(root, spec, until):
     Dùng: danh mục mục tiêu đã niêm phong (DECIDE và periods.csv), các dòng áp sự kiện quyền đã ghi, giá trong kho, luật của
     mô-đun. Cổng R1a ở phiên khớp được TÍNH LẠI bằng hàm thuần risk_gate.check từ đầu vào robot đã ghi ở dòng RISK_GATE:
     mục tiêu, NAV và vị thế phải trùng trạng thái replay đang dựng, giá và giá trị giao dịch bình quân phải trùng phép tính lại
-    từ kho, kết luận phải trùng; khác thì ReplayMismatch. Riêng cửa sổ cách ly lấy từ dòng đã ghi, kèm sha256 các tệp đầu
-    vào (manifest bản gốc, bảng sự kiện, lịch, rổ) để kiểm toán dựng lại ở commit của lượt chạy."""
+    từ kho, kết luận phải trùng; khác thì ReplayMismatch. Cửa sổ cách ly: danh sách SỰ KIỆN lấy từ dòng đã ghi (kèm sha256
+    các tệp đầu vào: manifest bản gốc, bảng sự kiện, lịch, rổ, để kiểm toán dựng lại ở commit của lượt chạy); với sự kiện có
+    k ≤ phiên khớp, replay đếm lại cửa sổ trên trục phiên FWD: mã trúng cửa sổ phải có trong danh sách cách ly đã ghi, và mã
+    trong danh sách đã ghi phải trúng cửa sổ hoặc có sự kiện sau phiên khớp (đếm theo lịch lúc chạy)."""
     root = pathlib.Path(root)
     d = book_dir(root, spec["trial_id"])
     p_state = d / STATE
@@ -932,6 +987,16 @@ def replay(root, spec, until):
             adv, _ = ctx.adv(s, list(m.get("adv_value") or {}) + list(m.get("adv_problem") or {}))
             if adv != (m.get("adv_value") or {}):
                 raise ReplayMismatch(f"{si} {book}: giá trị giao dịch bình quân ở dòng RISK_GATE khác phép tính lại từ kho")
+        if m.get("quarantined") is not None and rec.get("limits"):
+            items = rec.get("quarantine_events")
+            if items is None:
+                raise ReplayMismatch(f"{si} {book}: dòng RISK_GATE thiếu danh sách sự kiện cách ly")
+            hit = set(ctx.window(s, [i for i in items if pd.Timestamp(i[1]) <= s]))
+            later = {i[0] for i in items if pd.Timestamp(i[1]) > s}
+            got = set(m["quarantined"])
+            if not hit <= got or not got <= hit | later:
+                raise ReplayMismatch(f"{si} {book}: danh sách cách ly ở dòng RISK_GATE ({sorted(got)}) khác cửa sổ đếm lại "
+                                     f"trên trục phiên FWD ({sorted(hit)})")
         g = risk_gate.check(rec["targets"], {"nav": rec["nav"], "positions": rec["positions"]}, m, rec["limits"])
         if g["verdict"] != rec["verdict"] or g["excluded"] != rec["excluded"]:
             raise ReplayMismatch(f"{si} {book}: kết luận cổng ghi ({rec['verdict']}) khác check tính lại ({g['verdict']})")

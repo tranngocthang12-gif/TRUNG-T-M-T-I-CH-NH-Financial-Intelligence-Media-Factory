@@ -24,7 +24,7 @@ import pytest
 REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from engine import adjust, config, data, fwd  # noqa: E402
+from engine import adjust, config, data, fwd, risk_gate  # noqa: E402
 
 IDX = pd.bdate_range("2025-01-02", periods=300)            # 2025-01-02 … 2026-02-24
 TICK = ["AAA", "BBB", "CCC", "DDD", "EEE", "FFF", "GGG"]
@@ -1010,3 +1010,113 @@ def test_late_events_in_a_chain_use_the_shares_effective_before_each_event(env):
     assert abs(float(r.nav.item()) - (float(r.cash.item()) + sum(n * px.at[IDX[D0 + 4], t] for t, n in pos.items()))) <= 1
     assert fwd.replay(home, SPEC, S[D0 + 4]).astype(str).reset_index(drop=True).equals(
         nav[["date", "book", "nav"]].reset_index(drop=True))
+
+
+def _split(t, day):
+    return {"ticker": t, "ex_date": str(pd.Timestamp(day).date()), "type": "stock_split", "ratio": 2.0}
+
+
+def test_the_quarantine_window_counts_fwd_sessions_at_both_boundaries(env):
+    """Bản chấm vòng 3: cửa sổ cách ly QĐ-3 [k − 21, k + 120] đếm trên trục phiên FWD. CCC có chia tách chưa kiểm ở ka, DDD
+    ở kb; mỗi cửa sổ có một ngày CHUA_CO_THONG_BAO không có dòng giá nào (xa giữa ka và phiên thứ 120 sau ka; xb giữa phiên
+    thứ 21 trước kb và kb). Oracle: trục FWD = các phiên của fixture bỏ xa, xb. Phiên thứ 120 sau ka và phiên thứ 21 trước kb
+    bị cách ly (cổng loại mã); phiên kế bên ngoài thì không. market_snapshot (risk_gate.session_axis, đếm cả xa và xb) cho mua
+    ở cả hai phiên biên trong: đó là lỗi được sửa."""
+    ka, xa, xb, kb = IDX[100], IDX[150], IDX[260], IDX[270]
+    px = _prices()
+    px.loc[ka:, "CCC"] = (px.loc[ka:, "CCC"] / 2).round(-1)
+    px.loc[kb:, "DDD"] = (px.loc[kb:, "DDD"] / 2).round(-1)
+    home = _home(env, close=px, drop=[(xa, None), (xb, None)], unann=[xa, xb], events=[_split("CCC", ka), _split("DDD", kb)])
+    lim = config.CFG["paper"]["risk_limits"]
+    assert (lim["quarantine_sessions_before"], lim["quarantine_sessions_after"]) == (21, 120)
+    ctx = fwd._Ctx(home, S[D0])
+    axis = [d for d in IDX[:D0 + 1] if d not in (xa, xb)]                    # oracle: trục phiên FWD
+    assert list(ctx.sessions) == axis
+    ia, ib = axis.index(ka), axis.index(kb)
+    tg = TICK[:6]
+    for t, name, inside in [(axis[ia + 120], "CCC", True), (axis[ia + 121], "CCC", False),
+                            (axis[ib - 21], "DDD", True), (axis[ib - 22], "DDD", False)]:
+        rows = []
+        g = ctx.gate("fill", "FWD-EW", t, tg, float(CAP), {}, rows)
+        assert g["verdict"] == "PASS" and set(g["excluded"]) == ({name} if inside else set()), (t, name)
+        rec = json.loads(rows[0]["targets"])
+        assert set(rec["market"]["quarantined"]) == ({name} if inside else set())
+        assert sorted(e[0] for e in rec["quarantine_events"]) == ["CCC", "DDD"]
+        assert rec["market"]["adv_problem"] == {}
+        old = risk_gate.market_snapshot(t, tg, lim, root=home, frozen=False)["quarantined"]
+        assert old == {}, (t, old)                                            # trục cũ: mua sớm một phiên
+
+
+def test_a_name_inside_the_window_at_the_fill_is_not_bought_when_an_unannounced_day_lies_ahead(env):
+    """Biên 21 phiên trước sự kiện, ở phiên khớp của robot: quyết định D0 có CCC (22 phiên trước k); phiên khớp D0+1 là phiên
+    thứ 21 trước k, vì ngày X (CHUA_CO_THONG_BAO, không có dòng giá) nằm giữa D0+1 và k không phải phiên. Lúc khớp, X còn ở
+    tương lai: đếm theo lịch, ngày CHUA_CO_THONG_BAO không tính, nên CCC bị cách ly, không mua và không thử lại. replay trùng
+    nav.csv."""
+    x = IDX[D0 + 5]
+    after = [d for d in IDX[D0 + 2:] if d != x] + list(pd.bdate_range(IDX[-1] + pd.Timedelta(days=1), periods=30))
+    k = after[20]                                                             # phiên thứ 21 sau D0+1 trên trục FWD
+    home = _home(env, drop=[(x, None)], unann=[x], events=[_split("CCC", k)])
+    rb = Robot(home)
+    for i in (D0, D0 + 1, D0 + 2):
+        assert rb.day(i)["stopped"] is None, S[i]
+    tg = json.loads(_csv(home, "decisions.csv").query("action == 'DECIDE'").targets.item())
+    assert "CCC" in tg["FWD-EW"] and "CCC" in tg["FWD-HOLD"]
+    g = _gate_rows(home)
+    notes = {(r.date, r.book, r.note): json.loads(r.targets) for r in g.itertuples(index=False)}
+    for b in ("FWD-EW", "FWD-HOLD"):
+        assert notes[(S[D0], b, "decide: PASS")]["excluded"] == {}
+        assert list(notes[(S[D0 + 1], b, "fill: PASS")]["excluded"]) == ["CCC"]
+    trd = _csv(home, "trades.csv")
+    ccc = trd[trd.asset == "CCC"]
+    assert ccc[["date", "book", "side"]].values.tolist() == [[S[D0 + 1], "FWD-EW", "UNFILLED_RISK_GATE"],
+                                                              [S[D0 + 1], "FWD-HOLD", "UNFILLED_RISK_GATE"]]
+    assert set(trd[(trd.side == "BUY") & (trd.book == "FWD-EW")].asset) == {"AAA", "BBB", "DDD", "EEE", "FFF"}
+    nav = _csv(home, "nav.csv")[["date", "book", "nav"]].reset_index(drop=True)
+    assert fwd.replay(home, SPEC, S[D0 + 2]).astype(str).reset_index(drop=True).equals(nav)
+
+
+@pytest.mark.parametrize("tamper", ["drop", "add"])
+def test_replay_recounts_the_quarantine_window_of_events_already_in_effect(env, tamper):
+    """CCC có chia tách chưa kiểm hiệu lực ngay ở phiên khớp D0+1, robot chỉ biết sau lượt D0 (bảng sự kiện ghi thêm): cổng ở
+    phiên khớp loại CCC. replay đếm lại cửa sổ của sự kiện có k ≤ phiên khớp trên trục phiên FWD. Sửa dòng RISK_GATE cho khớp
+    với nhau (bỏ CCC khỏi danh sách cách ly và mã bị loại; hay thêm AAA vào cả hai) thì kết luận tính lại vẫn trùng, nhưng
+    cửa sổ đếm lại thì không: ReplayMismatch."""
+    home = _home(env)
+    rb = Robot(home)
+    rb.day(D0)
+    _write_events(home, [_split("CCC", IDX[D0 + 1])])
+    rb.day(D0 + 1)
+    rec = json.loads(_gate_rows(home).query(f"date == '{S[D0 + 1]}' and book == 'FWD-EW'").targets.item())
+    assert list(rec["excluded"]) == ["CCC"] and [e[:2] for e in rec["quarantine_events"]] == [["CCC", S[D0 + 1]]]
+    nav = _csv(home, "nav.csv")[["date", "book", "nav"]].reset_index(drop=True)
+    assert fwd.replay(home, SPEC, S[D0 + 1]).astype(str).reset_index(drop=True).equals(nav)
+
+    def change(r):
+        if tamper == "drop":
+            r["market"]["quarantined"].pop("CCC")
+            r["excluded"].pop("CCC")
+        else:
+            r["market"]["quarantined"]["AAA"] = "giả"
+            r["excluded"]["AAA"] = "giả"
+    _edit_gate(home, S[D0 + 1], "FWD-EW", change)
+    with pytest.raises(fwd.ReplayMismatch, match="danh sách cách ly"):
+        fwd.replay(home, SPEC, S[D0 + 1])
+
+
+def test_a_quarantine_window_that_cannot_be_computed_fails_the_gate(env, monkeypatch):
+    """Không dựng được danh sách sự kiện cách ly trên trục FWD (lỗi bất kỳ): như market_snapshot, cổng FAIL, lỗi được ghi
+    trong dòng RISK_GATE; robot không mua mã nào ở phiên khớp."""
+    home = _home(env)
+    rb = Robot(home)
+    rb.day(D0)
+
+    def boom(self, s, tickers):
+        raise RuntimeError("không đọc được bản gốc")
+    monkeypatch.setattr(fwd._Ctx, "quarantine", boom)
+    rb.day(D0 + 1)
+    for b in ("FWD-EW", "FWD-HOLD"):
+        rec = json.loads(_gate_rows(home).query(f"date == '{S[D0 + 1]}' and book == '{b}'").targets.item())
+        assert rec["verdict"] == "FAIL" and rec["market"]["quarantined"] is None and rec["market"]["adv_value"] == {}
+        assert rec["market"]["errors"] == ["RuntimeError: không đọc được bản gốc"] and rec["quarantine_events"] == []
+    trd = _csv(home, "trades.csv")
+    assert set(trd.side) == {"UNFILLED_RISK_GATE"} and len(trd) == 12
