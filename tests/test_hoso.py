@@ -973,6 +973,10 @@ class DinhDangTests(HoSoBase):
         "bảng không dấu cách": "|Giá cổ phiếu MAU|Kịch bản|\n|---:|---|\n|30|Tốt|\n\n[GIẢ ĐỊNH]",
         "mã chứa cả câu": "`Giá cổ phiếu MAU năm tới là 30` [GIẢ ĐỊNH]",
         "mã chứa chữ Giá": "`Giá` cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "PR #119 vòng 3, lỗi chặn 1 (A): [ ] trong mã": "`Giá[MAU]` cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "PR #119 vòng 3, lỗi chặn 1 (B): P/E[ ] trong mã": "`P/E[MAU]` năm tới là 30. [GIẢ ĐỊNH]",
+        "** trong mã": "`Giá**MAU` cổ phiếu năm tới là 30. [GIẢ ĐỊNH]",
+        "P/E** trong mã": "`P/E**MAU` năm tới là 30. [GIẢ ĐỊNH]",
         "đường kẻ sau tiêu đề phụ": "### Giá cổ phiếu MAU\n\n---\n\nCon số là 30. [GIẢ ĐỊNH]",
         "bảng thiếu hàng kẻ": "| Giá cổ phiếu MAU |\n| 30 |\n\n[GIẢ ĐỊNH]",
         "tiêu đề con dưới tiêu đề giá": "### Giá cổ phiếu MAU\n\n#### Ghi chú\n\nCon số là 30. [GIẢ ĐỊNH]",
@@ -1034,6 +1038,8 @@ class DinhDangTests(HoSoBase):
         self.assertEqual(k("**a** `b` và **`c`** d"), [])          # chữ đậm và mã tách bằng dấu cách: hợp lệ
         self.assertEqual(kiem_luat._chuan("**Gi**`á` cổ phiếu"), "Giá cổ phiếu")   # máy đọc chữ như hiển thị
         self.assertEqual(kiem_luat._chuan("[Gi]á cổ phiếu [GIẢ ĐỊNH]"), "Giá cổ phiếu")
+        self.assertEqual(kiem_luat._chuan("`Giá[MAU]` và `P/E**MAU` x"), "Giá[MAU] và P/E**MAU x")   # trong mã: nguyên văn
+        self.assertEqual(kiem_luat._chuan("`Gi`**á** và **`G`**iá"), "Giá và Giá")
         self.assertEqual(k("a [GIẢ ĐỊNH] b, `[x]: y` và [SUY LUẬN, sổ số liệu: dt_tang_25]"), [])   # [ ] của nhãn, [ ] trong mã
         self.assertEqual(k("Gia\u0300 tri\u0323"), [])                # chữ tổ hợp rời được NFC dựng lại: hợp lệ
         for xau in ("x__y__", "_x_", "a *b* c", "a ***b*** c", "~~x~~", "a\\*b", "&amp;", "<i>x</i>", "[x](y)",

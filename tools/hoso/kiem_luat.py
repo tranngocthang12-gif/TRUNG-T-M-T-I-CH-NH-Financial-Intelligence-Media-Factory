@@ -317,9 +317,15 @@ def chu_trong_nhan(nhan: str) -> str:
 
 
 def _chuan(chu: str) -> str:
-    """Bỏ nhãn; bỏ dấu backtick, dấu đậm và dấu [ ] còn lại mà không chèn dấu cách, để chữ máy đọc giống chữ hiển thị
-    («**Gi**`á`» → «Giá», «[Gi]á» → «Giá»); gộp khoảng trắng."""
-    return " ".join(_TAG.sub(" ", nfc(chu)).replace("`", "").replace("*", "").replace("[", "").replace("]", "").split())
+    """Chữ máy đọc giống chữ hiển thị. Bỏ nhãn. Ngoài mã: bỏ dấu đậm và dấu [ ] còn lại («**Gi**`á`» → «Giá», «[Gi]á» →
+    «Giá»). Trong mã «`…`»: giữ nguyên từng ký tự, vì GitHub hiện nguyên văn («`Giá[MAU]`», «`Giá**MAU`» vẫn có chữ «Giá»
+    đứng riêng). Bỏ dấu backtick mà không chèn dấu cách; gộp khoảng trắng. Số dấu ` lẻ thì coi cả đoạn là ngoài mã."""
+    t = _TAG.sub(" ", nfc(chu))
+    phan = t.split("`")
+    if len(phan) % 2 == 0:
+        phan = [t.replace("`", "")]
+    t = "".join(p if k % 2 else p.replace("*", "").replace("[", "").replace("]", "") for k, p in enumerate(phan))
+    return " ".join(t.split())
 
 
 def ma_ho_so(text: str) -> str:
