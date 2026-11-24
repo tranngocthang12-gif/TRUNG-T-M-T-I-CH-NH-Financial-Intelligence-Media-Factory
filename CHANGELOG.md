@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-24 — Sửa main đỏ bốn test từ commit robot 251656f — Claude Code (Anthropic)
+- Theo gói giao Claude Code số 8 (lệnh Owner 24/11/2026). Owner cho phép sửa đúng một dòng `engine/adjust.py` và sửa tham chiếu của hai test «không đổi một byte» trên kho thật.
+- Nguyên nhân: vòng học 23/11 (`251656f`) lần đầu tải giá và sự kiện của năm mã `data.ingest_extra` (BSR, LPB, MCH, TCX, VPL). Từ đó `main` đỏ bốn test: `test_verified_adjust.py::test_m4_build_refuses_out_dir_that_appeared_after_the_check`, `test_verified_adjust.py::test_e1_real_repo_nothing_enters_chain_without_publication_date`, `test_research_input_verified.py::test_legacy_is_byte_identical_on_the_real_store`, `test_universe_modes.py::test_real_store_default_is_byte_identical_to_main_reference`.
+- `engine/adjust.py` `build_events`, một dòng: chuỗi rỗng dùng cho mã không có cột trong bảng giá nay mang chỉ mục ngày (`pd.DatetimeIndex([])`). Trước đó phép so với `ex_date` ném `TypeError` (ví dụ MCH: 237 dòng giá, bị loại ở ngưỡng 250). Nay sự kiện đó nhận `status` `KHONG_CO_MA` như nhánh đã viết sẵn, không áp hệ số nào. Khi mọi mã của sự kiện có trong bảng giá, kết quả không đổi.
+- `tests/test_universe_modes.py`, `tests/test_research_input_verified.py`: tham chiếu `_main_reference`, `_legacy_reference` (và `_assert_legacy_unchanged`) nhận tham số `only`. Chỉ hai test trên kho thật truyền `only=config.CFG["universe"]`: tham chiếu khi đó chỉ nhận dòng kho của mã trong universe, và sự kiện của mã còn trong bảng sau ngưỡng 250 dòng. Lý do: từ E2b, kho thật có mã `ingest_extra` nằm ngoài bảng mặc định (QĐ-4). Các test trên kho tạm giữ nguyên lời gọi. Hai test mới: sự kiện của mã vắng nhận `KHONG_CO_MA` (đỏ trên `b01bde9`); bảng mặc định của kho thật không có mã `ingest_extra`.
+- Dấu vân tay mã `data.code_fingerprint()` đổi vì `engine/adjust.py` nằm trong `CODE_FILES`: `code-sha256:51c80564d1f66625b7c4b68f2e4401077d99b92ca0ceb04a12e56d9eb5e30969` → `code-sha256:76a1bedfa593e39f397f2886d42ef8441630ef556e28010d00b0603c71169d81`. `derivation_id` của các lượt chạy sau đổi theo.
+- Không chạm `data/`, `ledger/`, `governance/`, `paper/`, `research/`, `config.yaml`, `requirements.txt`, `tools/`, `.github/` hay tệp `engine/` khác.
+
 ## 2026-11-23 — ADR-0019: đổi phạm vi sang phân tích một mã cổ phiếu và kỷ luật đầu tư — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 23/11/2026 (18:05 đổi mục đích dự án; 18:38 triển khai ngay) và gói giao Claude Code số 5. Chỉ đổi chữ, không đổi mã.
 - `architecture/adr/ADR-0019-doi-pham-vi-phan-tich-va-ky-luat.md` (mới, chép nguyên văn). ACCEPTED 23/11/2026, hiệu lực khi Owner gộp PR này; QĐ-P12 và QĐ-P13 là mặc định của kiến trúc sư, Owner đổi được trước khi gộp.

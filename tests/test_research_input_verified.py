@@ -104,9 +104,16 @@ def _h(x):
     return hashlib.sha256(json.dumps(x, sort_keys=True, default=str, ensure_ascii=False).encode()).hexdigest()
 
 
-def _legacy_reference(as_of=None):
-    """Bản sao nguyên văn thân load_market trên main trước E2a (8550622…1fdb3e0): mốc so 'không đổi một byte'."""
+def _legacy_reference(as_of=None, only=None):
+    """Bản sao nguyên văn thân load_market trên main trước E2a (8550622…1fdb3e0): mốc so 'không đổi một byte'.
+
+    only (Owner cho sửa tham chiếu, 24/11/2026): từ E2b, kho thật có mã data.ingest_extra nằm ngoài bảng mặc định (QĐ-4),
+    nên mốc «không đổi một byte» trên kho thật là thân cũ chạy trên dòng kho và sự kiện của mã trong universe. Khi only được
+    truyền: chỉ giữ dòng kho của mã trong only, và chỉ giữ sự kiện (tay lẫn Yahoo) của mã còn trong bảng sau ngưỡng 250 dòng.
+    only=None: thân cũ chạy y như trước (các test trên kho tạm)."""
     s = data.load_store()
+    if only is not None:
+        s = s[s.ticker.isin(list(only))]
     if as_of is not None:
         s = s[s.date <= pd.Timestamp(as_of)]
     raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
@@ -114,7 +121,10 @@ def _legacy_reference(as_of=None):
     obs = s.pivot(index="date", columns="ticker", values="observed_at").sort_index()
     keep = raw.columns[raw.notna().sum() > 250]
     raw, vol, obs = raw[keep], vol[keep], obs[keep]
-    events = adjust.build_events(raw, obs, adjust.load_manual(), adjust.load_yahoo())
+    man, yah = adjust.load_manual(), adjust.load_yahoo()
+    if only is not None:
+        man, yah = man[man["ticker"].isin(keep)], yah[yah["ticker"].isin(keep)]
+    events = adjust.build_events(raw, obs, man, yah)
     F, S = adjust.factors(raw.index, raw.columns, events)
     adj = raw * F
     bad, rep, flags = adjust.quality(adj)
@@ -131,9 +141,10 @@ def _legacy_reference(as_of=None):
 
 # ---------- 1. legacy: không đổi một byte ----------
 
-def _assert_legacy_unchanged(home, as_of=None):
+def _assert_legacy_unchanged(home, as_of=None, only=None):
+    """only: xem _legacy_reference (Owner cho sửa tham chiếu, 24/11/2026); chỉ test trên kho thật truyền universe."""
     with patch.object(config, "ROOT", home), patch.object(adjust, "ROOT", home):
-        new, old = data.load_market(as_of), _legacy_reference(as_of)
+        new, old = data.load_market(as_of), _legacy_reference(as_of, only)
     # E2c (Owner cho sửa assert, 22/11/2026): chế độ mặc định sessions="keep" thêm đúng một khóa quality.sessions (liệt kê
     # ngày không phải phiên, không bỏ ngày nào); mọi phần khác vẫn so từng byte với bản trước E2a
     q = dict(new["quality"])
@@ -155,8 +166,9 @@ def test_legacy_is_byte_identical_on_a_fixture_with_an_unverified_event(tmp_path
 
 
 def test_legacy_is_byte_identical_on_the_real_store():
-    _assert_legacy_unchanged(config.ROOT)
-    _assert_legacy_unchanged(config.ROOT, as_of="2025-06-30")
+    # Owner cho sửa tham chiếu, 24/11/2026: kho thật có mã ingest_extra; mốc là thân cũ trên dòng kho và sự kiện của universe
+    _assert_legacy_unchanged(config.ROOT, only=config.CFG["universe"])
+    _assert_legacy_unchanged(config.ROOT, as_of="2025-06-30", only=config.CFG["universe"])
 
 
 def test_features_without_exclude_are_byte_identical(tmp_path):
