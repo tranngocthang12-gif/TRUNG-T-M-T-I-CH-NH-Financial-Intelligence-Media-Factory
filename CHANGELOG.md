@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-11-24 — Sửa lỗi chặn của bản chấm L-09 vòng 5 (PR #117) — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+- Bản chấm vòng 5 (ChatGPT) ghi CHƯA GỘP ĐƯỢC `827052a`, một lỗi chặn: dấu `~` đơn (gạch ngang chữ của GFM) che được chữ «Giá», ví dụ `Gi~á~ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]`. PR #117 đã gộp vào `main` lúc 15:08 ngày 24/11/2026, trước khi có bản chấm này. Theo gói giao 11 không có vòng 6; ngày 24/11/2026 Owner quyết sửa bằng PR mới này (gói giao Claude Code số 12).
+- `tools/hoso/kiem_luat.py` (`_dd_noi_dong`, docstring): ngoài mã, dấu `~` và dấu `$` (GitHub hiển thị `$…$` thành công thức toán) là định dạng ngoài bộ cho phép; `~~` vẫn bị cấm ở mọi chỗ. Kiến trúc sư thử trên `be76467`: bốn đầu vào (`Gi~á~`, `~Gi~á`, `Gi$á$`, tiêu đề phụ `### Gi$á$`) cho phiếu ĐẠT; trên bản sửa cả bốn CHƯA ĐẠT; hồ sơ mẫu (không đổi byte) vẫn ĐẠT.
+- `docs/QUY_TRINH_HO_SO_MA.md` (B5): thêm `~` và `$` ngoài mã vào danh sách không dùng. `tests/test_hoso.py` (`DinhDangTests`): thêm bốn đầu vào vào `CHEN` và sáu chuỗi vào `test_tung_quy_tac`, đỏ trên `be76467`; sửa câu chú thích sai về `CHEN` (góp ý không chặn của bản chấm vòng 5).
+
 ## 2026-11-24 — ADR-0020: ghế phân tích của dự án và phiếu máy cho hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 24/11/2026 (00:48 và 00:54) và gói giao Claude Code số 6. ADR-0020 ACCEPTED 24/11/2026, hiệu lực khi Owner gộp PR này.
 - 22 tệp mới chép đúng từng byte từ gói giao (tách bằng đoạn Python ở mục F; sha256 từng tệp khớp dòng `BEGIN FILE` và bảng ở mục C): `architecture/adr/ADR-0020-ghe-phan-tich-va-phieu-may.md`; `docs/QUY_TRINH_HO_SO_MA.md` (quy trình tám bước); `docs/CHI_DAN_PROJECT.md` (chỉ dẫn cho phiên Claude trong Project); `tools/hoso/` (nhận tệp, kiểm sổ số liệu, kiểm trích dẫn, kiểm luật và khung, gài lỗi, phiếu máy; chỉ thư viện chuẩn của Python); `tests/test_hoso.py`; `templates/hoso/` (lệnh mẫu và ví dụ số liệu bịa của một doanh nghiệp không có thật); `templates/ky_luat/MAU_KY_LUAT_TRONG.md` (bộ mẫu kỷ luật trống, QĐ-P8).

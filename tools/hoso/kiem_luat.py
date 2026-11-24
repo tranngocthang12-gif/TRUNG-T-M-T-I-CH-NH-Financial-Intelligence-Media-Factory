@@ -3,7 +3,7 @@
 0. Định dạng cho phép (kiem_dinh_dang; sửa theo bản chấm L-09 vòng 4): hồ sơ chỉ được dùng một bộ Markdown hẹp, liệt kê
    ở docstring của kiem_dinh_dang. Dòng nào ngoài bộ là lỗi, bất kể nội dung. Mục đích: mọi cách viết làm chữ hiển thị
    khác chữ máy đọc (dấu nhấn mạnh bằng «_», tiêu đề thụt lề hay gạch chân, thực thể và thẻ HTML, ký tự vô hình, mã chen
-   giữa chữ…) bị chặn trước khi cổng giá đọc chữ. Tiêu đề cấp hai phải đúng từng chữ một tên của khung (TIEU_DE_CAP_HAI),
+   giữa chữ, gạch ngang chữ bằng «~», công thức toán bằng «$»…) bị chặn trước khi cổng giá đọc chữ. Tiêu đề cấp hai phải đúng từng chữ một tên của khung (TIEU_DE_CAP_HAI),
    nên tiêu đề khung không chở được dấu hiệu giá.
 1. L-02: không cụm từ khuyến nghị nào ở bất kỳ dòng nào. Dùng đúng bộ mẫu của tools/laws_checks.py, thêm vài cụm
    riêng của hồ sơ mã. Kiểm cứng, không xét ngữ cảnh: câu phủ định có cụm cấm cũng bị bắt — đổi cách viết.
@@ -224,8 +224,10 @@ def _dd_noi_dong(doan: str, trong_ma: bool) -> list:
         loi.append("dấu \\ (ký tự thoát)")
     if "*" in doan.replace("**", "") or "***" in doan:
         loi.append("dấu * lẻ (chỉ dùng ** để in đậm)")
-    if "~~" in doan:
-        loi.append("dấu ~~")
+    if "~~" in doan or (not trong_ma and "~" in doan):        # GFM gạch ngang chữ bằng một hay hai dấu ~
+        loi.append("dấu ~ (gạch ngang chữ; ngoài mã không được dùng)")
+    if not trong_ma and "$" in doan:                          # GitHub hiển thị $…$ thành công thức toán
+        loi.append("dấu $ (công thức toán; ngoài mã không được dùng)")
     if _DD_THUC_THE.search(doan):
         loi.append("thực thể HTML (&…;)")
     if _DD_THE.search(doan):
@@ -248,7 +250,7 @@ def kiem_dinh_dang(text: str) -> list:
         trong khóa sổ dạng chữ thường không dấu «a_b_1» nằm trong một nhãn, trong mã chỉ khi nằm giữa hai chữ (tên tệp).
     Không cho phép: dấu cách khác dấu cách thường (tab, dấu cách cứng…); ký tự định dạng vô hình (rộng 0, gạch nối mềm,
     đổi chiều) và dấu kết hợp đứng riêng sau chuẩn hóa NFC (chữ Việt chuẩn luôn là chữ dựng sẵn); dấu «_» hay «*» để
-    nhấn mạnh; «~~»; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang; trích dẫn «>»; khối mã
+    nhấn mạnh; dấu «~» và «$» ngoài mã (gạch ngang chữ, công thức toán), «~~» ở mọi chỗ; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang; trích dẫn «>»; khối mã
     (```, ~~~ hay thụt lề); tiêu đề gạch chân (=== hay --- ngay dưới một dòng chữ); dòng thụt lề mà không phải mục liệt
     kê."""
     loi, truoc = [], ""

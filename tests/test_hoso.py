@@ -910,7 +910,8 @@ class DinhDangTests(HoSoBase):
     """Bản chấm L-09 vòng 4: định dạng Markdown che dấu hiệu giá. Sửa theo loại: hồ sơ chỉ được dùng một bộ Markdown hẹp
     (kiem_luat.kiem_dinh_dang); dòng ngoài bộ là lỗi, bất kể nội dung."""
 
-    # Mỗi đầu vào thêm vào ngay dưới tiêu đề mục 9 của hồ sơ mẫu. Tất cả cho phiếu ĐẠT trên 0ab2564.
+    # Mỗi đầu vào thêm vào ngay dưới tiêu đề mục 9 của hồ sơ mẫu. Kiểm rằng kiem_dinh_dang báo lỗi và phiếu CHƯA ĐẠT;
+    # một số đầu vào cũng bị cổng giá bắt. Bốn đầu vào «~ đơn», «$» cuối danh sách cho phiếu ĐẠT trên be76467 (bản chấm L-09 vòng 5).
     CHEN = {
         "vòng 4, lỗi chặn 1: __Giá__": "__Giá__ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
         "vòng 4, lỗi chặn 2: tiêu đề thụt ba dấu cách": "   ### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
@@ -942,6 +943,10 @@ class DinhDangTests(HoSoBase):
         "tiêu đề cấp một thứ hai": "# Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
         "xuống dòng cứng bằng \\": "Giá cổ phiếu MAU\\\nnăm tới là 30. [GIẢ ĐỊNH]",
         "khóa sổ không dấu trong câu": "gia_co_phieu_mau năm tới là 30. [GIẢ ĐỊNH]",
+        "vòng 5, lỗi chặn 1: ~ đơn": "Gi~á~ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "~ đơn bọc cả từ": "~Gi~á cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "$ công thức toán": "Gi$á$ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "$ ở tiêu đề phụ": "### Gi$á$ cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
     }
     # Thay tiêu đề khung: tiêu đề cấp hai phải đúng từng chữ, nên không chở được dấu hiệu.
     THAY = {
@@ -1015,10 +1020,11 @@ class DinhDangTests(HoSoBase):
     def test_tung_quy_tac(self):
         k = kiem_luat.kiem_dinh_dang
         self.assertEqual(k("a `b_c.txt` d [SUY LUẬN, sổ số liệu: dt_tang_25]"), [])
+        self.assertEqual(k("a `x~y$z` b"), [])                     # ~ và $ đơn trong mã: hợp lệ
         self.assertEqual(k("Gia\u0300 tri\u0323"), [])                # chữ tổ hợp rời được NFC dựng lại: hợp lệ
         for xau in ("x__y__", "_x_", "a *b* c", "a ***b*** c", "~~x~~", "a\\*b", "&amp;", "<i>x</i>", "[x](y)",
                     "![x](y)", "[x][1]", "[^1]", "> x", "```", "~~~", "    x", " x", "* x", "1) x", "x | y", "===",
-                    "a\u00a0b", "a\u2060b", "q\u0301", "a`b`", "`b`c", "``b``", "`a"):
+                    "a\u00a0b", "a\u2060b", "q\u0301", "a`b`", "`b`c", "``b``", "`a", "a~b~c", "~a", "a $x$ b", "a$", "`~~`"):
             with self.subTest(xau):
                 self.assertTrue(k(xau), repr(xau))
         self.assertTrue(k("chữ\n---"))                            # tiêu đề gạch chân
