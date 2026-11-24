@@ -3,7 +3,10 @@
 Hồ sơ là tệp Markdown. Mỗi đoạn kết bằng một nhãn trong ngoặc vuông:
     [ĐÃ KIỂM D1 tr.12]   [ĐÃ KIỂM D1 tr.8–11; D5 tr.3]   [SUY LUẬN, tính từ D1 tr.12]   [GIẢ ĐỊNH]   [CHƯA BIẾT]
 Nhãn phủ phần chữ từ nhãn trước (hoặc đầu đoạn) tới nó. Nhãn đứng ở dòng ngay trước một bảng, hoặc đứng đầu dòng
-ngay sau bảng, phủ cả bảng.
+ngay sau bảng, phủ cả bảng. Giữa nhãn đứng trước và bảng chỉ được có dòng trống: nhãn không phủ bảng qua một tiêu đề.
+Ô đầu hàng bảng chỉ là số thứ tự (không phải số liệu) khi tiêu đề cột đầu, bỏ dấu đậm và khoảng trắng thừa, là một trong
+TIEU_DE_SO_THU_TU (#, STT, TT, Số TT, Số thứ tự) và các ô của cột đó đúng là 1, 2, …, n theo thứ tự. Thiếu một trong hai
+điều thì ô đầu là số liệu như mọi ô khác.
 
 Mỗi trang ghi trong nhãn ĐÃ KIỂM phải có trong thư mục trang/ của nguồn đó; không có thì ĐỊA CHỈ SAI.
 Mỗi con số trong đoạn ĐÃ KIỂM phải lần ra được theo một trong các đường:
@@ -44,6 +47,7 @@ from tools.hoso.kiem_so_lieu import doc_so_lieu  # noqa: E402
 _TAG = re.compile(r"\[[^\[\]]*(?:" + "|".join(NHAN) + r")[^\[\]]*\]")
 _DIA_CHI = re.compile(r"(?<![\w.])([A-Z]\d{1,2})(?!\w)|tr\.\s*(\d+)(?:\s*[–-]\s*(\d+))?")
 NGOAI_PHAM_VI = ("Cách đọc", "Bảng nguồn", "Lịch sử sửa", "Phiếu máy")
+TIEU_DE_SO_THU_TU = ("#", "STT", "TT", "Số TT", "Số thứ tự")
 
 # Những thứ có chữ số nhưng không phải số liệu: bỏ trước khi tìm số.
 _BO = [re.compile(m, re.I) for m in (
@@ -138,7 +142,8 @@ def _gom_khoi(dong: list) -> list:
             if m:
                 k["nhan"] = m.group(0)
                 khoi[j + 1]["bo_dau"] = len(khoi[j + 1]["dong_chu"][0]) - len(khoi[j + 1]["dong_chu"][0].lstrip()) + m.end()
-        if not k["nhan"] and j and not khoi[j - 1]["bang"]:
+        giua = dong[khoi[j - 1]["dong"] - 1 + len(khoi[j - 1]["dong_chu"]):k["dong"] - 1] if j else []
+        if not k["nhan"] and j and not khoi[j - 1]["bang"] and not any(d.strip() for d in giua):   # không qua tiêu đề
             truoc = " ".join(khoi[j - 1]["dong_chu"]).rstrip()
             cac = list(_TAG.finditer(truoc))
             if cac and cac[-1].end() == len(truoc):
@@ -152,6 +157,17 @@ def _hang_bang(k: dict) -> list:
     return [(k["dong"] + n, h) for n, h in enumerate(hang) if not all(set(c) <= set("-: ") for c in h)]
 
 
+def cot_so_thu_tu(hang: list) -> bool:
+    """Cột đầu của bảng (hang như _hang_bang trả về) là số thứ tự thật: tiêu đề là một trong TIEU_DE_SO_THU_TU và các ô của
+    cột đó đúng là 1, 2, …, n theo thứ tự."""
+    if len(hang) < 2 or not hang[0][1]:
+        return False
+    tieu_de = " ".join(hang[0][1][0].replace("*", "").split()).lower()
+    if tieu_de not in {x.lower() for x in TIEU_DE_SO_THU_TU}:
+        return False
+    return [(h[0] if h else "").replace("*", "").strip() for _, h in hang[1:]] == [str(i) for i in range(1, len(hang))]
+
+
 def tach_doan(text: str) -> list:
     """Trả danh sách, mỗi phần tử là MỘT con số kèm ngữ cảnh:
     {'dong': số dòng, 'chu': chữ của đoạn, 'nhan': nhãn đầy đủ hoặc '', 'so': So, 'hang': [...], 'cot': [...]}.
@@ -160,11 +176,12 @@ def tach_doan(text: str) -> list:
     for k in _gom_khoi(nfc(text).splitlines()):
         if k["bang"]:
             hang = _hang_bang(k)
+            stt = cot_so_thu_tu(hang)
             o_bang = []                                          # (hàng, cột, chỉ số trong doan); hàng đầu là tiêu đề cột
             for n, (so_dong, h) in enumerate(hang[1:]):
                 rieng = _TAG.search(" | ".join(h))               # nhãn nằm trong một ô thì phủ riêng hàng đó
                 for c, o in enumerate(h):
-                    if c == 0 and re.fullmatch(r"\**\d{1,2}\**", o):  # cột đầu chỉ là số thứ tự
+                    if c == 0 and stt:                           # cột đầu là số thứ tự thật
                         continue
                     for s in so_can_kiem(_TAG.sub(" ", o)):
                         o_bang.append((n, c, len(doan)))
@@ -188,11 +205,14 @@ def tach_doan(text: str) -> list:
 
 
 def cac_phan_chu(text: str) -> list:
-    """MỌI phần chữ của hồ sơ, kèm nhãn phủ nó: [{'dong', 'chu', 'nhan', 'o', 'tieu_de', 'loai', 'muc'}]. Phần nằm trong
-    phạm vi đối chiếu trích dẫn được gắn nhãn đúng như tach_doan. Hàng tiêu đề của bảng, chữ nằm trong chính nhãn, tiêu
-    đề mục và các mục ngoài phạm vi có nhãn ''. Với hàng dữ liệu của bảng: 'o' là các ô (đã bỏ nhãn), 'tieu_de' là các ô
-    tiêu đề cột. 'loai': hang_bang, tieu_de_bang, doan, nhan (chữ nằm trong chính nhãn), tieu_de (dòng '#'), ngoai (mục
-    ngoài phạm vi đối chiếu). 'muc': tiêu đề cấp hai đang chứa phần chữ ('' nếu trước tiêu đề đầu tiên).
+    """MỌI phần chữ của hồ sơ, kèm nhãn phủ nó: [{'dong', 'chu', 'nhan', 'o', 'tieu_de', 'loai', 'muc', 'khoi', 'kieu_khoi',
+    'cap', 'stt'}]. Phần nằm trong phạm vi đối chiếu trích dẫn được gắn nhãn đúng như tach_doan. Hàng tiêu đề của bảng, chữ
+    nằm trong chính nhãn, tiêu đề mục và các mục ngoài phạm vi có nhãn ''. Với hàng dữ liệu của bảng: 'o' là các ô (đã bỏ
+    nhãn), 'tieu_de' là các ô tiêu đề cột, 'stt' cho biết cột đầu có phải số thứ tự thật (cot_so_thu_tu).
+    'loai': hang_bang, tieu_de_bang, doan, nhan (chữ nằm trong chính nhãn), tieu_de (dòng '#'), ngoai (mục ngoài phạm vi
+    đối chiếu). 'muc': tiêu đề cấp hai đang chứa phần chữ ('' nếu trước tiêu đề đầu tiên).
+    'khoi': số thứ tự của khối chứa phần chữ, theo thứ tự trong hồ sơ; 'kieu_khoi': bang, muc (một mục liệt kê), doan,
+    tieu_de; 'cap': số dấu '#' của dòng tiêu đề (0 nếu không phải tiêu đề). Dòng trống không phải khối.
     Dùng cho phép kiểm phải phủ toàn hồ sơ (khoảng giá, cổng giá; QĐ-P13)."""
     dong = nfc(text).splitlines()
     muc_cua, muc = {}, ""
@@ -201,46 +221,60 @@ def cac_phan_chu(text: str) -> list:
             muc = d[3:].strip()
         muc_cua[i] = muc
     kq, phu = [], set()
+    la_muc = re.compile(r"\s*(?:[-*]|\d+\.)\s")
 
-    def them(so_dong, chu, nhan, loai, o=(), tieu_de=()):
+    def them(so_dong, chu, nhan, loai, khoi, kieu, o=(), tieu_de=(), stt=False):
         kq.append({"dong": so_dong, "chu": chu, "nhan": nhan, "o": list(o), "tieu_de": list(tieu_de), "loai": loai,
-                   "muc": muc_cua.get(so_dong, "")})
+                   "muc": muc_cua.get(so_dong, ""), "khoi": khoi, "kieu_khoi": kieu, "cap": 0, "stt": stt})
         return kq[-1]
     for k in _gom_khoi(dong):
         phu.update(range(k["dong"], k["dong"] + len(k["dong_chu"])))
         if k["bang"]:
             hang = _hang_bang(k)
+            stt = cot_so_thu_tu(hang)
             tieu_de = [_TAG.sub(" ", o) for o in hang[0][1]] if hang else []
             for n, (so_dong, h) in enumerate(hang):
                 o = [_TAG.sub(" ", c) for c in h]
                 rieng = _TAG.search(" | ".join(h))
                 if n == 0:
-                    them(so_dong, " | ".join(o), "", "tieu_de_bang")
+                    them(so_dong, " | ".join(o), "", "tieu_de_bang", k["dong"], "bang")
                 else:
-                    them(so_dong, " | ".join(o), rieng.group(0) if rieng else k["nhan"], "hang_bang", o, tieu_de)
+                    them(so_dong, " | ".join(o), rieng.group(0) if rieng else k["nhan"], "hang_bang", k["dong"], "bang", o,
+                         tieu_de, stt)
                 for m in _TAG.finditer(" | ".join(h)):
-                    them(so_dong, m.group(0), "", "nhan")
+                    them(so_dong, m.group(0), "", "nhan", k["dong"], "bang")
             continue
+        kieu = "muc" if la_muc.match(k["dong_chu"][0]) else "doan"
         chu = " ".join(k["dong_chu"])
         bo = k.get("bo_dau", 0)
         if bo:
-            them(k["dong"], chu[:bo], "", "nhan")
+            them(k["dong"], chu[:bo], "", "nhan", k["dong"], kieu)
         chu, dau = chu[bo:], 0
         for m in list(_TAG.finditer(chu)) + [None]:
-            them(k["dong"], chu[dau:m.start()] if m else chu[dau:], m.group(0) if m else "", "doan")
+            them(k["dong"], chu[dau:m.start()] if m else chu[dau:], m.group(0) if m else "", "doan", k["dong"], kieu)
             if m:
-                them(k["dong"], m.group(0), "", "nhan")
+                them(k["dong"], m.group(0), "", "nhan", k["dong"], kieu)
                 dau = m.end()
-    nhom = None                                                  # các dòng còn lại: tiêu đề, mục ngoài phạm vi
+    nhom, bang_dau = None, None                                  # các dòng còn lại: tiêu đề, mục ngoài phạm vi
     for i, d in enumerate(dong, 1):
         if i in phu or not d.strip():
+            nhom, bang_dau = None, None
+        elif d.startswith("#"):
+            p = them(i, d, "", "tieu_de", i, "tieu_de")
+            p["cap"] = len(d) - len(d.lstrip("#"))
+            nhom, bang_dau = None, None
+        elif d.lstrip().startswith("|"):                         # dòng bảng ngoài phạm vi: mỗi dòng một phần, chung khối
+            bang_dau = bang_dau or i
+            them(i, d, "", "ngoai", bang_dau, "bang")
             nhom = None
-        elif nhom is None or d.startswith("#") or d.lstrip().startswith("|") or re.match(r"\s*(?:[-*]|\d+\.)\s", d):
-            nhom = them(i, d, "", "tieu_de" if d.startswith("#") else "ngoai")
-            if d.startswith("#") or d.lstrip().startswith("|"):  # tiêu đề, dòng bảng: mỗi dòng một phần riêng
-                nhom = None
+        elif nhom is None or la_muc.match(d):
+            nhom = them(i, d, "", "ngoai", i, "muc" if la_muc.match(d) else "doan")
+            bang_dau = None
         else:
             nhom["chu"] += " " + d
+    thu_tu = {k: n for n, k in enumerate(sorted({p["khoi"] for p in kq}))}
+    for p in kq:
+        p["khoi"] = thu_tu[p["khoi"]]
     return sorted(kq, key=lambda x: x["dong"])
 
 
@@ -392,7 +426,7 @@ def kiem(thu_muc, ho_so_text: str) -> dict:
         if p["loai"] not in ("doan", "hang_bang") or loai_nhan(p["nhan"]) != "ĐÃ KIỂM":
             continue
         o = list(p["o"]) if p["loai"] == "hang_bang" else [_DAU_DONG.sub(" ", p["chu"])]
-        if p["loai"] == "hang_bang" and o and re.fullmatch(r"\**\d{1,2}\**", o[0].strip()):
+        if p["loai"] == "hang_bang" and o and p["stt"]:
             o[0] = ""
         dia_chi = doc_dia_chi(p["nhan"])
         dung = bool(dia_chi) and all(ma in kho.nguon for ma in dia_chi) and all(

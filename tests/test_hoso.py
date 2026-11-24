@@ -487,6 +487,265 @@ class CongGiaTests(HoSoBase):
         self.assertIn("(c) hệ số định giá hoặc vốn hóa", dh("vốn hoá 100 tỷ đồng"))
 
 
+class CongGiaVong3Tests(HoSoBase):
+    """Bản chấm L-09 vòng 3 (hai lỗi chặn ở cổng giá) và gói giao 10: ba loại đường lọt. Mọi ca DO và TU_TAN_CONG cho phiếu
+    ĐẠT tại 8d2ad27; nay mỗi ca cho lỗi cổng giá và phiếu CHƯA ĐẠT. Mỗi đầu vào được chèn vào đầu mục 9 của hồ sơ mẫu."""
+    DO = {                                       # loại 1: con số bị giấu khỏi cổng
+        "B1": "| Giá dự kiến (nghìn đồng) | Kịch bản |\n|---:|---|\n| 30 | Tốt |\n\n[GIẢ ĐỊNH]",
+        "1a": "| Giá cổ phiếu (nghìn đồng) | Ghi chú |\n|---:|---|\n| 45 | mức bịa |\n\n[ĐÃ KIỂM G1]",
+        "7a": "| STT | Giá cổ phiếu (nghìn đồng) |\n|---:|---|\n| 30 | xem dưới |\n\n[GIẢ ĐỊNH]",
+        "7b": "| | Giá dự kiến (nghìn đồng) |\n|---:|---|\n| 30 | Tốt |\n\n[GIẢ ĐỊNH]",
+        "1b": "Giá cổ phiếu dự kiến 25–30 kỳ tới. [GIẢ ĐỊNH]",
+        "1c": "Giá cổ phiếu MAU cuối kỳ: điểm 30. [GIẢ ĐỊNH]",
+        "1d": "Giá cổ phiếu MAU: bản 45. [ĐÃ KIỂM G1]",
+        "1i": "Giá cổ phiếu MAU kỳ tới: 25/4. [GIẢ ĐỊNH]",
+        "1e": "Giá cổ phiếu MAU kỳ tới là ba mươi nghìn đồng. [GIẢ ĐỊNH]",
+        "1f": "Giá cổ phiếu MAU sẽ tăng gấp đôi trong năm tới. [GIẢ ĐỊNH]",
+        "1h": "30. Giá cổ phiếu MAU kịch bản tốt. [GIẢ ĐỊNH]",
+        # loại 2: từ ghép loại trừ che dấu hiệu
+        "B2": "Giá bán cổ phiếu MAU kỳ tới là 25,40. [ĐÃ KIỂM G1]",
+        "2a": "Giá mua cổ phiếu MAU nên chờ là 25,40. [ĐÃ KIỂM G1]",
+        "2b": "Giá trị cổ phiếu MAU kỳ tới là 25,40. [ĐÃ KIỂM G1]",
+        "2c": "Đánh giá cổ phiếu MAU kỳ tới ở 25,40. [ĐÃ KIỂM G1]",
+        "2d": "Cổ phiếu MAU kỳ tới trị giá 25,40. [ĐÃ KIỂM G1]",
+        "2e": "Giá bán MAU kỳ tới là 25,40. [ĐÃ KIỂM G1]",
+        "2f": "Giá bán cổ phiếu MAU kỳ tới là 31,70. [GIẢ ĐỊNH]",
+        "6b": "Giá bán của MAU kỳ tới là 25,40. [ĐÃ KIỂM G1]",
+        # loại 3: dấu hiệu nằm sát bên, hoặc ý tương lai với số quá khứ có nguồn
+        "3a": "Giá cổ phiếu dự kiến theo kịch bản (nghìn đồng):\n\n| Kịch bản | Mức |\n|---|---:|\n| Tốt | 30 |\n\n[GIẢ ĐỊNH]",
+        "3b": "Giá cổ phiếu dự kiến:\n\n- Tốt: 30. [GIẢ ĐỊNH]",
+        "3c": "Giá theo kịch bản (nghìn):\n\n| Kịch bản | Mức |\n|---|---:|\n| Tốt | 30 |\n\n[GIẢ ĐỊNH]",
+        "3d": "### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "6a": "Cổ phiếu MAU kỳ tới về 25,40. [ĐÃ KIỂM G1]",
+        "4a": "Giá cổ phiếu MAU theo kịch bản tốt là 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "4b": "Giá cổ phiếu MAU năm sau là 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "4c": "Giá cổ phiếu MAU cuối năm 2027 là 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "4d": "Nếu lợi nhuận tăng thì giá cổ phiếu MAU là 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "5a": "Mục tiêu mười hai tháng: 30 nghìn mỗi cp. [GIẢ ĐỊNH]",
+        "5b": "Gia co phieu MAU ky toi la 30. [GIẢ ĐỊNH]",
+    }
+    TU_TAN_CONG = {                              # tự tấn công trước khi đẩy (không lấy từ gói giao)
+        # loại 1
+        "TT không đúng 1..n": "| TT | Ghi chú |\n|---:|---|\n| 30 | giá cổ phiếu MAU |\n\n[GIẢ ĐỊNH]",
+        "điểm soi ngoài 1–15": "Giá cổ phiếu MAU ở điểm soi 30. [GIẢ ĐỊNH]",
+        "mục ngoài 1–12": "Giá cổ phiếu MAU: mục 13. [GIẢ ĐỊNH]",
+        "giờ phút": "Giá cổ phiếu MAU chốt phiên lúc 14:30. [GIẢ ĐỊNH]",
+        "backtick và số tháng": "Giá cổ phiếu MAU: `30` nghìn đồng trong 12 tháng. [GIẢ ĐỊNH]",
+        "vòng": "Giá cổ phiếu MAU vòng 3 là 31. [ĐÃ KIỂM G1]",
+        "số không đọc được kiểu Việt Nam": "Giá cổ phiếu MAU: 25.4 nghìn đồng. [GIẢ ĐỊNH]",
+        "số bằng chữ có từ chỉ cổ phiếu": "Giá cổ phiếu MAU là ba mươi mốt nghìn đồng. [ĐÃ KIỂM G1]",
+        "số chỉ có trong ngày tháng của trang": "Giá cổ phiếu MAU là 23 nghìn đồng. [ĐÃ KIỂM G1]",
+        "STT thật, giá ở cột sau": "| Số TT | Giá cổ phiếu (nghìn đồng) |\n|---:|---:|\n| 1 | 31,70 |\n\n[ĐÃ KIỂM G1]",
+        "chữ dính số": "Giá cổ phiếu MAU: x31. [GIẢ ĐỊNH]",
+        "số đầu dòng không phải 1..n": "7. Giá cổ phiếu MAU. [GIẢ ĐỊNH]",
+        "số trong nhãn": "Giá cổ phiếu MAU [GIẢ ĐỊNH: 31,70 nghìn đồng]",
+        "mã dạng chữ hoa dính số": "Giá cổ phiếu MAU là VND31. [GIẢ ĐỊNH]",
+        "chữ số toàn khổ": "Giá cổ phiếu MAU: ３１ nghìn đồng. [GIẢ ĐỊNH]",
+        "ngày thiếu năm": "Giá cổ phiếu MAU: 31/12. [GIẢ ĐỊNH]",
+        "STT in đậm, giá trong ô chữ": "| **STT** | Ghi chú |\n|---|---|\n| **1** | Giá cổ phiếu MAU 31 nghìn đồng |\n\n[GIẢ ĐỊNH]",
+        "danh sách đánh số 1, 3": "1. Doanh thu tăng. [SUY LUẬN]\n3. Giá cổ phiếu MAU. [GIẢ ĐỊNH]",
+        "số bằng chữ ở tiêu đề": "### Giá cổ phiếu MAU ba mươi nghìn đồng\n\nCác tệp không nói. [CHƯA BIẾT]",
+        "thẻ html": "Giá cổ phiếu MAU <b>31</b> nghìn đồng. [GIẢ ĐỊNH]",
+        # loại 2
+        "giá thành mỗi cổ phiếu": "Giá thành mỗi cổ phiếu MAU là 31,70. [GIẢ ĐỊNH]",
+        "giá gốc cổ phiếu": "Giá gốc cổ phiếu MAU là 31,70. [ĐÃ KIỂM G1]",
+        "giá phí cp": "Giá phí cp MAU là 31,70. [GIẢ ĐỊNH]",
+        "đơn giá cổ phần": "Đơn giá cổ phần MAU là 31,70. [SUY LUẬN]",
+        "tỷ giá cổ phiếu năm sau nguồn": "Tỷ giá cổ phiếu MAU năm 2027 là 25,40. [ĐÃ KIỂM G1]",
+        "nguyên giá cổ phiếu": "Nguyên giá cổ phiếu MAU là 31,70. [SUY LUẬN]",
+        "giá trị MAU": "Giá trị MAU là 31,70. [GIẢ ĐỊNH]",
+        "giá bán mã MAU": "Giá bán mã MAU là 31,70. [GIẢ ĐỊNH]",
+        "từ chỉ cổ phiếu ở dòng dẫn": "Cổ phiếu MAU:\n\n| Giá bán | Mức |\n|---|---:|\n| Tốt | 31,70 |\n\n[GIẢ ĐỊNH]",
+        "từ chỉ cổ phiếu ở tiêu đề phụ": "### Cổ phiếu MAU\n\nGiá bán là 31,70. [GIẢ ĐỊNH]",
+        "gía viết sai dấu": "Gía bán cổ phiếu MAU là 31,70. [GIẢ ĐỊNH]",
+        "giá trị mỗi cp": "Giá trị mỗi cp MAU 31,70. [GIẢ ĐỊNH]",
+        "đánh giá co phieu": "Đánh giá co phieu MAU: 31,70. [GIẢ ĐỊNH]",
+        "giá vốn cổ phần": "Giá vốn cổ phần MAU 31,70. [GIẢ ĐỊNH]",
+        "giá mua MAU": "Giá mua MAU là 31,70. [GIẢ ĐỊNH]",
+        "giá bán ở tiêu đề cột, cổ phiếu ở ô": "| Giá bán | Ghi chú |\n|---:|---|\n| 31,70 | cổ phiếu MAU |\n\n[GIẢ ĐỊNH]",
+        "giá bán cổ phiếu ở dòng dẫn": "Giá bán cổ phiếu MAU:\n\n- 31,70. [GIẢ ĐỊNH]",
+        # loại 3
+        "tiêu đề cấp bốn": "#### Giá MAU\n\nMức 30. [GIẢ ĐỊNH]",
+        "danh sách dưới dòng dẫn": "Giá cổ phiếu MAU các phiên:\n\n- Phiên đầu: 25,40. [ĐÃ KIỂM G1]\n- Phiên sau: 31,70. [ĐÃ KIỂM G1]",
+        "dự tính": "Giá cổ phiếu MAU dự tính 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "ngắn hạn": "Giá cổ phiếu MAU trong ngắn hạn quanh 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "ngày vượt năm nguồn": "Giá cổ phiếu MAU ngày 23/11/2027 là 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "giả sử": "Giả sử lợi nhuận tăng, giá cổ phiếu MAU là 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "hướng tới": "Giá cổ phiếu MAU hướng tới 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "năm ở dòng dẫn": "Giá cổ phiếu MAU năm 2027:\n\n| Trường hợp | Mức (nghìn đồng) |\n|---|---:|\n| Cơ sở | 25,40 |\n\n[ĐÃ KIỂM G1]",
+        "từ tương lai ở tiêu đề phụ": "### Kịch bản\n\nGiá cổ phiếu MAU 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "tách câu bằng hai nhãn": "Giá cổ phiếu MAU đóng cửa 26,10 nghìn đồng. [ĐÃ KIỂM G1] Kỳ tới 31,70. [GIẢ ĐỊNH]",
+        "năm ở tiêu đề cột": "| Chỉ tiêu | Năm 2027 |\n|---|---:|\n| Giá cổ phiếu MAU (nghìn đồng) | 25,40 |\n\n[ĐÃ KIỂM G1]",
+        "sang năm, chỉ có dấu hiệu (d)": "Cổ phiếu MAU sang năm về 25,40. [ĐÃ KIỂM G1]",
+        "từ tương lai ở dòng dẫn không dấu hiệu": "Kịch bản tốt:\n\n- Giá cổ phiếu MAU 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "từ tương lai ở dòng dẫn, bảng ĐÃ KIỂM": "Giá theo kịch bản (nghìn):\n\n| Trường hợp | Mức |\n|---|---:|\n| Tốt | 25,40 |\n\n"
+                                                  "[ĐÃ KIỂM G1]",
+        "tiêu đề cấp hai ngoài khung": "## Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "nhắm": "Giá cổ phiếu MAU nhắm 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "quý vượt năm nguồn": "Giá cổ phiếu MAU quý 4/2027 là 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "ngày ISO vượt năm nguồn": "Giá cổ phiếu MAU 2027-01-15 là 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "nhãn tương lai đứng trước": "Cổ phiếu MAU tương lai: [GIẢ ĐỊNH] giá 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "bảng dưới câu ĐÃ KIỂM G1": "Giá đóng cửa 26,10 nghìn đồng. [ĐÃ KIỂM G1]\n\n| Kỳ | Mức |\n|---|---:|\n| Tới | 31,70 |\n\n[GIẢ ĐỊNH]",
+    }
+    XANH = (                                     # không bắt nhầm (gói giao 10 mục 3, và ca tự viết)
+        "Giả định giá bán hàng hóa tăng 5% mỗi năm. [GIẢ ĐỊNH]",
+        "Giá vốn hàng bán năm 2025 là 840 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+        "Giá vốn của MAU năm 2025 là 840 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+        "Giá nguyên liệu có thể tăng. [GIẢ ĐỊNH]",
+        "Giá đóng cửa tăng từ 25,40 lên 26,10 nghìn đồng, tức 2,8%. [ĐÃ KIỂM G1]",
+        "| # | Ngày | Giá đóng cửa (nghìn đồng) |\n|---|---|---:|\n| 1 | 20/11/2026 | 25,40 |\n| 2 | 23/11/2026 | 26,10 |\n\n"
+        "[ĐÃ KIỂM G1]",
+        "Công ty Cổ phần Mẫu ghi giá trị hợp đồng tăng 20,0%. [SUY LUẬN, sổ số liệu: dt_tang_25]",
+        "Cty CP Mẫu có giá trị hợp đồng tăng 20,0%. [SUY LUẬN, sổ số liệu: dt_tang_25]",
+        "Giá vốn của MAU năm 2026 dự kiến tăng 5%. [GIẢ ĐỊNH]",
+        "Giá đóng cửa năm 2026 là 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "Giá đóng cửa hai phiên:\n\n1. Phiên 20/11/2026: 25,40 nghìn đồng. [ĐÃ KIỂM G1]\n"
+        "2. Phiên 23/11/2026: 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "### Giá đóng cửa\n\nPhiên 23/11/2026: 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+        "Doanh thu thuần năm 2025 là 1.200 tỷ đồng, giá trị lớn nhất hai năm. [ĐÃ KIỂM D1 tr.1]",
+        "Giá đóng cửa của cổ phiếu MAU phiên 23/11/2026 là 26,10 nghìn đồng, khối lượng 1.380.000 cổ phiếu. [ĐÃ KIỂM G1]",
+        "Cổ phiếu MAU thuộc nhóm vốn hóa nhỏ. [SUY LUẬN]",
+        "Công ty Cổ phần Mẫu có giá bán sản phẩm tăng 5% năm 2025. [GIẢ ĐỊNH]",
+        "Lợi nhuận trên mỗi cổ phiếu chưa có trong tệp gốc. [CHƯA BIẾT]",
+        "Giá đóng cửa phiên 23/11/2026 là 26,10 nghìn đồng, phiên 20/11/2026 là 25,40 nghìn đồng. [ĐÃ KIỂM G1]",
+        "Giá trị hợp lý của khoản đầu tư cổ phiếu chưa có trong tệp gốc. [CHƯA BIẾT]",
+    )
+    GIOI_HAN = {                                 # sáu giới hạn đã công bố: máy chưa bắt, ghế phản biện khác hãng đọc
+        1: ("Cổ phiếu MAU kỳ tới về 25,40. [GIẢ ĐỊNH]", "Giá bán của MAU kỳ tới là 31,70. [GIẢ ĐỊNH]"),
+        2: ("Giá cổ phiếu MAU như sau.\n\nTốt: 30. [GIẢ ĐỊNH]",),
+        3: ("Giá cổ phiếu MAU còn dư địa về 26,10 nghìn đồng. [ĐÃ KIỂM G1]", "Giá cổ phiếu MAU tăng 25%. [ĐÃ KIỂM G1]"),
+        4: ("Giá ba mươi nghìn đồng. [GIẢ ĐỊNH]",),
+        5: ("Gia ban co phieu MAU ky toi la 31,70. [GIẢ ĐỊNH]", "Giá cổ phiếu MAU: ³¹ nghìn đồng. [GIẢ ĐỊNH]"),
+    }
+
+    def chen(self, cau):
+        self.ho_so.write_text(self.goc.replace(MUC_9, MUC_9 + "\n\n" + cau), encoding="utf-8")
+
+    def setUp(self):
+        super().setUp()
+        self.goc = self.ho_so.read_text(encoding="utf-8")
+
+    def test_ba_loai_duong_lot_cua_goi_giao(self):
+        self.assertEqual(len(self.DO), 30)
+        for ma, cau in self.DO.items():
+            with self.subTest(ma=ma):
+                self.chen(cau)
+                self.assertTrue(any("ngữ cảnh giá cổ phiếu" in x for x in self.luat()), self.luat())
+                self.assertFalse(self.phieu()[1])
+
+    def test_tu_tan_cong(self):
+        for ten, cau in self.TU_TAN_CONG.items():
+            with self.subTest(ten=ten):
+                self.chen(cau)
+                self.assertTrue(any("ngữ cảnh giá cổ phiếu" in x for x in self.luat()), self.luat())
+                self.assertFalse(self.phieu()[1])
+
+    def test_khong_bat_nham(self):
+        self.assertEqual(kiem_luat.kiem_cong_gia(self.goc, KhoTrang(self.tm)), [])
+        for cau in self.XANH:
+            with self.subTest(cau=cau):
+                self.chen(cau)
+                self.assertEqual(self.luat(), [])
+                self.assertTrue(self.phieu()[1])
+
+    def test_gioi_han_da_cong_bo(self):
+        # máy chưa bắt các câu này (giới hạn 1–5 ở đầu kiem_luat.py; giới hạn 6 cần một tệp giá không mang mã G). Nếu một ngày
+        # máy bắt được thì sửa test này và bỏ giới hạn tương ứng khỏi danh sách đã công bố
+        for so, ds in self.GIOI_HAN.items():
+            for cau in ds:
+                with self.subTest(gioi_han=so, cau=cau):
+                    self.chen(cau)
+                    self.assertEqual(self.luat(), [])
+
+    def test_loi_neu_dong_dau_hieu_va_luat(self):
+        self.chen("Giá cổ phiếu MAU cuối năm 2027 là 25,40 nghìn đồng. [ĐÃ KIỂM G1]")
+        self.assertIn("dòng 82: ngữ cảnh giá cổ phiếu (dấu hiệu: (a) đơn vị giá; (b) chữ «giá»; (d) nhãn ĐÃ KIỂM dẫn nguồn giá "
+                      "G1) — quy tắc 4: năm 2027 vượt năm lớn nhất trên trang đã ghi (2026)", "\n".join(self.luat()))
+        self.chen("### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]")
+        self.assertIn("dòng 84: ngữ cảnh giá cổ phiếu (dấu hiệu: (b) chữ «giá» ở tiêu đề dòng 82) — quy tắc 1: có con số (30)",
+                      "\n".join(self.luat()))
+        self.chen("Giá cổ phiếu dự kiến:\n\n- Tốt: 30. [GIẢ ĐỊNH]")
+        self.assertIn("dòng 84: ngữ cảnh giá cổ phiếu (dấu hiệu: (b) chữ «giá» ở dòng dẫn 82) — quy tắc 1", "\n".join(self.luat()))
+
+    def test_hang_so_va_tu_chi_co_phieu(self):
+        moi = ("kịch bản", "nếu", "giả sử", "giả định", "năm sau", "quý sau", "tháng sau", "tuần sau", "kỳ sau", "sang năm",
+               "dự tính", "ước lượng", "ước đạt", "hướng tới", "nhắm", "ngắn hạn", "trung hạn", "dài hạn", "nên", "chờ")
+        self.assertTrue(set(moi) <= set(kiem_luat.TU_TUONG_LAI))
+        self.assertNotIn("phiên sau", kiem_luat.TU_TUONG_LAI)
+        self.assertNotIn("sau", kiem_luat.TU_TUONG_LAI)
+        self.assertEqual(kiem_luat.GIA_KHONG_DAU, ("gia co phieu", "gia co phan", "gia cp", "thi gia"))
+        cp = kiem_luat.co_tu_co_phieu
+        for chu in ("cổ phiếu", "co phieu", "cổ phần MAU", "co phan", "30 nghìn/cp", "giá MAU", "giá bán MAU", "giá trị MAU",
+                    "mã MAU"):
+            self.assertTrue(cp(chu, "MAU"), chu)
+        for chu in ("Công ty Cổ phần Mẫu", "cong ty co phan", "Cty CP Mẫu", "Giá vốn của MAU", "CTCP Mẫu", "MAU tăng"):
+            self.assertFalse(cp(chu, "MAU"), chu)
+        self.assertEqual(kiem_luat.ma_ho_so(self.goc), "MAU")
+        dh = kiem_luat.dau_hieu_gia
+        self.assertEqual(dh("Giá bán năm 2025 là 840 tỷ đồng"), [])
+        self.assertIn("(b) chữ «giá»", dh("Giá bán năm 2025 là 840", co_phieu=True))
+        self.assertIn("(a) đơn vị giá", dh("30 nghìn mỗi cp"))
+        self.assertIn("(a) đơn vị giá", dh("30k/cổ phần"))
+        self.assertIn("(b) chữ «giá»", dh("thi gia 30"))
+        self.assertEqual(dh("Khối lượng 30", nhan="[ĐÃ KIỂM G1]"), ["(d) nhãn ĐÃ KIỂM dẫn nguồn giá G1"])
+        self.assertEqual(dh("Khối lượng 30", nhan="[ĐÃ KIỂM D1 tr.1]"), [])
+        self.assertEqual(dh("Khối lượng 30", nhan="[GIẢ ĐỊNH, theo G1]"), [])
+
+    def test_con_so_o_ngu_canh_gia(self):
+        so = kiem_luat.so_ngu_canh_gia
+        cac = lambda chu, bo=True: [x for x, _, _ in so(chu, bo)[0]]  # noqa: E731
+        self.assertEqual(cac("Theo L-02, QĐ-P13, ADR-0019, D1 tr.1, G1, mục 12, điểm soi 15, https://x.vn/31 (2,8%)"), ["2,8"])
+        self.assertEqual(cac("ngày 20/11/2026, 2026-11-23, ngày 1 tháng 2 năm 2026, năm 2025, tháng 12/2026, quý 3/2026"), [])
+        self.assertEqual(so("ngày 20/11/2027, năm 2025, quý 4/2028, 2029")[1], [2027, 2025, 2028, 2029])
+        self.assertEqual(cac("điểm 30, bản 45, 25–30 kỳ, 12 tháng, 25/4, 25:40, mục 13, điểm soi 16, `7`, x9, 25.4"),
+                         ["30", "45", "25", "30", "12", "25", "4", "25", "40", "13", "16", "7", "9", "25.4"])
+        self.assertEqual(cac("1. Giá 30", True), ["30"])
+        self.assertEqual(cac("1. Giá 30", False), ["1", "30"])
+        bang_chu = kiem_luat.so_bang_chu
+        self.assertEqual(bang_chu("ba mươi nghìn đồng, mười hai tháng, hai phiên, mười năm qua, một trăm phần trăm"),
+                         [("ba mươi nghìn", False), ("một trăm", True)])
+
+
+class SoThuTuTests(HoSoBase):
+    """Ô đầu hàng bảng chỉ là số thứ tự khi tiêu đề cột là #, STT, TT, Số TT hoặc Số thứ tự và các ô đúng là 1, 2, …, n
+    (bản chấm L-09 vòng 3, lỗi chặn 1; áp cho cả đối chiếu trích dẫn)."""
+
+    def test_quy_tac_cot_so_thu_tu(self):
+        cot = kiem_trich_dan.cot_so_thu_tu
+
+        def bang(*dong):
+            return [(i, [c.strip() for c in d.split("|")]) for i, d in enumerate(dong)]
+        self.assertTrue(cot(bang("# | a", "1 | x", "2 | y")))
+        self.assertTrue(cot(bang("**Số thứ tự** | a", "**1** | x")))
+        for td in ("STT", "TT", "Số TT", "số  tt"):
+            self.assertTrue(cot(bang(f"{td} | a", "1 | x")), td)
+        self.assertFalse(cot(bang("STT | a", "30 | x")))
+        self.assertFalse(cot(bang("TT | a", "1 | x", "3 | y")))
+        self.assertFalse(cot(bang(" | a", "1 | x")))
+        self.assertFalse(cot(bang("Năm | a", "1 | x")))
+
+    def test_o_dau_khong_phai_so_thu_tu_thi_phai_lan_ra(self):
+        self.them_sau(MUC_9, "| STT | Doanh thu (tỷ đồng) |\n|---:|---:|\n| 30 | 1.200 |\n\n[ĐÃ KIỂM D1 tr.1]")
+        self.assertTrue(any(": 30 — không có trên trang" in x for x in self.trich_dan()["loi"]), self.trich_dan()["loi"])
+        self.assertFalse(self.phieu()[1])
+
+    def test_so_thu_tu_that_van_bo_qua(self):
+        self.them_sau(MUC_9, "| # | Chỉ tiêu | Tỷ đồng |\n|---|---|---:|\n| 1 | Doanh thu | 1.200 |\n| 2 | Lợi nhuận gộp | 360 |"
+                             "\n\n[ĐÃ KIỂM D1 tr.1]")
+        self.assertEqual(self.trich_dan()["loi"], [])
+        self.assertTrue(self.phieu()[1])
+
+    def test_nhan_dung_truoc_bang_khong_qua_tieu_de(self):
+        # câu cuối mục 9 mang nhãn; bảng ngay dưới tiêu đề mục 10 không được nhận nhãn đó
+        self.sua("HO_SO_MAU.md", "Các tệp hiện có không nói về ngành. [CHƯA BIẾT]",
+                 "Doanh thu thuần năm 2025 là 1.200 tỷ đồng. [ĐÃ KIỂM D1 tr.1]")
+        self.sua("HO_SO_MAU.md", "## Mục 10. Cung cầu và xu hướng giá (chỉ mô tả, không sinh tín hiệu)\n\n",
+                 "## Mục 10. Cung cầu và xu hướng giá (chỉ mô tả, không sinh tín hiệu)\n\n| Chỉ tiêu | Tỷ đồng |\n|---|---:|\n"
+                 "| Lợi nhuận gộp | 360 |\n\n")
+        self.assertIn("dòng 88: 360 — đoạn có số mà không có nhãn", self.trich_dan()["loi"])
+        self.assertFalse(self.phieu()[1])
+
+
 class ChungMinhSuaTests(HoSoBase):
     """Lỗi chặn 2b của bản chấm L-09 vòng 2: dòng sửa trong sổ (gia_tri khác máy đọc) chỉ kèm ghi chú chữ vẫn đi đường SỔ.
     Nay dòng sửa phải cách chuỗi máy đọc không quá hai ký tự và có đẳng thức cộng trừ trong quan_he.csv chứng minh."""

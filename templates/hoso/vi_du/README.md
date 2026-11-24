@@ -14,4 +14,6 @@ python tools/hoso/kiem_so_lieu.py --thu-muc /tmp/MAU
 python tools/hoso/phieu_may.py --thu-muc /tmp/MAU --ho-so /tmp/MAU/HO_SO_MAU.md
 ```
 
+Mã nguồn trong `ma_nguon.csv`: `D1`, `D2` là báo cáo tài chính; `G1` là tệp giá. Quy ước của dự án: tệp giá thị trường mang mã bắt đầu bằng chữ G, để cổng giá của phiếu máy nhận ra nhãn ĐÃ KIỂM dẫn nguồn giá (`docs/QUY_TRINH_HO_SO_MA.md` B2, B3).
+
 Hồ sơ thật, tệp gốc thật và sổ số liệu thật không nằm trong kho này. Xem `docs/QUY_TRINH_HO_SO_MA.md` mục 1.
