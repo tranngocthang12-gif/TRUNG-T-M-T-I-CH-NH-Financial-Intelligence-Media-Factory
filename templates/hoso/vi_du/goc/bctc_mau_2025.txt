@@ -1,0 +1,31 @@
+CÔNG TY CỔ PHẦN MẪU — BÁO CÁO TÀI CHÍNH NĂM 2025
+(Tệp giả để thử công cụ hồ sơ mã. Không phải doanh nghiệp thật.)
+Đơn vị: đồng
+
+KẾT QUẢ KINH DOANH                            2025                 2024
+Doanh thu thuần                  1.200.000.000.000    1.000.000.000.000
+Giá vốn hàng bán                   840.000.000.000      720.000.000.000
+Lợi nhuận gộp                      360.000.000.000      280.000.000.000
+Chi phí bán hàng và quản lý        180.000.000.000      150.000.000.000
+Lợi nhuận trước thuế               180.000.000.000      130.000.000.000
+Thuế thu nhập doanh nghiệp          36.000.000.000       26.000.000.000
+Lợi nhuận sau thuế                 144.000.000.000      104.000.000.000
+
+CÂN ĐỐI KẾ TOÁN                         31/12/2025           31/12/2024
+Tiền và tương đương tiền           250.000.000.000      200.000.000.000
+Phải thu khách hàng                300.000.000.000      220.000.000.000
+Tổng tài sản                       900.000.000.000      780.000.000.000
+Nợ phải trả                        400.000.000.000      380.000.000.000
+Vốn chủ sở hữu                     500.000.000.000      400.000.000.000
+Tổng nguồn vốn                     900.000.000.000      780.000.000.000
+
+LƯU CHUYỂN TIỀN TỆ                            2025                 2024
+Lưu chuyển tiền từ kinh doanh      120.000.000.000      110.000.000.000
+Lưu chuyển tiền từ đầu tư         (60.000.000.000)     (50.000.000.000)
+Lưu chuyển tiền từ tài chính      (10.000.000.000)     (20.000.000.000)
+Lưu chuyển tiền thuần trong năm     50.000.000.000       40.000.000.000
+Tiền đầu năm                       200.000.000.000      160.000.000.000
+Tiền cuối năm                      250.000.000.000      200.000.000.000
+
+Ý kiến kiểm toán: chấp nhận toàn phần.
+Cổ đông lớn: Ông Nguyễn Văn A (Chủ tịch) 12,50%; Quỹ đầu tư B 7,25%.

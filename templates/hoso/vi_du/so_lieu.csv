@@ -1,0 +1,36 @@
+khoa,nguon,trang,chuoi_goc,gia_tri,don_vi,ghi_chu,cong_thuc
+# --- D1 tr.1: kết quả kinh doanh 2025 và 2024 (đồng)
+kq25_dt,D1,1,1.200.000.000.000,,dong,,
+kq24_dt,D1,1,1.000.000.000.000,,dong,,
+kq25_gia_von,D1,1,840.000.000.000,,dong,,
+kq25_ln_gop,D1,1,360.000.000.000,,dong,,
+kq25_cp_bh_ql,D1,1,180.000.000.000,,dong,,
+kq25_lntt,D1,1,180.000.000.000,,dong,,
+kq25_thue,D1,1,36.000.000.000,,dong,,
+kq25_lnst,D1,1,144.000.000.000,,dong,,
+# --- D1 tr.1: cân đối kế toán 31/12/2025 (đồng)
+cd25_tien,D1,1,250.000.000.000,,dong,,
+cd25_phai_thu,D1,1,300.000.000.000,,dong,,
+cd24_phai_thu,D1,1,220.000.000.000,,dong,,
+cd25_tong_ts,D1,1,900.000.000.000,,dong,,
+cd25_no,D1,1,400.000.000.000,,dong,,
+cd25_von_chu,D1,1,500.000.000.000,,dong,,
+# --- D1 tr.1: lưu chuyển tiền tệ 2025 (đồng)
+lc25_kd,D1,1,120.000.000.000,,dong,,
+lc25_dt,D1,1,60.000.000.000,,dong,in trong ngoặc: tiền ra,
+lc25_tc,D1,1,10.000.000.000,,dong,in trong ngoặc: tiền ra,
+lc25_thuan,D1,1,50.000.000.000,,dong,,
+lc25_dau_nam,D1,1,200.000.000.000,,dong,,
+# --- D2 tr.1: lũy kế 9 tháng (triệu đồng)
+q3_dt_9t26,D2,1,1.050.000,,trieu,,
+q3_dt_9t25,D2,1,900.000,,trieu,,
+q3_dt_cl,D2,1,150.000,,trieu,,
+q3_lntt_9t26,D2,1,168.000,,trieu,,
+q3_lntt_9t25,D2,1,135.000,,trieu,,
+q3_lntt_cl,D2,1,33.000,,trieu,,
+# --- dòng tính: mọi tỷ lệ dùng trong hồ sơ đi qua đây
+bien_gop_25,,,,"30,0",pt,,kq25_ln_gop / kq25_dt * 100
+dt_tang_25,,,,"20,0",pt,,(kq25_dt / kq24_dt - 1) * 100
+phai_thu_tang_25,,,,"36,4",pt,,(cd25_phai_thu / cd24_phai_thu - 1) * 100
+tien_tren_lnst_25,,,,"0,83",lan,,lc25_kd / kq25_lnst
+no_tren_von_25,,,,"0,80",lan,,cd25_no / cd25_von_chu

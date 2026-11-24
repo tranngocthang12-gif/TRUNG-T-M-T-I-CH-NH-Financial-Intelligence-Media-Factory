@@ -1,0 +1,9 @@
+ten,ve_trai,ve_phai,sai_so
+kqkd 2025: doanh thu thuần − giá vốn = lợi nhuận gộp,kq25_dt - kq25_gia_von,kq25_ln_gop,1
+kqkd 2025: lợi nhuận gộp − chi phí bán hàng và quản lý = lợi nhuận trước thuế,kq25_ln_gop - kq25_cp_bh_ql,kq25_lntt,1
+kqkd 2025: lợi nhuận trước thuế − thuế = lợi nhuận sau thuế,kq25_lntt - kq25_thue,kq25_lnst,1
+cdkt 2025: nợ phải trả + vốn chủ sở hữu = tổng tài sản,cd25_no + cd25_von_chu,cd25_tong_ts,1
+lctt 2025: kinh doanh + đầu tư + tài chính = lưu chuyển thuần,lc25_kd - lc25_dt - lc25_tc,lc25_thuan,1
+lctt 2025: tiền đầu năm + lưu chuyển thuần = tiền cuối năm,lc25_dau_nam + lc25_thuan,cd25_tien,1
+quý 3 2026: doanh thu 9 tháng,q3_dt_9t26 - q3_dt_9t25,q3_dt_cl,2
+quý 3 2026: lợi nhuận trước thuế 9 tháng,q3_lntt_9t26 - q3_lntt_9t25,q3_lntt_cl,2
