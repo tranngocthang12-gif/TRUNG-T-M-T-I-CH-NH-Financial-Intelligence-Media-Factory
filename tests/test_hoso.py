@@ -911,7 +911,8 @@ class DinhDangTests(HoSoBase):
     (kiem_luat.kiem_dinh_dang); dòng ngoài bộ là lỗi, bất kể nội dung."""
 
     # Mỗi đầu vào thêm vào ngay dưới tiêu đề mục 9 của hồ sơ mẫu. Kiểm rằng kiem_dinh_dang báo lỗi và phiếu CHƯA ĐẠT;
-    # một số đầu vào cũng bị cổng giá bắt. Bốn đầu vào «~ đơn», «$» cuối danh sách cho phiếu ĐẠT trên be76467 (bản chấm L-09 vòng 5).
+    # một số đầu vào cũng bị cổng giá bắt. Bốn đầu vào «~ đơn», «$» cho phiếu ĐẠT trên be76467 (bản chấm L-09 vòng 5); ba đầu
+    # vào «chữ đậm ghép mã» cuối danh sách cho phiếu ĐẠT trên f48f6cc (bản chấm L-09 của PR #119).
     CHEN = {
         "vòng 4, lỗi chặn 1: __Giá__": "__Giá__ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
         "vòng 4, lỗi chặn 2: tiêu đề thụt ba dấu cách": "   ### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
@@ -947,6 +948,9 @@ class DinhDangTests(HoSoBase):
         "~ đơn bọc cả từ": "~Gi~á cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
         "$ công thức toán": "Gi$á$ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
         "$ ở tiêu đề phụ": "### Gi$á$ cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "PR #119, lỗi chặn 1: chữ đậm rồi mã": "**Gi**`á` cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "mã rồi chữ đậm": "`Gi`**á** cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "mã trong chữ đậm rồi chữ": "**`Gi`**á cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
     }
     # Thay tiêu đề khung: tiêu đề cấp hai phải đúng từng chữ, nên không chở được dấu hiệu.
     THAY = {
@@ -1021,10 +1025,13 @@ class DinhDangTests(HoSoBase):
         k = kiem_luat.kiem_dinh_dang
         self.assertEqual(k("a `b_c.txt` d [SUY LUẬN, sổ số liệu: dt_tang_25]"), [])
         self.assertEqual(k("a `x~y$z` b"), [])                     # ~ và $ đơn trong mã: hợp lệ
+        self.assertEqual(k("**a** `b` và **`c`** d"), [])          # chữ đậm và mã tách bằng dấu cách: hợp lệ
+        self.assertEqual(kiem_luat._chuan("**Gi**`á` cổ phiếu"), "Giá cổ phiếu")   # máy đọc chữ như hiển thị
         self.assertEqual(k("Gia\u0300 tri\u0323"), [])                # chữ tổ hợp rời được NFC dựng lại: hợp lệ
         for xau in ("x__y__", "_x_", "a *b* c", "a ***b*** c", "~~x~~", "a\\*b", "&amp;", "<i>x</i>", "[x](y)",
                     "![x](y)", "[x][1]", "[^1]", "> x", "```", "~~~", "    x", " x", "* x", "1) x", "x | y", "===",
-                    "a\u00a0b", "a\u2060b", "q\u0301", "a`b`", "`b`c", "``b``", "`a", "a~b~c", "~a", "a $x$ b", "a$", "`~~`"):
+                    "a\u00a0b", "a\u2060b", "q\u0301", "a`b`", "`b`c", "``b``", "`a", "a~b~c", "~a", "a $x$ b", "a$", "`~~`",
+                    "**a**`b`", "`a`**b**", "**`a`**b"):
             with self.subTest(xau):
                 self.assertTrue(k(xau), repr(xau))
         self.assertTrue(k("chữ\n---"))                            # tiêu đề gạch chân

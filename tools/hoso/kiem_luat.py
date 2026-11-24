@@ -246,7 +246,8 @@ def kiem_dinh_dang(text: str) -> list:
       - hàng bảng bắt đầu sát lề bằng «|»; dòng nào có «|» thì phải là hàng bảng;
       - mục liệt kê «- » hay «1. », thụt 0, 2, 4… dấu cách; nội dung mục không bắt đầu bằng «#», «>», «|», «<» hay «`»;
       - đường kẻ «---» đúng ba dấu, đứng sau một dòng trống;
-      - trong dòng: chữ đậm «**…**»; mã «`…`» với số dấu ` chẵn, không dính liền chữ ở mặt ngoài; dấu «_» ngoài mã chỉ
+      - trong dòng: chữ đậm «**…**»; mã «`…`» với số dấu ` chẵn, không dính liền chữ ở mặt ngoài, kể cả khi giữa mã và
+        chữ chỉ có dấu ** («**Gi**`á`» hiển thị thành «Giá»); dấu «_» ngoài mã chỉ
         trong khóa sổ dạng chữ thường không dấu «a_b_1» nằm trong một nhãn, trong mã chỉ khi nằm giữa hai chữ (tên tệp).
     Không cho phép: dấu cách khác dấu cách thường (tab, dấu cách cứng…); ký tự định dạng vô hình (rộng 0, gạch nối mềm,
     đổi chiều) và dấu kết hợp đứng riêng sau chuẩn hóa NFC (chữ Việt chuẩn luôn là chữ dựng sẵn); dấu «_» hay «*» để
@@ -287,11 +288,12 @@ def kiem_dinh_dang(text: str) -> list:
                 bao.append(f"dòng bắt đầu bằng «{dong[:3]}» (trích dẫn, HTML, khối mã hay ký hiệu liệt kê khác «- », «1. »)")
             elif "|" in dong:
                 bao.append("dấu | ngoài hàng bảng")
+        tron = dong.replace("*", "")                            # dấu đậm không hiện ra: «**Gi**`á`» hiển thị «Giá»
         if dong.count("`") % 2:
             bao.append("số dấu ` lẻ")
-        elif "``" in dong or any((a > 0 and dong[a - 1].isalnum()) or (b + 1 < len(dong) and dong[b + 1].isalnum())
-                                 for a, b in zip(*[iter([i for i, c in enumerate(dong) if c == "`"])] * 2)):
-            bao.append("mã «`…`» dính liền chữ ở mặt ngoài, hay dùng hai dấu ` liền nhau")
+        elif "``" in tron or any((a > 0 and tron[a - 1].isalnum()) or (b + 1 < len(tron) and tron[b + 1].isalnum())
+                                 for a, b in zip(*[iter([i for i, c in enumerate(tron) if c == "`"])] * 2)):
+            bao.append("mã «`…`» dính liền chữ ở mặt ngoài (kể cả qua dấu **), hay dùng hai dấu ` liền nhau")
         else:
             for k, doan in enumerate(dong.split("`")):
                 bao.extend(_dd_noi_dong(doan, trong_ma=k % 2 == 1))
@@ -311,8 +313,9 @@ def chu_trong_nhan(nhan: str) -> str:
 
 
 def _chuan(chu: str) -> str:
-    """Bỏ nhãn, dấu backtick và dấu đậm; gộp khoảng trắng."""
-    return " ".join(_TAG.sub(" ", nfc(chu)).replace("`", " ").replace("*", "").split())
+    """Bỏ nhãn; bỏ dấu backtick và dấu đậm mà không chèn dấu cách, để chữ máy đọc giống chữ hiển thị («**Gi**`á`» →
+    «Giá»); gộp khoảng trắng."""
+    return " ".join(_TAG.sub(" ", nfc(chu)).replace("`", "").replace("*", "").split())
 
 
 def ma_ho_so(text: str) -> str:
