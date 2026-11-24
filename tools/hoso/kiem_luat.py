@@ -247,11 +247,12 @@ def kiem_dinh_dang(text: str) -> list:
       - mục liệt kê «- » hay «1. », thụt 0, 2, 4… dấu cách; nội dung mục không bắt đầu bằng «#», «>», «|», «<» hay «`»;
       - đường kẻ «---» đúng ba dấu, đứng sau một dòng trống;
       - trong dòng: chữ đậm «**…**»; mã «`…`» với số dấu ` chẵn, không dính liền chữ ở mặt ngoài, kể cả khi giữa mã và
-        chữ chỉ có dấu ** («**Gi**`á`» hiển thị thành «Giá»); dấu «_» ngoài mã chỉ
+        chữ chỉ có dấu ** («**Gi**`á`» hiển thị thành «Giá»); dấu «[ ]» ngoài mã chỉ để viết nhãn; dấu «_» ngoài mã chỉ
         trong khóa sổ dạng chữ thường không dấu «a_b_1» nằm trong một nhãn, trong mã chỉ khi nằm giữa hai chữ (tên tệp).
     Không cho phép: dấu cách khác dấu cách thường (tab, dấu cách cứng…); ký tự định dạng vô hình (rộng 0, gạch nối mềm,
     đổi chiều) và dấu kết hợp đứng riêng sau chuẩn hóa NFC (chữ Việt chuẩn luôn là chữ dựng sẵn); dấu «_» hay «*» để
-    nhấn mạnh; dấu «~» và «$» ngoài mã (gạch ngang chữ, công thức toán), «~~» ở mọi chỗ; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang; trích dẫn «>»; khối mã
+    nhấn mạnh; dấu «~» và «$» ngoài mã (gạch ngang chữ, công thức toán), «~~» ở mọi chỗ; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang, định nghĩa liên kết ở mọi chỗ (kể cả
+    trong mục liệt kê: «- [Gi]: …» làm «[Gi]á» hiển thị thành «Giá»); trích dẫn «>»; khối mã
     (```, ~~~ hay thụt lề); tiêu đề gạch chân (=== hay --- ngay dưới một dòng chữ); dòng thụt lề mà không phải mục liệt
     kê."""
     loi, truoc = [], ""
@@ -297,6 +298,9 @@ def kiem_dinh_dang(text: str) -> list:
         else:
             for k, doan in enumerate(dong.split("`")):
                 bao.extend(_dd_noi_dong(doan, trong_ma=k % 2 == 1))
+            ngoai_ma = re.sub(r"`[^`]*`", "", dong)                 # ngoài mã, dấu [ ] chỉ để viết nhãn
+            if re.search(r"[\[\]]", _TAG.sub("", ngoai_ma)) or "]:" in ngoai_ma:
+                bao.append("dấu [ ] ngoài nhãn, hay «]:» (liên kết, định nghĩa liên kết ở mọi chỗ, chú thích, ô đánh dấu)")
         for b in dict.fromkeys(bao):
             loi.append(f"dòng {so}: định dạng ngoài bộ cho phép — {b}")
         truoc = dong
@@ -313,9 +317,9 @@ def chu_trong_nhan(nhan: str) -> str:
 
 
 def _chuan(chu: str) -> str:
-    """Bỏ nhãn; bỏ dấu backtick và dấu đậm mà không chèn dấu cách, để chữ máy đọc giống chữ hiển thị («**Gi**`á`» →
-    «Giá»); gộp khoảng trắng."""
-    return " ".join(_TAG.sub(" ", nfc(chu)).replace("`", "").replace("*", "").split())
+    """Bỏ nhãn; bỏ dấu backtick, dấu đậm và dấu [ ] còn lại mà không chèn dấu cách, để chữ máy đọc giống chữ hiển thị
+    («**Gi**`á`» → «Giá», «[Gi]á» → «Giá»); gộp khoảng trắng."""
+    return " ".join(_TAG.sub(" ", nfc(chu)).replace("`", "").replace("*", "").replace("[", "").replace("]", "").split())
 
 
 def ma_ho_so(text: str) -> str:
