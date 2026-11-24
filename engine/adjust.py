@@ -62,7 +62,7 @@ def build_events(close, observed, manual, yahoo):
     for e in ev.itertuples(index=False):
         row = {c: getattr(e, c) for c in EV_COLS}
         row.update(trade_date=pd.NaT, raw_return=np.nan, adj_return=np.nan, price_factor=1.0, split_factor=1.0)
-        s = close[e.ticker].dropna() if e.ticker in close.columns else pd.Series(dtype=float)
+        s = close[e.ticker].dropna() if e.ticker in close.columns else pd.Series(dtype=float, index=pd.DatetimeIndex([]))
         before, after = s[s.index < e.ex_date], s[s.index >= e.ex_date]
         if e.ticker not in close.columns:
             row["status"] = "KHONG_CO_MA"
