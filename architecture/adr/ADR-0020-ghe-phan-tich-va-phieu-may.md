@@ -41,7 +41,7 @@
 | 2 | Sổ số liệu | Mỗi dòng gốc có trên trang đã ghi; mọi quan hệ trong `quan_he.csv` đúng; có đẳng thức đúng cho cả ba báo cáo (`cdkt`, `kqkd`, `lctt`); chỗ ghế phân tích ghi khác máy đọc phải cách chuỗi máy đọc không quá hai ký tự, được một đẳng thức cộng trừ trong `quan_he.csv` chứng minh, và hiện trên phiếu kèm tên đẳng thức |
 | 3 | Soát bảng | Mọi hàng "a − b lệch c đúng một chữ số" trên trang hồ sơ có dùng đã được ghế phân tích kết luận trong sổ |
 | 4 | Trích dẫn | Mỗi con số trong đoạn ĐÃ KIỂM có trên trang đã ghi, hoặc là một dòng của sổ, hoặc tính được từ các số đã lần ra cùng đoạn; không đoạn nào có số mà thiếu nhãn; không có ngoại lệ, con số máy không lần ra thì không mang nhãn ĐÃ KIỂM |
-| 5 | Luật và khung | Không cụm từ L-02 cấm; đủ mười hai mục; mục 8 trống; mục 11 đủ ba giả thuyết, điều kiện sai, ngày xem lại; đủ mười lăm điểm soi; kết bằng danh sách CHƯA BIẾT; bảng nguồn khớp sha256; giá cổ phiếu, hệ số định giá và vốn hóa chỉ được nêu dưới dạng số quá khứ có nguồn trong đoạn ĐÃ KIỂM, không kèm từ chỉ tương lai |
+| 5 | Luật và khung | Chỉ dùng bộ định dạng cho phép, tiêu đề cấp hai đúng tên khung; không cụm từ L-02 cấm; đủ mười hai mục; mục 8 trống; mục 11 đủ ba giả thuyết, điều kiện sai, ngày xem lại; đủ mười lăm điểm soi; kết bằng danh sách CHƯA BIẾT; bảng nguồn khớp sha256; giá cổ phiếu, hệ số định giá và vốn hóa chỉ được nêu dưới dạng số quá khứ có nguồn trong đoạn ĐÃ KIỂM, không kèm từ chỉ tương lai |
 
 - Phiếu ghi sha256 của hồ sơ và commit của công cụ. Phiếu không có giờ chạy: cùng đầu vào, cùng công cụ thì ra cùng phiếu. Ai có thư mục mã cũng chạy lại được. Phiếu là bằng chứng chạy lại được, không phải chữ ký.
 - Phiếu ĐẠT nghĩa là con số lần ra được và hồ sơ đúng khung. Phiếu không nói lập luận đúng.

@@ -906,5 +906,128 @@ class GaiLoiTests(HoSoBase):
         self.assertFalse((self.tm / "HO_SO_MAU_BAN_PHAN_BIEN.md").exists())
 
 
+class DinhDangTests(HoSoBase):
+    """Bản chấm L-09 vòng 4: định dạng Markdown che dấu hiệu giá. Sửa theo loại: hồ sơ chỉ được dùng một bộ Markdown hẹp
+    (kiem_luat.kiem_dinh_dang); dòng ngoài bộ là lỗi, bất kể nội dung."""
+
+    # Mỗi đầu vào thêm vào ngay dưới tiêu đề mục 9 của hồ sơ mẫu. Tất cả cho phiếu ĐẠT trên 0ab2564.
+    CHEN = {
+        "vòng 4, lỗi chặn 1: __Giá__": "__Giá__ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "vòng 4, lỗi chặn 2: tiêu đề thụt ba dấu cách": "   ### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "_Giá_": "_Giá_ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "tiêu đề thụt một dấu cách": " ### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "tiêu đề gạch chân ---": "Giá cổ phiếu MAU\n---\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "tiêu đề gạch chân ===": "Giá cổ phiếu MAU\n===\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "thực thể &aacute;": "Gi&aacute; cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "thực thể &#225;": "Gi&#225; cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "chú thích HTML giữa chữ": "Gi<!-- -->á cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "ký tự rộng 0": "Gi\u200bá cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "gạch nối mềm": "Gi\u00adá cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "bộ chọn biến thể": "Gi\ufe0fá cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "\\_Giá\\_": "\\_Giá\\_ cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "mục liệt kê chứa tiêu đề": "- ### Giá cổ phiếu MAU\n\n  Con số là 30. [GIẢ ĐỊNH]",
+        "tiêu đề phụ có __": "### __Giá__ cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "ô bảng __Giá__": "| __Giá__ cổ phiếu MAU | Kịch bản |\n|---:|---|\n| 30 | Tốt |\n\n[GIẢ ĐỊNH]",
+        "tab đầu dòng": "\t### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "dấu cách cứng đầu dòng": "\u00a0### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "dấu cách hẹp giữa chữ": "Giá\u202fcổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "mã chen giữa chữ": "Gi`á` cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "mã `__Giá__`": "`__Giá__` cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "Gi_á": "Gi_á cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "nhãn chứa chữ nối gạch dưới": "Con số là 30. [GIẢ ĐỊNH: giá_cổ_phiếu_MAU]",
+        "danh sách 1)": "1) Giá cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "bảng không viền trái": "Giá cổ phiếu MAU | Kịch bản\n---:|---\n30 | Tốt\n\n[GIẢ ĐỊNH]",
+        "+ làm ký hiệu liệt kê": "+ Giá cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "mục con chứa trích dẫn": "- Kịch bản\n  - > Giá cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "tiêu đề cấp một thứ hai": "# Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "xuống dòng cứng bằng \\": "Giá cổ phiếu MAU\\\nnăm tới là 30. [GIẢ ĐỊNH]",
+        "khóa sổ không dấu trong câu": "gia_co_phieu_mau năm tới là 30. [GIẢ ĐỊNH]",
+    }
+    # Thay tiêu đề khung: tiêu đề cấp hai phải đúng từng chữ, nên không chở được dấu hiệu.
+    THAY = {
+        "mục 9 đổi tên": (MUC_9, "## Mục 9. Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]"),
+        "mục 9 thêm đuôi": (MUC_9, MUC_9 + " — giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]"),
+        "Một trang thêm đuôi": ("## Một trang\n", "## Một trang — giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]\n"),
+    }
+    # Dùng bộ cho phép mà vẫn nêu giá: cổng giá phải bắt (không qua đường định dạng).
+    CONG_GIA = {
+        "tiêu đề phụ có ### đóng": "### Giá cổ phiếu MAU ###\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "xuống dòng mềm": "Giá cổ phiếu MAU\nnăm tới là 30. [GIẢ ĐỊNH]",
+        "danh sách dưới tiêu đề phụ": "### Giá cổ phiếu MAU\n\n- Tốt: 30. [GIẢ ĐỊNH]",
+        "tiêu đề phụ Gi**á**": "#### Gi**á** cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "bảng không dấu cách": "|Giá cổ phiếu MAU|Kịch bản|\n|---:|---|\n|30|Tốt|\n\n[GIẢ ĐỊNH]",
+        "mã chứa cả câu": "`Giá cổ phiếu MAU năm tới là 30` [GIẢ ĐỊNH]",
+        "mã chứa chữ Giá": "`Giá` cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
+        "đường kẻ sau tiêu đề phụ": "### Giá cổ phiếu MAU\n\n---\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "bảng thiếu hàng kẻ": "| Giá cổ phiếu MAU |\n| 30 |\n\n[GIẢ ĐỊNH]",
+        "tiêu đề con dưới tiêu đề giá": "### Giá cổ phiếu MAU\n\n#### Ghi chú\n\nCon số là 30. [GIẢ ĐỊNH]",
+        "tiêu đề liền dòng chữ": "### Giá cổ phiếu MAU\nCon số là 30. [GIẢ ĐỊNH]",
+        "xuống dòng bằng hai dấu cách": "Giá cổ phiếu MAU  \nnăm tới là 30. [GIẢ ĐỊNH]",
+        "số tách bằng chữ đậm": "Giá cổ phiếu MAU năm tới là 3**0**. [GIẢ ĐỊNH]",
+        "nhãn trong chữ đậm": "Giá cổ phiếu MAU năm tới là 30. **[GIẢ ĐỊNH]**",
+    }
+    # Không bắt nhầm.
+    XANH = {
+        "chữ đậm ** đầu dòng": "**Doanh thu** năm 2025 là 1.200 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+        "khóa sổ có gạch dưới trong nhãn": "Biên lợi nhuận gộp là 30,0%. [SUY LUẬN, sổ số liệu: bien_gop_25]",
+        "tiêu đề phụ không giá": "### Doanh thu\n\nDoanh thu năm 2025 là 1.200 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+        "mục con thụt hai dấu cách": "- Doanh thu:\n  - năm 2025 là 1.200 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+        "tên tệp trong mã": "Xem tệp `gia_mau.csv` ở Bảng nguồn. [CHƯA BIẾT]",
+        "đường kẻ sau dòng trống": "Ngành chưa rõ. [CHƯA BIẾT]\n\n---",
+        "danh sách đánh số": "1. Doanh thu năm 2025 là 1.200 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+        "giá bán hàng hóa": "Giả định giá bán hàng hóa tăng 5% mỗi năm. [GIẢ ĐỊNH]",
+        "giá đóng cửa có nguồn": "Giá đóng cửa tăng từ 25,40 lên 26,10 nghìn đồng, tức 2,8%. [ĐÃ KIỂM G1]",
+    }
+
+    def _dinh_dang(self):
+        return [x for x in self.luat() if "định dạng ngoài bộ cho phép" in x]
+
+    def test_mau_dung_bo_cho_phep(self):
+        self.assertEqual(kiem_luat.kiem_dinh_dang(self.ho_so.read_text(encoding="utf-8")), [])
+
+    def test_dinh_dang_che_dau_hieu_gia(self):
+        goc = self.ho_so.read_text(encoding="utf-8")
+        ca = [(ten, MUC_9, MUC_9 + "\n\n" + doan) for ten, doan in self.CHEN.items()]
+        ca += [(ten, cu, moi) for ten, (cu, moi) in self.THAY.items()]
+        for ten, cu, moi in ca:
+            with self.subTest(ten):
+                self.ho_so.write_text(goc.replace(cu, moi, 1), encoding="utf-8")
+                self.assertTrue(self._dinh_dang(), ten)
+                self.assertFalse(self.phieu()[1], ten)
+
+    def test_bo_cho_phep_van_qua_cong_gia(self):
+        goc = self.ho_so.read_text(encoding="utf-8")
+        for ten, doan in self.CONG_GIA.items():
+            with self.subTest(ten):
+                self.ho_so.write_text(goc.replace(MUC_9, MUC_9 + "\n\n" + doan, 1), encoding="utf-8")
+                self.assertEqual(self._dinh_dang(), [], ten)
+                self.assertTrue(any("cổng giá" in x or "quy tắc" in x for x in self.luat()), ten)
+                self.assertFalse(self.phieu()[1], ten)
+
+    def test_khong_bat_nham(self):
+        goc = self.ho_so.read_text(encoding="utf-8")
+        for ten, doan in self.XANH.items():
+            with self.subTest(ten):
+                self.ho_so.write_text(goc.replace(MUC_9, MUC_9 + "\n\n" + doan, 1), encoding="utf-8")
+                phieu, dat = self.phieu()
+                self.assertTrue(dat, f"{ten}\n{phieu}")
+
+    def test_tung_quy_tac(self):
+        k = kiem_luat.kiem_dinh_dang
+        self.assertEqual(k("a `b_c.txt` d [SUY LUẬN, sổ số liệu: dt_tang_25]"), [])
+        self.assertEqual(k("Gia\u0300 tri\u0323"), [])                # chữ tổ hợp rời được NFC dựng lại: hợp lệ
+        for xau in ("x__y__", "_x_", "a *b* c", "a ***b*** c", "~~x~~", "a\\*b", "&amp;", "<i>x</i>", "[x](y)",
+                    "![x](y)", "[x][1]", "[^1]", "> x", "```", "~~~", "    x", " x", "* x", "1) x", "x | y", "===",
+                    "a\u00a0b", "a\u2060b", "q\u0301", "a`b`", "`b`c", "``b``", "`a"):
+            with self.subTest(xau):
+                self.assertTrue(k(xau), repr(xau))
+        self.assertTrue(k("chữ\n---"))                            # tiêu đề gạch chân
+        self.assertEqual(k("chữ\n\n---"), [])                     # đường kẻ sau dòng trống
+        self.assertTrue(k("dòng đầu\n# Tiêu đề cấp một"))
+        self.assertTrue(k("dòng đầu\n## Mục 9. Giá"))
+        self.assertEqual(k("dòng đầu\n## Mục 9. Thị trường chung và chu kỳ"), [])
+        self.assertEqual(kiem_luat.TIEU_DE_CAP_HAI[:2], ("Cách đọc", "Một trang"))
+
+
 if __name__ == "__main__":
     unittest.main()

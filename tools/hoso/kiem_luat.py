@@ -1,5 +1,10 @@
 """B6 của quy trình hồ sơ mã: kiểm luật và khung của hồ sơ (ADR-0019 QĐ-P5, QĐ-P13; ADR-0020).
 
+0. Định dạng cho phép (kiem_dinh_dang; sửa theo bản chấm L-09 vòng 4): hồ sơ chỉ được dùng một bộ Markdown hẹp, liệt kê
+   ở docstring của kiem_dinh_dang. Dòng nào ngoài bộ là lỗi, bất kể nội dung. Mục đích: mọi cách viết làm chữ hiển thị
+   khác chữ máy đọc (dấu nhấn mạnh bằng «_», tiêu đề thụt lề hay gạch chân, thực thể và thẻ HTML, ký tự vô hình, mã chen
+   giữa chữ…) bị chặn trước khi cổng giá đọc chữ. Tiêu đề cấp hai phải đúng từng chữ một tên của khung (TIEU_DE_CAP_HAI),
+   nên tiêu đề khung không chở được dấu hiệu giá.
 1. L-02: không cụm từ khuyến nghị nào ở bất kỳ dòng nào. Dùng đúng bộ mẫu của tools/laws_checks.py, thêm vài cụm
    riêng của hồ sơ mã. Kiểm cứng, không xét ngữ cảnh: câu phủ định có cụm cấm cũng bị bắt — đổi cách viết.
 2. Khung: đủ mười hai mục theo thứ tự; có "Một trang", "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn".
@@ -73,6 +78,7 @@ import argparse
 import pathlib
 import re
 import sys
+import unicodedata
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from tools import laws_checks  # noqa: E402
@@ -184,6 +190,113 @@ def _la_tieu_de_khung(d: str) -> bool:
     """Tiêu đề cấp hai của khung: '## Mục n…' và các tiêu đề cố định của hồ sơ. Các tiêu đề này không truyền dấu hiệu."""
     ten = d[3:].strip() if d.startswith("## ") else None
     return ten is not None and (re.match(r"Mục \d+\.", ten) is not None or any(ten.startswith(x) for x in KHUNG_CAP_HAI))
+
+
+# ---------- định dạng cho phép (sửa theo bản chấm L-09 vòng 4) ----------
+TIEU_DE_CAP_HAI = (
+    "Cách đọc", "Một trang",
+    "Mục 1. Doanh nghiệp làm gì: tiền đến từ đâu", "Mục 2. Loại doanh nghiệp", "Mục 3. Lợi thế cạnh tranh: bằng chứng số",
+    "Mục 4. Ban lãnh đạo và cổ đông", "Mục 5. Sức khỏe tài chính", "Mục 6. Chất lượng lợi nhuận",
+    "Mục 7. Tăng trưởng gần đây", "Mục 8. Định giá theo khoảng", "Mục 9. Thị trường chung và chu kỳ",
+    "Mục 10. Cung cầu và xu hướng giá (chỉ mô tả, không sinh tín hiệu)",
+    "Mục 11. Ba giả thuyết, điều kiện sai, ngày xem lại", "Mục 12. Ca tương tự, thành và bại",
+    "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT (hồ sơ kết thúc ở đây)", "Bảng nguồn (tệp gốc đã ghim)", "Lịch sử sửa",
+    "Phiếu máy",
+)
+_DD_TIEU_DE = re.compile(r"#{1,6} \S")
+_DD_MUC = re.compile(r"(?P<thut>(?:  )*)(?:- |\d{1,2}\. )(?P<noi>.*)")
+_DD_THUC_THE = re.compile(r"&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);")
+_DD_THE = re.compile(r"<[A-Za-z!/?]")
+_DD_LIEN_KET = re.compile(r"\]\(|\]\[|!\[|\[\^|^\s*\[[^\]]*\]:")
+_DD_KHOA = re.compile(r"(?<![\w])[a-z0-9]+(?:_[a-z0-9]+)+(?!\w)")
+
+
+def _dd_noi_dong(doan: str, trong_ma: bool) -> list:
+    """Lỗi định dạng trong một đoạn chữ của một dòng (trong hay ngoài dấu `)."""
+    loi = []
+    if trong_ma:                                                 # trong mã: «_» chỉ nằm giữa hai chữ (tên tệp)
+        if any(c == "_" and not (0 < i < len(doan) - 1 and doan[i - 1].isalnum() and doan[i + 1].isalnum())
+               for i, c in enumerate(doan)):
+            loi.append("dấu _ trong mã không nằm giữa hai chữ")
+    elif "_" in _TAG.sub(lambda m: _DD_KHOA.sub("", m.group(0)), doan):   # ngoài mã: «_» chỉ trong khóa sổ trong nhãn
+        loi.append("dấu _ ngoài khóa sổ trong nhãn (dấu nhấn mạnh hay chữ nối)")
+    if "\\" in doan and not trong_ma:
+        loi.append("dấu \\ (ký tự thoát)")
+    if "*" in doan.replace("**", "") or "***" in doan:
+        loi.append("dấu * lẻ (chỉ dùng ** để in đậm)")
+    if "~~" in doan:
+        loi.append("dấu ~~")
+    if _DD_THUC_THE.search(doan):
+        loi.append("thực thể HTML (&…;)")
+    if _DD_THE.search(doan):
+        loi.append("thẻ HTML hay chú thích HTML (<…)")
+    if not trong_ma and _DD_LIEN_KET.search(doan):
+        loi.append("liên kết, ảnh hay chú thích chân trang")
+    return loi
+
+
+def kiem_dinh_dang(text: str) -> list:
+    """Hồ sơ chỉ được dùng một bộ Markdown hẹp. Dòng nào ngoài bộ này là lỗi, bất kể nội dung (danh sách cho phép, không
+    phải danh sách cấm). Bộ cho phép:
+      - dòng trống; dòng chữ bắt đầu sát lề, không bắt đầu bằng «>», «<», «=», «```», «~~~», «* », «+ », «1) »;
+      - tiêu đề «# …» tới «###### …» sát lề, có một dấu cách sau dấu #; «# » chỉ ở dòng đầu; tiêu đề cấp hai đúng từng
+        chữ một tên trong TIEU_DE_CAP_HAI;
+      - hàng bảng bắt đầu sát lề bằng «|»; dòng nào có «|» thì phải là hàng bảng;
+      - mục liệt kê «- » hay «1. », thụt 0, 2, 4… dấu cách; nội dung mục không bắt đầu bằng «#», «>», «|», «<» hay «`»;
+      - đường kẻ «---» đúng ba dấu, đứng sau một dòng trống;
+      - trong dòng: chữ đậm «**…**»; mã «`…`» với số dấu ` chẵn, không dính liền chữ ở mặt ngoài; dấu «_» ngoài mã chỉ
+        trong khóa sổ dạng chữ thường không dấu «a_b_1» nằm trong một nhãn, trong mã chỉ khi nằm giữa hai chữ (tên tệp).
+    Không cho phép: dấu cách khác dấu cách thường (tab, dấu cách cứng…); ký tự định dạng vô hình (rộng 0, gạch nối mềm,
+    đổi chiều) và dấu kết hợp đứng riêng sau chuẩn hóa NFC (chữ Việt chuẩn luôn là chữ dựng sẵn); dấu «_» hay «*» để
+    nhấn mạnh; «~~»; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang; trích dẫn «>»; khối mã
+    (```, ~~~ hay thụt lề); tiêu đề gạch chân (=== hay --- ngay dưới một dòng chữ); dòng thụt lề mà không phải mục liệt
+    kê."""
+    loi, truoc = [], ""
+    for so, dong in enumerate(nfc(text).split("\n"), 1):
+        bao = []
+        for c in dong:
+            if unicodedata.category(c) in ("Cf", "Cc", "Zl", "Zp", "Mn", "Mc", "Me") or (
+                    unicodedata.category(c) == "Zs" and c != " "):
+                bao.append(f"ký tự U+{ord(c):04X} ({unicodedata.name(c, 'không tên')})")
+                break
+        than = dong
+        if not dong.strip():
+            pass
+        elif dong.startswith("#"):
+            if not _DD_TIEU_DE.match(dong):
+                bao.append("tiêu đề phải là 1–6 dấu # sát lề rồi một dấu cách")
+            elif dong.startswith("# ") and so != 1:
+                bao.append("tiêu đề cấp một chỉ ở dòng đầu")
+            elif dong.startswith("## ") and dong[3:].strip() not in TIEU_DE_CAP_HAI:
+                bao.append("tiêu đề cấp hai phải đúng từng chữ một tên của khung (TIEU_DE_CAP_HAI)")
+        elif dong.startswith("|"):
+            pass
+        elif re.fullmatch(r"=+\s*", dong) or (re.fullmatch(r"-+\s*", dong) and (truoc.strip() or dong.strip() != "---")):
+            bao.append("tiêu đề gạch chân hay đường kẻ sai (chỉ cho «---» sau một dòng trống)")
+        else:
+            m = _DD_MUC.fullmatch(dong)
+            if m:
+                than = m.group("noi")
+                if than[:1] in ("#", ">", "|", "<", "`") or not than.strip():
+                    bao.append("nội dung mục liệt kê không được là tiêu đề, trích dẫn, bảng, HTML, mã hay trống")
+            elif dong[:1].isspace():
+                bao.append("dòng thụt lề mà không phải mục liệt kê (khối mã, đoạn nối, tiêu đề thụt)")
+            elif dong[:1] in (">", "<", "=") or dong.startswith(("```", "~~~")) or re.match(r"[*+] |\d{1,9}\) ", dong):
+                bao.append(f"dòng bắt đầu bằng «{dong[:3]}» (trích dẫn, HTML, khối mã hay ký hiệu liệt kê khác «- », «1. »)")
+            elif "|" in dong:
+                bao.append("dấu | ngoài hàng bảng")
+        if dong.count("`") % 2:
+            bao.append("số dấu ` lẻ")
+        elif "``" in dong or any((a > 0 and dong[a - 1].isalnum()) or (b + 1 < len(dong) and dong[b + 1].isalnum())
+                                 for a, b in zip(*[iter([i for i, c in enumerate(dong) if c == "`"])] * 2)):
+            bao.append("mã «`…`» dính liền chữ ở mặt ngoài, hay dùng hai dấu ` liền nhau")
+        else:
+            for k, doan in enumerate(dong.split("`")):
+                bao.extend(_dd_noi_dong(doan, trong_ma=k % 2 == 1))
+        for b in dict.fromkeys(bao):
+            loi.append(f"dòng {so}: định dạng ngoài bộ cho phép — {b}")
+        truoc = dong
+    return loi
 
 
 def chu_trong_nhan(nhan: str) -> str:
@@ -564,7 +677,7 @@ def kiem_khoang_gia(text: str, kho=None) -> list:
 def kiem(ho_so_text: str, thu_muc=None) -> list:
     text = nfc(ho_so_text)
     dong = text.splitlines()
-    loi = []
+    loi = kiem_dinh_dang(text)                                   # 0. định dạng cho phép
     for i, d in enumerate(dong, 1):                              # 1. L-02
         m = _CAM.search(d)
         if m:
