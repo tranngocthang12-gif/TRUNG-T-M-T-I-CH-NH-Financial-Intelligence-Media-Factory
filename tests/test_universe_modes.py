@@ -90,10 +90,17 @@ def _h(x):
     return hashlib.sha256(json.dumps(x, sort_keys=True, default=str, ensure_ascii=False).encode()).hexdigest()
 
 
-def _main_reference(as_of=None):
+def _main_reference(as_of=None, only=None):
     """Thân load_market chế độ mặc định trên main trước E2b (e6778d1), chép nguyên văn phần dựng bảng: mốc 'không đổi một
-    byte'. Mã trước E2b không lọc theo universe và không lọc sự kiện theo mã."""
+    byte'. Mã trước E2b không lọc theo universe và không lọc sự kiện theo mã.
+
+    only (Owner cho sửa tham chiếu, 24/11/2026): từ E2b, kho thật có mã data.ingest_extra nằm ngoài bảng mặc định (QĐ-4),
+    nên mốc «không đổi một byte» trên kho thật là thân cũ chạy trên dòng kho và sự kiện của mã trong universe. Khi only được
+    truyền: chỉ giữ dòng kho của mã trong only, và chỉ giữ sự kiện (tay lẫn Yahoo) của mã còn trong bảng sau ngưỡng 250 dòng.
+    only=None: thân cũ chạy y như trước (các test trên kho tạm)."""
     s = data.load_store()
+    if only is not None:
+        s = s[s.ticker.isin(list(only))]
     if as_of is not None:
         s = s[s.date <= pd.Timestamp(as_of)]
     raw = s.pivot(index="date", columns="ticker", values="close").sort_index()
@@ -101,7 +108,10 @@ def _main_reference(as_of=None):
     obs = s.pivot(index="date", columns="ticker", values="observed_at").sort_index()
     keep = raw.columns[raw.notna().sum() > 250]
     raw, vol, obs = raw[keep], vol[keep], obs[keep]
-    events = adjust.build_events(raw, obs, adjust.load_manual(), adjust.load_yahoo())
+    man, yah = adjust.load_manual(), adjust.load_yahoo()
+    if only is not None:
+        man, yah = man[man["ticker"].isin(keep)], yah[yah["ticker"].isin(keep)]
+    events = adjust.build_events(raw, obs, man, yah)
     F, S = adjust.factors(raw.index, raw.columns, events)
     adj = raw * F
     bad, rep, flags = adjust.quality(adj)
@@ -219,7 +229,8 @@ def test_operational_store_without_any_universe_ticker_fails_closed(tmp_path):
 
 
 def test_real_store_default_is_byte_identical_to_main_reference():
-    assert _same(data.load_market(), _main_reference())
+    # Owner cho sửa tham chiếu, 24/11/2026: kho thật có mã ingest_extra; mốc là thân cũ trên dòng kho và sự kiện của universe
+    assert _same(data.load_market(), _main_reference(only=config.CFG["universe"]))
 
 
 # ---------- 3. mã bị loại vì thiếu lịch sử, sự kiện của mã vắng ----------
@@ -255,6 +266,33 @@ def test_events_of_tickers_absent_from_the_table_are_dropped_before_build_events
     assert tick == {U[0]} and tick <= cols
     assert set(mk["events"]["ticker"]) == {U[0]}
     assert not any("KHONG_CO_MA" in x for x in mk["quality"]["events_not_applied"])
+
+
+def _split(ticker, at, ratio):
+    return pd.DataFrame([{"ticker": ticker, "ex_date": at, "type": "stock_split", "ratio": ratio, "cash_per_share": np.nan,
+                          "source": "yahoo", "source_status": "TU_DONG", "note": ""}], columns=adjust.EV_COLS)
+
+
+def test_build_events_gives_khong_co_ma_for_events_of_a_ticker_without_a_price_column():
+    """Gói giao 8 (24/11/2026): sự kiện của mã không có cột trong bảng giá (như MCH, 237 dòng giá, bị loại ở ngưỡng 250) nhận
+    status KHONG_CO_MA và không áp hệ số nào. Trước bản sửa, chuỗi rỗng có chỉ mục số nguyên làm phép so với ex_date ném
+    TypeError (main b01bde9). Các dòng còn lại trùng từng byte kết quả khi gọi không có hai sự kiện đó."""
+    close = _walk(U)
+    obs = pd.DataFrame(pd.Timestamp(OBS), index=close.index, columns=close.columns)
+    yahoo = pd.concat([_cash(U[0], IDX[200]), _split(U[1], IDX[300], 2.0)], ignore_index=True)
+    vang = pd.concat([_cash("MCH", IDX[150]), _split("MCH", IDX[150], 1.2147)], ignore_index=True)
+    ref = adjust.build_events(close, obs, NONE, yahoo)
+    got = adjust.build_events(close, obs, _cash("MCH", IDX[160], 2500.0), pd.concat([yahoo, vang], ignore_index=True))
+    v = got[got["ticker"] == "MCH"]
+    assert len(v) == 3 and (v["status"] == "KHONG_CO_MA").all()
+    assert (v["price_factor"] == 1.0).all() and (v["split_factor"] == 1.0).all() and v["trade_date"].isna().all()
+    assert _h(got[got["ticker"] != "MCH"].reset_index(drop=True)) == _h(ref)
+    assert "MCH" not in adjust.factors(close.index, close.columns, got)[0].columns
+
+
+def test_real_store_default_table_has_no_ingest_extra_ticker():
+    cols = set(data.load_market()["close"].columns)
+    assert not cols & set(EXTRA) and cols <= set(config.CFG["universe"])
 
 
 # ---------- 4. chế độ "historical" ----------
