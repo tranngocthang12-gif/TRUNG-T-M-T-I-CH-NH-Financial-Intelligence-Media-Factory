@@ -31,6 +31,8 @@ Viết bốn phần:
 3. Các con số then chốt bạn đã tự mở tài liệu gốc để đối chiếu: ghi số trong hồ sơ, số trong tài liệu gốc, trang, KHỚP hay LỆCH.
 4. Một việc Owner nên tự kiểm.
 
+Sau bốn phần, trả lời câu hỏi bắt buộc (máy chỉ bắt câu giá theo dấu hiệu, không bắt hết): **Liệt kê mọi câu trong hồ sơ nêu hoặc ngụ ý giá tương lai, khoảng giá trị, hệ số định giá mục tiêu, hay hành động với cổ phiếu. Không có thì ghi "không có".**
+
 Luật:
 
 - Không nêu hành động nào với cổ phiếu. Không nêu khoảng giá trị hay mức giá nào.

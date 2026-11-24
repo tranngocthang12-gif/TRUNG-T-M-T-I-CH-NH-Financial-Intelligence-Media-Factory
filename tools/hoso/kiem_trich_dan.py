@@ -8,15 +8,16 @@ ngay sau bảng, phủ cả bảng.
 Mỗi trang ghi trong nhãn ĐÃ KIỂM phải có trong thư mục trang/ của nguồn đó; không có thì ĐỊA CHỈ SAI.
 Mỗi con số trong đoạn ĐÃ KIỂM phải lần ra được theo một trong các đường:
     TRANG   có trên trang đã ghi (cho phép đổi đơn vị 10^3, 10^6, 10^9 và làm tròn tới số chữ số lẻ đã viết)
-    SỔ      khớp một dòng GỐC của so_lieu.csv có đúng nguồn và đúng trang ghi trong nhãn (kể cả dòng ghế phân tích đã
-            sửa lỗi máy đọc). Dòng tính không hợp thức hóa được một địa chỉ trang: số tính đi dưới nhãn
+    SỔ      khớp một dòng GỐC của so_lieu.csv có đúng nguồn và đúng trang ghi trong nhãn. Dòng sửa (ghế phân tích ghi
+            khác máy đọc) chỉ được dùng khi đã được chứng minh (kiem_so_lieu: gần chuỗi máy đọc và có đẳng thức cộng
+            trừ trong quan_he.csv). Dòng tính không hợp thức hóa được một địa chỉ trang: số tính đi dưới nhãn
             [SUY LUẬN, sổ số liệu: <khóa>].
     TÍNH    ra được bằng một phép tính đơn giản trên các số đã lần ra khác cùng đoạn, cùng hàng hoặc cùng cột
-    NGOẠI LỆ có trong ngoai_le.csv (cột so,ngu_canh,ly_do,nguon,trang), với nguồn và trang có trong kho và nằm trong
-            địa chỉ của nhãn đoạn đó. Máy chỉ kiểm ĐỊA CHỈ của ngoại lệ, không kiểm con số có trên trang (lý do ngoại lệ
-            chính là máy đọc không ra). Ghế phản biện phải đối chiếu mọi số NGOẠI LỆ với trang gốc. Phiếu in từng
-            ngoại lệ và tỷ lệ ngoại lệ trên số con số ĐÃ KIỂM; trên 10% thì in CẢNH BÁO.
-Không theo đường nào: KHÔNG LẦN RA — hồ sơ chưa đạt.
+Không theo đường nào: KHÔNG LẦN RA — hồ sơ chưa đạt. Không có đường ngoại lệ (ADR-0020, sửa theo bản chấm L-09 vòng 2):
+con số máy không lần ra thì không mang nhãn ĐÃ KIỂM. Thư mục mã còn tệp ngoai_le.csv thì báo lỗi: tệp không còn dùng.
+so_can_kiem bỏ qua số nguyên dưới 10, năm và số trong dấu backtick. Trong đoạn ĐÃ KIỂM, các số đó vẫn phải có trên trang
+đã ghi hoặc là dòng gốc của sổ (lượt 4); không thì KHÔNG LẦN RA. Ngày tháng, số mục, mã tài liệu, địa chỉ trang và số
+đếm thời gian ("9 tháng", "66 ngày") không được coi là con số và không bị đối chiếu.
 
 Dấu: số viết có dấu âm rõ ràng (−, -, hoặc trong ngoặc đơn) chỉ khớp số âm trên trang hay trong sổ, và không đi đường
 TÍNH bằng phép cộng, nhân, chia. Số viết không dấu khớp theo trị tuyệt đối, vì văn xuôi thường bỏ dấu ("lỗ 1.193 tỷ").
@@ -37,14 +38,12 @@ import sys
 from collections import Counter
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
-from tools.hoso.chung import NHAN, KhoTrang, doc_csv, khop_co_dau, nfc, nua_don_vi, tim_so  # noqa: E402
+from tools.hoso.chung import NHAN, KhoTrang, khop_co_dau, nfc, nua_don_vi, tim_so  # noqa: E402
 from tools.hoso.kiem_so_lieu import doc_so_lieu  # noqa: E402
 
 _TAG = re.compile(r"\[[^\[\]]*(?:" + "|".join(NHAN) + r")[^\[\]]*\]")
 _DIA_CHI = re.compile(r"(?<![\w.])([A-Z]\d{1,2})(?!\w)|tr\.\s*(\d+)(?:\s*[–-]\s*(\d+))?")
 NGOAI_PHAM_VI = ("Cách đọc", "Bảng nguồn", "Lịch sử sửa", "Phiếu máy")
-COT_NGOAI_LE = ("so", "ngu_canh", "ly_do", "nguon", "trang")
-NGUONG_NGOAI_LE = 10     # phần trăm số con số ĐÃ KIỂM; vượt thì phiếu in CẢNH BÁO (ADR-0020, điều kiện hoàn tác 1)
 
 # Những thứ có chữ số nhưng không phải số liệu: bỏ trước khi tìm số.
 _BO = [re.compile(m, re.I) for m in (
@@ -74,13 +73,21 @@ def so_can_kiem(text: str) -> list:
     return kq
 
 
-def so_tho(text: str) -> list:
-    """Mọi con số trong một đoạn chữ, chỉ bỏ ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian. KHÔNG bỏ
-    số nguyên nhỏ, năm hay số trong dấu backtick. Dùng cho phép kiểm phải chặt hơn đối chiếu trích dẫn (khoảng giá)."""
+_DAU_DONG = re.compile(r"^\s*(?:[-*]\s+)?\d+\.\s")
+
+
+def lam_sach(text: str) -> str:
+    """Bỏ dấu backtick, ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian (thay bằng khoảng trắng)."""
     text = text.replace("`", " ")
     for mau in _BO:
         text = mau.sub(" ", text)
-    return tim_so(text)
+    return text
+
+
+def so_tho(text: str) -> list:
+    """Mọi con số trong một đoạn chữ, chỉ bỏ ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian. KHÔNG bỏ
+    số nguyên nhỏ, năm hay số trong dấu backtick. Dùng cho phép kiểm phải chặt hơn đối chiếu trích dẫn (khoảng giá)."""
+    return tim_so(lam_sach(text))
 
 
 def doc_dia_chi(nhan: str) -> dict:
@@ -181,12 +188,24 @@ def tach_doan(text: str) -> list:
 
 
 def cac_phan_chu(text: str) -> list:
-    """MỌI phần chữ của hồ sơ, kèm nhãn phủ nó: [{'dong', 'chu', 'nhan', 'o', 'tieu_de'}]. Phần nằm trong phạm vi đối
-    chiếu trích dẫn được gắn nhãn đúng như tach_doan. Hàng tiêu đề của bảng, chữ nằm trong chính nhãn, tiêu đề mục và các
-    mục ngoài phạm vi có nhãn ''. Với hàng dữ liệu của bảng: 'o' là các ô (đã bỏ nhãn), 'tieu_de' là các ô tiêu đề cột.
-    Dùng cho phép kiểm phải phủ toàn hồ sơ (khoảng giá, QĐ-P13)."""
+    """MỌI phần chữ của hồ sơ, kèm nhãn phủ nó: [{'dong', 'chu', 'nhan', 'o', 'tieu_de', 'loai', 'muc'}]. Phần nằm trong
+    phạm vi đối chiếu trích dẫn được gắn nhãn đúng như tach_doan. Hàng tiêu đề của bảng, chữ nằm trong chính nhãn, tiêu
+    đề mục và các mục ngoài phạm vi có nhãn ''. Với hàng dữ liệu của bảng: 'o' là các ô (đã bỏ nhãn), 'tieu_de' là các ô
+    tiêu đề cột. 'loai': hang_bang, tieu_de_bang, doan, nhan (chữ nằm trong chính nhãn), tieu_de (dòng '#'), ngoai (mục
+    ngoài phạm vi đối chiếu). 'muc': tiêu đề cấp hai đang chứa phần chữ ('' nếu trước tiêu đề đầu tiên).
+    Dùng cho phép kiểm phải phủ toàn hồ sơ (khoảng giá, cổng giá; QĐ-P13)."""
     dong = nfc(text).splitlines()
+    muc_cua, muc = {}, ""
+    for i, d in enumerate(dong, 1):
+        if d.startswith("## "):
+            muc = d[3:].strip()
+        muc_cua[i] = muc
     kq, phu = [], set()
+
+    def them(so_dong, chu, nhan, loai, o=(), tieu_de=()):
+        kq.append({"dong": so_dong, "chu": chu, "nhan": nhan, "o": list(o), "tieu_de": list(tieu_de), "loai": loai,
+                   "muc": muc_cua.get(so_dong, "")})
+        return kq[-1]
     for k in _gom_khoi(dong):
         phu.update(range(k["dong"], k["dong"] + len(k["dong_chu"])))
         if k["bang"]:
@@ -195,35 +214,47 @@ def cac_phan_chu(text: str) -> list:
             for n, (so_dong, h) in enumerate(hang):
                 o = [_TAG.sub(" ", c) for c in h]
                 rieng = _TAG.search(" | ".join(h))
-                nhan = "" if n == 0 else (rieng.group(0) if rieng else k["nhan"])
-                kq.append({"dong": so_dong, "chu": " | ".join(o), "nhan": nhan,
-                           "o": o if n else [], "tieu_de": tieu_de if n else []})
-                kq.extend({"dong": so_dong, "chu": m.group(0), "nhan": "", "o": [], "tieu_de": []}
-                          for m in _TAG.finditer(" | ".join(h)))
+                if n == 0:
+                    them(so_dong, " | ".join(o), "", "tieu_de_bang")
+                else:
+                    them(so_dong, " | ".join(o), rieng.group(0) if rieng else k["nhan"], "hang_bang", o, tieu_de)
+                for m in _TAG.finditer(" | ".join(h)):
+                    them(so_dong, m.group(0), "", "nhan")
             continue
         chu = " ".join(k["dong_chu"])
         bo = k.get("bo_dau", 0)
         if bo:
-            kq.append({"dong": k["dong"], "chu": chu[:bo], "nhan": "", "o": [], "tieu_de": []})
+            them(k["dong"], chu[:bo], "", "nhan")
         chu, dau = chu[bo:], 0
         for m in list(_TAG.finditer(chu)) + [None]:
-            kq.append({"dong": k["dong"], "chu": chu[dau:m.start()] if m else chu[dau:], "nhan": m.group(0) if m else "",
-                       "o": [], "tieu_de": []})
+            them(k["dong"], chu[dau:m.start()] if m else chu[dau:], m.group(0) if m else "", "doan")
             if m:
-                kq.append({"dong": k["dong"], "chu": m.group(0), "nhan": "", "o": [], "tieu_de": []})
+                them(k["dong"], m.group(0), "", "nhan")
                 dau = m.end()
     nhom = None                                                  # các dòng còn lại: tiêu đề, mục ngoài phạm vi
     for i, d in enumerate(dong, 1):
         if i in phu or not d.strip():
             nhom = None
         elif nhom is None or d.startswith("#") or d.lstrip().startswith("|") or re.match(r"\s*(?:[-*]|\d+\.)\s", d):
-            nhom = {"dong": i, "chu": d, "nhan": "", "o": [], "tieu_de": []}
-            kq.append(nhom)
+            nhom = them(i, d, "", "tieu_de" if d.startswith("#") else "ngoai")
             if d.startswith("#") or d.lstrip().startswith("|"):  # tiêu đề, dòng bảng: mỗi dòng một phần riêng
                 nhom = None
         else:
             nhom["chu"] += " " + d
     return sorted(kq, key=lambda x: x["dong"])
+
+
+def khop_dong_goc(so_lieu: list, so, dia_chi: dict) -> bool:
+    """Con số khớp một dòng GỐC của sổ có đúng nguồn, đúng trang trong địa chỉ (giữ dấu). Dòng sửa chỉ được dùng khi đã
+    được chứng minh; dòng tính không bao giờ."""
+    for d in so_lieu:
+        if d["loai"] != "goc" or (d.get("sua") and not d.get("chung_minh")) or d["nguon"] not in dia_chi:
+            continue
+        if dia_chi[d["nguon"]] is not None and d["trang"] not in dia_chi[d["nguon"]]:
+            continue
+        if khop_co_dau(so, [d["gia_tri"]]):
+            return True
+    return False
 
 
 def tren_trang(kho: KhoTrang, so, dia_chi: dict) -> bool:
@@ -288,55 +319,21 @@ def tinh_duoc(d, hang: list, cot: list = ()) -> str:
 
 
 # ---------- kiểm ----------
-def doc_ngoai_le(kho: KhoTrang) -> tuple:
-    """(các dòng dùng được của ngoai_le.csv, lỗi của các dòng không dùng được). Dòng dùng được phải đủ năm cột
-    so,ngu_canh,ly_do,nguon,trang; nguồn có trong nguon.csv; trang có trong thư mục trang/ của nguồn đó."""
-    p = kho.thu_muc / "ngoai_le.csv"
-    if not p.is_file():
-        return [], []
-    dung, loi = [], []
-    for e in doc_csv(p):
-        noi = f"ngoai_le.csv: dòng cho số {e.get('so', '')!r} không dùng được —"
-        thieu = [c for c in COT_NGOAI_LE if not e.get(c)]
-        if thieu:
-            loi.append(f"{noi} thiếu cột {', '.join(thieu)} (cần đủ {','.join(COT_NGOAI_LE)})")
-        elif e["nguon"] not in kho.nguon:
-            loi.append(f"{noi} nguồn {e['nguon']!r} không có trong nguon.csv")
-        elif not e["trang"].isdigit() or int(e["trang"]) not in kho.cac_trang(e["nguon"]):
-            loi.append(f"{noi} {e['nguon']} không có trang {e['trang']!r} trong thư mục trang/")
-        else:
-            dung.append(dict(e, trang=int(e["trang"])))
-    return dung, loi
-
-
 def kiem(thu_muc, ho_so_text: str) -> dict:
     kho = KhoTrang(thu_muc)
     so_lieu = doc_so_lieu(kho)["dong"] if (kho.thu_muc / "so_lieu.csv").is_file() else []
-    ngoai_le, loi_ngoai_le = doc_ngoai_le(kho)
-    da_dung = set()
     doan = tach_doan(ho_so_text)
-    kq = {"dem": Counter(), "loi": list(loi_ngoai_le), "ngoai_le": [], "khong_kiem": [], "so_con_so": len(doan)}
+    kq = {"dem": Counter(), "loi": [], "khong_kiem": [], "so_con_so": len(doan)}
+    if (kho.thu_muc / "ngoai_le.csv").is_file():
+        kq["loi"].append("ngoai_le.csv: tệp không còn được dùng — ADR-0020 (sửa theo bản chấm L-09 vòng 2) bỏ hẳn ngoại lệ; "
+                         "con số máy không lần ra thì không mang nhãn ĐÃ KIỂM. Xóa tệp này")
 
     def trong_so(s, dia_chi=None) -> bool:
-        """dia_chi (đoạn ĐÃ KIỂM): chỉ dòng gốc có đúng nguồn, đúng trang của nhãn. None: mọi dòng của sổ."""
-        for d in so_lieu:
-            if dia_chi is not None and (d["loai"] != "goc" or d["nguon"] not in dia_chi or (
-                    dia_chi[d["nguon"]] is not None and d["trang"] not in dia_chi[d["nguon"]])):
-                continue
-            if khop_co_dau(s, [d["gia_tri"]]):
-                return True
-        return False
-
-    def la_ngoai_le(s, chu, dia_chi) -> bool:
-        """Chỉ cho con số ĐÃ KIỂM; nguồn và trang của dòng ngoại lệ phải nằm trong địa chỉ của nhãn đoạn đó."""
-        for n, e in enumerate(ngoai_le):
-            if (e["so"] == s.raw and e["ngu_canh"] in chu and e["nguon"] in dia_chi
-                    and (dia_chi[e["nguon"]] is None or e["trang"] in dia_chi[e["nguon"]])):
-                if n not in da_dung:
-                    da_dung.add(n)
-                    kq["ngoai_le"].append(f"{s.raw} («{e['ngu_canh']}», {e['nguon']} tr.{e['trang']}): {e['ly_do']}")
-                return True
-        return False
+        """dia_chi (đoạn ĐÃ KIỂM): chỉ dòng gốc có đúng nguồn, đúng trang của nhãn, dòng sửa phải đã chứng minh.
+        None (đoạn không phải ĐÃ KIỂM, chỉ để đếm): mọi dòng của sổ."""
+        if dia_chi is not None:
+            return khop_dong_goc(so_lieu, s, dia_chi)
+        return any(khop_co_dau(s, [d["gia_tri"]]) for d in so_lieu)
 
     loai = [""] * len(doan)
     cho = []                                                     # con số ĐÃ KIỂM chưa neo được vào trang hay sổ
@@ -371,14 +368,11 @@ def kiem(thu_muc, ho_so_text: str) -> dict:
                 cho.remove(i)
     for i in cho:
         d, s = doan[i], doan[i]["so"]
-        if la_ngoai_le(s, d["chu"], doc_dia_chi(d["nhan"])):
-            loai[i] = "NGOẠI LỆ"
-        else:
-            loai[i] = "KHÔNG LẦN RA"
-            kq["loi"].append(f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} — không có trên trang đã ghi, không có trong sổ, "
-                             f"không tính ra được từ các số đã lần ra cùng đoạn {d['nhan']}")
+        loai[i] = "KHÔNG LẦN RA"
+        kq["loi"].append(f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} — không có trên trang đã ghi, không có trong sổ, "
+                         f"không tính ra được từ các số đã lần ra cùng đoạn {d['nhan']}")
     da_lan_ra = {(doan[i]["so"].tuyet_doi, doan[i]["so"].so_le) for i, x in enumerate(loai)
-                 if x in ("TRANG", "SỔ", "TÍNH", "NGOẠI LỆ")}
+                 if x in ("TRANG", "SỔ", "TÍNH")}
     for i, d in enumerate(doan):                                 # lượt 3: đoạn không phải ĐÃ KIỂM
         if loai[i]:
             continue
@@ -394,21 +388,30 @@ def kiem(thu_muc, ho_so_text: str) -> dict:
             loai[i] = "MÁY KHÔNG KIỂM"
             kq["khong_kiem"].append(f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} [{loai_n}]")
     kq["dem"].update(loai)
+    for p in cac_phan_chu(ho_so_text):                           # lượt 4: số so_can_kiem bỏ qua, trong đoạn ĐÃ KIỂM
+        if p["loai"] not in ("doan", "hang_bang") or loai_nhan(p["nhan"]) != "ĐÃ KIỂM":
+            continue
+        o = list(p["o"]) if p["loai"] == "hang_bang" else [_DAU_DONG.sub(" ", p["chu"])]
+        if p["loai"] == "hang_bang" and o and re.fullmatch(r"\**\d{1,2}\**", o[0].strip()):
+            o[0] = ""
+        dia_chi = doc_dia_chi(p["nhan"])
+        dung = bool(dia_chi) and all(ma in kho.nguon for ma in dia_chi) and all(
+            t in kho.cac_trang(ma) for ma, tr in dia_chi.items() if tr is not None for t in tr)
+        for c in o:
+            con = Counter((s.raw, s.gia_tri, s.pt) for s in so_can_kiem(c))
+            for s in so_tho(c):
+                if con[(s.raw, s.gia_tri, s.pt)] > 0:
+                    con[(s.raw, s.gia_tri, s.pt)] -= 1
+                    continue
+                if dung and (tren_trang(kho, s, dia_chi) or khop_dong_goc(so_lieu, s, dia_chi)):
+                    kq["dem"]["TRANG"] += 1
+                    continue
+                kq["dem"]["KHÔNG LẦN RA"] += 1
+                kq["loi"].append(f"dòng {p['dong']}: {s.raw}{'%' if s.pt else ''} — số nhỏ, năm hay số trong backtick "
+                                 f"ở đoạn ĐÃ KIỂM không có trên trang đã ghi hay dòng gốc của sổ {p['nhan']}")
     kq["trang_da_dung"] = sorted({(ma, t) for d in doan if loai_nhan(d["nhan"]) == "ĐÃ KIỂM"
                                   for ma, trang in doc_dia_chi(d["nhan"]).items() if ma in kho.nguon
                                   for t in (trang if trang is not None else kho.cac_trang(ma))})
-    for n, e in enumerate(ngoai_le):
-        if n not in da_dung:
-            kq["loi"].append(f"ngoai_le.csv: dòng cho số {e['so']!r} ({e['nguon']} tr.{e['trang']}) không dùng tới: không có "
-                             "con số ĐÃ KIỂM nào cần nó, với nhãn ghi đúng nguồn và trang này — xóa đi")
-    n_dk = sum(1 for d in doan if loai_nhan(d["nhan"]) == "ĐÃ KIỂM")
-    n_nl = kq["dem"]["NGOẠI LỆ"]
-    kq["so_da_kiem"] = n_dk
-    kq["ti_le_ngoai_le"] = (f"NGOẠI LỆ {n_nl}/{n_dk} số ĐÃ KIỂM = "
-                            f"{(f'{n_nl * 100 / n_dk:.1f}' if n_dk else '0.0').replace('.', ',')}%")
-    kq["canh_bao"] = ([f"CẢNH BÁO: ngoại lệ vượt {NGUONG_NGOAI_LE}% số con số ĐÃ KIỂM (ADR-0020, điều kiện hoàn tác 1). "
-                       "Ghế phản biện phải đối chiếu từng số NGOẠI LỆ với trang gốc."]
-                      if n_nl * 100 > NGUONG_NGOAI_LE * n_dk else [])
     return kq
 
 
@@ -421,11 +424,6 @@ def main(argv=None) -> int:
     kq = kiem(a.thu_muc, pathlib.Path(a.ho_so).read_text(encoding="utf-8"))
     for dong in kq["loi"]:
         print("LỖI:", dong)
-    for dong in kq["ngoai_le"]:
-        print("NGOẠI LỆ:", dong)
-    print(kq["ti_le_ngoai_le"])
-    for dong in kq["canh_bao"]:
-        print(dong)
     if a.chi_tiet:
         for dong in kq["khong_kiem"]:
             print("MÁY KHÔNG KIỂM:", dong)

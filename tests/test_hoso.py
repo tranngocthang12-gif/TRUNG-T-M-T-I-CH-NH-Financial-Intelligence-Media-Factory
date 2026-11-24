@@ -1,6 +1,7 @@
 """Test cho bộ công cụ hồ sơ mã tools/hoso/ (ADR-0020). Chỉ dùng doanh nghiệp giả ở templates/hoso/vi_du/:
 kho công khai không chứa hồ sơ thật, tệp gốc thật hay số liệu riêng của Owner."""
 import pathlib
+import re
 import shutil
 import sys
 import tempfile
@@ -47,6 +48,21 @@ class HoSoBase(unittest.TestCase):
 
     def ngoai_le(self, *dong, cot="so,ngu_canh,ly_do,nguon,trang"):
         (self.tm / "ngoai_le.csv").write_text(cot + "\n" + "".join(d + "\n" for d in dong), encoding="utf-8")
+
+    def them_dong(self, ten, *dong):
+        with open(self.tm / ten, "a", encoding="utf-8") as f:
+            f.write("".join(d + "\n" for d in dong))
+
+    def doc_sai(self, tep, *thay):
+        """Giả lập máy đọc sai: đổi tệp gốc giả (mỗi mẫu đúng một chỗ) rồi nhận lại, ghim lại sha256 trong bảng nguồn."""
+        goc = self.tm / "goc" / tep
+        cu, chu = sha256_tep(goc)[:12], goc.read_text(encoding="utf-8")
+        for a, b in thay:
+            self.assertEqual(len(re.findall(a, chu)), 1, a)
+            chu = re.sub(a, b, chu)
+        goc.write_text(chu, encoding="utf-8")
+        nhan_tep.nhan(self.tm, self.tm / "ma_nguon.csv")
+        self.sua("HO_SO_MAU.md", f"| {cu} |", f"| {sha256_tep(goc)[:12]} |")
 
 
 class DocSoTests(unittest.TestCase):
@@ -155,14 +171,14 @@ class TrichDanTests(HoSoBase):
         kq = self.trich_dan()
         self.assertEqual(kq["dem"]["ĐỊA CHỈ SAI"], 1)
 
-    def test_ngoai_le_phai_co_ly_do_va_khong_de_thua(self):
+    def test_ngoai_le_khong_con_la_duong_lan_ra(self):
+        # vòng sửa 2 (Owner quyết 24/11/2026: bỏ hẳn ngoại lệ): dòng ngoại lệ đủ cột trước đây cho số này qua, nay không
         self.sua("HO_SO_MAU.md", "| 12,50% |", "| 15,20% |")
         self.ngoai_le('"15,20",Nguyễn Văn A,ví dụ: số lấy từ ảnh chữ ký máy không đọc được,D1,1')
         kq = self.trich_dan()
-        self.assertEqual((kq["loi"], kq["dem"]["NGOẠI LỆ"], len(kq["ngoai_le"])), ([], 1, 1))
-        self.assertIn("NGOẠI LỆ: 15,20 («Nguyễn Văn A», D1 tr.1)", phieu_may.lap_phieu(self.tm, self.ho_so)[0])
-        self.sua("HO_SO_MAU.md", "| 15,20% |", "| 12,50% |")       # hết cần mà còn để: báo lỗi
-        self.assertTrue(any("ngoai_le.csv" in x for x in self.trich_dan()["loi"]))
+        self.assertEqual(kq["dem"]["KHÔNG LẦN RA"], 1)
+        self.assertTrue(any("ngoai_le.csv: tệp không còn được dùng" in x for x in kq["loi"]))
+        self.assertFalse(self.phieu()[1])
 
 
 class SoLieuTests(HoSoBase):
@@ -197,6 +213,7 @@ class SoLieuTests(HoSoBase):
         phieu, dat = phieu_may.lap_phieu(self.tm, self.ho_so)
         self.assertTrue(dat, phieu)
         self.assertIn("ĐÃ SỬA SO VỚI MÁY ĐỌC: q3_lntt_9t25", phieu)
+        self.assertIn("chứng minh bằng đẳng thức «quý 3 2026: lợi nhuận trước thuế 9 tháng»", phieu)
 
     def test_chuoi_goc_phai_co_tren_trang(self):
         self.sua("so_lieu.csv", "kq25_thue,D1,1,36.000.000.000", "kq25_thue,D1,1,63.000.000.000")
@@ -360,63 +377,189 @@ class DauVaDiaChiTests(HoSoBase):
         self.assertEqual(len(kq["loi"]), 2)
 
 
-class NgoaiLeTests(HoSoBase):
-    """Lỗi chặn 3: ngoại lệ phải ghi nguồn và trang, chỉ dùng cho số ĐÃ KIỂM, và hiện trên phiếu kèm tỷ lệ."""
+class BoNgoaiLeTests(HoSoBase):
+    """Lỗi chặn 2a của bản chấm L-09 vòng 2: con số tự khai qua ngoại lệ. Owner quyết bỏ hẳn ngoại lệ (24/11/2026): con số
+    máy không lần ra thì không mang nhãn ĐÃ KIỂM."""
     CAU = "Dự kiến doanh thu 2027 là 987,65 tỷ. [ĐÃ KIỂM D1 tr.1]"
-    DONG = '"987,65",Dự kiến doanh thu 2027,máy nhận dạng sai'
 
-    def test_ngoai_le_tu_khai_khong_co_nguon_trang(self):
+    def test_vi_du_ban_cham_vong_2_nay_chua_dat(self):
         self.them_sau(MUC_9, self.CAU)
-        self.ngoai_le(self.DONG, cot="so,ngu_canh,ly_do")
+        self.ngoai_le('"987,65",Dự kiến doanh thu 2027,máy nhận dạng sai,D1,1')
         kq = self.trich_dan()
-        self.assertTrue(any("thiếu cột nguon, trang" in x for x in kq["loi"]))
-        self.assertEqual(kq["dem"]["KHÔNG LẦN RA"], 1)
+        self.assertTrue(any(": 987,65 — không có trên trang" in x for x in kq["loi"]), kq["loi"])
+        self.assertTrue(any("ngoai_le.csv: tệp không còn được dùng" in x for x in kq["loi"]))
+        phieu, dat = self.phieu()
+        self.assertFalse(dat)
+        self.assertNotIn("NGOẠI LỆ", phieu)
+
+    def test_so_nho_nam_va_backtick_trong_doan_da_kiem_cung_phai_lan_ra(self):
+        # so_can_kiem bỏ qua số nguyên dưới 10, năm và số trong backtick; trong đoạn ĐÃ KIỂM chúng vẫn phải có trên trang
+        for cau, so in (("Dự kiến doanh thu 2027 là 9 nghìn tỷ đồng. [ĐÃ KIỂM D1 tr.1]", {"2027", "9"}),
+                        ("Doanh thu năm tới là `987,65` tỷ đồng. [ĐÃ KIỂM D1 tr.1]", {"987,65"})):
+            with self.subTest(cau=cau):
+                chu = self.ho_so.read_text(encoding="utf-8")
+                self.them_sau(MUC_9, cau)
+                loi = self.trich_dan()["loi"]
+                self.assertEqual({x.split(" — ")[0].split(": ")[1] for x in loi}, so, loi)
+                self.assertFalse(self.phieu()[1])
+                self.ho_so.write_text(chu, encoding="utf-8")
+        self.them_sau(MUC_9, "Hai phiên quan sát đều thuộc 2026. [ĐÃ KIỂM G1]")    # 2026 có trên trang G1
+        self.assertEqual(self.trich_dan()["loi"], [])
+        self.assertTrue(self.phieu()[1])
+
+    def test_tep_ngoai_le_con_trong_thu_muc_la_loi(self):
+        self.ngoai_le()                                            # chỉ dòng tiêu đề, không dòng nào
+        self.assertEqual(len(self.trich_dan()["loi"]), 1)
         self.assertFalse(self.phieu()[1])
+        (self.tm / "ngoai_le.csv").unlink()
+        self.assertTrue(self.phieu()[1])
 
-    def test_ngoai_le_trang_khong_co_hoac_nguon_la(self):
-        self.them_sau(MUC_9, self.CAU)
-        for duoi, bao in ((",D1,7", "D1 không có trang '7'"), (",Z9,1", "nguồn 'Z9' không có trong nguon.csv"),
-                          (",D1,mot", "D1 không có trang 'mot'")):
-            with self.subTest(duoi=duoi):
-                self.ngoai_le(self.DONG + duoi)
-                kq = self.trich_dan()
-                self.assertTrue(any(bao in x for x in kq["loi"]), kq["loi"])
-                self.assertEqual(kq["dem"]["NGOẠI LỆ"], 0)
 
-    def test_ngoai_le_phai_nam_trong_dia_chi_cua_nhan(self):
-        self.them_sau(MUC_9, self.CAU)
-        self.ngoai_le(self.DONG + ",D2,1")                      # D2 tr.1 có thật, nhưng nhãn đoạn ghi D1 tr.1
-        kq = self.trich_dan()
-        self.assertEqual(kq["dem"]["KHÔNG LẦN RA"], 1)
-        self.assertTrue(any("không dùng tới" in x for x in kq["loi"]))
+class CongGiaTests(HoSoBase):
+    """Lỗi chặn 1 của bản chấm L-09 vòng 2: giá mục tiêu lọt cổng L-02. Quy tắc cho phép (kiem_luat.kiem_cong_gia): giá cổ
+    phiếu, hệ số định giá và vốn hóa chỉ được nêu dưới dạng số quá khứ có nguồn trong đoạn ĐÃ KIỂM, không kèm từ chỉ tương
+    lai. Mọi ca DO đều cho phiếu ĐẠT tại 8a06134 (ca số tuyệt đối tính ra thì phiếu đã CHƯA ĐẠT vì mục 4, nhưng cổng luật
+    không báo gì)."""
+    DO = ("Dự kiến giá cổ phiếu MAU kỳ tới là 25,40 nghìn đồng. [GIẢ ĐỊNH]",
+          "Giá cổ phiếu dự báo dao động từ 25,40 tới 26,10 nghìn đồng. [ĐÃ KIỂM G1]",
+          "Dự kiến giá cổ phiếu MAU kỳ tới là 25,40. [GIẢ ĐỊNH]",
+          "Kỳ vọng thị giá năm tới đạt 31.500 đ một cổ phiếu. [SUY LUẬN, tính từ D1 tr.1]",
+          "Với P/E 15 lần và EPS 2.000 đồng, cổ phiếu đáng 30.000 đồng. [GIẢ ĐỊNH]",
+          "Cổ phiếu sẽ về lại 25,40 nghìn đồng trong quý tới. [ĐÃ KIỂM G1]",
+          "Tiềm năng tăng giá 35% trong mười hai tháng tới. [GIẢ ĐỊNH]",
+          "P/E mục tiêu 15 lần. [GIẢ ĐỊNH]",
+          "Vốn hóa có thể đạt 100.000 tỷ đồng. [GIẢ ĐỊNH]",
+          "Mục tiêu mười hai tháng: 30 nghìn. [GIẢ ĐỊNH]",
+          "Giá 26,10 nghìn đồng, tăng 10% tức 2,61, thành 28,71 nghìn đồng. [ĐÃ KIỂM G1]",
+          "| Kịch bản | Giá (nghìn đồng) |\n|---|---:|\n| Cơ sở | 27,50 |\n\n[SUY LUẬN]")
+    XANH = ("Giá vốn hàng bán năm 2025 là 840 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+            "Giá vốn bằng 70,0% doanh thu. [SUY LUẬN, sổ số liệu: bien_gop_25]",
+            "Giá đóng cửa tăng từ 25,40 lên 26,10 nghìn đồng, tức 2,8%. [ĐÃ KIỂM G1]")
 
-    def test_ngoai_le_khong_dung_cho_doan_khong_nhan(self):
-        self.them_sau(MUC_9, "Dự kiến doanh thu 2027 là 987,65 tỷ.")
-        self.ngoai_le(self.DONG + ",D1,1")
-        kq = self.trich_dan()
-        self.assertEqual((kq["dem"]["CHƯA GẮN NHÃN"], kq["dem"]["NGOẠI LỆ"]), (1, 0))
-        self.assertTrue(any("không dùng tới" in x for x in kq["loi"]))
+    def test_gia_tuong_lai_hay_khong_nguon_bi_bat(self):
+        chu = self.ho_so.read_text(encoding="utf-8")
+        for cau in self.DO:
+            with self.subTest(cau=cau):
+                self.ho_so.write_text(chu.replace(MUC_9, MUC_9 + "\n\n" + cau), encoding="utf-8")
+                self.assertTrue(any("ngữ cảnh giá cổ phiếu" in x for x in self.luat()), self.luat())
+                self.assertFalse(self.phieu()[1])
 
-    def test_ngoai_le_du_cot_thi_qua_va_hien_tren_phieu(self):
-        so_dk = self.trich_dan()["so_da_kiem"]
-        self.them_sau(MUC_9, self.CAU)
-        self.ngoai_le(self.DONG + ",D1,1")
+    def test_khong_bat_nham(self):
+        # hồ sơ mẫu có: tiêu đề "Mục 8. Định giá theo khoảng", "Mục 10. … xu hướng giá", hàng G1 của Bảng nguồn, hàng
+        # "Chi phí vốn hóa, trả trước" của bảng 15 điểm soi, câu giá đóng cửa ĐÃ KIỂM G1 ở mục 10
+        self.assertEqual(kiem_luat.kiem_cong_gia(self.ho_so.read_text(encoding="utf-8"), KhoTrang(self.tm)), [])
+        chu = self.ho_so.read_text(encoding="utf-8")
+        for cau in self.XANH:
+            with self.subTest(cau=cau):
+                self.ho_so.write_text(chu.replace(MUC_9, MUC_9 + "\n\n" + cau), encoding="utf-8")
+                self.assertEqual(self.luat(), [])
+                self.assertTrue(self.phieu()[1])
+
+    def test_tieu_de_va_bang_nguon_khong_lot(self):
+        # tiêu đề, hàng tiêu đề bảng và bảng nguồn không mang nhãn: có dấu hiệu giá kèm số (không tính năm) là lỗi
+        chu = self.ho_so.read_text(encoding="utf-8")
+        for cu, moi in ((MUC_9, MUC_9 + "\n\n### Dự kiến giá cổ phiếu năm tới: 30.000 đồng\n\nCác tệp không nói. [CHƯA BIẾT]"),
+                        (MUC_9, MUC_9 + "\n\n| Dự kiến giá 30.000 đồng |\n|---|\n\n[GIẢ ĐỊNH]"),
+                        ("| G1 | Giá đóng cửa hai phiên", "| — | Dự kiến giá 30.000 đồng | — | — |\n| G1 | Giá đóng cửa hai phiên")):
+            with self.subTest(moi=moi):
+                self.ho_so.write_text(chu.replace(cu, moi), encoding="utf-8")
+                self.assertTrue(any("tiêu đề hay bảng nguồn ở ngữ cảnh giá" in x for x in self.luat()), self.luat())
+                self.assertFalse(self.phieu()[1])
+        self.ho_so.write_text(chu.replace(MUC_9, MUC_9 + "\n\n### Giá đóng cửa 2024–2026\n\nCác tệp không nói. [CHƯA BIẾT]"),
+                              encoding="utf-8")
+        self.assertEqual(self.luat(), [])                                         # chỉ có năm: không bắt
+
+    def test_danh_sach_loai_tru_la_hang_so(self):
+        dh = kiem_luat.dau_hieu_gia
+        for cum in kiem_luat.GIA_KHONG_TINH:
+            self.assertEqual(dh(f"{cum[0].upper()}{cum[1:]} năm 2025 là 840 tỷ đồng"), [], cum)
+        for cum in kiem_luat.VON_HOA_KHONG_TINH:
+            self.assertEqual(dh(f"{cum} 12 tỷ đồng"), [], cum)
+        self.assertEqual(dh("Chi phí vốn hoá, trả trước 12"), [])                 # biến thể "hoá"
+        self.assertEqual(dh("Giá trị sổ sách 12 tỷ đồng"), [])
+        for cum in kiem_luat.GIA_TRI_TINH:
+            self.assertIn("(b) chữ «giá»", dh(f"Giá trị {cum} là 12"), cum)
+        self.assertIn("(b) chữ «giá»", dh("Thị giá 25"))
+        self.assertIn("(a) đơn vị giá", dh("Mục tiêu: 30 nghìn."))
+        self.assertIn("(a) đơn vị giá", dh("EPS 2.880/cp"))
+        self.assertEqual(dh("Khối lượng 30 nghìn cổ phiếu; doanh thu 1.200 tỷ đồng; quỹ 5 nghìn tỷ đồng"), [])
+        self.assertIn("(c) hệ số định giá hoặc vốn hóa", dh("P / E 15 lần"))
+        self.assertIn("(c) hệ số định giá hoặc vốn hóa", dh("vốn hoá 100 tỷ đồng"))
+
+
+class ChungMinhSuaTests(HoSoBase):
+    """Lỗi chặn 2b của bản chấm L-09 vòng 2: dòng sửa trong sổ (gia_tri khác máy đọc) chỉ kèm ghi chú chữ vẫn đi đường SỔ.
+    Nay dòng sửa phải cách chuỗi máy đọc không quá hai ký tự và có đẳng thức cộng trừ trong quan_he.csv chứng minh."""
+    SUA = "x_sua,D1,1,36.000.000.000,37.000.000.000,dong,máy đọc 7 thành 6 (giả),"
+
+    def cho(self, khoa):
+        return [x for x in kiem_so_lieu.doc_so_lieu(KhoTrang(self.tm))["loi"] if "CHỜ CHỨNG MINH" in x and f"'{khoa}'" in x]
+
+    def test_x_bia_cua_kien_truc_su(self):
+        self.them_dong("so_lieu.csv", "x_bia,D1,1,36.000.000.000,987.650.000.000,dong,máy đọc sai,")
+        self.them_sau(MUC_9, "Dự kiến doanh thu 2027 là 987,65 tỷ. [ĐÃ KIỂM D1 tr.1]")
+        self.assertTrue(self.cho("x_bia"))
+        self.assertTrue(any(": 987,65 — không có trên trang" in x for x in self.trich_dan()["loi"]))
+        phieu, dat = self.phieu()
+        self.assertFalse(dat)
+        self.assertIn("x_bia", phieu)
+
+    def test_dang_thuc_khong_chung_minh_duoc(self):
+        so_lieu = (self.tm / "so_lieu.csv").read_text(encoding="utf-8")
+        quan_he = (self.tm / "quan_he.csv").read_text(encoding="utf-8")
+        ca = {
+            "hệ số gộp của khóa bằng 0": ([self.SUA], ["thu,x_sua - x_sua + kq25_dt,kq25_dt,0"], ["x_sua"]),
+            "có hằng số": ([self.SUA], ["thu,x_sua,kq25_dt - 1163000000000,1"], ["x_sua"]),
+            "sai_so lớn": ([self.SUA], ["thu,x_sua,kq25_thue,1.000.000.000"], ["x_sua"]),
+            "khóa còn lại là dòng sửa chưa chứng minh": (
+                [self.SUA, "y_sua,D1,1,10.000.000.000,11.000.000.000,dong,máy đọc 1 thành 0 (giả),"],
+                ["thu,x_sua - y_sua,kq25_thue - lc25_tc,1"], ["x_sua", "y_sua"]),
+            "dùng dòng tính": ([self.SUA, "z_tinh,,,,,dong,,kq25_thue + lc25_tc / 10"], ["thu,x_sua,z_tinh,1"], ["x_sua"]),
+            "cách chuỗi máy đọc ba ký tự": (["x_xa,D1,1,36.000.000.000,144.000.000.000,dong,máy đọc sai (giả),"],
+                                            ["thu,x_xa,kq25_lnst,1"], ["x_xa"]),
+        }
+        for ten, (dong_so, dong_qh, cho) in ca.items():
+            with self.subTest(ca=ten):
+                (self.tm / "so_lieu.csv").write_text(so_lieu, encoding="utf-8")
+                (self.tm / "quan_he.csv").write_text(quan_he, encoding="utf-8")
+                self.them_dong("so_lieu.csv", *dong_so)
+                self.them_dong("quan_he.csv", *dong_qh)
+                self.assertEqual(kiem_so_lieu.kiem_quan_he(KhoTrang(self.tm),
+                                                           kiem_so_lieu.doc_so_lieu(KhoTrang(self.tm))["bien"])["loi"], [])
+                for k in cho:
+                    self.assertTrue(self.cho(k), (ten, k))
+                self.assertFalse(self.phieu()[1])
+
+    def test_hai_dong_sua_chung_minh_noi_tiep(self):
+        # máy đọc sai giá vốn (840 → 870) và lợi nhuận gộp (360 → 350). Đẳng thức doanh thu − giá vốn = lợi nhuận gộp chứa
+        # cả hai nên chưa chứng minh được dòng nào; lợi nhuận gộp được chứng minh trước bằng đẳng thức kế tiếp, rồi mới tới
+        # giá vốn.
+        self.doc_sai("bctc_mau_2025.txt", (r"840\.000\.000\.000", "870.000.000.000"), (r"360\.000\.000\.000", "350.000.000.000"))
+        self.sua("so_lieu.csv", "kq25_gia_von,D1,1,840.000.000.000,,dong,,",
+                 "kq25_gia_von,D1,1,870.000.000.000,840.000.000.000,dong,máy đọc 4 thành 7 (giả),")
+        self.sua("so_lieu.csv", "kq25_ln_gop,D1,1,360.000.000.000,,dong,,",
+                 "kq25_ln_gop,D1,1,350.000.000.000,360.000.000.000,dong,máy đọc 6 thành 5 (giả),")
         phieu, dat = self.phieu()
         self.assertTrue(dat, phieu)
-        self.assertIn("NGOẠI LỆ: 987,65 («Dự kiến doanh thu 2027», D1 tr.1): máy nhận dạng sai", phieu)
-        self.assertIn(f"NGOẠI LỆ 1/{so_dk + 1} số ĐÃ KIỂM = {100 / (so_dk + 1):.1f}%".replace(".", ","), phieu)
-        self.assertNotIn("CẢNH BÁO", phieu)
+        self.assertIn("kq25_ln_gop: máy đọc 350.000.000.000, ghế phân tích ghi 360.000.000.000 (D1 tr.1) — máy đọc 6 thành 5 "
+                      "(giả); chứng minh bằng đẳng thức «kqkd 2025: lợi nhuận gộp − chi phí bán hàng và quản lý = lợi nhuận "
+                      "trước thuế»", phieu)
+        self.assertIn("chứng minh bằng đẳng thức «kqkd 2025: doanh thu thuần − giá vốn = lợi nhuận gộp»", phieu)
 
-    def test_canh_bao_khi_ngoai_le_vuot_muoi_phan_tram(self):
-        so = ("987,65", "876,54", "765,43", "654,32")
-        self.them_sau(MUC_9, f"Dự kiến bốn chỉ tiêu 2027: {'; '.join(so)} tỷ. [ĐÃ KIỂM D1 tr.1]")
-        self.ngoai_le(*[f'"{x}",Dự kiến bốn chỉ tiêu 2027,máy nhận dạng sai,D1,1' for x in so])
-        kq = self.trich_dan()
-        self.assertEqual((kq["loi"], kq["dem"]["NGOẠI LỆ"]), ([], 4))
-        self.assertGreater(4 * 100, kiem_trich_dan.NGUONG_NGOAI_LE * kq["so_da_kiem"])
+    def test_dong_chi_thieu_dau_cham(self):
+        self.doc_sai("bctc_mau_q3_2026.txt", (r"1\.050\.000", "1.050000"))
+        self.sua("so_lieu.csv", "q3_dt_9t26,D2,1,1.050.000,,trieu,,",
+                 "q3_dt_9t26,D2,1,1.050000,1.050.000,trieu,máy đọc thiếu dấu chấm (giả),")
         phieu, dat = self.phieu()
-        self.assertIn("CẢNH BÁO: ngoại lệ vượt 10%", phieu)
-        self.assertTrue(dat, phieu)                               # cảnh báo, không đổi phiếu thành CHƯA ĐẠT
+        self.assertTrue(dat, phieu)
+        self.assertIn("chứng minh bằng đẳng thức «quý 3 2026: doanh thu 9 tháng»", phieu)
+
+    def test_khoang_cach_va_he_so(self):
+        self.assertEqual(kiem_so_lieu.khoang_cach(kiem_so_lieu.day_so("(36.000.000.000)"), kiem_so_lieu.day_so("36000000000")), 0)
+        self.assertEqual(kiem_so_lieu.khoang_cach("36000000000", "144000000000"), 3)
+        self.assertEqual(kiem_so_lieu.he_so_cong_tru("a - (b - c) + -d"), {"a": 1, "b": -1, "c": 1, "d": -1})
+        for xau in ("a - 1", "a * b", "a / b", "abs(a)", "a ** 2"):
+            self.assertIsNone(kiem_so_lieu.he_so_cong_tru(xau), xau)
 
 
 class VanTayTrangTests(HoSoBase):

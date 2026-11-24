@@ -12,12 +12,24 @@ so_lieu.csv, cột: khoa,nguon,trang,chuoi_goc,gia_tri,don_vi,ghi_chu,cong_thuc
              tích kết luận máy đọc sai; khi đó `ghi_chu` bắt buộc nói vì sao (phép trừ nào, đã xem ảnh trang nào).
              chuoi_goc chép không kèm dấu ngoặc thì giá trị dương, dấu do công thức ở quan_he.csv quyết định;
              chép kèm ngoặc đơn thì giá trị âm.
+  Dòng sửa : dòng gốc có `gia_tri` khác giá trị máy đọc từ chuoi_goc (kể cả khi chuoi_goc không đọc được thành một
+             con số). Lời ghi chú không đủ: dòng sửa chỉ được nhận khi máy kiểm được cả hai điều (ADR-0020 QĐ-H4):
+             (i)  gần chuỗi máy đọc: bỏ dấu chấm, dấu phẩy, khoảng trắng, ngoặc và dấu trừ ở cả chuoi_goc và gia_tri,
+                  khoảng cách sửa (thêm, bớt, thay một ký tự) giữa hai dãy còn lại không quá KHOANG_CACH_TOI_DA;
+             (ii) có đẳng thức chứng minh trong quan_he.csv: đẳng thức đúng; hai vế chỉ gồm tên khóa nối bằng cộng,
+                  trừ và ngoặc (không hằng số, không nhân chia); mọi khóa là dòng gốc; hệ số gộp của khóa đang xét
+                  khác 0; sai_so không quá SAI_SO_CHUNG_MINH đơn vị ở chữ số cuối của gia_tri; mọi khóa khác là dòng
+                  gốc chép đúng máy đọc hoặc dòng sửa đã được chứng minh trước (lặp tới khi không thêm được; không
+                  chứng minh vòng).
+             Thiếu một trong hai: CHỜ CHỨNG MINH, là lỗi; đối chiếu trích dẫn không dùng dòng đó cho số ĐÃ KIỂM.
   Dòng tính: khoa,cong_thuc (chỉ + - * / trên các khóa đứng trước). `gia_tri` nếu điền phải khớp kết quả.
-quan_he.csv, cột: ten,ve_trai,ve_phai,sai_so  (sai_so tính theo đơn vị của hai vế; số viết kiểu Việt Nam).
+quan_he.csv, cột: ten,ve_trai,ve_phai,sai_so  (sai_so tính theo đơn vị của hai vế; số viết kiểu Việt Nam). Quan hệ có
+  hằng số hay nhân chia (ví dụ cột phần trăm) vẫn được kiểm đúng sai, chỉ không tính là chứng minh cho dòng sửa.
 
 Chạy: python tools/hoso/kiem_so_lieu.py --thu-muc <thư mục mã> [--soat-bang]
 """
 import argparse
+import ast
 import pathlib
 import re
 import sys
@@ -27,6 +39,45 @@ sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from tools.hoso.chung import KhoTrang, doc_csv, doc_so, nua_don_vi, tim_so, tinh_bieu_thuc  # noqa: E402
 
 _KHOA = re.compile(r"^[a-z][a-z0-9_]*$")
+KHOANG_CACH_TOI_DA = 2        # ký tự, giữa dãy chữ số của chuoi_goc và của gia_tri
+SAI_SO_CHUNG_MINH = 2         # đơn vị ở chữ số cuối của gia_tri
+
+
+def day_so(chuoi: str) -> str:
+    """Bỏ dấu chấm, dấu phẩy, khoảng trắng, dấu ngoặc và dấu trừ."""
+    return re.sub(r"[.,\s()\[\]\-−–]", "", chuoi or "")
+
+
+def khoang_cach(a: str, b: str) -> int:
+    """Khoảng cách sửa (thêm, bớt, thay một ký tự) giữa hai chuỗi."""
+    truoc = list(range(len(b) + 1))
+    for i, x in enumerate(a, 1):
+        hien = [i]
+        for j, y in enumerate(b, 1):
+            hien.append(min(truoc[j] + 1, hien[j - 1] + 1, truoc[j - 1] + (x != y)))
+        truoc = hien
+    return truoc[-1]
+
+
+def he_so_cong_tru(bieu_thuc: str):
+    """{khóa: hệ số} nếu biểu thức chỉ gồm tên khóa nối bằng cộng, trừ và ngoặc (cho phép dấu đứng trước); None nếu có
+    hằng số, nhân, chia hay thứ khác."""
+    try:
+        cay = ast.parse((bieu_thuc or "").strip(), mode="eval").body
+    except SyntaxError:
+        return None
+    hs = {}
+
+    def di(nut, dau):
+        if isinstance(nut, ast.Name):
+            hs[nut.id] = hs.get(nut.id, 0) + dau
+            return True
+        if isinstance(nut, ast.BinOp) and isinstance(nut.op, (ast.Add, ast.Sub)):
+            return di(nut.left, dau) and di(nut.right, dau if isinstance(nut.op, ast.Add) else -dau)
+        if isinstance(nut, ast.UnaryOp) and isinstance(nut.op, (ast.UAdd, ast.USub)):
+            return di(nut.operand, dau if isinstance(nut.op, ast.UAdd) else -dau)
+        return False
+    return hs if di(cay, 1) else None
 
 
 def _co_tren_trang(chuoi_goc: str, van_ban: str) -> bool:
@@ -46,7 +97,7 @@ def doc_so_lieu(kho: KhoTrang) -> dict:
         kq["loi"].append("thiếu so_lieu.csv")
         return kq
     for d in doc_csv(p):
-        khoa = d.get("khoa", "")
+        khoa, sua = d.get("khoa", ""), False
         noi = f"so_lieu.csv, khóa {khoa!r}"
         if not _KHOA.match(khoa) or khoa in kq["bien"]:
             kq["loi"].append(f"{noi}: khóa phải là chữ thường, số, gạch dưới, bắt đầu bằng chữ, và không trùng")
@@ -88,8 +139,7 @@ def doc_so_lieu(kho: KhoTrang) -> dict:
                         if not d.get("ghi_chu"):
                             kq["loi"].append(f"{noi}: gia_tri khác chuoi_goc mà không có ghi_chu giải thích")
                             continue
-                        kq["da_sua"].append(f"{khoa}: máy đọc {chuoi}, ghế phân tích ghi {d['gia_tri']} "
-                                            f"({ma} tr.{trang}) — {d['ghi_chu']}")
+                        sua = True
                 loai = "goc"
         except (ValueError, KeyError, InvalidOperation, ZeroDivisionError, SyntaxError) as e:
             kq["loi"].append(f"{noi}: {e}")
@@ -97,8 +147,71 @@ def doc_so_lieu(kho: KhoTrang) -> dict:
         kq["bien"][khoa] = gia_tri
         kq["dong"].append({"khoa": khoa, "loai": loai, "gia_tri": gia_tri, "nguon": d.get("nguon", ""),
                            "trang": int(d.get("trang") or 0), "chuoi_goc": re.sub(r"\s+", "", d.get("chuoi_goc", "")),
-                           "ghi_chu": d.get("ghi_chu", "")})
+                           "ghi_chu": d.get("ghi_chu", ""), "sua": sua, "gia_tri_ghi": d.get("gia_tri", ""),
+                           "chung_minh": ""})
+    _chung_minh(kho, kq)
     return kq
+
+
+def _chung_minh(kho: KhoTrang, kq: dict) -> None:
+    """Xét từng dòng sửa theo hai điều (i), (ii) ở đầu tệp. Ghi tên đẳng thức chứng minh vào dòng['chung_minh']; dòng
+    thiếu điều nào thì thêm lỗi CHỜ CHỨNG MINH. Ghi kq['da_sua'] cho mọi dòng sửa."""
+    sua = {d["khoa"]: d for d in kq["dong"] if d["sua"]}
+    if not sua:
+        return
+    goc = {d["khoa"] for d in kq["dong"] if d["loai"] == "goc"}
+    goc_dung = {d["khoa"] for d in kq["dong"] if d["loai"] == "goc" and not d["sua"]}
+    p = kho.thu_muc / "quan_he.csv"
+    quan_he = []                                             # (tên, {khóa: hệ số của vế trái − vế phải}, sai_so)
+    for r in (doc_csv(p) if p.is_file() else []):
+        trai, phai = he_so_cong_tru(r.get("ve_trai", "")), he_so_cong_tru(r.get("ve_phai", ""))
+        if trai is None or phai is None or not (set(trai) | set(phai)) <= goc:
+            continue
+        try:
+            lech = abs(tinh_bieu_thuc(r["ve_trai"], kq["bien"]) - tinh_bieu_thuc(r["ve_phai"], kq["bien"]))
+            sai_so = abs(doc_so(r.get("sai_so") or "0"))
+        except (ValueError, KeyError, InvalidOperation, ZeroDivisionError, SyntaxError):
+            continue
+        if lech <= sai_so:
+            hs = dict(trai)
+            for k, v in phai.items():
+                hs[k] = hs.get(k, 0) - v
+            quan_he.append((r.get("ten", ""), hs, sai_so))
+    kc = {k: khoang_cach(day_so(d["chuoi_goc"]), day_so(d["gia_tri_ghi"])) for k, d in sua.items()}
+    gan = {k for k in sua if kc[k] <= KHOANG_CACH_TOI_DA}
+
+    def chung_minh_duoc(k, da):
+        don_vi = Decimal(1).scaleb(-tim_so(sua[k]["gia_tri_ghi"])[0].so_le)
+        for ten, hs, sai_so in quan_he:
+            if hs.get(k, 0) != 0 and sai_so <= SAI_SO_CHUNG_MINH * don_vi and all(
+                    o in goc_dung or o in da for o in hs if o != k):
+                return ten
+        return ""
+    da = {}
+    doi = True
+    while doi:                                               # lặp tới khi không thêm được dòng nào
+        doi = False
+        for k in sorted(gan - set(da)):
+            ten = chung_minh_duoc(k, da)
+            if ten:
+                da[k], doi = ten, True
+    for k, d in sua.items():
+        d["chung_minh"] = da.get(k, "")
+        dong = (f"{k}: máy đọc {d['chuoi_goc']}, ghế phân tích ghi {d['gia_tri_ghi']} ({d['nguon']} tr.{d['trang']}) — "
+                f"{d['ghi_chu']}")
+        if k in da:
+            kq["da_sua"].append(f"{dong}; chứng minh bằng đẳng thức «{da[k]}»")
+            continue
+        kq["da_sua"].append(f"{dong}; CHỜ CHỨNG MINH")
+        thieu = []
+        if k not in gan:
+            thieu.append(f"cách chuỗi máy đọc {kc[k]} ký tự (quá {KHOANG_CACH_TOI_DA})")
+        if not chung_minh_duoc(k, da):
+            thieu.append("chưa có đẳng thức chứng minh trong quan_he.csv (đúng; chỉ tên khóa nối bằng cộng, trừ, ngoặc; "
+                         f"mọi khóa là dòng gốc; hệ số của {k} khác 0; sai_so không quá {SAI_SO_CHUNG_MINH} đơn vị ở chữ "
+                         "số cuối; mọi khóa khác là dòng gốc chép đúng máy đọc hoặc dòng sửa đã chứng minh)")
+        kq["loi"].append(f"so_lieu.csv, khóa {k!r}: CHỜ CHỨNG MINH — dòng sửa so với máy đọc chưa được nhận: "
+                         + "; ".join(thieu))
 
 
 def kiem_quan_he(kho: KhoTrang, bien: dict) -> dict:

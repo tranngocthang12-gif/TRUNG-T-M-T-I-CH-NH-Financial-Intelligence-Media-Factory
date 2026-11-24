@@ -38,10 +38,10 @@
 | # | Kiểm | Đạt khi |
 |---|---|---|
 | 1 | Danh mục nguồn | Mỗi tệp gốc còn đúng sha256 đã ghim; đủ trang văn bản |
-| 2 | Sổ số liệu | Mỗi dòng gốc có trên trang đã ghi; mọi quan hệ trong `quan_he.csv` đúng; có đẳng thức đúng cho cả ba báo cáo (`cdkt`, `kqkd`, `lctt`); chỗ ghế phân tích ghi khác máy đọc phải có ghi chú và hiện trên phiếu |
+| 2 | Sổ số liệu | Mỗi dòng gốc có trên trang đã ghi; mọi quan hệ trong `quan_he.csv` đúng; có đẳng thức đúng cho cả ba báo cáo (`cdkt`, `kqkd`, `lctt`); chỗ ghế phân tích ghi khác máy đọc phải cách chuỗi máy đọc không quá hai ký tự, được một đẳng thức cộng trừ trong `quan_he.csv` chứng minh, và hiện trên phiếu kèm tên đẳng thức |
 | 3 | Soát bảng | Mọi hàng "a − b lệch c đúng một chữ số" trên trang hồ sơ có dùng đã được ghế phân tích kết luận trong sổ |
-| 4 | Trích dẫn | Mỗi con số trong đoạn ĐÃ KIỂM có trên trang đã ghi, hoặc là một dòng của sổ, hoặc tính được từ các số đã lần ra cùng đoạn; không đoạn nào có số mà thiếu nhãn; ngoại lệ phải có lý do và hiện trên phiếu |
-| 5 | Luật và khung | Không cụm từ L-02 cấm; đủ mười hai mục; mục 8 trống; mục 11 đủ ba giả thuyết, điều kiện sai, ngày xem lại; đủ mười lăm điểm soi; kết bằng danh sách CHƯA BIẾT; bảng nguồn khớp sha256 |
+| 4 | Trích dẫn | Mỗi con số trong đoạn ĐÃ KIỂM có trên trang đã ghi, hoặc là một dòng của sổ, hoặc tính được từ các số đã lần ra cùng đoạn; không đoạn nào có số mà thiếu nhãn; không có ngoại lệ, con số máy không lần ra thì không mang nhãn ĐÃ KIỂM |
+| 5 | Luật và khung | Không cụm từ L-02 cấm; đủ mười hai mục; mục 8 trống; mục 11 đủ ba giả thuyết, điều kiện sai, ngày xem lại; đủ mười lăm điểm soi; kết bằng danh sách CHƯA BIẾT; bảng nguồn khớp sha256; giá cổ phiếu, hệ số định giá và vốn hóa chỉ được nêu dưới dạng số quá khứ có nguồn trong đoạn ĐÃ KIỂM, không kèm từ chỉ tương lai |
 
 - Phiếu ghi sha256 của hồ sơ và commit của công cụ. Phiếu không có giờ chạy: cùng đầu vào, cùng công cụ thì ra cùng phiếu. Ai có thư mục mã cũng chạy lại được. Phiếu là bằng chứng chạy lại được, không phải chữ ký.
 - Phiếu ĐẠT nghĩa là con số lần ra được và hồ sơ đúng khung. Phiếu không nói lập luận đúng.
@@ -50,7 +50,7 @@
 ### QĐ-H4 — Số trong hồ sơ đi qua sổ
 
 - Mọi tỷ lệ, hiệu, tổng do ghế phân tích tự tính được ghi thành dòng tính trong `so_lieu.csv` và máy tính lại. Không tính nhẩm trong lúc viết.
-- Số ghế phân tích kết luận là máy đọc sai được ghi cùng chuỗi máy đọc, giá trị sửa và phép tính chứng minh. Không sửa chuỗi máy đọc.
+- Số ghế phân tích kết luận là máy đọc sai được ghi cùng chuỗi máy đọc, giá trị sửa và phép tính chứng minh; phép tính chứng minh là một dòng của `quan_he.csv` và máy kiểm. Không sửa chuỗi máy đọc.
 - Đọc hết mọi trang của báo cáo quý mới nhất và phần thuyết minh của báo cáo năm mới nhất.
 
 ### QĐ-H5 — Phản biện và đối chiếu số
@@ -86,6 +86,7 @@ Sau mốc dựng xong, thêm việc mới vào kiến trúc cần lệnh Owner. 
 | QĐ | Trạng thái | Owner | Ngày |
 |---|---|---|---|
 | QĐ-H1 tới QĐ-H8 | ACCEPTED theo lệnh Owner giao kiến trúc sư chọn cách làm; Owner đổi được trước khi gộp | Owner (lệnh 00:48 và 00:54) | 24/11/2026 |
+| QĐ-H3 (dòng 2, 4, 5), QĐ-H4 và điều kiện hoàn tác 1 | Sửa theo bản chấm L-09 vòng 2; Owner chọn bỏ hẳn ngoại lệ | Owner | 24/11/2026 |
 
 ## Lý do (bằng chứng, số đo)
 
@@ -104,6 +105,7 @@ Chạy thử bộ công cụ ngày 24/11/2026 trên thư mục mã của hồ s�
 - Máy không bắt được con số có trên trang nhưng lấy nhầm ô, không kiểm lập luận, không biết hồ sơ bỏ sót gì.
 - Phép "tính được từ số cùng đoạn" có thể cho qua nhầm một con số nhỏ trùng hợp. Phiếu in số lượng theo từng đường lần ra để người đọc biết.
 - Bộ mẫu L-02 kiểm cứng: câu phủ định có cụm cấm cũng bị bắt. Cách xử lý là đổi cách viết.
+- Cổng giá cổ phiếu là quy tắc theo dấu hiệu (đơn vị giá, chữ «giá», hệ số định giá, vốn hóa) và danh sách từ chỉ tương lai. Máy không bắt câu nêu giá tương lai mà không có chữ «giá», không đơn vị tiền, không hệ số định giá (ví dụ «Cổ phiếu MAU kỳ tới về 25,40»), và câu đặt số quá khứ có nguồn vào ý tương lai bằng từ ngoài danh sách. Lớp bắt phần này là ghế phản biện khác hãng (B7), với câu hỏi bắt buộc trong `templates/hoso/LENH_MAU.md`.
 - Phiếu là văn bản. Giá trị của nó ở chỗ chạy lại được, không ở chỗ không giả được.
 - Công cụ mới thử trên một mã, là doanh nghiệp phi tài chính. Ngân hàng, bảo hiểm, chứng khoán có mẫu báo cáo khác; chưa thử.
 - Ghế viết và ghế kiến trúc cùng hãng; phản biện khác hãng vẫn là lớp kiểm không thay được.
@@ -117,7 +119,7 @@ Chạy thử bộ công cụ ngày 24/11/2026 trên thư mục mã của hồ s�
 
 ## Điều kiện hoàn tác
 
-1. Sau hai hồ sơ, nếu ở cả hai phiếu máy chỉ đạt được khi ghi ngoại lệ cho hơn một phần mười số con số ĐÃ KIỂM, hoặc cả hai lần máy đối chiếu không bắt được lỗi gài: kiến trúc sư báo Owner trong 7 ngày. Owner chọn bằng một ADR mới: sửa công cụ, hoặc bỏ điều kiện phiếu máy và quay về kiểm tay cộng phản biện khác hãng như ADR-0019.
+1. Sau hai hồ sơ, nếu ở cả hai có hơn một phần mười số dòng gốc của sổ phải sửa so với máy đọc, hoặc có hơn mười con số trên trang mà máy không đọc được sau khi đã đọc lại, hoặc cả hai lần máy đối chiếu không bắt được lỗi gài: kiến trúc sư báo Owner trong 7 ngày. Owner chọn bằng một ADR mới: sửa công cụ, hoặc bỏ điều kiện phiếu máy và quay về kiểm tay cộng phản biện khác hãng như ADR-0019.
 2. Tới hết ngày 31/01/2027 chưa đạt điều (3) của QĐ-H8: xử lý theo điều kiện hoàn tác 1 của ADR-0019.
 3. Hoàn tác không cần khôi phục gì: PR này chỉ thêm tệp mới và vài dòng chỉ đường; gỡ là xóa `tools/hoso/`, `tests/test_hoso.py`, `templates/hoso/`, `templates/ky_luat/`, hai tệp trong `docs/` và một tên trong `tests.yml`.
 

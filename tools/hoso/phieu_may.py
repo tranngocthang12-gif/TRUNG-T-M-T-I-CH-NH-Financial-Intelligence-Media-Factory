@@ -6,10 +6,10 @@ Phiếu ghi sha256 của hồ sơ, nên sửa hồ sơ một chữ là phiếu c
 cùng công cụ thì ra cùng phiếu — ai có thư mục mã cũng tự chạy lại để kiểm được.
 
 Hồ sơ chỉ được gọi là "hồ sơ mã của dự án" khi phiếu kết luận ĐẠT. Phiếu ĐẠT nghĩa là: tệp gốc đúng bản đã ghim, văn
-bản trang đúng bản máy tách ra, số trong sổ khớp trang và khớp phép tính, mỗi con số ĐÃ KIỂM lần ra được, hồ sơ đúng
-khung và không phạm L-02.
-Phiếu ĐẠT KHÔNG có nghĩa là lập luận đúng: việc đó thuộc ghế phản biện khác hãng và Owner. Số NGOẠI LỆ chỉ được máy kiểm
-địa chỉ (nguồn, trang), không kiểm con số có trên trang: ghế phản biện đối chiếu từng số với trang gốc.
+bản trang đúng bản máy tách ra, số trong sổ khớp trang và khớp phép tính, mỗi dòng sửa so với máy đọc được một đẳng thức
+cộng trừ chứng minh (phiếu in tên đẳng thức), mỗi con số ĐÃ KIỂM lần ra được (không có ngoại lệ), hồ sơ đúng khung,
+không phạm L-02, và giá cổ phiếu chỉ được nêu dưới dạng số quá khứ có nguồn.
+Phiếu ĐẠT KHÔNG có nghĩa là lập luận đúng: việc đó thuộc ghế phản biện khác hãng và Owner.
 
 Mã thoát: 0 nếu ĐẠT, 1 nếu CHƯA ĐẠT. Phiếu được ghi cạnh hồ sơ: PHIEU_MAY_<tên hồ sơ>.txt
 """
@@ -61,7 +61,8 @@ def lap_phieu(thu_muc, ho_so) -> tuple:
     qh = kiem_so_lieu.kiem_quan_he(kho, sl["bien"])
     thieu = [b for b in BA_BAO_CAO if not any(t.lower().startswith(b) for t in qh["ten_dat"])]
     loi_so = sl["loi"] + qh["loi"] + [f"quan_he.csv chưa có đẳng thức đúng nào tên bắt đầu bằng '{b}'" for b in thieu]
-    muc("2. Sổ số liệu", loi_so, f"{len(sl['dong'])} dòng, {qh['dat']} quan hệ đúng",
+    muc("2. Sổ số liệu", loi_so, f"{len(sl['dong'])} dòng, {qh['dat']} quan hệ đúng, "
+        f"{sum(1 for d in sl['dong'] if d['sua'])} dòng sửa so với máy đọc",
         [f"ĐÃ SỬA SO VỚI MÁY ĐỌC: {x}" for x in sl["da_sua"]])
 
     td = kiem_trich_dan.kiem(thu_muc, text)
@@ -78,13 +79,11 @@ def lap_phieu(thu_muc, ho_so) -> tuple:
         f"trong đó {ngoai} hàng ở trang hồ sơ không dùng")
 
     dem = td["dem"]
-    thu_tu = ("TRANG", "SỔ", "TÍNH", "NGOẠI LỆ", "NHẮC LẠI", "MÁY KHÔNG KIỂM", "KHÔNG LẦN RA", "CHƯA GẮN NHÃN", "ĐỊA CHỈ SAI")
-    muc("4. Trích dẫn", td["loi"], ", ".join(f"{k} {dem.get(k, 0)}" for k in thu_tu),
-        [f"NGOẠI LỆ: {x}" for x in td["ngoai_le"]] + [td["ti_le_ngoai_le"]
-         + " (máy chỉ kiểm nguồn và trang của ngoại lệ; ghế phản biện đối chiếu từng số với trang gốc)"] + td["canh_bao"])
+    thu_tu = ("TRANG", "SỔ", "TÍNH", "NHẮC LẠI", "MÁY KHÔNG KIỂM", "KHÔNG LẦN RA", "CHƯA GẮN NHÃN", "ĐỊA CHỈ SAI")
+    muc("4. Trích dẫn", td["loi"], ", ".join(f"{k} {dem.get(k, 0)}" for k in thu_tu) + "; không có đường ngoại lệ")
 
     muc("5. Luật và khung", kiem_luat.kiem(text, thu_muc),
-        "L-02, khoảng giá ở mọi mục, mười hai mục, mục 8 đúng câu cố định, giả thuyết, bảng nguồn")
+        "L-02, cổng giá cổ phiếu, khoảng giá ở mọi mục, mười hai mục, mục 8 đúng câu cố định, giả thuyết, bảng nguồn")
     return _dong_goi(ho_so, dong, tong_loi == 0), tong_loi == 0
 
 
