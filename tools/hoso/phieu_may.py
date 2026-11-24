@@ -5,9 +5,11 @@
 Phiếu ghi sha256 của hồ sơ, nên sửa hồ sơ một chữ là phiếu cũ hết giá trị. Phiếu không có giờ chạy: cùng đầu vào,
 cùng công cụ thì ra cùng phiếu — ai có thư mục mã cũng tự chạy lại để kiểm được.
 
-Hồ sơ chỉ được gọi là "hồ sơ mã của dự án" khi phiếu kết luận ĐẠT. Phiếu ĐẠT nghĩa là: tệp gốc đúng bản đã ghim, số
-trong sổ khớp trang và khớp phép tính, mỗi con số ĐÃ KIỂM lần ra được, hồ sơ đúng khung và không phạm L-02.
-Phiếu ĐẠT KHÔNG có nghĩa là lập luận đúng: việc đó thuộc ghế phản biện khác hãng và Owner.
+Hồ sơ chỉ được gọi là "hồ sơ mã của dự án" khi phiếu kết luận ĐẠT. Phiếu ĐẠT nghĩa là: tệp gốc đúng bản đã ghim, văn
+bản trang đúng bản máy tách ra, số trong sổ khớp trang và khớp phép tính, mỗi con số ĐÃ KIỂM lần ra được, hồ sơ đúng
+khung và không phạm L-02.
+Phiếu ĐẠT KHÔNG có nghĩa là lập luận đúng: việc đó thuộc ghế phản biện khác hãng và Owner. Số NGOẠI LỆ chỉ được máy kiểm
+địa chỉ (nguồn, trang), không kiểm con số có trên trang: ghế phản biện đối chiếu từng số với trang gốc.
 
 Mã thoát: 0 nếu ĐẠT, 1 nếu CHƯA ĐẠT. Phiếu được ghi cạnh hồ sơ: PHIEU_MAY_<tên hồ sơ>.txt
 """
@@ -53,7 +55,7 @@ def lap_phieu(thu_muc, ho_so) -> tuple:
         muc("1. Danh mục nguồn", loi_nguon, "tệp gốc không đúng bản đã ghim")
         return _dong_goi(ho_so, dong, False), False
     kho = KhoTrang(thu_muc)
-    muc("1. Danh mục nguồn", [], f"{len(kho.nguon)} tệp, sha256 khớp, đủ trang")
+    muc("1. Danh mục nguồn", [], f"{len(kho.nguon)} tệp, sha256 khớp, đủ trang, văn bản trang khớp dấu vân tay đã ghi")
 
     sl = kiem_so_lieu.doc_so_lieu(kho)
     qh = kiem_so_lieu.kiem_quan_he(kho, sl["bien"])
@@ -78,9 +80,11 @@ def lap_phieu(thu_muc, ho_so) -> tuple:
     dem = td["dem"]
     thu_tu = ("TRANG", "SỔ", "TÍNH", "NGOẠI LỆ", "NHẮC LẠI", "MÁY KHÔNG KIỂM", "KHÔNG LẦN RA", "CHƯA GẮN NHÃN", "ĐỊA CHỈ SAI")
     muc("4. Trích dẫn", td["loi"], ", ".join(f"{k} {dem.get(k, 0)}" for k in thu_tu),
-        [f"NGOẠI LỆ: {x}" for x in td["ngoai_le"]])
+        [f"NGOẠI LỆ: {x}" for x in td["ngoai_le"]] + [td["ti_le_ngoai_le"]
+         + " (máy chỉ kiểm nguồn và trang của ngoại lệ; ghế phản biện đối chiếu từng số với trang gốc)"] + td["canh_bao"])
 
-    muc("5. Luật và khung", kiem_luat.kiem(text, thu_muc), "L-02, mười hai mục, mục 8 trống, giả thuyết, bảng nguồn")
+    muc("5. Luật và khung", kiem_luat.kiem(text, thu_muc),
+        "L-02, khoảng giá ở mọi mục, mười hai mục, mục 8 đúng câu cố định, giả thuyết, bảng nguồn")
     return _dong_goi(ho_so, dong, tong_loi == 0), tong_loi == 0
 
 

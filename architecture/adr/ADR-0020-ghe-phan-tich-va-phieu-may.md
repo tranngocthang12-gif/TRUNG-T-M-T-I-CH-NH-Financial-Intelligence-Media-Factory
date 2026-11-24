@@ -69,7 +69,7 @@
 ### QĐ-H7 — Sửa thứ tự của QĐ-P14
 
 - Theo lệnh Owner ngày 24/11/2026: hai việc của bước 3 ở QĐ-P14 — chốt mẫu vào kho và viết máy kiểm trích dẫn — làm ngay bằng PR này, không chờ Owner dùng xong hồ sơ đầu tiên. Việc thứ ba (xét xóa phần mã đã ngừng) vẫn để sau.
-- Thước đo của ADR-0019 giữ nguyên và thêm một điều kiện: hồ sơ đầu tiên phải có phiếu máy ĐẠT.
+- Thước đo ở QĐ-P14 của ADR-0019 giữ nguyên chữ và nguyên tiêu chí. Phiếu máy ĐẠT là cổng kỹ thuật của sản phẩm theo ADR này: một bản phân tích chưa có phiếu ĐẠT thì chưa được gọi là hồ sơ mã của dự án (QĐ-H1), nên chưa được đem ra đo theo QĐ-P14.
 - Hồ sơ đầu tiên bản 1 không bị thu hồi. Owner vẫn đọc được. Ghế phân tích làm bản 2 theo quy trình này.
 
 ### QĐ-H8 — "Kiến trúc xong" là gì

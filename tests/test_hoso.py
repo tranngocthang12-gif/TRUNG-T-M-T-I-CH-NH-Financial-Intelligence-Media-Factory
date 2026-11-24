@@ -6,14 +6,17 @@ import sys
 import tempfile
 import unittest
 from decimal import Decimal
+from unittest import mock
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from tools import laws_checks  # noqa: E402
 from tools.hoso import gai_loi, kiem_luat, kiem_so_lieu, kiem_trich_dan, nhan_tep, phieu_may  # noqa: E402
-from tools.hoso.chung import KhoTrang, tim_so, tinh_bieu_thuc  # noqa: E402
+from tools.hoso.chung import KhoTrang, sha256_tep, tim_so, tinh_bieu_thuc  # noqa: E402
 
 VI_DU = ROOT / "templates" / "hoso" / "vi_du"
+MUC_8 = "**Chưa viết.** Theo ADR-0019 QĐ-P13, mục này chỉ viết sau khi Owner sửa L-02."
+MUC_9 = "## Mục 9. Thị trường chung và chu kỳ"
 
 
 class HoSoBase(unittest.TestCase):
@@ -35,6 +38,15 @@ class HoSoBase(unittest.TestCase):
 
     def trich_dan(self):
         return kiem_trich_dan.kiem(self.tm, self.ho_so.read_text(encoding="utf-8"))
+
+    def luat(self):
+        return kiem_luat.kiem(self.ho_so.read_text(encoding="utf-8"), self.tm)
+
+    def phieu(self):
+        return phieu_may.lap_phieu(self.tm, self.ho_so)
+
+    def ngoai_le(self, *dong, cot="so,ngu_canh,ly_do,nguon,trang"):
+        (self.tm / "ngoai_le.csv").write_text(cot + "\n" + "".join(d + "\n" for d in dong), encoding="utf-8")
 
 
 class DocSoTests(unittest.TestCase):
@@ -119,11 +131,12 @@ class TrichDanTests(HoSoBase):
         self.assertEqual(kq["dem"]["KHÔNG LẦN RA"], 3)
 
     def test_tinh_tu_so_da_lan_ra(self):
+        truoc = self.trich_dan()["dem"]["TÍNH"]
         self.them_sau("## Mục 6. Chất lượng lợi nhuận",
                       "Giá vốn 840 tỷ đồng trên doanh thu 1.200 tỷ đồng, tức 70,0%. [ĐÃ KIỂM D1 tr.1]")
         kq = self.trich_dan()
         self.assertEqual(kq["loi"], [])
-        self.assertEqual(kq["dem"]["TÍNH"], 1)
+        self.assertEqual(kq["dem"]["TÍNH"], truoc + 1)
 
     def test_doan_co_so_ma_khong_nhan(self):
         self.them_sau("## Mục 9. Thị trường chung và chu kỳ", "Doanh thu năm tới ước 1.444 tỷ đồng.")
@@ -144,19 +157,22 @@ class TrichDanTests(HoSoBase):
 
     def test_ngoai_le_phai_co_ly_do_va_khong_de_thua(self):
         self.sua("HO_SO_MAU.md", "| 12,50% |", "| 15,20% |")
-        (self.tm / "ngoai_le.csv").write_text(
-            "so,ngu_canh,ly_do\n\"15,20\",Nguyễn Văn A,ví dụ: số lấy từ ảnh chữ ký máy không đọc được\n", encoding="utf-8")
+        self.ngoai_le('"15,20",Nguyễn Văn A,ví dụ: số lấy từ ảnh chữ ký máy không đọc được,D1,1')
         kq = self.trich_dan()
         self.assertEqual((kq["loi"], kq["dem"]["NGOẠI LỆ"], len(kq["ngoai_le"])), ([], 1, 1))
-        self.assertIn("NGOẠI LỆ: 15,20", phieu_may.lap_phieu(self.tm, self.ho_so)[0])
+        self.assertIn("NGOẠI LỆ: 15,20 («Nguyễn Văn A», D1 tr.1)", phieu_may.lap_phieu(self.tm, self.ho_so)[0])
         self.sua("HO_SO_MAU.md", "| 15,20% |", "| 12,50% |")       # hết cần mà còn để: báo lỗi
         self.assertTrue(any("ngoai_le.csv" in x for x in self.trich_dan()["loi"]))
 
 
 class SoLieuTests(HoSoBase):
     def _may_doc_sai(self):
-        """Giả lập máy nhận dạng đọc 135.000 thành 125.000 trên trang, và sổ chép đúng theo máy."""
-        self.sua("trang/D2/p001.txt", "135.000", "125.000")
+        """Giả lập máy nhận dạng đọc 135.000 thành 125.000, và sổ chép đúng theo máy. Trang do máy tách ra nên không sửa tay
+        được (trang_sha256.csv): giả lập bằng cách đổi tệp gốc giả rồi nhận lại, và ghim lại sha256 trong bảng nguồn."""
+        cu = sha256_tep(self.tm / "goc" / "bctc_mau_q3_2026.txt")[:12]
+        self.sua("goc/bctc_mau_q3_2026.txt", "135.000", "125.000")
+        nhan_tep.nhan(self.tm, self.tm / "ma_nguon.csv")
+        self.sua("HO_SO_MAU.md", f"| {cu} |", f"| {sha256_tep(self.tm / 'goc' / 'bctc_mau_q3_2026.txt')[:12]} |")
         self.sua("so_lieu.csv", "q3_lntt_9t25,D2,1,135.000,,trieu,,", "q3_lntt_9t25,D2,1,125.000,,trieu,,")
 
     def test_phep_tru_hang_bat_chu_so_doc_sai(self):
@@ -234,6 +250,229 @@ class LuatTests(HoSoBase):
     def test_bang_nguon_khop_sha256(self):
         self.sua("HO_SO_MAU.md", "| cb37fce58f1b |", "| cb37fce58f17 |")
         self.assertTrue(any("sha256 của D1" in x for x in self.loi()))
+
+
+class KhoangGiaTests(HoSoBase):
+    """Lỗi chặn 1 của bản chấm L-09 vòng 1, PR #117: mục 8 và khoảng giá lọt qua L-02 (QĐ-P13)."""
+
+    def test_muc_8_chi_duoc_dung_cau_co_dinh(self):
+        for them in ("Giá trị một cổ phiếu là 9 đồng.", "Giá trị một cổ phiếu là `45` nghìn đồng.", "Chưa có số.",
+                     "| Kịch bản | |\n|---|---|\n| Cơ sở | |"):
+            with self.subTest(them=them):
+                chu = self.ho_so.read_text(encoding="utf-8")
+                self.sua("HO_SO_MAU.md", MUC_8, MUC_8 + "\n" + them)
+                self.assertTrue(any(x.startswith("Mục 8") for x in self.luat()))
+                self.assertFalse(self.phieu()[1])
+                self.ho_so.write_text(chu, encoding="utf-8")
+        self.sua("HO_SO_MAU.md", MUC_8, "Chưa   viết.  Theo ADR-0019 **QĐ-P13**,\nmục này chỉ viết sau khi Owner sửa L-02.")
+        self.assertEqual(self.luat(), [])                       # chỉ đổi chữ đậm và khoảng trắng: vẫn đạt
+
+    def test_khoang_gia_gia_dinh_o_muc_khac(self):
+        self.them_sau(MUC_9, "Khoảng giá trị 20,5–30,5 nghìn đồng. [GIẢ ĐỊNH]")
+        self.assertEqual(self.trich_dan()["loi"], [])           # đối chiếu trích dẫn không kiểm đoạn GIẢ ĐỊNH
+        self.assertTrue(any("khoảng giá «20,5–30,5 nghìn đồng»" in x for x in self.luat()))
+        self.assertFalse(self.phieu()[1])
+
+    def test_khoang_gia_suy_luan(self):
+        self.them_sau(MUC_9, "Cổ phiếu có thể giao dịch từ 20,5 tới 30,5 nghìn đồng. [SUY LUẬN]")
+        self.assertTrue(any("khoảng giá «20,5 tới 30,5 nghìn đồng»" in x for x in self.luat()))
+
+    def test_khoang_gia_dang_bang(self):
+        self.them_sau(MUC_9, "| Kịch bản | Giá trị (nghìn đồng) |\n|---|---:|\n| Cơ sở | 20,5–30,5 |\n\n[GIẢ ĐỊNH]")
+        self.assertTrue(any("khoảng giá «20,5–30,5 nghìn đồng»" in x for x in self.luat()))   # đơn vị ở tiêu đề cột
+        self.assertFalse(self.phieu()[1])
+
+    def test_gia_tri_mot_co_phieu_theo_kich_ban_dang_bang(self):
+        self.them_sau(MUC_9, "| Kịch bản | Giá trị một cổ phiếu (nghìn đồng) |\n|---|---:|\n| Xấu | 20,5 |\n| Tốt | 30,5 |"
+                             "\n\n[GIẢ ĐỊNH]")
+        self.assertEqual(sum("«Giá trị một cổ phiếu» đi với số" in x for x in self.luat()), 2)
+
+    def test_khoang_nam_trong_nhan_cung_bi_bat(self):
+        self.them_sau(MUC_9, "Các tệp hiện có không nói về ngành. [GIẢ ĐỊNH 20–30 nghìn đồng]")
+        self.assertTrue(any("khoảng giá «20–30 nghìn đồng»" in x for x in self.luat()))
+
+    def test_gia_qua_khu_da_kiem_tren_trang_thi_qua(self):
+        self.them_sau(MUC_9, "Giá đóng cửa hai phiên nằm trong khoảng 25,40–26,10 nghìn đồng. [ĐÃ KIỂM G1]\n\n"
+                             "Mức giá đóng cửa phiên 23/11/2026 là 26,10 nghìn đồng. [ĐÃ KIỂM G1]")
+        self.assertEqual(self.luat(), [])
+        self.assertTrue(self.phieu()[1])
+
+    def test_mot_dau_khong_co_tren_trang_thi_bi_bat(self):
+        self.them_sau(MUC_9, "Giá đóng cửa hai phiên nằm trong khoảng 25,40–29,10 nghìn đồng. [ĐÃ KIỂM G1]")
+        self.assertTrue(any("khoảng giá «25,40–29,10 nghìn đồng»" in x for x in self.luat()))
+        self.assertTrue(any("khoảng giá" in x for x in kiem_luat.kiem(self.ho_so.read_text(encoding="utf-8"))))  # không có trang
+
+
+class DauVaDiaChiTests(HoSoBase):
+    """Lỗi chặn 2: số sai dấu, dòng tính của sổ và trang không có thật không được coi là đã kiểm."""
+
+    def test_so_am_khong_khop_so_duong_tren_trang(self):
+        for viet in ("-1.200", "(1.200)", "−1.200"):
+            with self.subTest(viet=viet):
+                chu = self.ho_so.read_text(encoding="utf-8")
+                self.sua("HO_SO_MAU.md", "Doanh thu thuần năm 2025 là 1.200 tỷ đồng, năm trước",
+                         f"Doanh thu thuần năm 2025 là {viet} tỷ đồng, năm trước")
+                loi = self.trich_dan()["loi"]
+                self.assertEqual(len(loi), 1, loi)
+                self.assertIn("1.200 — không có trên trang", loi[0])
+                self.ho_so.write_text(chu, encoding="utf-8")
+
+    def test_so_am_khong_tinh_ra_bang_phep_cong(self):
+        # 1.000 + 200 = 1.200 đều có trên trang, nhưng tổng của hai số dương không ra số âm
+        self.them_sau(MUC_9, "Doanh thu 2025 là -1.200 tỷ đồng, năm trước 1.000 tỷ đồng, tiền đầu năm 200 tỷ đồng. "
+                             "[ĐÃ KIỂM D1 tr.1]")
+        loi = self.trich_dan()["loi"]
+        self.assertEqual(len(loi), 1, loi)
+        self.assertIn("1.200 — không có trên trang", loi[0])
+
+    def test_so_am_viet_dung_dau_van_qua(self):
+        # tệp mẫu in lưu chuyển tiền đầu tư và tài chính trong ngoặc đơn (số âm)
+        self.them_sau(MUC_9, "Lưu chuyển tiền từ đầu tư là (60) tỷ đồng, từ tài chính là -10 tỷ đồng, kinh doanh 120 tỷ đồng. "
+                             "[ĐÃ KIỂM D1 tr.1]")
+        kq = self.trich_dan()
+        self.assertEqual(kq["loi"], [])
+        self.assertTrue(self.phieu()[1])
+
+    def test_dong_tinh_khong_hop_thuc_hoa_dia_chi_trang(self):
+        self.them_sau(MUC_9, "Phải thu khách hàng tăng 36,4%. [ĐÃ KIỂM D2 tr.1]")
+        loi = self.trich_dan()["loi"]
+        self.assertEqual(len(loi), 1, loi)
+        self.assertIn("36,4% — không có trên trang", loi[0])
+        self.assertFalse(self.phieu()[1])
+
+    def test_dong_goc_cua_so_chi_khop_dung_trang(self):
+        # 135 (tỷ) là dòng gốc q3_lntt_9t25 của D2 tr.1 trong sổ; nhãn ghi D1 tr.1 thì không được dùng dòng đó
+        self.them_sau(MUC_9, "Lợi nhuận trước thuế chín tháng năm trước là 135 tỷ đồng. [ĐÃ KIỂM D1 tr.1]")
+        self.assertEqual(len(self.trich_dan()["loi"]), 1)
+
+    def test_trang_khong_co_trong_kho(self):
+        self.them_sau(MUC_9, "Phải thu khách hàng tăng 36,4%. [ĐÃ KIỂM D1 tr.99]")
+        kq = self.trich_dan()
+        self.assertEqual(kq["dem"]["ĐỊA CHỈ SAI"], 1)
+        self.assertIn("D1 tr.99", kq["loi"][0])
+        self.assertFalse(self.phieu()[1])
+
+    def test_so_khong_nhan_khong_thanh_nhac_lai_hay_so(self):
+        # 1.200 đã lần ra ở chỗ khác và 36,4 có trong sổ, nhưng đoạn không có nhãn thì vẫn là CHƯA GẮN NHÃN
+        self.them_sau(MUC_9, "Doanh thu năm 2025 là 1.200 tỷ đồng, phải thu tăng 36,4%.")
+        kq = self.trich_dan()
+        self.assertEqual(kq["dem"]["CHƯA GẮN NHÃN"], 2)
+        self.assertEqual(len(kq["loi"]), 2)
+
+
+class NgoaiLeTests(HoSoBase):
+    """Lỗi chặn 3: ngoại lệ phải ghi nguồn và trang, chỉ dùng cho số ĐÃ KIỂM, và hiện trên phiếu kèm tỷ lệ."""
+    CAU = "Dự kiến doanh thu 2027 là 987,65 tỷ. [ĐÃ KIỂM D1 tr.1]"
+    DONG = '"987,65",Dự kiến doanh thu 2027,máy nhận dạng sai'
+
+    def test_ngoai_le_tu_khai_khong_co_nguon_trang(self):
+        self.them_sau(MUC_9, self.CAU)
+        self.ngoai_le(self.DONG, cot="so,ngu_canh,ly_do")
+        kq = self.trich_dan()
+        self.assertTrue(any("thiếu cột nguon, trang" in x for x in kq["loi"]))
+        self.assertEqual(kq["dem"]["KHÔNG LẦN RA"], 1)
+        self.assertFalse(self.phieu()[1])
+
+    def test_ngoai_le_trang_khong_co_hoac_nguon_la(self):
+        self.them_sau(MUC_9, self.CAU)
+        for duoi, bao in ((",D1,7", "D1 không có trang '7'"), (",Z9,1", "nguồn 'Z9' không có trong nguon.csv"),
+                          (",D1,mot", "D1 không có trang 'mot'")):
+            with self.subTest(duoi=duoi):
+                self.ngoai_le(self.DONG + duoi)
+                kq = self.trich_dan()
+                self.assertTrue(any(bao in x for x in kq["loi"]), kq["loi"])
+                self.assertEqual(kq["dem"]["NGOẠI LỆ"], 0)
+
+    def test_ngoai_le_phai_nam_trong_dia_chi_cua_nhan(self):
+        self.them_sau(MUC_9, self.CAU)
+        self.ngoai_le(self.DONG + ",D2,1")                      # D2 tr.1 có thật, nhưng nhãn đoạn ghi D1 tr.1
+        kq = self.trich_dan()
+        self.assertEqual(kq["dem"]["KHÔNG LẦN RA"], 1)
+        self.assertTrue(any("không dùng tới" in x for x in kq["loi"]))
+
+    def test_ngoai_le_khong_dung_cho_doan_khong_nhan(self):
+        self.them_sau(MUC_9, "Dự kiến doanh thu 2027 là 987,65 tỷ.")
+        self.ngoai_le(self.DONG + ",D1,1")
+        kq = self.trich_dan()
+        self.assertEqual((kq["dem"]["CHƯA GẮN NHÃN"], kq["dem"]["NGOẠI LỆ"]), (1, 0))
+        self.assertTrue(any("không dùng tới" in x for x in kq["loi"]))
+
+    def test_ngoai_le_du_cot_thi_qua_va_hien_tren_phieu(self):
+        so_dk = self.trich_dan()["so_da_kiem"]
+        self.them_sau(MUC_9, self.CAU)
+        self.ngoai_le(self.DONG + ",D1,1")
+        phieu, dat = self.phieu()
+        self.assertTrue(dat, phieu)
+        self.assertIn("NGOẠI LỆ: 987,65 («Dự kiến doanh thu 2027», D1 tr.1): máy nhận dạng sai", phieu)
+        self.assertIn(f"NGOẠI LỆ 1/{so_dk + 1} số ĐÃ KIỂM = {100 / (so_dk + 1):.1f}%".replace(".", ","), phieu)
+        self.assertNotIn("CẢNH BÁO", phieu)
+
+    def test_canh_bao_khi_ngoai_le_vuot_muoi_phan_tram(self):
+        so = ("987,65", "876,54", "765,43", "654,32")
+        self.them_sau(MUC_9, f"Dự kiến bốn chỉ tiêu 2027: {'; '.join(so)} tỷ. [ĐÃ KIỂM D1 tr.1]")
+        self.ngoai_le(*[f'"{x}",Dự kiến bốn chỉ tiêu 2027,máy nhận dạng sai,D1,1' for x in so])
+        kq = self.trich_dan()
+        self.assertEqual((kq["loi"], kq["dem"]["NGOẠI LỆ"]), ([], 4))
+        self.assertGreater(4 * 100, kiem_trich_dan.NGUONG_NGOAI_LE * kq["so_da_kiem"])
+        phieu, dat = self.phieu()
+        self.assertIn("CẢNH BÁO: ngoại lệ vượt 10%", phieu)
+        self.assertTrue(dat, phieu)                               # cảnh báo, không đổi phiếu thành CHƯA ĐẠT
+
+
+class VanTayTrangTests(HoSoBase):
+    """Lỗi chặn 4: văn bản trang đã tách không sửa tay được mà kiểm nguồn vẫn đạt."""
+
+    def test_nhan_ghi_dau_van_tay_tung_trang(self):
+        van_tay = nhan_tep.doc_van_tay(self.tm)
+        self.assertEqual(sorted(van_tay), [("D1", "p001.txt"), ("D2", "p001.txt"), ("G1", "p001.txt")])
+        self.assertEqual(van_tay[("D1", "p001.txt")]["sha256"], sha256_tep(self.tm / "trang" / "D1" / "p001.txt"))
+        self.assertEqual(nhan_tep.kiem_ke(self.tm), [])
+
+    def test_sua_trang_sau_khi_nhan(self):
+        with open(self.tm / "trang" / "D1" / "p001.txt", "a", encoding="utf-8") as f:
+            f.write("Dữ liệu bổ sung: 987,65 tỷ đồng\n")
+        self.them_sau(MUC_9, "Dữ liệu bổ sung 987,65 tỷ. [ĐÃ KIỂM D1 tr.1]")
+        self.assertEqual(self.trich_dan()["loi"], [])             # chính đối chiếu số thì bị lừa
+        self.assertTrue(any("trang/D1/p001.txt đã bị sửa" in x for x in nhan_tep.kiem_ke(self.tm)))
+        phieu, dat = self.phieu()
+        self.assertFalse(dat)
+        self.assertNotIn("4. Trích dẫn", phieu)                   # nguồn không đáng tin thì không kiểm tiếp
+
+    def test_sua_ca_trang_lan_danh_muc_voi_tep_van_ban(self):
+        p = self.tm / "trang" / "D1" / "p001.txt"
+        p.write_text(p.read_text(encoding="utf-8") + "Dữ liệu bổ sung: 987,65 tỷ đồng\n", encoding="utf-8")
+        dm = self.tm / "trang_sha256.csv"                        # sửa luôn cột sha256 của trang trong danh mục
+        cu = nhan_tep.doc_van_tay(self.tm)[("D1", "p001.txt")]["sha256"]
+        dm.write_text("".join(d.replace(cu, sha256_tep(p), 1) if d.startswith("D1,p001.txt,") else d
+                              for d in dm.read_text(encoding="utf-8").splitlines(True)), encoding="utf-8")
+        self.assertNotIn("đã bị sửa", " ".join(nhan_tep.kiem_ke(self.tm)))
+        self.assertEqual(nhan_tep.kiem_ke(self.tm), ["D1: trang/D1/p001.txt khác văn bản tách lại từ tệp gốc"])
+
+    def test_tep_trang_la_hoac_bi_xoa(self):
+        (self.tm / "trang" / "D1" / "p001.tay.txt").write_text("987,65\n", encoding="utf-8")
+        self.assertTrue(any("p001.tay.txt không có trong trang_sha256.csv" in x for x in nhan_tep.kiem_ke(self.tm)))
+        self.assertFalse(self.phieu()[1])
+        with self.assertRaises(SystemExit):                       # nhận lại cũng không hợp thức hóa tệp lạ
+            nhan_tep.nhan(self.tm, self.tm / "ma_nguon.csv")
+        (self.tm / "trang" / "D1" / "p001.tay.txt").unlink()
+        nhan_tep.nhan(self.tm, self.tm / "ma_nguon.csv")
+        (self.tm / "trang" / "D2" / "p001.txt").unlink()
+        loi = nhan_tep.kiem_ke(self.tm)
+        self.assertTrue(any("trang/D2/p001.txt có trong trang_sha256.csv mà đã mất" in x for x in loi))
+        (self.tm / "trang_sha256.csv").unlink()
+        self.assertTrue(nhan_tep.kiem_ke(self.tm)[0].startswith("thiếu trang_sha256.csv"))
+
+    def test_doc_lai_hop_le_van_qua(self):
+        with mock.patch.object(nhan_tep, "_chay", return_value="Doanh thu thuần 1.200.000.000.000\n"):
+            ra = nhan_tep.doc_lai(self.tm, "D1", 1)
+        self.assertEqual(ra.name, "p001.dpi400psm4.txt")
+        self.assertEqual(nhan_tep.kiem_ke(self.tm), [])
+        self.assertTrue(self.phieu()[1])
+        nhan_tep.nhan(self.tm, self.tm / "ma_nguon.csv")          # nhận lại: bản đọc lại còn nguyên thì được giữ
+        self.assertEqual(nhan_tep.kiem_ke(self.tm), [])
+        with open(ra, "a", encoding="utf-8") as f:
+            f.write("987,65\n")
+        self.assertTrue(any("p001.dpi400psm4.txt đã bị sửa" in x for x in nhan_tep.kiem_ke(self.tm)))
 
 
 class GaiLoiTests(HoSoBase):

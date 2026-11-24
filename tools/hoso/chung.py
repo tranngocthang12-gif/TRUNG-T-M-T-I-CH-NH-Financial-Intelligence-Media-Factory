@@ -104,6 +104,14 @@ def khop_tap(gia_tri: Decimal, so_le: int, tap) -> str:
     return ""
 
 
+def khop_co_dau(so: "So", tap_co_dau) -> str:
+    """Như khop_tap, có xét dấu. tap_co_dau là tập giá trị CÓ DẤU (KhoTrang.tap_so_co_dau, hoặc giá trị trong sổ).
+    Số viết có dấu âm rõ ràng (−, -, hoặc trong ngoặc đơn) chỉ khớp được số âm của tập. Số viết không dấu khớp theo trị
+    tuyệt đối, vì văn xuôi thường bỏ dấu ("lỗ 1.193 tỷ")."""
+    am = so.gia_tri < 0
+    return khop_tap(so.gia_tri, so.so_le, {abs(p) for p in tap_co_dau if p < 0 or not am})
+
+
 # ---------- trang nguồn ----------
 class KhoTrang:
     """Văn bản từng trang của tệp gốc: <thu_muc>/trang/<mã nguồn>/pNNN.txt; danh mục ở <thu_muc>/nguon.csv."""
@@ -132,6 +140,13 @@ class KhoTrang:
         if (ma, trang) not in self._tap:
             self._tap[(ma, trang)] = frozenset(s.tuyet_doi for s in tim_so(self.van_ban(ma, trang), self.kieu_so(ma)))
         return self._tap[(ma, trang)]
+
+    def tap_so_co_dau(self, ma: str, trang: int) -> frozenset:
+        """Tập giá trị CÓ DẤU của mọi con số trên một trang: số trong ngoặc đơn hoặc có dấu trừ là số âm."""
+        if (ma, trang, "dau") not in self._tap:
+            so = tim_so(self.van_ban(ma, trang), self.kieu_so(ma))
+            self._tap[(ma, trang, "dau")] = frozenset(s.gia_tri for s in so)
+        return self._tap[(ma, trang, "dau")]
 
 
 # ---------- biểu thức số học an toàn ----------

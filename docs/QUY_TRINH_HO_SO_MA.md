@@ -21,10 +21,11 @@ Thư mục mã có dạng:
   goc/                 tệp gốc đã tải (PDF, CSV…), không sửa
   ma_nguon.csv         ghế phân tích viết: ma,tep,ten,kieu_so
   nguon.csv            máy sinh: thêm sha256, số trang, cách đọc
-  trang/<mã nguồn>/    máy sinh: pNNN.txt cho từng trang
+  trang/<mã nguồn>/    máy sinh: pNNN.txt cho từng trang, không sửa tay
+  trang_sha256.csv     máy sinh: sha256 từng tệp trong trang/ (kể cả bản đọc lại)
   so_lieu.csv          sổ số liệu
   quan_he.csv          đẳng thức phải đúng
-  ngoai_le.csv         (nếu cần) con số máy không lần ra được, kèm lý do
+  ngoai_le.csv         (nếu cần) con số máy không lần ra được, kèm lý do, nguồn và trang
   HO_SO_<MÃ>_<ngày>.md
   PHIEU_MAY_HO_SO_<MÃ>_<ngày>.txt
   phan_bien/           bản trả lời của các ghế khác hãng, chép nguyên văn
@@ -56,6 +57,7 @@ python tools/hoso/nhan_tep.py nhan --thu-muc <TM> --ma-nguon <TM>/ma_nguon.csv
 - Đối chiếu sha256 máy in ra với sha256 Cowork báo. Lệch một tệp thì dừng.
 - PDF dạng ảnh được máy nhận dạng chữ. Trang có bảng mà máy đọc không ra số thì đọc lại: `python tools/hoso/nhan_tep.py doc-lai --thu-muc <TM> --ma D7 --trang 16`.
 - Máy thiếu `pdftotext`, `pdftoppm` hoặc `tesseract` (gói tiếng Việt) thì dừng và báo Owner. Không đoán số.
+- Không sửa tay tệp nào trong `trang/`. Máy ghi sha256 từng tệp trang vào `trang_sha256.csv` khi nhận và khi đọc lại; tệp trang bị sửa, bị thêm hay bị mất thì phiếu máy CHƯA ĐẠT. Cách hợp lệ để sửa lỗi máy đọc là dòng `goc` trong `so_lieu.csv`: điền `gia_tri` và `ghi_chu` (B4).
 - **Đọc hết mọi trang của báo cáo quý mới nhất và phần thuyết minh của báo cáo năm mới nhất.** Hồ sơ đầu tiên đã bỏ sót một trang giải trình vì chỉ đọc các trang có bảng chính.
 
 ### B4. Lập sổ số liệu và soát
@@ -78,7 +80,8 @@ Lý do có bước này: ở hồ sơ đầu tiên máy đọc sai năm con số
 - Chép khung từ `templates/hoso/vi_du/HO_SO_MAU.md`: đầu hồ sơ, "Cách đọc", "Một trang", Mục 1 tới Mục 12, "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn", "Lịch sử sửa".
 - Mỗi câu có số phải kết bằng một nhãn: `[ĐÃ KIỂM D1 tr.12]`, `[SUY LUẬN …]`, `[GIẢ ĐỊNH]`, `[CHƯA BIẾT]`.
 - Số trong đoạn ĐÃ KIỂM phải có trên trang đã ghi, hoặc là một dòng của sổ, hoặc tính được từ các số cùng đoạn. Số tự tính mà không có số gốc đứng cạnh thì đưa vào sổ thành dòng tính và dán nhãn SUY LUẬN.
-- Mục 8 để trống, ghi "Chưa viết" và dẫn QĐ-P13, cho tới khi Owner sửa L-02. Không viết khoảng giá trị ở bất kỳ mục nào khác.
+- Mục 8 để trống cho tới khi Owner sửa L-02: thân mục chỉ có đúng câu của hồ sơ mẫu, «**Chưa viết.** Theo ADR-0019 QĐ-P13, mục này chỉ viết sau khi Owner sửa L-02.». Máy bắt mọi chữ, số hay bảng thêm vào.
+- Không viết khoảng giá trị hay giá mục tiêu ở bất kỳ mục nào khác, dù nhãn là gì. Máy bắt hai số nối bằng gạch ngang hoặc "đến/tới" kèm đơn vị tiền (đồng, nghìn đồng, VND, đ; trong bảng tính cả đơn vị ở tiêu đề cột), và các cụm "khoảng giá", "vùng giá", "mức giá", "giá mục tiêu", "giá trị nội tại", "giá trị một/mỗi cổ phiếu" đi với số. Chỉ giá quá khứ trong đoạn ĐÃ KIỂM, mọi số có trên trang đã ghi, mới được qua.
 - Mục 10 chỉ mô tả giá và khối lượng.
 - Mục 11: ba giả thuyết H1 (tốt), H2 (xấu), H0 (không có gì đặc biệt). Mỗi giả thuyết có điều kiện làm nó sai. Có ngày xem lại.
 - Hồ sơ kết bằng danh sách CHƯA BIẾT.
@@ -91,7 +94,8 @@ python tools/hoso/phieu_may.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ngày>.m
 ```
 
 - Phiếu CHƯA ĐẠT: sửa hồ sơ hoặc sổ rồi chạy lại. Không gửi phản biện, không giao Owner.
-- Chỉ dùng `ngoai_le.csv` khi con số thật sự có trên trang mà máy không đọc được, sau khi đã đọc lại trang đó. Mỗi ngoại lệ hiện nguyên văn trên phiếu.
+- Chỉ dùng `ngoai_le.csv` khi con số thật sự có trên trang mà máy không đọc được, sau khi đã đọc lại trang đó. Cột: `so,ngu_canh,ly_do,nguon,trang`. Máy chỉ kiểm địa chỉ của ngoại lệ: nguồn có trong `nguon.csv`, trang có trong thư mục `trang/`, và cặp nguồn, trang nằm trong nhãn ĐÃ KIỂM của đoạn chứa con số. Máy không kiểm được con số có trên trang, vì lý do ngoại lệ chính là máy đọc không ra. Ngoại lệ không dùng cho đoạn không có nhãn hay đoạn SUY LUẬN.
+- Mỗi ngoại lệ hiện trên phiếu kèm nguồn và trang, cùng dòng tổng «NGOẠI LỆ n/N số ĐÃ KIỂM = x%»; trên 10% thì phiếu in CẢNH BÁO. Ghế phản biện phải đối chiếu mọi số NGOẠI LỆ với trang gốc (B7).
 - Phiếu ĐẠT nghĩa là con số lần ra được và hồ sơ đúng khung. Phiếu không nói lập luận đúng.
 
 ### B7. Phản biện và đối chiếu số (ghế khác hãng)
@@ -126,5 +130,5 @@ python tools/hoso/gai_loi.py tao --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ngày>
 
 ## 4. Giới hạn của máy
 
-- Máy bắt được: con số không có trên trang đã ghi; phép tính không khớp; tệp gốc bị đổi; hồ sơ sai khung; cụm từ L-02 cấm.
-- Máy không bắt được: con số có trên trang nhưng lấy nhầm ô; lập luận sai; điều hồ sơ bỏ sót. Ba việc này thuộc ghế phản biện khác hãng, Owner, và hậu kiểm theo thời gian.
+- Máy bắt được: con số không có trên trang đã ghi, hoặc sai dấu; trang ghi trong nhãn không có thật; phép tính không khớp; tệp gốc bị đổi; tệp trang bị sửa, thêm hay mất; hồ sơ sai khung; cụm từ L-02 cấm; khoảng giá viết theo các mẫu ở B5.
+- Máy không bắt được: con số có trên trang nhưng lấy nhầm ô; con số NGOẠI LỆ có thật trên trang hay không (máy chỉ kiểm nguồn và trang của nó); khoảng giá viết không theo mẫu (hai ô "thấp | cao" không kèm cụm nào, hai câu rời mỗi câu một giá); lập luận sai; điều hồ sơ bỏ sót. Các việc này thuộc ghế phản biện khác hãng, Owner, và hậu kiểm theo thời gian.

@@ -26,7 +26,7 @@ ADR-0019 đổi mục đích của dự án: giúp Owner phân tích một mã c
 | §9 | Giữ các dòng về L-02, L-03, L-05, L-06, L-07, L-08. Hai dòng về Ledger và về A–B ngừng cùng phép thử |
 | §10 | Không đổi |
 
-**Từ ADR-0020 (24/11/2026).** Việc phân tích một mã do ghế phân tích của dự án làm theo `docs/QUY_TRINH_HO_SO_MA.md`, bằng công cụ ở `tools/hoso/`. Một bản phân tích chỉ là hồ sơ mã của dự án khi có phiếu máy ĐẠT đi kèm. Hồ sơ, tệp gốc và sổ số liệu nằm ngoài kho. ADR-0020 đổi thứ tự thi công của QĐ-P14: mẫu và máy kiểm trích dẫn vào kho ngay; thước đo thêm điều kiện hồ sơ đầu tiên có phiếu máy ĐẠT.
+**Từ ADR-0020 (24/11/2026).** Việc phân tích một mã do ghế phân tích của dự án làm theo `docs/QUY_TRINH_HO_SO_MA.md`, bằng công cụ ở `tools/hoso/`. Một bản phân tích chỉ là hồ sơ mã của dự án khi có phiếu máy ĐẠT đi kèm. Hồ sơ, tệp gốc và sổ số liệu nằm ngoài kho. ADR-0020 đổi thứ tự thi công của QĐ-P14: mẫu và máy kiểm trích dẫn vào kho ngay. Thước đo của QĐ-P14 giữ nguyên; phiếu máy ĐẠT là cổng kỹ thuật của sản phẩm: bản phân tích chưa có phiếu ĐẠT chưa là hồ sơ mã của dự án, nên chưa được đem ra đo theo QĐ-P14.
 
 ## 0. Điều gì đổi so với v2.2, và vì sao
 

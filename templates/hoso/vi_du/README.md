@@ -5,7 +5,7 @@ Thư mục này là một "thư mục mã" thu nhỏ của một doanh nghiệp 
 1. Cho ghế phân tích xem một hồ sơ đạt phiếu máy trông thế nào (`HO_SO_MAU.md`, `so_lieu.csv`, `quan_he.csv`).
 2. Làm dữ liệu cho `tests/test_hoso.py`.
 
-Chạy thử từ gốc kho (chép ra chỗ khác trước, vì lệnh `nhan` sinh thêm `nguon.csv` và `trang/`):
+Chạy thử từ gốc kho (chép ra chỗ khác trước, vì lệnh `nhan` sinh thêm `nguon.csv`, `trang/` và `trang_sha256.csv`):
 
 ```
 cp -r templates/hoso/vi_du /tmp/MAU
