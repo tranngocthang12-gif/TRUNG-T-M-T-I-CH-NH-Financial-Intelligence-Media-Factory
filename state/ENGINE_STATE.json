@@ -364,15 +364,13 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-11-25T19:28:12.869447",
+    "at": "2026-11-25T22:30:34.301708",
     "end": "2026-11-25",
     "sources": [
       "yahoo"
     ],
-    "new_rows": 35,
-    "rows_by_source": {
-      "yahoo": 35
-    },
+    "new_rows": 0,
+    "rows_by_source": {},
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
