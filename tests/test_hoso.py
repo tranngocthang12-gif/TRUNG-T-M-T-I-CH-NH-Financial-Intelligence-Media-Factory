@@ -944,6 +944,8 @@ class DinhDangTests(HoSoBase):
         "khóa sổ không dấu trong câu": "gia_co_phieu_mau năm tới là 30. [GIẢ ĐỊNH]",
         # từ vòng sửa 2 của ADR-0021: dấu định dạng cắt đôi con số là lỗi định dạng (trước đó chỉ cổng giá bắt)
         "số tách bằng chữ đậm": "Giá cổ phiếu MAU năm tới là 3**0**. [GIẢ ĐỊNH]",
+        # từ vòng sửa 2 của ADR-0021: bảng không có dòng kẻ là lỗi định dạng (trình dựng hiện thành đoạn chữ)
+        "bảng thiếu hàng kẻ": "| Giá cổ phiếu MAU |\n| 30 |\n\n[GIẢ ĐỊNH]",
     }
     # Thay tiêu đề khung: tiêu đề cấp hai phải đúng từng chữ, nên không chở được dấu hiệu.
     THAY = {
@@ -961,7 +963,6 @@ class DinhDangTests(HoSoBase):
         "mã chứa cả câu": "`Giá cổ phiếu MAU năm tới là 30` [GIẢ ĐỊNH]",
         "mã chứa chữ Giá": "`Giá` cổ phiếu MAU năm tới là 30. [GIẢ ĐỊNH]",
         "đường kẻ sau tiêu đề phụ": "### Giá cổ phiếu MAU\n\n---\n\nCon số là 30. [GIẢ ĐỊNH]",
-        "bảng thiếu hàng kẻ": "| Giá cổ phiếu MAU |\n| 30 |\n\n[GIẢ ĐỊNH]",
         "tiêu đề con dưới tiêu đề giá": "### Giá cổ phiếu MAU\n\n#### Ghi chú\n\nCon số là 30. [GIẢ ĐỊNH]",
         "tiêu đề liền dòng chữ": "### Giá cổ phiếu MAU\nCon số là 30. [GIẢ ĐỊNH]",
         "xuống dòng bằng hai dấu cách": "Giá cổ phiếu MAU  \nnăm tới là 30. [GIẢ ĐỊNH]",

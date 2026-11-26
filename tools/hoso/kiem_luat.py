@@ -9,7 +9,9 @@
 1. L-02: không cụm từ khuyến nghị nào ở bất kỳ dòng nào. Dùng đúng bộ mẫu của tools/laws_checks.py, thêm vài cụm
    riêng của hồ sơ mã. Kiểm cứng, không xét ngữ cảnh: câu phủ định có cụm cấm cũng bị bắt — đổi cách viết.
 2. Khung: đủ mười hai mục theo thứ tự; có "Một trang", "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn". Mỗi
-   tiêu đề cấp hai chỉ được xuất hiện một lần; khi tiêu đề lặp, máy báo lỗi và xét thân của lần xuất hiện đầu tiên.
+   tiêu đề cấp hai chỉ được xuất hiện một lần; khi tiêu đề lặp, máy báo lỗi và xét thân của lần xuất hiện đầu tiên. Mọi
+   tiêu đề cấp hai đứng theo thứ tự của khung, nên một mục ngoài phạm vi đối chiếu («Cách đọc», «Lịch sử sửa», «Phiếu
+   máy») không chen được vào giữa các mục có số liệu.
 3. Mục 8 để trống cho tới khi Owner sửa L-02 (QĐ-P13): sau khi bỏ chữ đậm và khoảng trắng thừa, thân mục phải đúng bằng
    câu cố định MUC_8. Thêm bất kỳ chữ, chữ số hay bảng nào là lỗi.
    Khoảng giá trị bị cấm ở MỌI mục, bất kể nhãn (QĐ-P13): hai số nối bằng gạch ngang hoặc "đến/tới" kèm đơn vị tiền
@@ -74,7 +76,8 @@
 6. Đầu hồ sơ ghi rõ đây không phải lời khuyên đầu tư và là bản riêng tư.
 7. Bảng nguồn khớp nguon.csv: đủ mã, đúng 12 ký tự đầu sha256.
 8. Trạng thái kiểm (ADR-0021 QĐ-K3): tiêu đề cấp hai đầu tiên là "Trạng thái kiểm" và chỉ xuất hiện một lần; mỗi tên
-   trong TRANG_THAI_KIEM mở đầu đúng một mục liệt kê riêng («- **Phiếu máy:** …», bỏ chữ đậm khi so). Máy không kiểm nội
+   trong TRANG_THAI_KIEM mở đầu đúng một mục liệt kê riêng («- **Phiếu máy:** …», dòng phải bắt đầu bằng «- »; bỏ chữ
+   đậm khi so tên). Máy không kiểm nội
    dung bốn dòng; mục này nằm ngoài phạm vi đối chiếu trích dẫn như "Lịch sử sửa".
 
 Chạy: python tools/hoso/kiem_luat.py --thu-muc <thư mục mã> --ho-so <tệp .md>
@@ -281,13 +284,30 @@ def _dd_so(dong: str, cac_doan: list) -> list:
     return loi
 
 
+def _dd_bang(bang: list) -> list:
+    """Bảng phải là bảng thật của trình dựng (sửa cùng loại với lỗi chặn 2 của bản chấm L-09 vòng 2, ADR-0021). bang:
+    [(số dòng, dòng)] của một dãy dòng liền nhau bắt đầu bằng «|». Dòng thứ hai phải là dòng kẻ «|---|» có đủ số ô của
+    hàng tiêu đề; thiếu thì trình dựng hiện cả dãy thành đoạn chữ, trong khi máy vẫn đọc là bảng. Mỗi hàng phải có đúng số
+    ô của hàng tiêu đề: trình dựng bỏ ô thừa, trong khi máy đọc mọi ô. Trả [(số dòng, lỗi)]."""
+    def o(d):
+        d = d.strip()
+        return [c.strip() for c in d[1:-1 if d.endswith("|") and len(d) > 1 else None].split("|")]
+    n = len(o(bang[0][1]))
+    if len(bang) < 2 or len(o(bang[1][1])) != n or not all(re.fullmatch(r":?-+:?", c) for c in o(bang[1][1])):
+        return [(bang[0][0], "bảng thiếu dòng kẻ «|---|» ngay dưới hàng tiêu đề, hay dòng kẻ không đủ số ô của hàng tiêu đề "
+                             "(trình dựng hiện thành đoạn chữ, không thành bảng)")]
+    return [(so, f"hàng bảng có {len(o(d))} ô, hàng tiêu đề có {n} ô (trình dựng bỏ ô thừa; ô thiếu thì thêm ô trống)")
+            for so, d in bang[2:] if len(o(d)) != n]
+
+
 def kiem_dinh_dang(text: str) -> list:
     """Hồ sơ chỉ được dùng một bộ Markdown hẹp. Dòng nào ngoài bộ này là lỗi, bất kể nội dung (danh sách cho phép, không
     phải danh sách cấm). Bộ cho phép:
       - dòng trống; dòng chữ bắt đầu sát lề, không bắt đầu bằng «>», «<», «=», «```», «~~~», «* », «+ », «1) »;
       - tiêu đề «# …» tới «###### …» sát lề, có một dấu cách sau dấu #; «# » chỉ ở dòng đầu; tiêu đề cấp hai đúng từng
         chữ một tên trong TIEU_DE_CAP_HAI;
-      - hàng bảng bắt đầu sát lề bằng «|»; dòng nào có «|» thì phải là hàng bảng;
+      - hàng bảng bắt đầu sát lề bằng «|»; dòng nào có «|» thì phải là hàng bảng; bảng có dòng kẻ «|---|» ngay dưới
+        hàng tiêu đề và mọi hàng đủ đúng số ô của hàng tiêu đề (_dd_bang);
       - mục liệt kê «- » hay «1. », thụt 0, 2, 4… dấu cách; nội dung mục không bắt đầu bằng «#», «>», «|», «<» hay «`»;
       - đường kẻ «---» đúng ba dấu, đứng sau một dòng trống;
       - trong dòng: chữ đậm «**…**»; mã «`…`» với số dấu ` chẵn, không dính liền chữ ở mặt ngoài; dấu «_» ngoài mã chỉ
@@ -301,8 +321,16 @@ def kiem_dinh_dang(text: str) -> list:
     nhấn mạnh; «~~»; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang; trích dẫn «>»; khối mã
     (```, ~~~ hay thụt lề); tiêu đề gạch chân (=== hay --- ngay dưới một dòng chữ); dòng thụt lề mà không phải mục liệt
     kê."""
-    loi, truoc = [], ""
-    for so, dong in enumerate(nfc(text).split("\n"), 1):
+    loi, truoc, bang = [], "", []
+    cac_dong = nfc(text).split("\n")
+    for so, dong in enumerate(cac_dong + [""], 1):               # dòng trống thêm ở cuối để khép bảng cuối tệp
+        if dong.startswith("|"):
+            bang.append((so, dong))
+        elif bang:
+            loi.extend(f"dòng {d}: định dạng ngoài bộ cho phép — {b}" for d, b in _dd_bang(bang))
+            bang = []
+        if so > len(cac_dong):
+            break
         bao = []
         for c in dong:
             if unicodedata.category(c) in ("Cf", "Cc", "Zl", "Zp", "Mn", "Mc", "Me") or (
@@ -749,6 +777,11 @@ def kiem(ho_so_text: str, thu_muc=None) -> list:
     if trung:                                                    # sửa theo bản chấm L-09 vòng 2 của ADR-0021, lỗi chặn 4
         loi.append("khung: tiêu đề cấp hai xuất hiện hơn một lần: " + ", ".join(f"'## {t}'" for t in trung)
                    + "; mỗi tiêu đề của khung chỉ được có một lần")
+    thu_tu = ("Trạng thái kiểm",) + tuple(t for t in TIEU_DE_CAP_HAI if t != "Trạng thái kiểm")
+    biet = [t for t in dict.fromkeys(ten) if t in thu_tu]
+    if biet != sorted(biet, key=thu_tu.index):                   # mục ngoài phạm vi đối chiếu không chen được vào giữa
+        loi.append("khung: tiêu đề cấp hai không theo thứ tự của khung: Trạng thái kiểm, Cách đọc, Một trang, Mục 1 tới "
+                   "Mục 12, Kết quả 15 điểm soi, Danh sách CHƯA BIẾT, Bảng nguồn, Lịch sử sửa, Phiếu máy")
     than = {}
     for _, t, b in muc:
         than.setdefault(t, b)                                    # tiêu đề lặp: xét thân của lần xuất hiện đầu tiên
@@ -758,7 +791,7 @@ def kiem(ho_so_text: str, thu_muc=None) -> list:
     if not ten or ten[0] != "Trạng thái kiểm":                  # 8. trạng thái kiểm (ADR-0021 QĐ-K3)
         loi.append("khung: tiêu đề cấp hai đầu tiên phải là '## Trạng thái kiểm' (ADR-0021 QĐ-K3)")
     else:
-        dong_tt = [_gon(d) for d in than_cua("Trạng thái kiểm").splitlines() if d.strip()]
+        dong_tt = [_gon(d) for d in than_cua("Trạng thái kiểm").splitlines() if re.match(r"\s*- ", d)]   # mục liệt kê thật
         sai_tt = [x for x in TRANG_THAI_KIEM if sum(1 for d in dong_tt if d.startswith("- " + x)) != 1]
         if sai_tt:                                               # vòng sửa 1 theo bản chấm L-09, lỗi chặn 5
             loi.append("Trạng thái kiểm: cần đúng một mục liệt kê riêng mở đầu bằng mỗi tên sau, thiếu hoặc trùng: "
