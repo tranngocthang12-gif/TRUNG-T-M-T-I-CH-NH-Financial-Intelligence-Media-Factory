@@ -1,4 +1,4 @@
-# Quy trình làm một hồ sơ mã (ADR-0019, ADR-0020)
+# Quy trình làm một hồ sơ mã (ADR-0019, ADR-0020, ADR-0021)
 
 Tệp này là việc phải làm theo thứ tự của **ghế phân tích**. Ghế phân tích là một phiên Claude trong Project TTC, đã đọc tệp này và ADR-0019, ADR-0020 ở `main` mới nhất. Sản phẩm chỉ được gọi là "hồ sơ mã của dự án" khi có phiếu máy ĐẠT đi kèm.
 
@@ -27,6 +27,7 @@ Thư mục mã có dạng:
   quan_he.csv          đẳng thức phải đúng
   HO_SO_<MÃ>_<ngày>.md
   PHIEU_MAY_HO_SO_<MÃ>_<ngày>.txt
+  BANG_DINH_NGHIA_HO_SO_<MÃ>_<ngày>_BAN_PHAN_BIEN.md   máy sinh ở B7 (ADR-0021 QĐ-K2)
   phan_bien/           bản trả lời của các ghế khác hãng, chép nguyên văn
 ```
 
@@ -85,6 +86,11 @@ Lý do có bước này: ở hồ sơ đầu tiên máy đọc sai năm con số
 - Chỉ dùng bộ định dạng của hồ sơ mẫu: tiêu đề `#` sát lề (tiêu đề `##` giữ đúng tên của khung, không thêm chữ), đoạn chữ sát lề, bảng bắt đầu bằng `|`, mục liệt kê `- ` hay `1. ` (mục con thụt 2, 4… dấu cách), chữ đậm `**…**`, mã `` `…` `` tách khỏi chữ bằng dấu cách hay dấu câu, dấu `_` chỉ trong khóa sổ nằm trong nhãn (`[SUY LUẬN, sổ số liệu: dt_tang_25]`) hay tên tệp trong mã. Không dùng `_` hay `*` để nhấn mạnh, thẻ hay thực thể HTML, liên kết, trích dẫn `>`, khối mã, tiêu đề gạch chân, dòng thụt lề không phải mục liệt kê, dấu `\`, tab hay dấu cách đặc biệt. Máy báo mọi dòng ngoài bộ này (`kiem_luat.kiem_dinh_dang`).
 - Mỗi câu có số phải kết bằng một nhãn: `[ĐÃ KIỂM D1 tr.12]`, `[SUY LUẬN …]`, `[GIẢ ĐỊNH]`, `[CHƯA BIẾT]`.
 - Số trong đoạn ĐÃ KIỂM phải có trên trang đã ghi, hoặc là một dòng gốc của sổ, hoặc tính được từ các số cùng đoạn. Số nguyên nhỏ, năm và số trong dấu backtick cũng vậy, và không đi đường tính. Số tự tính mà không có số gốc đứng cạnh thì đưa vào sổ thành dòng tính và dán nhãn SUY LUẬN.
+- Nhãn SUY LUẬN gọi tên khóa sổ (ADR-0021 QĐ-K1): `[SUY LUẬN, sổ số liệu: khóa_a, khóa_b]`. Dãy khóa cùng phần chữ viết `[SUY LUẬN, sổ số liệu: kl_tb_t06 tới kl_tb_t11]`. Ghi chú đặt sau dấu `;`: `[SUY LUẬN, sổ số liệu: dt_tang_25; căn cứ thêm phai_thu_tang_25]`. Máy kiểm hai chiều:
+  - mỗi con số trong đoạn SUY LUẬN phải khớp giá trị của một khóa nhãn gọi tên, hoặc là hằng số viết trong công thức của khóa đó (ví dụ 49 trong `g2_cp_luu_hanh * 49 / 100`), hoặc trùng một số ĐÃ KIỂM đã lần ra trong hồ sơ. Đoạn SUY LUẬN không gọi khóa nào thì mọi con số phải là số ĐÃ KIỂM nhắc lại: không tính nhẩm;
+  - phần chữ có chữ số thì mỗi khóa nhãn gọi tên phải hiện ra ở ít nhất một con số của chính phần chữ đó. Một con số không đứng thay cho hai khóa làm tròn ra hai số khác nhau. Khóa chỉ làm căn cứ cho một câu định tính («đều âm», «khoảng một nửa») thì đặt sau dấu `;`.
+  - Ngưỡng của điều kiện sai ở Mục 11 («tăng trưởng dưới 15%») là lựa chọn của ghế phân tích, không phải số tính: viết dưới nhãn `[GIẢ ĐỊNH]`.
+- Ngay sau đầu hồ sơ là mục «Trạng thái kiểm» (ADR-0021 QĐ-K3), bốn dòng: `- **Phiếu máy:**`, `- **Đối chiếu số khác hãng:**`, `- **Phản biện khác hãng:**`, `- **Owner tự mở ba số:**`. Lúc viết, ba dòng sau ghi «chưa làm». Mục này nằm ngoài phạm vi đối chiếu trích dẫn; máy chỉ kiểm có đủ bốn dòng.
 - Mục 8 để trống cho tới khi Owner sửa L-02: thân mục chỉ có đúng câu của hồ sơ mẫu, «**Chưa viết.** Theo ADR-0019 QĐ-P13, mục này chỉ viết sau khi Owner sửa L-02.». Máy bắt mọi chữ, số hay bảng thêm vào.
 - Giá cổ phiếu, hệ số định giá (P/E, P/B, P/S, EV/EBITDA) và vốn hóa chỉ được nêu dưới dạng số quá khứ có nguồn: trong đoạn ĐÃ KIỂM, mọi chữ số có trên trang đã ghi (hoặc là dòng gốc của sổ), năm không vượt năm lớn nhất của trang đó, không kèm từ chỉ tương lai hay tín hiệu (dự báo, dự kiến, kỳ vọng, mục tiêu, sẽ, có thể, kịch bản, nếu, giả định, năm sau, ngắn hạn, nên, chờ, … tới, hỗ trợ, kháng cự…). Máy nhận ra "ngữ cảnh giá" qua: số mang đơn vị giá (đồng, nghìn đồng, VND, đ, "/cp", "30 nghìn mỗi cp"…); chữ "giá" (giá vốn, giá bán, đánh giá, "giá trị" thường… chỉ được bỏ qua khi phần chữ không có từ chỉ cổ phiếu: cổ phiếu, cổ phần, cp, "giá MAU"); hệ số định giá hay vốn hóa; nhãn ĐÃ KIỂM dẫn nguồn G. Từ tương lai đi cùng từ chỉ cổ phiếu là lỗi kể cả khi không có con số. Tiêu đề, hàng tiêu đề bảng và bảng nguồn không mang nhãn, nên không được nêu giá kèm số (năm đứng riêng thì được). Danh sách đầy đủ ở docstring `tools/hoso/kiem_luat.py`.
 - Bảng hay danh sách đặt ngay dưới một câu có chữ «giá», và mọi đoạn dưới một tiêu đề phụ có chữ «giá», sẽ bị xét như ngữ cảnh giá. Trong phần chữ nói về giá, mọi chữ số đều phải có trên trang nguồn: số thứ tự chỉ được bỏ qua khi cột đầu tên là #, STT, TT, Số TT hoặc Số thứ tự và đánh đúng 1, 2, …, n; «điểm 30», «12 tháng», «25/4» đều là con số.
@@ -107,6 +113,7 @@ python tools/hoso/phieu_may.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ngày>.m
   3. còn lại: không viết con số đó dưới ĐÃ KIỂM. Viết dưới `[CHƯA BIẾT]` và ghi vào Danh sách CHƯA BIẾT kèm «máy không đọc được <nguồn> tr.<n>».
 - Thư mục mã còn tệp `ngoai_le.csv` thì phiếu báo lỗi: tệp không còn dùng, xóa đi.
 - Phiếu ĐẠT nghĩa là con số lần ra được và hồ sơ đúng khung. Phiếu không nói lập luận đúng.
+- Cuối phiếu có mục «Owner tự mở ba số» (ADR-0021 QĐ-K4): máy chọn theo sha256 của hồ sơ một số ĐÃ KIỂM ở «Một trang», một dòng máy đọc sai đã sửa, và một dòng gốc sau một khóa SUY LUẬN ở «Một trang». Ghế phân tích không đổi ba số này.
 
 ### B7. Phản biện và đối chiếu số (ghế khác hãng)
 
@@ -117,18 +124,25 @@ python tools/hoso/gai_loi.py tao --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ngày>
 ```
 
    Máy chỉ nhận lỗi gài mà phép đối chiếu số bắt được. Tệp `…_LOI_GAI.md` là niêm phong: không gửi ghế nào.
-2. Gửi `…_BAN_PHAN_BIEN.md` cùng đường dẫn tệp gốc cho hai ghế khác hãng Anthropic, theo mẫu ở `templates/hoso/LENH_MAU.md`: một ghế viết bản phản biện bốn phần (QĐ-P7), một ghế đối chiếu số.
+2. Lập bảng định nghĩa cho bản gửi đi (ADR-0021 QĐ-K2):
+
+```
+python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ngày>_BAN_PHAN_BIEN.md
+```
+
+   Gửi `…_BAN_PHAN_BIEN.md` cùng đường dẫn tệp gốc cho hai ghế khác hãng Anthropic, theo mẫu ở `templates/hoso/LENH_MAU.md`: một ghế viết bản phản biện bốn phần (QĐ-P7), một ghế đối chiếu số. Ghế đối chiếu số nhận thêm bảng định nghĩa và trả lời ba câu hỏi của bảng cho từng dòng.
 3. Bản trả lời phải mở đầu bằng **mã nhận tệp** in ở đầu bản phản biện. Không có mã: coi như ghế đó chưa đọc tệp, gửi lại.
 4. Ghế nào hết hạn mức thì chuyển sang ghế khác hãng còn lại (ChatGPT, Gemini, Grok). Không dùng Claude cho bước này.
 5. Chép nguyên văn bản trả lời vào `phan_bien/`. Ghi vào tệp niêm phong: ghế nào nhận được tệp, ghế nào bắt được lỗi gài.
 
 ### B8. Sửa, giao Owner, hậu kiểm
 
-1. Với từng điểm ghế khác hãng nêu: mở trang gốc kiểm lại. Đúng thì sửa hồ sơ và sổ; không đúng thì ghi lý do. Ghi vào "Lịch sử sửa".
+1. Với từng điểm ghế khác hãng nêu: mở trang gốc kiểm lại. Đúng thì sửa hồ sơ và sổ; không đúng thì ghi lý do. Ghi vào "Lịch sử sửa". Viết lại mục «Trạng thái kiểm»: ghế nào đối chiếu số và kết quả (số dòng KHỚP, LỆCH, có bắt được lỗi gài không); ghế nào phản biện; tệp gốc nào mỗi ghế không mở được; ý nào ở «Một trang» chưa được ghế khác hãng nào đối chiếu.
 2. Chạy lại B6 cho bản đã sửa. Chạy `python tools/hoso/gai_loi.py kiem --ho-so … --niem-phong …` để chắc bản Owner không còn lỗi gài.
-3. Giao Owner ba thứ: hồ sơ, phiếu máy ĐẠT, bản phản biện. Nhắc Owner tự mở ba con số bất kỳ trong tệp gốc (QĐ-P9).
-4. Tới ngày xem lại ở Mục 11: lấy báo cáo mới, làm lại từ B2 cho phần mới, ghi ĐÚNG, SAI hoặc CHƯA RÕ cho từng giả thuyết.
-5. Sửa quá ba vòng phản biện mà chưa hội tụ: dừng, báo Owner.
+3. Giao Owner ba thứ: hồ sơ, phiếu máy ĐẠT, bản phản biện. Owner tự mở ba con số mà phiếu máy chọn (ADR-0021 QĐ-K4, thay cách chọn «ba con số bất kỳ» của QĐ-P9); Owner muốn mở thêm số nào cũng được.
+4. Niêm phong bản đã giao (ADR-0021 QĐ-K5): ghế phân tích ghi phiếu máy ĐẠT, có sha256 của hồ sơ, vào tài liệu của Project ngay khi giao. Từ lúc đó không sửa bản đã giao; muốn sửa thì làm bản mới, có phiếu mới.
+5. Tới ngày xem lại ở Mục 11: mở đúng bản đã giao, kiểm sha256 của tệp khớp sha256 trên phiếu đã ghi vào Project. Lấy báo cáo mới, làm lại từ B2 cho phần mới. Với từng giả thuyết, chép nguyên văn điều kiện sai của bản đã giao, rồi ghi ĐÚNG, SAI hoặc CHƯA RÕ kèm bằng chứng có nhãn. Không chấm theo chữ của một bản sửa sau.
+6. Sửa quá ba vòng phản biện mà chưa hội tụ: dừng, báo Owner.
 
 ## 3. Khi nào dừng và báo Owner
 
@@ -140,8 +154,8 @@ python tools/hoso/gai_loi.py tao --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ngày>
 
 ## 4. Giới hạn của máy
 
-- Máy bắt được: con số không có trên trang đã ghi (kể cả số nhỏ, năm, số trong backtick ở đoạn ĐÃ KIỂM), hoặc sai dấu; trang ghi trong nhãn không có thật; phép tính không khớp; dòng sửa trong sổ không gần chuỗi máy đọc hoặc không có đẳng thức cộng trừ chứng minh; tệp gốc bị đổi; tệp trang bị sửa, thêm hay mất; hồ sơ sai khung; cụm từ L-02 cấm; khoảng giá viết theo các mẫu ở B5; giá cổ phiếu, hệ số định giá, vốn hóa nêu ngoài đoạn ĐÃ KIỂM, không có trên trang, năm vượt nguồn, hay kèm từ chỉ tương lai trong danh sách — ở chính phần chữ có dấu hiệu giá, ở bảng hay danh sách ngay dưới nó, và dưới tiêu đề phụ có dấu hiệu giá.
-- Máy không bắt được: con số có trên trang nhưng lấy nhầm ô; ở phần chữ không nói về giá, ngày tháng, số mục và số đếm thời gian («9 tháng», «66 ngày»), vì máy không coi chúng là con số; đẳng thức chứng minh dòng sửa đúng về số học nhưng không có nghĩa kế toán (phiếu in tên đẳng thức để ghế phản biện đọc); khoảng giá viết không theo mẫu (hai ô "thấp | cao" không kèm cụm nào, hai câu rời mỗi câu một giá); lập luận sai; điều hồ sơ bỏ sót.
+- Máy bắt được: con số không có trên trang đã ghi (kể cả số nhỏ, năm, số trong backtick ở đoạn ĐÃ KIỂM), hoặc sai dấu; trang ghi trong nhãn không có thật; phép tính không khớp; số SUY LUẬN không khớp khóa nhãn gọi tên, khóa gọi tên mà không hiện số, khóa không có trong sổ (ADR-0021); dòng sửa trong sổ không gần chuỗi máy đọc hoặc không có đẳng thức cộng trừ chứng minh; tệp gốc bị đổi; tệp trang bị sửa, thêm hay mất; hồ sơ sai khung; cụm từ L-02 cấm; khoảng giá viết theo các mẫu ở B5; giá cổ phiếu, hệ số định giá, vốn hóa nêu ngoài đoạn ĐÃ KIỂM, không có trên trang, năm vượt nguồn, hay kèm từ chỉ tương lai trong danh sách — ở chính phần chữ có dấu hiệu giá, ở bảng hay danh sách ngay dưới nó, và dưới tiêu đề phụ có dấu hiệu giá.
+- Máy không bắt được: con số có trên trang nhưng lấy nhầm ô; ở phần chữ không nói về giá, ngày tháng, số mục và số đếm thời gian («9 tháng», «66 ngày»), vì máy không coi chúng là con số (riêng chiều ngược của luật khóa có đọc số đếm thời gian); đẳng thức chứng minh dòng sửa đúng về số học nhưng không có nghĩa kế toán (phiếu in tên đẳng thức để ghế phản biện đọc); công thức của một dòng tính đúng về số học nhưng sai nghĩa hay sai phạm vi (bảng định nghĩa đưa phần này cho ghế đối chiếu số); số SUY LUẬN sai mà tình cờ trùng một số ĐÃ KIỂM khác trong hồ sơ; khoảng giá viết không theo mẫu (hai ô "thấp | cao" không kèm cụm nào, hai câu rời mỗi câu một giá); lập luận sai; điều hồ sơ bỏ sót.
 - Định dạng: máy chỉ nhận bộ Markdown hẹp ở B5, nên cách viết làm chữ hiển thị khác chữ máy đọc bị chặn theo loại, không theo từng mẫu. Chữ đồng dạng khác bảng mã (ví dụ chữ Kirin trông như chữ Latin) và ký tự thay cho chữ số vẫn thuộc giới hạn 5 dưới đây.
 - Cổng giá cổ phiếu không bắt:
   1. câu nêu giá tương lai mà phần chữ, dòng dẫn và tiêu đề phụ của nó không có dấu hiệu nào (không chữ «giá», không đơn vị tiền, không hệ số định giá, không dẫn nguồn G; từ ghép như «giá bán» không kèm từ chỉ cổ phiếu cũng không phải dấu hiệu), ví dụ «Cổ phiếu MAU kỳ tới về 25,40. [GIẢ ĐỊNH]», «Giá bán của MAU kỳ tới là 31,70. [GIẢ ĐỊNH]»;

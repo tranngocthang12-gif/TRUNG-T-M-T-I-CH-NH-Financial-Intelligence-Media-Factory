@@ -433,7 +433,7 @@ class CongGiaTests(HoSoBase):
           "Giá 26,10 nghìn đồng, tăng 10% tức 2,61, thành 28,71 nghìn đồng. [ĐÃ KIỂM G1]",
           "| Kịch bản | Giá (nghìn đồng) |\n|---|---:|\n| Cơ sở | 27,50 |\n\n[SUY LUẬN]")
     XANH = ("Giá vốn hàng bán năm 2025 là 840 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
-            "Giá vốn bằng 70,0% doanh thu. [SUY LUẬN, sổ số liệu: bien_gop_25]",
+            "Giá vốn chiếm phần doanh thu còn lại sau biên lợi nhuận gộp 30,0%. [SUY LUẬN, sổ số liệu: bien_gop_25]",
             "Giá đóng cửa tăng từ 25,40 lên 26,10 nghìn đồng, tức 2,8%. [ĐÃ KIỂM G1]")
 
     def test_gia_tuong_lai_hay_khong_nguon_bi_bat(self):
@@ -659,13 +659,13 @@ class CongGiaVong3Tests(HoSoBase):
 
     def test_loi_neu_dong_dau_hieu_va_luat(self):
         self.chen("Giá cổ phiếu MAU cuối năm 2027 là 25,40 nghìn đồng. [ĐÃ KIỂM G1]")
-        self.assertIn("dòng 82: ngữ cảnh giá cổ phiếu (dấu hiệu: (a) đơn vị giá; (b) chữ «giá»; (d) nhãn ĐÃ KIỂM dẫn nguồn giá "
+        self.assertIn("dòng 89: ngữ cảnh giá cổ phiếu (dấu hiệu: (a) đơn vị giá; (b) chữ «giá»; (d) nhãn ĐÃ KIỂM dẫn nguồn giá "
                       "G1) — quy tắc 4: năm 2027 vượt năm lớn nhất trên trang đã ghi (2026)", "\n".join(self.luat()))
         self.chen("### Giá cổ phiếu MAU\n\nCon số là 30. [GIẢ ĐỊNH]")
-        self.assertIn("dòng 84: ngữ cảnh giá cổ phiếu (dấu hiệu: (b) chữ «giá» ở tiêu đề dòng 82) — quy tắc 1: có con số (30)",
+        self.assertIn("dòng 91: ngữ cảnh giá cổ phiếu (dấu hiệu: (b) chữ «giá» ở tiêu đề dòng 89) — quy tắc 1: có con số (30)",
                       "\n".join(self.luat()))
         self.chen("Giá cổ phiếu dự kiến:\n\n- Tốt: 30. [GIẢ ĐỊNH]")
-        self.assertIn("dòng 84: ngữ cảnh giá cổ phiếu (dấu hiệu: (b) chữ «giá» ở dòng dẫn 82) — quy tắc 1", "\n".join(self.luat()))
+        self.assertIn("dòng 91: ngữ cảnh giá cổ phiếu (dấu hiệu: (b) chữ «giá» ở dòng dẫn 89) — quy tắc 1", "\n".join(self.luat()))
 
     def test_hang_so_va_tu_chi_co_phieu(self):
         moi = ("kịch bản", "nếu", "giả sử", "giả định", "năm sau", "quý sau", "tháng sau", "tuần sau", "kỳ sau", "sang năm",
@@ -742,7 +742,7 @@ class SoThuTuTests(HoSoBase):
         self.sua("HO_SO_MAU.md", "## Mục 10. Cung cầu và xu hướng giá (chỉ mô tả, không sinh tín hiệu)\n\n",
                  "## Mục 10. Cung cầu và xu hướng giá (chỉ mô tả, không sinh tín hiệu)\n\n| Chỉ tiêu | Tỷ đồng |\n|---|---:|\n"
                  "| Lợi nhuận gộp | 360 |\n\n")
-        self.assertIn("dòng 88: 360 — đoạn có số mà không có nhãn", self.trich_dan()["loi"])
+        self.assertIn("dòng 95: 360 — đoạn có số mà không có nhãn", self.trich_dan()["loi"])
         self.assertFalse(self.phieu()[1])
 
 

@@ -25,20 +25,34 @@ so_can_kiem bỏ qua số nguyên dưới 10, năm và số trong dấu backtick
 Dấu: số viết có dấu âm rõ ràng (−, -, hoặc trong ngoặc đơn) chỉ khớp số âm trên trang hay trong sổ, và không đi đường
 TÍNH bằng phép cộng, nhân, chia. Số viết không dấu khớp theo trị tuyệt đối, vì văn xuôi thường bỏ dấu ("lỗ 1.193 tỷ").
 
-Đoạn SUY LUẬN, GIẢ ĐỊNH, CHƯA BIẾT: máy chỉ đếm; số nào trùng số đã lần ra thì ghi NHẮC LẠI.
+Đoạn SUY LUẬN (ADR-0021 QĐ-K1): nhãn gọi tên khóa sổ sau «sổ số liệu:», cách nhau bằng dấu phẩy, tới dấu «;» hoặc hết
+nhãn; chữ sau dấu «;» là ghi chú, máy không đọc. «a05 tới a09» là dãy khóa cùng phần chữ, phần số tăng từng một, giữ số
+chữ số. Khóa không có trong sổ, hay phần không phải tên khóa trước dấu «;», là lỗi. Mỗi con số trong đoạn phải:
+    KHÓA      khớp giá trị của một khóa nhãn gọi tên (làm tròn tới số chữ số đã viết, đổi đơn vị 10^3, 10^6, 10^9); hoặc
+    HẰNG SỐ   khớp một hằng số viết trong công thức của một khóa nhãn gọi tên (ví dụ 49 trong «a * 49 / 100»); hoặc
+    NHẮC LẠI  khớp một con số ĐÃ KIỂM đã lần ra trong hồ sơ.
+Không theo đường nào: KHÔNG GẮN KHÓA — hồ sơ chưa đạt. Đoạn SUY LUẬN không gọi khóa nào thì mọi con số phải là NHẮC LẠI
+(QĐ-H4 của ADR-0020: không tính nhẩm). Chiều ngược: phần chữ nhãn phủ (cả bảng, khi nhãn phủ bảng) có ít nhất một chữ số
+thì mỗi khóa nhãn gọi tên phải khớp ít nhất một con số trong đó; khóa chỉ dùng làm căn cứ mà không in số thì đặt sau dấu «;».
+Ở chiều ngược, máy đọc cả số nhỏ, năm và số đếm thời gian («66 ngày»). Câu dẫn hay câu định tính không có chữ số nào thì
+chiều ngược không xét.
+Đoạn GIẢ ĐỊNH, CHƯA BIẾT: máy chỉ đếm; số nào trùng số đã lần ra thì ghi NHẮC LẠI.
 Đoạn có số mà không có nhãn: CHƯA GẮN NHÃN — hồ sơ chưa đạt, kể cả khi số đó trùng số đã lần ra hay trùng sổ.
 
-Giới hạn, nói thẳng: máy chỉ bắt được con số KHÔNG có trên trang và phép tính KHÔNG khớp. Máy không biết con số có
-đúng ô hay không, và không kiểm lập luận. Việc đó thuộc ghế phản biện khác hãng và Owner (QĐ-P9 lớp 2, 3).
+Giới hạn, nói thẳng: máy chỉ bắt được con số KHÔNG có trên trang, phép tính KHÔNG khớp, và số SUY LUẬN không khớp khóa
+nhãn gọi tên. Máy không biết con số có đúng ô hay không, công thức có đúng nghĩa không, và không kiểm lập luận. Việc đó
+thuộc ghế phản biện khác hãng (có bảng định nghĩa, ADR-0021 QĐ-K2) và Owner (QĐ-P9 lớp 2, 3).
 
 Chạy: python tools/hoso/kiem_trich_dan.py --thu-muc <thư mục mã> --ho-so <tệp .md>
 """
 import argparse
+import ast
 import itertools
 import pathlib
 import re
 import sys
 from collections import Counter
+from decimal import Decimal
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from tools.hoso.chung import NHAN, KhoTrang, khop_co_dau, nfc, nua_don_vi, tim_so  # noqa: E402
@@ -46,7 +60,10 @@ from tools.hoso.kiem_so_lieu import doc_so_lieu  # noqa: E402
 
 _TAG = re.compile(r"\[[^\[\]]*(?:" + "|".join(NHAN) + r")[^\[\]]*\]")
 _DIA_CHI = re.compile(r"(?<![\w.])([A-Z]\d{1,2})(?!\w)|tr\.\s*(\d+)(?:\s*[–-]\s*(\d+))?")
-NGOAI_PHAM_VI = ("Cách đọc", "Bảng nguồn", "Lịch sử sửa", "Phiếu máy")
+NGOAI_PHAM_VI = ("Trạng thái kiểm", "Cách đọc", "Bảng nguồn", "Lịch sử sửa", "Phiếu máy")
+_KHOA_NHAN = re.compile(r"sổ số liệu\s*:\s*([^;\]]*)")
+_KHOA_TEN = re.compile(r"[a-z][a-z0-9_]*")
+_KHOA_DAY = re.compile(r"([a-z][a-z0-9_]*?)(\d+)\s+tới\s+([a-z][a-z0-9_]*?)(\d+)")
 TIEU_DE_SO_THU_TU = ("#", "STT", "TT", "Số TT", "Số thứ tự")
 
 # Những thứ có chữ số nhưng không phải số liệu: bỏ trước khi tìm số.
@@ -110,6 +127,59 @@ def doc_dia_chi(nhan: str) -> dict:
 def loai_nhan(nhan: str) -> str:
     vi_tri = [(nhan.find(n), n) for n in NHAN if n in nhan]
     return min(vi_tri)[1] if vi_tri else ""
+
+
+def doc_khoa(nhan: str, trong_so) -> tuple:
+    """Khóa sổ mà nhãn gọi tên (ADR-0021 QĐ-K1): phần sau «sổ số liệu:» tới dấu «;» hoặc hết nhãn, cách nhau bằng dấu
+    phẩy. «a05 tới a09» là dãy khóa cùng phần chữ, phần số tăng từng một, giữ số chữ số. trong_so: tập khóa của sổ.
+    Trả (danh sách khóa theo thứ tự, không trùng; danh sách lỗi)."""
+    m = _KHOA_NHAN.search(nhan)
+    if not m:
+        return [], []
+    khoa, loi = [], []
+    for phan in m.group(1).split(","):
+        phan = " ".join(phan.split()).rstrip(".")
+        day = _KHOA_DAY.fullmatch(phan)
+        if day:
+            p1, s1, p2, s2 = day.groups()
+            if p1 != p2 or len(s1) != len(s2) or int(s1) > int(s2):
+                loi.append(f"dãy «{phan}» không hợp lệ: hai đầu phải cùng phần chữ, cùng số chữ số, đầu không lớn hơn cuối")
+                continue
+            ds = [f"{p1}{n:0{len(s1)}d}" for n in range(int(s1), int(s2) + 1)]
+        elif _KHOA_TEN.fullmatch(phan):
+            ds = [phan]
+        else:
+            loi.append(f"«{phan}» không phải tên khóa sổ (chữ thường, số, gạch dưới); ghi chú đặt sau dấu «;»")
+            continue
+        for k in ds:
+            if k not in trong_so:
+                loi.append(f"khóa {k} không có trong sổ số liệu")
+            elif k not in khoa:
+                khoa.append(k)
+    return khoa, loi
+
+
+def hang_so_cong_thuc(cong_thuc: str) -> list:
+    """Các hằng số viết trong công thức của một dòng tính (ví dụ 49 và 100 trong «a * 49 / 100»)."""
+    try:
+        cay = ast.parse(cong_thuc.strip(), mode="eval") if cong_thuc and cong_thuc.strip() else None
+    except SyntaxError:
+        return []
+    return [Decimal(str(n.value)) for n in ast.walk(cay) if isinstance(n, ast.Constant)
+            and isinstance(n.value, (int, float)) and not isinstance(n.value, bool)] if cay else []
+
+
+def _gon_so(v) -> str:
+    """Giá trị của một khóa sổ, viết gọn để in lỗi."""
+    return f"{v:.0f}" if abs(v) >= 1000 else f"{v:.4f}".rstrip("0").rstrip(".")
+
+
+def so_hien(text: str) -> list:
+    """Mọi con số hiện trong một phần chữ, kể cả số nhỏ, năm và số đếm thời gian («66 ngày»); chỉ bỏ địa chỉ trang, mã tài
+    liệu, ngày tháng, số mục, URL và mã trong backtick. Dùng cho chiều ngược của QĐ-K1: khóa nhãn gọi tên có hiện số không."""
+    for mau in _BO[:-1]:                                         # mẫu cuối của _BO là số đếm thời gian: giữ lại
+        text = mau.sub(" ", text)
+    return tim_so(text)
 
 
 # ---------- tách hồ sơ thành đoạn ----------
@@ -355,19 +425,19 @@ def tinh_duoc(d, hang: list, cot: list = ()) -> str:
 # ---------- kiểm ----------
 def kiem(thu_muc, ho_so_text: str) -> dict:
     kho = KhoTrang(thu_muc)
-    so_lieu = doc_so_lieu(kho)["dong"] if (kho.thu_muc / "so_lieu.csv").is_file() else []
+    so = doc_so_lieu(kho) if (kho.thu_muc / "so_lieu.csv").is_file() else {"bien": {}, "dong": []}
+    so_lieu, bien = so["dong"], so["bien"]
+    hang_so = {d["khoa"]: hang_so_cong_thuc(d.get("cong_thuc", "")) for d in so_lieu}
     doan = tach_doan(ho_so_text)
-    kq = {"dem": Counter(), "loi": [], "khong_kiem": [], "so_con_so": len(doan)}
+    kq = {"dem": Counter(), "loi": [], "khong_kiem": [], "so_con_so": len(doan), "lan_ra": [], "khoa_dung": []}
     if (kho.thu_muc / "ngoai_le.csv").is_file():
         kq["loi"].append("ngoai_le.csv: tệp không còn được dùng — ADR-0020 (sửa theo bản chấm L-09 vòng 2) bỏ hẳn ngoại lệ; "
                          "con số máy không lần ra thì không mang nhãn ĐÃ KIỂM. Xóa tệp này")
 
-    def trong_so(s, dia_chi=None) -> bool:
-        """dia_chi (đoạn ĐÃ KIỂM): chỉ dòng gốc có đúng nguồn, đúng trang của nhãn, dòng sửa phải đã chứng minh.
-        None (đoạn không phải ĐÃ KIỂM, chỉ để đếm): mọi dòng của sổ."""
-        if dia_chi is not None:
-            return khop_dong_goc(so_lieu, s, dia_chi)
-        return any(khop_co_dau(s, [d["gia_tri"]]) for d in so_lieu)
+    def trong_so(s, dia_chi) -> bool:
+        """Đoạn ĐÃ KIỂM: chỉ dòng gốc có đúng nguồn, đúng trang của nhãn, dòng sửa phải đã chứng minh. (Từ ADR-0021, đoạn
+        SUY LUẬN không còn khớp «mọi dòng của sổ»: số phải khớp đúng khóa nhãn gọi tên.)"""
+        return khop_dong_goc(so_lieu, s, dia_chi)
 
     loai = [""] * len(doan)
     cho = []                                                     # con số ĐÃ KIỂM chưa neo được vào trang hay sổ
@@ -407,6 +477,9 @@ def kiem(thu_muc, ho_so_text: str) -> dict:
                          f"không tính ra được từ các số đã lần ra cùng đoạn {d['nhan']}")
     da_lan_ra = {(doan[i]["so"].tuyet_doi, doan[i]["so"].so_le) for i, x in enumerate(loai)
                  if x in ("TRANG", "SỔ", "TÍNH")}
+    gia_tri_lan_ra = {doan[i]["so"].gia_tri for i, x in enumerate(loai) if x in ("TRANG", "SỔ", "TÍNH")}
+    kq["lan_ra"] = [{"dong": d["dong"], "raw": d["so"].raw + ("%" if d["so"].pt else ""), "loai": loai[i],
+                     "nhan": d["nhan"]} for i, d in enumerate(doan) if loai[i] in ("TRANG", "SỔ")]
     for i, d in enumerate(doan):                                 # lượt 3: đoạn không phải ĐÃ KIỂM
         if loai[i]:
             continue
@@ -414,14 +487,42 @@ def kiem(thu_muc, ho_so_text: str) -> dict:
         if not loai_n:
             loai[i] = "CHƯA GẮN NHÃN"
             kq["loi"].append(f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} — đoạn có số mà không có nhãn")
+        elif loai_n == "SUY LUẬN":                               # ADR-0021 QĐ-K1: số SUY LUẬN gắn đúng khóa nhãn gọi tên
+            khoa = doc_khoa(d["nhan"], bien)[0]
+            if any(khop_co_dau(s, [bien[k]]) for k in khoa):
+                loai[i] = "KHÓA"
+            elif any(khop_co_dau(s, hang_so.get(k, ())) for k in khoa):
+                loai[i] = "HẰNG SỐ"
+            elif khop_co_dau(s, gia_tri_lan_ra):
+                loai[i] = "NHẮC LẠI"
+            else:
+                loai[i] = "KHÔNG GẮN KHÓA"
+                kq["loi"].append(
+                    f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} — đoạn SUY LUẬN: số không khớp khóa nào nhãn gọi tên"
+                    f" ({', '.join(khoa) if khoa else 'nhãn không gọi khóa nào'}), không phải hằng số trong công thức của"
+                    f" các khóa đó, không trùng số ĐÃ KIỂM nào đã lần ra {d['nhan']}")
         elif (s.tuyet_doi, s.so_le) in da_lan_ra:
             loai[i] = "NHẮC LẠI"
-        elif trong_so(s):
-            loai[i] = "SỔ"
         else:
             loai[i] = "MÁY KHÔNG KIỂM"
             kq["khong_kiem"].append(f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} [{loai_n}]")
     kq["dem"].update(loai)
+    nhom = {}                                                    # ADR-0021 QĐ-K1, chiều ngược: khóa gọi tên phải hiện số
+    for p in cac_phan_chu(ho_so_text):
+        if p["loai"] in ("doan", "hang_bang") and loai_nhan(p["nhan"]) == "SUY LUẬN" and "sổ số liệu" in p["nhan"]:
+            nhom.setdefault((p["khoi"], p["nhan"]), []).append(p)
+    for (_, nhan), cac_phan in nhom.items():
+        dong_dau = cac_phan[0]["dong"]
+        khoa, loi_khoa = doc_khoa(nhan, bien)
+        kq["loi"].extend(f"dòng {dong_dau}: nhãn {nhan}: {x}" for x in loi_khoa)
+        kq["khoa_dung"].append({"dong": dong_dau, "nhan": nhan, "khoa": khoa})
+        hien = [s for p in cac_phan for s in so_hien(" | ".join(p["o"]) if p["loai"] == "hang_bang" else p["chu"])]
+        if not hien:                                             # câu dẫn hay câu định tính không có chữ số: không xét
+            continue
+        for k in khoa:
+            if not any(khop_co_dau(s, [bien[k]]) for s in hien):
+                kq["loi"].append(f"dòng {dong_dau}: nhãn gọi khóa {k} (sổ: {_gon_so(bien[k])}) nhưng phần chữ nhãn phủ không có "
+                                 f"con số nào khớp khóa này; khóa chỉ dùng làm căn cứ thì đặt sau dấu «;» {nhan}")
     for p in cac_phan_chu(ho_so_text):                           # lượt 4: số so_can_kiem bỏ qua, trong đoạn ĐÃ KIỂM
         if p["loai"] not in ("doan", "hang_bang") or loai_nhan(p["nhan"]) != "ĐÃ KIỂM":
             continue

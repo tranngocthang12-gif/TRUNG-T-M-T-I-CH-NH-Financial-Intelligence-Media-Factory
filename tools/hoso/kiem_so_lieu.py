@@ -148,8 +148,28 @@ def doc_so_lieu(kho: KhoTrang) -> dict:
         kq["dong"].append({"khoa": khoa, "loai": loai, "gia_tri": gia_tri, "nguon": d.get("nguon", ""),
                            "trang": int(d.get("trang") or 0), "chuoi_goc": re.sub(r"\s+", "", d.get("chuoi_goc", "")),
                            "ghi_chu": d.get("ghi_chu", ""), "sua": sua, "gia_tri_ghi": d.get("gia_tri", ""),
-                           "chung_minh": ""})
+                           "chung_minh": "", "cong_thuc": d.get("cong_thuc", ""), "don_vi": d.get("don_vi", "")})
     _chung_minh(kho, kq)
+    return kq
+
+
+def cac_dong_goc(khoa: str, theo_khoa: dict) -> list:
+    """Các dòng GỐC mà một khóa dựa vào, lần qua công thức của các dòng tính, theo thứ tự gặp, không trùng.
+    theo_khoa: khóa → dòng (như doc_so_lieu trả trong 'dong'). Khóa gốc trả chính nó. (ADR-0021 QĐ-K2, QĐ-K4.)"""
+    kq, da_qua = [], set()
+
+    def di(k):
+        if k in da_qua or k not in theo_khoa:
+            return
+        da_qua.add(k)
+        d = theo_khoa[k]
+        if d["loai"] == "goc":
+            kq.append(d)
+            return
+        for nut in ast.walk(ast.parse(d.get("cong_thuc", "").strip() or "0", mode="eval")):
+            if isinstance(nut, ast.Name):
+                di(nut.id)
+    di(khoa)
     return kq
 
 

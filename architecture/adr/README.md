@@ -41,3 +41,4 @@ Mẫu tệp `ADR-NNNN-<slug>.md`:
 | ADR-0018 | Cột dừng/đảo 3 tuần của G0: Owner không áp cột «quá 3 tuần → chỉ giữ Ledger»; giữ các điều kiện dừng đo được | QĐ-G0 ACCEPTED 22/11/2026 (Owner), hiệu lực khi Owner gộp PR này |
 | ADR-0019 | Đổi phạm vi: phân tích một mã cổ phiếu và kỷ luật đầu tư; ngừng phần đo của ADR-0002, 0013, 0016, 0017 | ACCEPTED 23/11/2026 (Owner), hiệu lực khi Owner gộp PR này |
 | ADR-0020 | Ghế phân tích của dự án và phiếu máy cho hồ sơ mã; sửa thứ tự thi công của ADR-0019 QĐ-P14 | ACCEPTED 24/11/2026 (Owner), hiệu lực khi Owner gộp PR này |
+| ADR-0021 | Số SUY LUẬN gắn đúng khóa sổ, bảng định nghĩa, mục Trạng thái kiểm, ba số Owner tự mở do máy chọn, niêm phong bản đã giao | ACCEPTED 27/11/2026 (Owner), hiệu lực khi Owner gộp PR này |

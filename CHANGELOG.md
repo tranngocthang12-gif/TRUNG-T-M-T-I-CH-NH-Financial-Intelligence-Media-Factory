@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-27 — ADR-0021: số SUY LUẬN gắn đúng khóa sổ, lớp định nghĩa, trạng thái kiểm — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+- Theo lệnh Owner ngày 26/11/2026 (23:53) và gói giao Claude Code số 16. ADR-0021 ACCEPTED 27/11/2026, hiệu lực khi Owner gộp PR này.
+- `tools/hoso/kiem_trich_dan.py`: đọc khóa trong nhãn SUY LUẬN (dấu phẩy, dãy «a05 tới a09», ghi chú sau «;»); số SUY LUẬN phải khớp khóa nhãn gọi tên, hằng số trong công thức của khóa, hay số ĐÃ KIỂM nhắc lại (KHÓA, HẰNG SỐ, NHẮC LẠI; không thì KHÔNG GẮN KHÓA); chiều ngược: phần chữ có chữ số thì mỗi khóa gọi tên phải hiện số; khóa lạ, dãy sai là lỗi; mục «Trạng thái kiểm» ngoài phạm vi đối chiếu. Đoạn GIẢ ĐỊNH, CHƯA BIẾT không còn đi đường «SỔ».
+- `tools/hoso/kiem_so_lieu.py`: dòng sổ giữ `cong_thuc`, `don_vi`; thêm `cac_dong_goc`. `tools/hoso/kiem_luat.py`: tiêu đề «Trạng thái kiểm» đứng đầu, đủ bốn dòng. `tools/hoso/phieu_may.py`: ba đường đếm mới; mục «Owner tự mở ba số» chọn theo sha256 hồ sơ. Tệp mới `tools/hoso/bang_dinh_nghia.py`.
+- `docs/QUY_TRINH_HO_SO_MA.md` (B5, B6, B7, B8, mục 4), `templates/hoso/LENH_MAU.md` (mẫu C: bảng định nghĩa), `templates/hoso/vi_du/HO_SO_MAU.md` (mục «Trạng thái kiểm»). `tests/test_hoso.py`: bốn số dòng dời 7 vì hồ sơ mẫu dài thêm; một câu của `CongGiaTests.XANH` viết lại theo luật khóa. Tệp test mới `tests/test_hoso_khoa.py`, thêm vào `UNITTEST` của `tests.yml`.
+- `architecture/adr/ADR-0021-khoa-so-va-lop-dinh-nghia.md`; `architecture/adr/README.md` thêm dòng ADR-0021; `architecture/ARCHITECTURE.md`: dòng trạng thái thêm ADR-0021, đoạn «Từ ADR-0021» sau đoạn «Từ ADR-0020». Chữ của §0–§10 và của ADR-0001…ADR-0020 giữ nguyên.
+- Không chạm `governance/`, `ledger/`, `paper/`, `research/`, `data/`, `engine/`. Không đưa hồ sơ thật, tệp gốc thật hay tên mã nào vào kho.
+
 ## 2026-11-24 — ADR-0020: ghế phân tích của dự án và phiếu máy cho hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 24/11/2026 (00:48 và 00:54) và gói giao Claude Code số 6. ADR-0020 ACCEPTED 24/11/2026, hiệu lực khi Owner gộp PR này.
 - 22 tệp mới chép đúng từng byte từ gói giao (tách bằng đoạn Python ở mục F; sha256 từng tệp khớp dòng `BEGIN FILE` và bảng ở mục C): `architecture/adr/ADR-0020-ghe-phan-tich-va-phieu-may.md`; `docs/QUY_TRINH_HO_SO_MA.md` (quy trình tám bước); `docs/CHI_DAN_PROJECT.md` (chỉ dẫn cho phiên Claude trong Project); `tools/hoso/` (nhận tệp, kiểm sổ số liệu, kiểm trích dẫn, kiểm luật và khung, gài lỗi, phiếu máy; chỉ thư viện chuẩn của Python); `tests/test_hoso.py`; `templates/hoso/` (lệnh mẫu và ví dụ số liệu bịa của một doanh nghiệp không có thật); `templates/ky_luat/MAU_KY_LUAT_TRONG.md` (bộ mẫu kỷ luật trống, QĐ-P8).

@@ -61,4 +61,12 @@ Việc: với từng dòng trong bảng dưới, mở tài liệu gốc ở đú
 
 Bảng phải phủ mọi mục có nhãn ĐÃ KIỂM của hồ sơ, mỗi mục ít nhất một dòng, và phải có dòng chứa chỗ đã gài lỗi (ghế phân tích tự lo việc này; không đánh dấu dòng đó).
 
+**Việc thứ hai (ADR-0021 QĐ-K2): bảng định nghĩa.** Tệp đính kèm thứ hai là `BANG_DINH_NGHIA_<…>.md`. Mỗi dòng là một số hồ sơ tự tính: công thức, giá trị, các dòng gốc (nguồn, trang, chuỗi máy đọc) và dòng hồ sơ dùng nó. Với từng dòng, ghi KHỚP NGHĨA hoặc LỆCH NGHĨA kèm một câu lý do, theo ba câu hỏi:
+
+1. Công thức có tính đúng điều câu hồ sơ ở cột «Dùng ở» nói không?
+2. Cùng một chỉ tiêu ở các kỳ khác nhau có cùng công thức, cùng phạm vi không?
+3. Dòng gốc có đúng là khoản mục câu hồ sơ nói tới không? Mở trang để xem tên dòng in trên báo cáo.
+
+Tệp gốc nào bạn không mở được thì ghi rõ tên tệp; không ghi KHỚP cho dòng dựa vào tệp đó.
+
 Tài liệu gốc: như bảng ở mẫu B.

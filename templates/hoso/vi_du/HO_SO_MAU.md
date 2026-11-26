@@ -5,6 +5,13 @@
 - **Mục 8 (định giá) để trống** cho tới khi Owner sửa L-02 (QĐ-P13).
 - Hồ sơ thật là bản riêng tư của Owner, không đưa vào kho công khai. Tệp này là ví dụ với số liệu bịa, dùng để thử công cụ.
 
+## Trạng thái kiểm
+
+- **Phiếu máy:** xem phiếu đi kèm; hồ sơ chỉ là hồ sơ của dự án khi phiếu kết luận ĐẠT cho đúng bản này.
+- **Đối chiếu số khác hãng:** chưa làm (bước B7).
+- **Phản biện khác hãng:** chưa làm (bước B7).
+- **Owner tự mở ba số:** chưa làm; ba số do phiếu máy chọn.
+
 ## Cách đọc
 
 Mỗi câu mang một trong bốn nhãn:

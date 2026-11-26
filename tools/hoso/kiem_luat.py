@@ -71,6 +71,8 @@
 5. Bảng 15 điểm soi đủ mười lăm dòng. Danh sách CHƯA BIẾT có ít nhất một dòng.
 6. Đầu hồ sơ ghi rõ đây không phải lời khuyên đầu tư và là bản riêng tư.
 7. Bảng nguồn khớp nguon.csv: đủ mã, đúng 12 ký tự đầu sha256.
+8. Trạng thái kiểm (ADR-0021 QĐ-K3): tiêu đề cấp hai đầu tiên là "Trạng thái kiểm", thân có đủ bốn dòng mở đầu bằng
+   TRANG_THAI_KIEM. Máy không kiểm nội dung bốn dòng; mục này nằm ngoài phạm vi đối chiếu trích dẫn như "Lịch sử sửa".
 
 Chạy: python tools/hoso/kiem_luat.py --thu-muc <thư mục mã> --ho-so <tệp .md>
 """
@@ -182,8 +184,9 @@ _BAC_CHU = re.compile(r"(?<!\w)(?:mười|mươi|trăm|nghìn|ngàn|triệu|tỷ
 _DON_VI_THOI_GIAN = re.compile(r"\s*(?:năm|tháng|quý|tuần|ngày|phiên|kỳ|kì|giờ|phút)(?!\w)", re.IGNORECASE)
 
 
-KHUNG_CAP_HAI = ("Cách đọc", "Một trang", "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn", "Lịch sử sửa",
-                 "Phiếu máy")
+KHUNG_CAP_HAI = ("Trạng thái kiểm", "Cách đọc", "Một trang", "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn",
+                 "Lịch sử sửa", "Phiếu máy")
+TRANG_THAI_KIEM = ("Phiếu máy:", "Đối chiếu số khác hãng:", "Phản biện khác hãng:", "Owner tự mở ba số:")
 
 
 def _la_tieu_de_khung(d: str) -> bool:
@@ -201,7 +204,7 @@ TIEU_DE_CAP_HAI = (
     "Mục 10. Cung cầu và xu hướng giá (chỉ mô tả, không sinh tín hiệu)",
     "Mục 11. Ba giả thuyết, điều kiện sai, ngày xem lại", "Mục 12. Ca tương tự, thành và bại",
     "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT (hồ sơ kết thúc ở đây)", "Bảng nguồn (tệp gốc đã ghim)", "Lịch sử sửa",
-    "Phiếu máy",
+    "Phiếu máy", "Trạng thái kiểm",
 )
 _DD_TIEU_DE = re.compile(r"#{1,6} \S")
 _DD_MUC = re.compile(r"(?P<thut>(?:  )*)(?:- |\d{1,2}\. )(?P<noi>.*)")
@@ -697,6 +700,12 @@ def kiem(ho_so_text: str, thu_muc=None) -> list:
 
     def than_cua(dau_ten):
         return next((b for t, b in than.items() if t.startswith(dau_ten)), "")
+    if not ten or ten[0] != "Trạng thái kiểm":                  # 8. trạng thái kiểm (ADR-0021 QĐ-K3)
+        loi.append("khung: tiêu đề cấp hai đầu tiên phải là '## Trạng thái kiểm' (ADR-0021 QĐ-K3)")
+    else:
+        thieu_tt = [x for x in TRANG_THAI_KIEM if x not in _gon(than_cua("Trạng thái kiểm"))]
+        if thieu_tt:
+            loi.append("Trạng thái kiểm: thiếu dòng " + ", ".join(f"«{x}»" for x in thieu_tt))
     if _gon(than_cua("Mục 8.")) != MUC_8:                        # 3. mục 8 trống; khoảng giá ở mọi mục
         loi.append(f"Mục 8: thân mục chỉ được là đúng câu «{MUC_8}» (bỏ chữ đậm và khoảng trắng thừa); không thêm chữ, "
                    "số hay bảng nào (QĐ-P13, L-02 chưa sửa)")
