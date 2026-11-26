@@ -50,8 +50,9 @@ def lap_bang(thu_muc, ho_so) -> str:
     for x in td["khoa_dung"]:
         for k in x["khoa"]:
             dung.setdefault(k, [])
-            if x["dong"] not in dung[k]:
-                dung[k].append(x["dong"])
+            for dg in x.get("dong_khoa", {}).get(k) or [x["dong"]]:   # dòng có số khớp khóa; không có thì dòng đầu nhãn
+                if dg not in dung[k]:
+                    dung[k].append(dg)
     dong = [
         "# BẢNG ĐỊNH NGHĨA — HỒ SƠ MÃ (ADR-0021 QĐ-K2)",
         "",

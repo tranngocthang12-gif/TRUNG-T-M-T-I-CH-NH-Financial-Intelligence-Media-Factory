@@ -7,6 +7,13 @@
 - `docs/QUY_TRINH_HO_SO_MA.md` (B5, B6, B7, B8, mục 4), `templates/hoso/LENH_MAU.md` (mẫu C: bảng định nghĩa), `templates/hoso/vi_du/HO_SO_MAU.md` (mục «Trạng thái kiểm»). `tests/test_hoso.py`: bốn số dòng dời 7 vì hồ sơ mẫu dài thêm; một câu của `CongGiaTests.XANH` viết lại theo luật khóa. Tệp test mới `tests/test_hoso_khoa.py`, thêm vào `UNITTEST` của `tests.yml`.
 - `architecture/adr/ADR-0021-khoa-so-va-lop-dinh-nghia.md`; `architecture/adr/README.md` thêm dòng ADR-0021; `architecture/ARCHITECTURE.md`: dòng trạng thái thêm ADR-0021, đoạn «Từ ADR-0021» sau đoạn «Từ ADR-0020». Chữ của §0–§10 và của ADR-0001…ADR-0020 giữ nguyên.
 - Không chạm `governance/`, `ledger/`, `paper/`, `research/`, `data/`, `engine/`. Không đưa hồ sơ thật, tệp gốc thật hay tên mã nào vào kho.
+- Vòng sửa 1 theo bản chấm L-09 vòng 1 (ChatGPT, «CHƯA GỘP ĐƯỢC 3cb2d6f», năm lỗi chặn) và gói giao Claude Code số 17:
+  - Lỗi 1 (`kiem_trich_dan.py`): số viết trong backtick ở đoạn SUY LUẬN cũng phải khớp khóa, hằng số hay số ĐÃ KIỂM nhắc lại.
+  - Lỗi 2 (`kiem_trich_dan.py`): mỗi lần nhãn xuất hiện là một phạm vi riêng cho chiều ngược; hai nhãn giống nhau trong một đoạn không còn che nhau. Nhãn phủ cả bảng thì cả bảng là một phạm vi, gộp đoạn dẫn mang cùng nhãn đứng ngay trên bảng.
+  - Lỗi 3 (`kiem_trich_dan.py`): khóa chỉ đọc ở phần nhãn trước dấu «;» đầu tiên; «sổ số liệu:» đứng sau «;» là ghi chú và máy báo riêng lỗi nhãn đó. Bỏ đường so một số SUY LUẬN với mọi dòng của sổ.
+  - Lỗi 4 (`kiem_trich_dan.py`): số thứ tự đầu dòng, số thứ tự trong bảng, năm và số nhỏ dưới 10 không làm phạm vi «có số liệu»; số đếm thời gian từ 10 trở lên thì có.
+  - Lỗi 5 (`kiem_luat.py`): mục «Trạng thái kiểm» phải có đúng một mục liệt kê riêng mở đầu bằng mỗi tên trong bốn tên.
+  - `bang_dinh_nghia.py`: cột «Dùng ở» lấy từ dòng thật có số khớp khóa. `phieu_may.py`: docstring ba số viết lại. ADR-0021 (QĐ-K1, QĐ-K3, QĐ-K4, QĐ-K6 đã kích hoạt theo điều kiện (2), Lý do đo lại, Điểm yếu) và `docs/QUY_TRINH_HO_SO_MA.md` (B5, hằng số viết nguyên văn, mục 4) đồng bộ. `tests/test_hoso_khoa.py`: lớp `VongSua1Tests` chứa đúng năm đầu vào của bản chấm và các ca cùng loại.
 
 ## 2026-11-24 — ADR-0020: ghế phân tích của dự án và phiếu máy cho hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 24/11/2026 (00:48 và 00:54) và gói giao Claude Code số 6. ADR-0020 ACCEPTED 24/11/2026, hiệu lực khi Owner gộp PR này.

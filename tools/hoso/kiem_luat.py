@@ -71,8 +71,9 @@
 5. Bảng 15 điểm soi đủ mười lăm dòng. Danh sách CHƯA BIẾT có ít nhất một dòng.
 6. Đầu hồ sơ ghi rõ đây không phải lời khuyên đầu tư và là bản riêng tư.
 7. Bảng nguồn khớp nguon.csv: đủ mã, đúng 12 ký tự đầu sha256.
-8. Trạng thái kiểm (ADR-0021 QĐ-K3): tiêu đề cấp hai đầu tiên là "Trạng thái kiểm", thân có đủ bốn dòng mở đầu bằng
-   TRANG_THAI_KIEM. Máy không kiểm nội dung bốn dòng; mục này nằm ngoài phạm vi đối chiếu trích dẫn như "Lịch sử sửa".
+8. Trạng thái kiểm (ADR-0021 QĐ-K3): tiêu đề cấp hai đầu tiên là "Trạng thái kiểm"; mỗi tên trong TRANG_THAI_KIEM mở
+   đầu đúng một mục liệt kê riêng («- **Phiếu máy:** …», bỏ chữ đậm khi so). Máy không kiểm nội dung bốn dòng; mục này nằm
+   ngoài phạm vi đối chiếu trích dẫn như "Lịch sử sửa".
 
 Chạy: python tools/hoso/kiem_luat.py --thu-muc <thư mục mã> --ho-so <tệp .md>
 """
@@ -703,9 +704,11 @@ def kiem(ho_so_text: str, thu_muc=None) -> list:
     if not ten or ten[0] != "Trạng thái kiểm":                  # 8. trạng thái kiểm (ADR-0021 QĐ-K3)
         loi.append("khung: tiêu đề cấp hai đầu tiên phải là '## Trạng thái kiểm' (ADR-0021 QĐ-K3)")
     else:
-        thieu_tt = [x for x in TRANG_THAI_KIEM if x not in _gon(than_cua("Trạng thái kiểm"))]
-        if thieu_tt:
-            loi.append("Trạng thái kiểm: thiếu dòng " + ", ".join(f"«{x}»" for x in thieu_tt))
+        dong_tt = [_gon(d) for d in than_cua("Trạng thái kiểm").splitlines() if d.strip()]
+        sai_tt = [x for x in TRANG_THAI_KIEM if sum(1 for d in dong_tt if d.startswith("- " + x)) != 1]
+        if sai_tt:                                               # vòng sửa 1 theo bản chấm L-09, lỗi chặn 5
+            loi.append("Trạng thái kiểm: cần đúng một mục liệt kê riêng mở đầu bằng mỗi tên sau, thiếu hoặc trùng: "
+                       + ", ".join(f"«- {x}»" for x in sai_tt))
     if _gon(than_cua("Mục 8.")) != MUC_8:                        # 3. mục 8 trống; khoảng giá ở mọi mục
         loi.append(f"Mục 8: thân mục chỉ được là đúng câu «{MUC_8}» (bỏ chữ đậm và khoảng trắng thừa); không thêm chữ, "
                    "số hay bảng nào (QĐ-P13, L-02 chưa sửa)")

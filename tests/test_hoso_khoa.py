@@ -59,7 +59,7 @@ class SoSuyLuanGanKhoaTests(KhoaBase):
         self.assertTrue(self.phieu()[1])
 
     def test_khoa_can_cu_khong_in_so(self):
-        self.chen("Phải thu tăng nhanh hơn doanh thu, gần gấp 2 lần. [SUY LUẬN, sổ số liệu: phai_thu_tang_25, dt_tang_25]")
+        self.chen("Doanh thu năm 2025 là 1.200 tỷ; phải thu tăng nhanh hơn. [SUY LUẬN, sổ số liệu: phai_thu_tang_25, dt_tang_25]")
         loi = self.loi()
         self.assertIn("nhãn gọi khóa phai_thu_tang_25", loi)
         self.assertIn("đặt sau dấu «;»", loi)
@@ -123,6 +123,71 @@ class SoSuyLuanGanKhoaTests(KhoaBase):
         self.assertEqual(self.trich_dan()["loi"], [])
 
 
+class VongSua1Tests(KhoaBase):
+    """Năm đầu vào của bản chấm L-09 vòng 1 (ChatGPT, CHƯA GỘP ĐƯỢC 3cb2d6f) và các ca cùng loại."""
+
+    def test_loi_chan_1_so_trong_backtick(self):
+        self.chen("Phải thu khách hàng tăng `63,4%`. [SUY LUẬN, sổ số liệu: phai_thu_tang_25]")
+        loi = self.loi()
+        self.assertIn("63,4% — đoạn SUY LUẬN: số không khớp khóa", loi)
+        self.assertIn("nhãn gọi khóa phai_thu_tang_25", loi)
+        self.assertFalse(self.phieu()[1])
+        self.sua("HO_SO_MAU.md", "`63,4%`", "`36,4%`")
+        self.assertEqual(self.trich_dan()["loi"], [])
+
+    def test_loi_chan_2_hai_nhan_giong_nhau_trong_mot_doan(self):
+        self.chen("Phải thu khách hàng tăng 100%. [SUY LUẬN, sổ số liệu: phai_thu_tang_25] Mức tăng phải thu theo sổ là 36,4%. "
+                  "[SUY LUẬN, sổ số liệu: phai_thu_tang_25]")
+        self.assertIn("nhãn gọi khóa phai_thu_tang_25", self.loi())
+        self.assertFalse(self.phieu()[1])
+
+    def test_loi_chan_3_so_so_lieu_sau_dau_cham_phay(self):
+        self.chen("Phải thu khách hàng tăng 20,0%. [SUY LUẬN; căn cứ sổ số liệu: dt_tang_25]")
+        loi = self.loi()
+        self.assertIn("20,0% — đoạn SUY LUẬN: số không khớp khóa nào nhãn gọi tên (nhãn không gọi khóa nào)", loi)
+        self.assertIn("«sổ số liệu:» đứng sau dấu «;» nên là ghi chú", loi)
+        self.assertFalse(self.phieu()[1])
+
+    def test_loi_chan_4_so_thu_tu_khong_phai_so_lieu(self):
+        self.chen("1. Phải thu tăng nhanh hơn doanh thu. [SUY LUẬN, sổ số liệu: phai_thu_tang_25]")
+        self.assertEqual(self.trich_dan()["loi"], [])
+        self.assertTrue(self.phieu()[1])
+
+    def test_nam_va_so_nho_khong_phai_so_lieu(self):
+        self.chen("Năm 2025, sau 4 kỳ, phải thu tăng nhanh hơn doanh thu. [SUY LUẬN, sổ số liệu: phai_thu_tang_25]")
+        self.assertEqual(self.trich_dan()["loi"], [])
+
+    def test_bang_co_so_thu_tu_nhan_trong_o(self):
+        self.chen("| # | Điểm | Kết quả | Nhãn |\n|---|---|---|---|\n"
+                  "| 1 | Phải thu | Tăng nhanh hơn doanh thu | [SUY LUẬN, sổ số liệu: phai_thu_tang_25] |\n"
+                  "| 2 | Doanh thu | Tăng 20,0% | [SUY LUẬN, sổ số liệu: dt_tang_25] |")
+        self.assertEqual(self.trich_dan()["loi"], [])
+        self.sua("HO_SO_MAU.md", "| Tăng 20,0% |", "| Tăng 36,4% |")
+        self.assertIn("nhãn gọi khóa dt_tang_25", self.loi())
+
+    def test_bang_nhan_o_doan_dan_gop_mot_pham_vi(self):
+        # đoạn dẫn có số liệu, nhãn cuối đoạn phủ luôn bảng ngay dưới: khóa hiện ở bảng vẫn tính
+        self.chen("Hai chỉ tiêu năm 2025, đơn vị phần trăm, theo sổ 30 dòng: [SUY LUẬN, sổ số liệu: dt_tang_25, phai_thu_tang_25]\n"
+                  "| Chỉ tiêu | Giá trị |\n|---|---:|\n| Doanh thu tăng | 20,0% |\n| Phải thu tăng | 36,4% |")
+        kq = self.trich_dan()
+        self.assertNotIn("nhãn gọi khóa", "\n".join(kq["loi"]))
+
+    def test_loi_chan_5_trang_thai_mot_dong(self):
+        chu = self.ho_so.read_text(encoding="utf-8")
+        dau = chu.index("## Trạng thái kiểm\n") + len("## Trạng thái kiểm\n")
+        cuoi = chu.index("## Cách đọc")
+        self.ho_so.write_text(chu[:dau] + "\n- Phiếu máy: chưa làm; Đối chiếu số khác hãng: chưa làm; Phản biện khác hãng: chưa "
+                              "làm; Owner tự mở ba số: chưa làm.\n\n" + chu[cuoi:], encoding="utf-8")
+        self.assertIn("thiếu hoặc trùng: «- Đối chiếu số khác hãng:», «- Phản biện khác hãng:», «- Owner tự mở ba số:»",
+                      "\n".join(self.luat()))
+        self.assertFalse(self.phieu()[1])
+
+    def test_trang_thai_trung_dong(self):
+        self.sua("HO_SO_MAU.md", "- **Phản biện khác hãng:** chưa làm (bước B7).",
+                 "- **Phản biện khác hãng:** chưa làm (bước B7).\n- **Phản biện khác hãng:** chưa làm.")
+        self.assertIn("thiếu hoặc trùng: «- Phản biện khác hãng:»", "\n".join(self.luat()))
+
+
 class BangDinhNghiaTests(KhoaBase):
     def test_bang(self):
         bang = bang_dinh_nghia.lap_bang(self.tm, self.ho_so)
@@ -137,7 +202,7 @@ class BangDinhNghiaTests(KhoaBase):
 class TrangThaiKiemTests(KhoaBase):
     def test_thieu_muc_hay_thieu_dong(self):
         self.sua("HO_SO_MAU.md", "- **Phản biện khác hãng:** chưa làm (bước B7).\n", "")
-        self.assertIn("Trạng thái kiểm: thiếu dòng «Phản biện khác hãng:»", "\n".join(self.luat()))
+        self.assertIn("thiếu hoặc trùng: «- Phản biện khác hãng:»", "\n".join(self.luat()))
         self.sua("HO_SO_MAU.md", "## Trạng thái kiểm\n", "")
         self.assertIn("tiêu đề cấp hai đầu tiên phải là '## Trạng thái kiểm'", "\n".join(self.luat()))
         self.assertFalse(self.phieu()[1])

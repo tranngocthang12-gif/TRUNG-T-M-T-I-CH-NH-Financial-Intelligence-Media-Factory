@@ -12,7 +12,8 @@ không phạm L-02, và giá cổ phiếu chỉ được nêu dưới dạng s�
 Phiếu ĐẠT KHÔNG có nghĩa là lập luận đúng: việc đó thuộc ghế phản biện khác hãng và Owner.
 
 Cuối phiếu có mục «Owner tự mở ba số» (ADR-0021 QĐ-K4): máy chọn ba con số theo sha256 của hồ sơ, nên cùng một hồ sơ luôn
-ra cùng ba số và ghế phân tích không chọn được. Mục này không ảnh hưởng kết luận ĐẠT hay CHƯA ĐẠT.
+ra cùng ba số và ghế phân tích không chọn trực tiếp; sửa hồ sơ một chữ thì ba số đổi theo. Mục này không ảnh hưởng kết luận
+ĐẠT hay CHƯA ĐẠT.
 
 Mã thoát: 0 nếu ĐẠT, 1 nếu CHƯA ĐẠT. Phiếu được ghi cạnh hồ sơ: PHIEU_MAY_<tên hồ sơ>.txt
 """

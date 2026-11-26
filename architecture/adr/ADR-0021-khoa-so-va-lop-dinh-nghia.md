@@ -19,9 +19,10 @@
 
 ### QĐ-K1 — Số SUY LUẬN gắn đúng khóa nhãn gọi tên
 
-- Nhãn: phần sau «sổ số liệu:» tới dấu «;» hoặc hết nhãn là danh sách khóa, cách nhau bằng dấu phẩy. «a05 tới a09» là dãy khóa cùng phần chữ, phần số tăng từng một, giữ số chữ số. Chữ sau dấu «;» là ghi chú, máy không đọc. Khóa không có trong sổ, dãy sai, hay phần không phải tên khóa trước dấu «;» là lỗi.
-- Chiều xuôi: mỗi con số trong đoạn SUY LUẬN phải khớp giá trị của một khóa nhãn gọi tên (làm tròn tới số chữ số đã viết, đổi đơn vị 10^3, 10^6, 10^9), hoặc là hằng số viết trong công thức của khóa đó, hoặc trùng một số ĐÃ KIỂM đã lần ra trong hồ sơ. Không thì KHÔNG GẮN KHÓA, phiếu CHƯA ĐẠT. Đoạn SUY LUẬN không gọi khóa nào thì mọi con số phải là số ĐÃ KIỂM nhắc lại.
-- Chiều ngược: phần chữ nhãn phủ (cả bảng, khi nhãn phủ bảng) có chữ số thì mỗi khóa nhãn gọi tên phải hiện ở ít nhất một con số của phần chữ đó; ở chiều này máy đọc cả số nhỏ, năm và số đếm thời gian. Câu dẫn hay câu định tính không có chữ số thì không xét. Khóa chỉ làm căn cứ thì đặt sau dấu «;».
+- Nhãn: cụm «sổ số liệu:» đứng trước dấu «;» đầu tiên; phần sau nó tới dấu «;» hoặc hết nhãn là danh sách khóa, cách nhau bằng dấu phẩy. «a05 tới a09» là dãy khóa cùng phần chữ, phần số tăng từng một, giữ số chữ số. Chữ sau dấu «;» là ghi chú, máy không đọc. Khóa không có trong sổ, dãy sai, hay phần không phải tên khóa trước dấu «;» là lỗi.
+- Phạm vi: mỗi lần nhãn xuất hiện là một phạm vi riêng. Nhãn phủ cả bảng thì cả bảng là một phạm vi, cộng đoạn dẫn mang nhãn đó khi nhãn đứng cuối đoạn ngay trên bảng; hàng bảng có nhãn trong ô là phạm vi riêng.
+- Chiều xuôi: mỗi con số trong đoạn SUY LUẬN, kể cả số viết trong backtick, phải khớp giá trị của một khóa nhãn gọi tên (làm tròn tới số chữ số đã viết, đổi đơn vị 10^3, 10^6, 10^9), hoặc là hằng số viết trong công thức của khóa đó, hoặc trùng một số ĐÃ KIỂM đã lần ra trong hồ sơ. Không thì KHÔNG GẮN KHÓA, phiếu CHƯA ĐẠT. Đoạn SUY LUẬN không gọi khóa nào thì mọi con số phải là số ĐÃ KIỂM nhắc lại.
+- Chiều ngược: phạm vi có số liệu thì mỗi khóa nhãn gọi tên phải hiện ở ít nhất một con số của phạm vi đó; ở chiều này máy đọc cả số nhỏ, năm, số đếm thời gian và số trong backtick. «Có số liệu» là có một con số mà chiều xuôi xét, hoặc một số đếm thời gian từ 10 trở lên; năm, số nhỏ dưới 10, số thứ tự đầu dòng và số thứ tự trong bảng không tính. Câu dẫn hay câu định tính không có số liệu thì không xét. Khóa chỉ làm căn cứ thì đặt sau dấu «;».
 - Đoạn GIẢ ĐỊNH và CHƯA BIẾT giữ như cũ: máy chỉ đếm. Ngưỡng của điều kiện sai ở Mục 11 là lựa chọn của ghế phân tích, viết dưới nhãn GIẢ ĐỊNH.
 - Phiếu in thêm ba đường: KHÓA, HẰNG SỐ, KHÔNG GẮN KHÓA. Đường «SỔ» từ nay chỉ còn cho số ĐÃ KIỂM khớp dòng gốc đúng nguồn, đúng trang.
 
@@ -34,11 +35,11 @@
 ### QĐ-K3 — Mục «Trạng thái kiểm»
 
 - Tiêu đề cấp hai đầu tiên của hồ sơ là «Trạng thái kiểm», bốn dòng: Phiếu máy; Đối chiếu số khác hãng; Phản biện khác hãng; Owner tự mở ba số. Ở B8, ghế phân tích ghi: ghế nào, kết quả, tệp gốc nào mỗi ghế không mở được, ý nào ở «Một trang» chưa được ghế khác hãng nào đối chiếu.
-- Máy chỉ kiểm có tiêu đề ở đúng chỗ và đủ bốn dòng. Mục nằm ngoài phạm vi đối chiếu trích dẫn như «Lịch sử sửa»; định dạng, L-02 và cổng giá vẫn áp.
+- Máy kiểm tiêu đề ở đúng chỗ và mỗi tên mở đầu đúng một mục liệt kê riêng. Mục nằm ngoài phạm vi đối chiếu trích dẫn như «Lịch sử sửa»; định dạng, L-02 và cổng giá vẫn áp.
 
 ### QĐ-K4 — Ba số Owner tự mở do máy chọn
 
-- Sửa cách chọn ở QĐ-P9 của ADR-0019 («ba con số bất kỳ»). Cuối phiếu có mục «Owner tự mở ba số»: máy chọn theo sha256 của hồ sơ một số ĐÃ KIỂM ở «Một trang», một dòng máy đọc sai đã sửa và chứng minh, và một dòng gốc sau một khóa SUY LUẬN ở «Một trang». Thiếu loại nào thì lấy số ĐÃ KIỂM khác. Cùng hồ sơ ra cùng ba số; ghế phân tích không chọn được.
+- Sửa cách chọn ở QĐ-P9 của ADR-0019 («ba con số bất kỳ»). Cuối phiếu có mục «Owner tự mở ba số»: máy chọn theo sha256 của hồ sơ một số ĐÃ KIỂM ở «Một trang», một dòng máy đọc sai đã sửa và chứng minh, và một dòng gốc sau một khóa SUY LUẬN ở «Một trang». Thiếu loại nào thì lấy số ĐÃ KIỂM khác. Cùng hồ sơ ra cùng ba số; ghế phân tích không chọn trực tiếp, và sửa hồ sơ một chữ thì ba số đổi theo. Ghế phân tích không sửa hồ sơ để đổi ba số.
 - Mục này không ảnh hưởng kết luận ĐẠT hay CHƯA ĐẠT. Owner muốn mở thêm số nào cũng được.
 
 ### QĐ-K5 — Niêm phong bản đã giao và hậu kiểm theo đúng chữ
@@ -51,6 +52,7 @@
 
 - Phiếu máy là một bộ duy nhất, cùng hãng với ghế phân tích. Chưa viết trình kiểm thứ hai.
 - Kích hoạt khi xảy ra một trong hai: (1) sau khi PR này gộp, ghế khác hãng hay hậu kiểm tìm ra một con số sai mà luật đã công bố của phiếu máy lẽ ra phải bắt; (2) phiếu máy cần thêm một vòng sửa vì một lỗi cùng loại với chỗ hở ở bối cảnh. Khi kích hoạt: kiến trúc sư soạn ADR mới; một ghế khác hãng viết bản kiểm nhỏ cho sha256 tệp gốc và cho việc mỗi con số lần ra trang, dòng gốc hay đúng khóa, chỉ từ chữ của quy trình, không đọc mã phiếu máy; hai bản phải ra cùng kết quả.
+- Đã kích hoạt ngày 27/11/2026 theo điều kiện (2): lỗi chặn 1 của bản chấm L-09 vòng 1 (số trong backtick ở đoạn SUY LUẬN không bị xét) cùng loại với chỗ hở ở bối cảnh, và phiếu máy phải thêm vòng sửa 1. Sau khi PR này gộp, kiến trúc sư soạn ADR cho trình kiểm thứ hai.
 
 ### QĐ-K7 — Hai hồ sơ đã giao
 
@@ -62,6 +64,7 @@
 | QĐ | Trạng thái | Owner | Ngày |
 |---|---|---|---|
 | QĐ-K1 tới QĐ-K7 | ACCEPTED theo lệnh Owner giao kiến trúc sư toàn quyền quyết định | Owner (lệnh 23:53 ngày 26/11/2026) | 27/11/2026 |
+| QĐ-K6 | Điều kiện (2) đã xảy ra ở vòng sửa 1; ADR trình kiểm thứ hai soạn sau khi PR này gộp | Owner (khi gộp) | 27/11/2026 |
 
 ## Lý do (bằng chứng, số đo)
 
@@ -69,18 +72,20 @@
 
 - Hồ sơ mẫu số liệu bịa: viết sai một số SUY LUẬN thành số của khóa khác, hoặc thành số không có trong sổ, thì phiếu trên `b0c004b` vẫn ĐẠT (ca thứ nhất cho các con đếm giống hệt bản đúng). Sau bản sửa: cả hai CHƯA ĐẠT.
 - Bản 1 của hồ sơ thứ hai (bản gửi phản biện): luật mới bắt đúng tỷ lệ in một số cho hai khóa ở chiều ngược.
-- Hồ sơ thứ hai bản 2: 79 số KHÓA, 2 HẰNG SỐ; luật mới báo 5 lỗi, cả 5 là cách ghi nhãn (một hằng số viết trong công thức dưới dạng 11/10, bốn khóa làm căn cứ cho câu định tính chưa đặt sau «;»), không lỗi giá trị.
-- Hồ sơ thứ nhất bản 2: 161 số KHÓA, 39 số NHẮC LẠI; luật mới báo 30 lỗi: 23 số chưa gắn khóa, 3 khóa làm căn cứ, 4 nhãn sai cú pháp. Kiến trúc sư soát 23 số chưa gắn khóa: số tính nhẩm đúng giá trị (một tổng hai đợt giao dịch, một hiệu hai tỷ lệ); ngưỡng của giả thuyết và khoảng viết bằng lời; số đọc từ tài liệu nhưng đặt dưới nhãn SUY LUẬN; số trong bảng mang nhãn chữ thay cho khóa; một số đúng giá trị nhưng ngược dấu với dòng sổ. Không thấy số sai. Một số đọc từ tài liệu trùng tình cờ một dòng sổ khác chỉ tiêu: đúng loại trùng mà phiếu cũ đếm là «SỔ».
+- Hồ sơ thứ hai bản 2: 79 số KHÓA, 2 HẰNG SỐ; luật mới báo 6 lỗi, cả 6 là cách ghi nhãn: hai lỗi ở cùng một câu viết «nhân 1,1» trong khi công thức sổ viết `* 11 / 10` (chiều xuôi và chiều ngược), bốn khóa làm căn cứ cho câu định tính chưa đặt sau «;»; không lỗi giá trị. Bản đo trước vòng sửa 1 chỉ ra 5 lỗi: số thứ tự «6.» đầu mục bị đọc như con số và, sau khi làm tròn, khớp một khóa căn cứ.
+- Hồ sơ thứ nhất bản 2: 157 số KHÓA, 40 số NHẮC LẠI; luật mới báo 34 lỗi: 26 số chưa gắn khóa, 2 khóa làm căn cứ, 4 nhãn sai cú pháp, 2 nhãn đặt «sổ số liệu:» sau dấu «;». Thử trên bản sao, đưa «sổ số liệu:» của hai nhãn đó lên trước dấu «;» thì còn đúng 30 lỗi của bản đo trước vòng sửa 1: 23 số chưa gắn khóa, 3 khóa làm căn cứ, 4 nhãn sai cú pháp (161 KHÓA, 39 NHẮC LẠI). Kiến trúc sư soát 23 số chưa gắn khóa: số tính nhẩm đúng giá trị (một tổng hai đợt giao dịch, một hiệu hai tỷ lệ); ngưỡng của giả thuyết và khoảng viết bằng lời; số đọc từ tài liệu nhưng đặt dưới nhãn SUY LUẬN; số trong bảng mang nhãn chữ thay cho khóa; một số đúng giá trị nhưng ngược dấu với dòng sổ. Không thấy số sai. Một số đọc từ tài liệu trùng tình cờ một dòng sổ khác chỉ tiêu: đúng loại trùng mà phiếu cũ đếm là «SỔ».
 - Ba số máy chọn cho hồ sơ thứ hai bản 2: số lãi một lần ở «Một trang», một dòng máy đọc sai đã sửa, và một dòng gốc của công thức nợ vay ròng — đúng công thức ghế phản biện bắt sai phạm vi ở vòng một.
-- `tests/test_hoso.py` và `tests/test_hoso_khoa.py`: 100 phép thử đạt.
+- `tests/test_hoso.py` và `tests/test_hoso_khoa.py`: 109 phép thử đạt, có đủ năm đầu vào của bản chấm vòng 1.
 
 Điểm yếu đã biết:
 
 - Số SUY LUẬN sai mà tình cờ trùng một số ĐÃ KIỂM khác trong hồ sơ, hay trùng một hằng số trong công thức của khóa (ví dụ 100 của phép đổi phần trăm), vẫn lọt chiều xuôi; chiều ngược bắt được nếu khóa nhãn gọi tên không hiện số nào.
-- Chiều ngược bỏ qua câu không có chữ số; khóa gọi tên ở câu đó chỉ được bảng định nghĩa đưa ra cho người đọc.
+- Trong một nhãn gọi nhiều khóa, máy không biết con số nào ứng với khóa nào: hai số đổi chỗ cho nhau vẫn qua.
+- Số viết bằng chữ («ba mươi sáu phần trăm») máy không đọc.
+- Chiều ngược bỏ qua phạm vi không có số liệu; khóa gọi tên ở đó chỉ được bảng định nghĩa đưa ra cho người đọc.
 - Máy vẫn không biết công thức có đúng nghĩa không. Bảng định nghĩa chỉ chuyển phần này tới đúng người đọc.
 - Hai hồ sơ đã giao không đạt luật mới nếu chạy lại; QĐ-K7 nói rõ vì sao không làm lại.
-- Ghế viết công cụ, ghế viết hồ sơ và ghế kiến trúc cùng hãng; QĐ-K6 mới chỉ là điều kiện, chưa là trình kiểm.
+- Ghế viết công cụ, ghế viết hồ sơ và ghế kiến trúc cùng hãng. QĐ-K6 đã kích hoạt nhưng trình kiểm thứ hai chưa viết.
 
 ## Không đổi
 
