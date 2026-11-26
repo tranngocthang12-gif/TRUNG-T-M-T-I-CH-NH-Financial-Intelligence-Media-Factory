@@ -5,7 +5,14 @@ import sys
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
 from test_hoso import MUC_9, HoSoBase  # noqa: E402
-from tools.hoso import bang_dinh_nghia, kiem_trich_dan  # noqa: E402
+from tools.hoso import bang_dinh_nghia, kiem_luat, kiem_trich_dan  # noqa: E402
+
+K = "[SUY LUẬN, sổ số liệu: phai_thu_tang_25]"                  # khóa phai_thu_tang_25 của hồ sơ mẫu: 36,3636
+KD = "[SUY LUẬN, sổ số liệu: dt_tang_25]"                       # khóa dt_tang_25: 20,0
+BANG = "| Chỉ tiêu | Tỷ lệ |\n|---|---:|\n"
+DINH_TINH = "Phải thu tăng nhanh hơn doanh thu. "
+TT_DU = ("- Phiếu máy: chưa làm.\n- Đối chiếu số khác hãng: chưa làm.\n- Phản biện khác hãng: chưa làm.\n"
+         "- Owner tự mở ba số: chưa làm.")
 
 
 class KhoaBase(HoSoBase):
@@ -186,6 +193,246 @@ class VongSua1Tests(KhoaBase):
         self.sua("HO_SO_MAU.md", "- **Phản biện khác hãng:** chưa làm (bước B7).",
                  "- **Phản biện khác hãng:** chưa làm (bước B7).\n- **Phản biện khác hãng:** chưa làm.")
         self.assertIn("thiếu hoặc trùng: «- Phản biện khác hãng:»", "\n".join(self.luat()))
+
+
+class VongSua2Tests(KhoaBase):
+    """Bốn đầu vào của bản chấm L-09 vòng 2 (ChatGPT, CHƯA GỘP ĐƯỢC c5becc5) và các ca cùng loại. Mỗi ca chèn vào dưới tiêu
+    đề mục 9 của hồ sơ mẫu, trừ ca ghi khác."""
+
+    def thu(self, cau, *so):
+        """Chèn cau vào hồ sơ mẫu (thêm dòng so vào sổ số liệu); trả (mọi lỗi nối lại, phiếu có ĐẠT không) rồi khôi phục."""
+        goc, so_goc = self.ho_so.read_text(encoding="utf-8"), (self.tm / "so_lieu.csv").read_text(encoding="utf-8")
+        self.addCleanup(self.ho_so.write_text, goc, encoding="utf-8")
+        self.addCleanup((self.tm / "so_lieu.csv").write_text, so_goc, encoding="utf-8")
+        if so:
+            self.them_dong("so_lieu.csv", *so)
+        self.ho_so.write_text(goc.replace(MUC_9, MUC_9 + "\n\n" + cau, 1), encoding="utf-8")
+        kq = "\n".join(self.trich_dan()["loi"] + self.luat()), self.phieu()[1]
+        self.ho_so.write_text(goc, encoding="utf-8")
+        (self.tm / "so_lieu.csv").write_text(so_goc, encoding="utf-8")
+        return kq
+
+    def chua_dat(self, ca):
+        for ten, (cau, loi_can) in ca.items():
+            with self.subTest(ten):
+                loi, dat = self.thu(cau)
+                self.assertIn(loi_can, loi, ten)
+                self.assertFalse(dat, ten)
+
+    def dat(self, ca):
+        for ten, cau in ca.items():
+            with self.subTest(ten):
+                loi, dat = self.thu(cau)
+                self.assertEqual(loi, "", ten)
+                self.assertTrue(dat, ten)
+
+    def thay_trang_thai(self, than):
+        chu = self.ho_so.read_text(encoding="utf-8")
+        dau = chu.index("## Trạng thái kiểm\n") + len("## Trạng thái kiểm\n")
+        self.ho_so.write_text(chu[:dau] + "\n" + than + "\n\n" + chu[chu.index("## Cách đọc"):], encoding="utf-8")
+
+    # ---------- lỗi chặn 1: định dạng làm biến đổi giá trị số
+    def test_loi_chan_1_dinh_dang_khong_doi_con_so(self):
+        khong_khop, dd = "đoạn SUY LUẬN: số không khớp khóa", "định dạng ngoài bộ cho phép — dấu ** hay ` chen vào con số"
+        self.chua_dat({
+            "bản chấm: dấu trừ ngoài backtick": ("Mức biến động phải thu là -`36,4%`. " + K, "36,4% — " + khong_khop),
+            "bản chấm: chữ đậm cắt đôi số": ("Phải thu khách hàng tăng **6**3 phần trăm. " + K, "63 — " + khong_khop),
+            "dấu trừ ngoài chữ đậm": ("Mức biến động phải thu là -**36,4%**. " + K, "36,4% — " + khong_khop),
+            "dấu trừ in đậm riêng": ("Mức biến động phải thu là **-**36,4%. " + K, "36,4% — " + khong_khop),
+            "ngoặc âm ngoài backtick": ("Mức biến động phải thu là (`36,4`) phần trăm. " + K, "36,4 — " + khong_khop),
+            "backtick cắt phần lẻ": ("Phải thu khách hàng tăng `63`,4%. " + K, "63,4% — " + khong_khop),
+            "chữ đậm cắt hàng nghìn": ("Phải thu khách hàng tăng **1**.193 phần trăm. " + K, "1.193 — " + khong_khop),
+            "chữ đậm giấu số nhỏ có %": ("Phải thu khách hàng tăng **5**%. " + K, "5% — " + khong_khop),
+            "chữ đậm trong ô bảng": (BANG + "| Phải thu tăng | **6**3 |\n\n" + K, "63 — " + khong_khop),
+            "cổng định dạng: dấu trừ ngoài backtick": ("Mức biến động phải thu là -`36,4%`. " + K, dd),
+            "cổng định dạng: chữ đậm cắt đôi số": ("Phải thu khách hàng tăng **6**3 phần trăm. " + K, dd),
+            "cổng định dạng: số đậm dán vào chữ": ("Phải thu khách hàng tăng**63,4%**. " + K, dd),
+            "mã có dấu cách sát mép": ("Mức biến động phải thu là -` 36,4% `. " + K, "mã «`…`» có dấu cách sát mép trong"),
+            "gạch nối không ngắt làm dấu âm": ("Mức biến động phải thu là ‑36,4%. " + K, "U+2011"),
+            "gạch dài dính số": ("Mức biến động phải thu là —36,4%. " + K, "U+2014"),
+            "ký tự trống dán số vào chữ": ("Phải thu khách hàng tăngㅤ63,4%. " + K, "U+3164"),
+            "ĐÃ KIỂM: dấu trừ ngoài backtick": ("Doanh thu thuần là -`1.200` tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+                                                "1.200 — số nhỏ, năm hay số trong backtick ở đoạn ĐÃ KIỂM không có trên trang"),
+            "số dương viết thành âm": ("Mức biến động phải thu là -36,4%. " + K, "36,4% — " + khong_khop),
+        })
+        self.dat({
+            "đậm trọn số": "Phải thu khách hàng tăng **36,4%**. " + K,
+            "mã trọn số": "Phải thu khách hàng tăng `36,4%`. " + K,
+            "đậm số, % ngoài": "Phải thu khách hàng tăng **36,4**%. " + K,
+            "ngoặc quanh số đậm có %": "Phải thu khách hàng tăng nhanh (**36,4%**). " + K,
+            "đậm nhãn chữ, tên tệp trong mã": "**Lưu ý:** phải thu khách hàng tăng 36,4% (xem `so_lieu.csv`). " + K,
+            "gạch dài có dấu cách": "Phải thu khách hàng tăng **36,4%** — nhanh hơn doanh thu. " + K,
+            "khóa viết trong backtick": "Phải thu khách hàng tăng 36,4%. [SUY LUẬN, sổ số liệu: `phai_thu_tang_25`]",
+            "nhãn in đậm": "Phải thu khách hàng tăng 36,4%. **" + K + "**",
+        })
+        loi, dat = self.thu("Mức chênh là **-26,7%**, tức −26,7%. [SUY LUẬN, sổ số liệu: am_25]",
+                            "am_25,,,,,pt,,(cd24_phai_thu / cd25_phai_thu - 1) * 100")
+        self.assertEqual((loi, dat), ("", True))                   # số âm thật khớp khóa âm, cả hai cách viết dấu
+
+    def test_doc_so_tren_chu_hien_thi(self):
+        ktd = kiem_trich_dan
+        self.assertEqual(ktd.chu_hien("-`36,4%` và **6**3"), "-36,4% và 63")
+        self.assertEqual([(s.raw, s.gia_tri < 0) for s in ktd.so_lieu_hien("-`36,4%`, **6**3, (**1.200**)")],
+                         [("36,4", True), ("63", False), ("1.200", True)])
+        self.assertEqual([s.raw for s in ktd.so_can_kiem("tăng **6**3 và **5**%")], ["63", "5"])
+        self.assertEqual([s.raw for s in ktd.so_hien("**Tháng** 12 năm `2025`: 4 kỳ, 91 ngày")], ["4", "91"])
+        k = kiem_luat.kiem_dinh_dang
+        for xau in ("-`36,4%`", "**6**3", "-**36,4**", "(`36,4`)", "`63`,4", "**1**.193", "x**5**", "` 5`", "`5 `",
+                    "a ** b", "** a**", "**a **", "`a**b**`", "—36", "‑5", "aㅤb", "a⠀b"):
+            with self.subTest(xau):
+                self.assertTrue(k(xau), repr(xau))
+        for xau in ("**36,4%**", "`36,4%`", "**36,4** %", "(**36,4%**)", "**-5** tới **5**", "2024—2025", "a — 5",
+                    "**1.** Doanh thu", "**Tháng 12**/2025", "| **A** | `b_c.txt` | 5 |"):
+            with self.subTest(xau):
+                self.assertEqual(k(xau), [], repr(xau))
+
+    # ---------- lỗi chặn 2: phạm vi theo lần xuất hiện của nhãn
+    def test_loi_chan_2_pham_vi_theo_lan_xuat_hien_cua_nhan(self):
+        nguoc = "nhãn gọi khóa phai_thu_tang_25 (sổ: 36.3636)"
+        self.chua_dat({
+            "bản chấm: nhãn cùng chữ sau bảng, cách một tiêu đề": (
+                "Phải thu khách hàng tăng 100%. " + K + " Bảng sau ghi kết quả riêng.\n\n" + BANG
+                + "| Phải thu tăng | 36,4% |\n\n### Ghi chú\n\n" + K, "dòng 89: " + nguoc),
+            "như trên, nhãn ngay sau bảng": (
+                "Phải thu khách hàng tăng 100%. " + K + " Bảng sau ghi kết quả riêng.\n\n" + BANG
+                + "| Phải thu tăng | 36,4% |\n\n" + K, "dòng 89: " + nguoc),
+            "đoạn dẫn kết bằng nhãn khác, nhãn cùng chữ sau bảng": (
+                "Phải thu khách hàng tăng 100%. " + K + " Doanh thu tăng 20,0%. " + KD + "\n\n" + BANG
+                + "| Phải thu tăng | 36,4% |\n\n" + K, "dòng 89: " + nguoc),
+            "hai nhãn cùng chữ trong đoạn dẫn, bảng ngay dưới": (
+                "Phải thu khách hàng tăng 100%. " + K + " Bảng dưới ghi số sổ. " + K + "\n" + BANG
+                + "| Phải thu tăng | 36,4% |", "dòng 89: " + nguoc),
+            "nhãn sau bảng cách một tiêu đề thì bảng không có nhãn": (
+                BANG + "| Phải thu tăng | 36,4% |\n\n### Ghi chú\n\n" + K, "36,4% — đoạn có số mà không có nhãn"),
+            "hai nhãn trong một hàng bảng": (
+                "| Chỉ tiêu | A | B |\n|---|---|---|\n| Tăng | 20,0% " + KD + " | 20,0% " + K + " |", "hàng bảng có 2 nhãn"),
+            "nhãn gọi khóa đứng sau một nhãn khác, không phủ chữ nào": (
+                "Phải thu khách hàng tăng 63,4%. [GIẢ ĐỊNH] " + K, "nhãn gọi khóa (phai_thu_tang_25) nhưng không phủ chữ nào"),
+            "nhãn giữa hai bảng, bảng dưới sai khóa": (
+                BANG + "| Phải thu tăng | 36,4% |\n\n" + K + "\n\n" + BANG + "| Doanh thu tăng | 20,0% |", "20,0% — đoạn SUY LUẬN"),
+        })
+        self.dat({
+            "đoạn dẫn kết bằng nhãn, bảng ngay dưới: một phạm vi":
+                "Hai chỉ tiêu, đơn vị phần trăm: [SUY LUẬN, sổ số liệu: dt_tang_25, phai_thu_tang_25]\n" + BANG
+                + "| Doanh thu tăng | 20,0% |\n| Phải thu tăng | 36,4% |",
+            "đoạn dẫn kết bằng nhãn, cách dòng trống, rồi bảng": "Mức tăng phải thu, đơn vị phần trăm: " + K + "\n\n" + BANG
+                + "| Phải thu tăng | 36,4% |",
+            "một nhãn giữa hai bảng: một lần xuất hiện, một phạm vi":
+                BANG + "| Doanh thu tăng | 20,0% |\n\n[SUY LUẬN, sổ số liệu: dt_tang_25, phai_thu_tang_25]\n\n" + BANG
+                + "| Phải thu tăng | 36,4% |",
+            "bảng có hàng mang nhãn riêng và nhãn sau bảng":
+                "| Chỉ tiêu | Tỷ lệ | Nhãn |\n|---|---:|---|\n| Doanh thu tăng | 20,0% | " + KD
+                + " |\n| Phải thu tăng | 36,4% | |\n\n" + K,
+        })
+
+    def test_pham_vi_nhan_theo_dinh_danh(self):
+        chu = ("## Mục 9. Thị trường chung và chu kỳ\n\nA 100%. " + K + " B.\n\n" + BANG + "| x | 36,4% |\n\n### Ghi chú\n\n" + K
+               + "\n\nC 36,4%. " + K + "\n" + BANG + "| y | 36,4% |\n")
+        nhom = kiem_trich_dan.pham_vi_nhan(kiem_trich_dan.cac_phan_chu(chu))
+        self.assertEqual([[p["chu"].strip() for p in ds] for ds in nhom.values()],
+                         [["A 100%."], [""], ["C 36,4%.", "y | 36,4%"]])   # bảng đầu không có nhãn; bảng sau gộp với đoạn dẫn
+
+    # ---------- lỗi chặn 3: ngày tháng không phải số đếm thời gian
+    def test_loi_chan_3_ngay_thang_khong_phai_so_dem_thoi_gian(self):
+        self.dat({
+            "bản chấm: Tháng 12 năm 2025": "Tháng 12 năm 2025, phải thu tăng nhanh hơn doanh thu. " + K,
+            "ngày 31 tháng 12 năm 2025": "Tới ngày 31 tháng 12 năm 2025, phải thu tăng nhanh hơn doanh thu. " + K,
+            "quý 4 năm 2025": "Quý 4 năm 2025, phải thu tăng nhanh hơn doanh thu. " + K,
+            "31/12/2025": "Tới 31/12/2025, phải thu tăng nhanh hơn doanh thu. " + K,
+            "tháng 12/2025": "Tháng 12/2025, phải thu tăng nhanh hơn doanh thu. " + K,
+            "chữ đậm quanh ngày tháng": "**Tháng 12 năm 2025**, phải thu tăng nhanh hơn doanh thu. " + K,
+            "chữ đậm cắt ngang ngày tháng": "**Tháng** 12 năm `2025`, phải thu tăng nhanh hơn doanh thu. " + K,
+            "hai năm": "So năm 2025 với năm 2024, phải thu tăng nhanh hơn doanh thu. " + K,
+            "khóa căn cứ đặt sau dấu ;": "Trong 12 tháng qua, phải thu tăng nhanh hơn doanh thu. [SUY LUẬN; căn cứ sổ: phai_thu_tang_25]",
+        })
+        for cau, co in (("Tháng 12 năm 2025, phải thu tăng nhanh", False), ("ngày 31 tháng 12 năm 2025", False),
+                        ("quý 4 năm 2025", False), ("trong 12 tháng qua", True), ("số ngày thu tiền là 95 ngày", True),
+                        ("sau 4 kỳ", False), ("tăng 36,4%", True), ("tăng 63.4%", True)):
+            with self.subTest(cau):
+                self.assertEqual(kiem_trich_dan.co_so_lieu(cau), co)
+        self.chua_dat({                                          # số đếm thời gian thật vẫn làm phạm vi «có số liệu»
+            "12 tháng": ("Trong 12 tháng qua, phải thu tăng nhanh hơn doanh thu. " + K, "nhãn gọi khóa phai_thu_tang_25"),
+        })
+
+    # ---------- lỗi chặn 4: tiêu đề cấp hai lặp
+    def test_loi_chan_4_tieu_de_cap_hai_lap(self):
+        lap = "khung: tiêu đề cấp hai xuất hiện hơn một lần: '## Trạng thái kiểm'"
+        goc = self.ho_so.read_text(encoding="utf-8")
+        for ten, than, them in (
+                ("bản chấm: mục đầu thiếu ba dòng, mục lặp đủ", "- Phiếu máy: chưa làm.\n\n## Trạng thái kiểm\n\n" + TT_DU,
+                 "thiếu hoặc trùng: «- Đối chiếu số khác hãng:», «- Phản biện khác hãng:», «- Owner tự mở ba số:»"),
+                ("cả hai mục đều đủ", TT_DU + "\n\n## Trạng thái kiểm\n\n" + TT_DU, lap)):
+            with self.subTest(ten):
+                self.thay_trang_thai(than)
+                loi = "\n".join(self.luat())
+                self.assertIn(lap, loi)
+                self.assertIn(them, loi)
+                self.assertFalse(self.phieu()[1])
+                self.ho_so.write_text(goc, encoding="utf-8")
+        self.ho_so.write_text(goc.rstrip("\n") + "\n\n## Trạng thái kiểm\n\n" + TT_DU + "\n", encoding="utf-8")
+        self.assertIn(lap, "\n".join(self.luat()))                # mục lặp ở cuối hồ sơ
+        self.ho_so.write_text(goc.replace("## Kết quả 15 điểm soi\n", "## Kết quả 15 điểm soi\n\n| # | Điểm soi |\n|---|---|\n"
+                                          "| 1 | Chỉ một dòng |\n\n## Kết quả 15 điểm soi\n", 1), encoding="utf-8")
+        loi = "\n".join(self.luat())
+        self.assertIn("xuất hiện hơn một lần: '## Kết quả 15 điểm soi'", loi)
+        self.assertIn("Kết quả 15 điểm soi: thiếu dòng [2, 3,", loi)   # xét thân của lần xuất hiện đầu tiên
+        self.ho_so.write_text(goc, encoding="utf-8")
+        self.thay_trang_thai(TT_DU)
+        self.assertEqual(self.luat(), [])
+        self.assertTrue(self.phieu()[1])
+
+    # ---------- cùng loại: con số ở chỗ máy trước đó không đọc
+    def test_so_thu_tu_chi_o_dau_muc_cua_danh_sach_danh_dung(self):
+        ds = "\n".join(f"{i}. Ý định tính. [SUY LUẬN]" for i in range(1, 13))
+        self.chua_dat({
+            "63. nối tiếp một đoạn": ("Phải thu khách hàng tăng nhanh, mức tăng tính theo phần trăm là\n63. " + K, "63 — đoạn SUY LUẬN"),
+            "63. sau dòng trống": ("Mức tăng phải thu tính theo phần trăm là:\n\n63. " + K, "63 — đoạn SUY LUẬN"),
+            "63. đứng giữa đoạn, sau một nhãn": (DINH_TINH + "[SUY LUẬN] 63. " + K, "63 — đoạn SUY LUẬN"),
+            "63. trong ô bảng": ("| Chỉ tiêu | Tỷ lệ |\n|---|---|\n| Phải thu tăng | 63. " + K + " |", "63 — đoạn SUY LUẬN"),
+            "số đậm 63. đầu đoạn": ("**63.** Phải thu khách hàng tăng, tính theo phần trăm. " + K, "63 — đoạn SUY LUẬN"),
+            # dãy 1..9, 13, 11, 12 không phải 1, 2, …, n: số đầu mục từ 10 trở lên là con số (13 và 12 tình cờ trùng số
+            # ĐÃ KIỂM 12,50 sau làm tròn nên là NHẮC LẠI — giới hạn đã công bố; 11 không trùng số nào)
+            "danh sách 1..12 mà mục 10 ghi 13": (ds.replace("\n10. ", "\n13. "), "11 — đoạn SUY LUẬN"),
+        })
+        self.dat({
+            "bản chấm vòng 1: 1. câu định tính": "1. " + DINH_TINH + K,
+            "danh sách 1..12": ds,
+            "mục con gạch đầu dòng giữa danh sách số": "1. " + DINH_TINH + K + "\n  - Ý phụ. [SUY LUẬN]\n2. Ý thứ hai. [SUY LUẬN]",
+            "danh sách ĐÃ KIỂM bị bảng ngắt, đánh tiếp 2.":
+                "1. Doanh thu thuần năm 2025 là 1.200 tỷ đồng. [ĐÃ KIỂM D1 tr.1]\n\n| Chỉ tiêu | Giá trị |\n|---|---:|\n"
+                "| Lợi nhuận gộp | 360 |\n\n[ĐÃ KIỂM D1 tr.1]\n\n2. Lợi nhuận sau thuế là 144 tỷ đồng. [ĐÃ KIỂM D1 tr.1]",
+        })
+
+    def test_so_o_cho_khong_mang_nhan(self):
+        self.chua_dat({
+            "bảng một hàng: hàng tiêu đề có số": ("| Phải thu khách hàng tăng 63,4% |\n\n" + K, "63,4% — số liệu ở hàng tiêu đề bảng"),
+            "tiêu đề phụ có số": ("### Phải thu tăng 63,4%\n\n" + DINH_TINH + K, "63,4% — số liệu ở tiêu đề phụ"),
+            "tiêu đề phụ đánh số 3.1.": ("### 3.1. Phải thu\n\n" + DINH_TINH + K, "3.1 — số liệu ở tiêu đề phụ"),
+            "số không nhãn trong backtick": ("Phải thu khách hàng tăng `63,4%`.", "63,4% — đoạn có số mà không có nhãn"),
+        })
+        self.dat({
+            "tiêu đề phụ có năm": "### Năm 2025\n\n" + DINH_TINH + K,
+            "tiêu đề phụ đánh số một tầng": "### 3. Phải thu\n\n" + DINH_TINH + K,
+            "hàng tiêu đề có năm và quý": "| Chỉ tiêu | 2025 | Quý 3 năm 2026 |\n|---|---:|---:|\n"
+                                          "| Doanh thu thuần | 1.200 | 1.050 |\n\n[ĐÃ KIỂM D1 tr.1; D2 tr.1]",
+            "GIẢ ĐỊNH có số trong backtick: chỉ đếm": "Giả sử biên lợi nhuận gộp giữ `31,5%`. [GIẢ ĐỊNH]",
+        })
+
+    def test_so_khong_doc_duoc_theo_kieu_viet_nam(self):
+        la = "cụm chữ số không đọc được theo kiểu số Việt Nam"
+        self.chua_dat({
+            "dấu chấm thập phân, số sai": ("Phải thu khách hàng tăng 63.4%. " + K, "«63.4» — " + la),
+            "dấu chấm thập phân, đúng giá trị": ("Phải thu khách hàng tăng 36.4%. " + K, "«36.4» — " + la),
+            "dấu phẩy tách nghìn": ("Phải thu khách hàng là 1,234,567. " + K, "«1,234,567» — " + la),
+            "trong backtick": ("Phải thu khách hàng tăng `63.4%`. " + K, "«63.4» — " + la),
+            "trong ô bảng": (BANG + "| Phải thu tăng | 63.4% |\n\n" + K, "«63.4» — " + la),
+            "không nhãn": ("Phải thu khách hàng tăng 63.4%.", "đoạn có số mà không có nhãn"),
+            "ở tiêu đề phụ": ("### Phải thu tăng 63.4%\n\n" + DINH_TINH + K, "63.4 — số liệu ở tiêu đề phụ"),
+        })
+        self.assertEqual(kiem_trich_dan.so_khong_doc_duoc("63.4% và 1,234,567; 1.200,5; ngày 31/12/2025; kq25_dt; D1 tr.3"),
+                         ["63.4", "1,234,567"])
+        self.dat({"GIẢ ĐỊNH: chỉ đếm": "Giả sử doanh thu gấp 1.5 lần. [GIẢ ĐỊNH]"})
+        self.assertEqual(self.thu("Giả sử doanh thu gấp 1.5 lần. [GIẢ ĐỊNH]"), ("", True))
 
 
 class BangDinhNghiaTests(KhoaBase):

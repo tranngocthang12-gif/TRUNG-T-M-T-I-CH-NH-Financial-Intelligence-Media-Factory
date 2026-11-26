@@ -4,10 +4,12 @@
    ở docstring của kiem_dinh_dang. Dòng nào ngoài bộ là lỗi, bất kể nội dung. Mục đích: mọi cách viết làm chữ hiển thị
    khác chữ máy đọc (dấu nhấn mạnh bằng «_», tiêu đề thụt lề hay gạch chân, thực thể và thẻ HTML, ký tự vô hình, mã chen
    giữa chữ…) bị chặn trước khi cổng giá đọc chữ. Tiêu đề cấp hai phải đúng từng chữ một tên của khung (TIEU_DE_CAP_HAI),
-   nên tiêu đề khung không chở được dấu hiệu giá.
+   nên tiêu đề khung không chở được dấu hiệu giá. Dấu định dạng cũng không được đổi con số (_dd_so; sửa theo bản chấm
+   L-09 vòng 2 của ADR-0021): chữ đậm và mã phải bọc trọn con số, kể cả dấu âm, ngoặc và dấu %.
 1. L-02: không cụm từ khuyến nghị nào ở bất kỳ dòng nào. Dùng đúng bộ mẫu của tools/laws_checks.py, thêm vài cụm
    riêng của hồ sơ mã. Kiểm cứng, không xét ngữ cảnh: câu phủ định có cụm cấm cũng bị bắt — đổi cách viết.
-2. Khung: đủ mười hai mục theo thứ tự; có "Một trang", "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn".
+2. Khung: đủ mười hai mục theo thứ tự; có "Một trang", "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn". Mỗi
+   tiêu đề cấp hai chỉ được xuất hiện một lần; khi tiêu đề lặp, máy báo lỗi và xét thân của lần xuất hiện đầu tiên.
 3. Mục 8 để trống cho tới khi Owner sửa L-02 (QĐ-P13): sau khi bỏ chữ đậm và khoảng trắng thừa, thân mục phải đúng bằng
    câu cố định MUC_8. Thêm bất kỳ chữ, chữ số hay bảng nào là lỗi.
    Khoảng giá trị bị cấm ở MỌI mục, bất kể nhãn (QĐ-P13): hai số nối bằng gạch ngang hoặc "đến/tới" kèm đơn vị tiền
@@ -71,9 +73,9 @@
 5. Bảng 15 điểm soi đủ mười lăm dòng. Danh sách CHƯA BIẾT có ít nhất một dòng.
 6. Đầu hồ sơ ghi rõ đây không phải lời khuyên đầu tư và là bản riêng tư.
 7. Bảng nguồn khớp nguon.csv: đủ mã, đúng 12 ký tự đầu sha256.
-8. Trạng thái kiểm (ADR-0021 QĐ-K3): tiêu đề cấp hai đầu tiên là "Trạng thái kiểm"; mỗi tên trong TRANG_THAI_KIEM mở
-   đầu đúng một mục liệt kê riêng («- **Phiếu máy:** …», bỏ chữ đậm khi so). Máy không kiểm nội dung bốn dòng; mục này nằm
-   ngoài phạm vi đối chiếu trích dẫn như "Lịch sử sửa".
+8. Trạng thái kiểm (ADR-0021 QĐ-K3): tiêu đề cấp hai đầu tiên là "Trạng thái kiểm" và chỉ xuất hiện một lần; mỗi tên
+   trong TRANG_THAI_KIEM mở đầu đúng một mục liệt kê riêng («- **Phiếu máy:** …», bỏ chữ đậm khi so). Máy không kiểm nội
+   dung bốn dòng; mục này nằm ngoài phạm vi đối chiếu trích dẫn như "Lịch sử sửa".
 
 Chạy: python tools/hoso/kiem_luat.py --thu-muc <thư mục mã> --ho-so <tệp .md>
 """
@@ -228,6 +230,8 @@ def _dd_noi_dong(doan: str, trong_ma: bool) -> list:
         loi.append("dấu \\ (ký tự thoát)")
     if "*" in doan.replace("**", "") or "***" in doan:
         loi.append("dấu * lẻ (chỉ dùng ** để in đậm)")
+    elif trong_ma and "*" in doan:
+        loi.append("dấu ** trong mã (trong mã, ** hiện nguyên văn chứ không in đậm)")
     if "~~" in doan:
         loi.append("dấu ~~")
     if _DD_THUC_THE.search(doan):
@@ -236,6 +240,44 @@ def _dd_noi_dong(doan: str, trong_ma: bool) -> list:
         loi.append("thẻ HTML hay chú thích HTML (<…)")
     if not trong_ma and _DD_LIEN_KET.search(doan):
         loi.append("liên kết, ảnh hay chú thích chân trang")
+    return loi
+
+
+_GACH_LA = "\u02d7\u207b\u208b\u2796"                           # dấu trừ biến thể không thuộc nhóm gạch ngang (Pd)
+_VI_TRI_DAU = re.compile(r"(?<![\w.,])(.)(?=\d)")                # ký tự đứng ở vị trí dấu của một con số (như chung._SO)
+
+
+def _dd_so(dong: str, cac_doan: list) -> list:
+    """Dấu định dạng không được đổi con số (sửa theo bản chấm L-09 vòng 2 của ADR-0021, lỗi chặn 1). cac_doan: dong cắt
+    theo dấu `, phần tử lẻ là mã. Bốn luật:
+      - mã «`…`» không có dấu cách sát mép trong (trình dựng bỏ dấu cách đó, «-` 36,4 `» hiện thành «-36,4»);
+      - dấu ** đủ cặp trên một dòng, chữ đậm không trống và không có dấu cách sát mép trong;
+      - đọc số trên chữ hiển thị (bỏ dấu ** và dấu `) phải ra đúng các con số như khi thay mỗi dấu đó bằng một dấu cách:
+        dấu định dạng không tách dấu âm, ngoặc, phần lẻ hay dấu % khỏi con số, không cắt đôi con số, không dán con số
+        vào chữ;
+      - ký tự gạch ngang mà máy không đọc là dấu âm (gạch dài «—», gạch nối không ngắt U+2011, dấu trừ nhỏ…) không được
+        dính liền trước chữ số ở vị trí của dấu âm."""
+    loi = []
+    if any(d != d.strip() for d in cac_doan[1::2]):
+        loi.append("mã «`…`» có dấu cách sát mép trong")
+    dam = "\x00".join(cac_doan[0::2]).split("**")               # chữ ngoài mã; mỗi đoạn mã giữ chỗ bằng một ký tự
+    if len(dam) % 2 == 0:
+        loi.append("dấu ** không đủ cặp trên một dòng")
+    elif any(not d or d != d.strip() for d in dam[1::2]):
+        loi.append("chữ đậm «**…**» trống hay có dấu cách sát mép trong")
+
+    def doc(t):
+        return [(x.raw, x.gia_tri, x.pt) for x in tim_so(" ".join(t.split()))]
+    hien = dong.replace("**", "").replace("`", "")
+    if doc(hien) != doc(dong.replace("**", " ").replace("`", " ")):
+        loi.append("dấu ** hay ` chen vào con số (tách dấu âm, ngoặc, phần lẻ hay dấu % khỏi con số, cắt đôi con số, hay "
+                   "dán con số vào chữ): đặt trọn con số vào trong hoặc ra ngoài dấu định dạng")
+    for m in _VI_TRI_DAU.finditer(hien):
+        c = m.group(1)
+        if c not in "-−–" and (unicodedata.category(c) == "Pd" or c in _GACH_LA):
+            loi.append(f"ký tự U+{ord(c):04X} ({unicodedata.name(c, 'không tên')}) dính liền trước chữ số trông như dấu âm "
+                       "nhưng máy không đọc là dấu âm: dùng «-» hay «−», hoặc thêm dấu cách")
+            break
     return loi
 
 
@@ -249,9 +291,13 @@ def kiem_dinh_dang(text: str) -> list:
       - mục liệt kê «- » hay «1. », thụt 0, 2, 4… dấu cách; nội dung mục không bắt đầu bằng «#», «>», «|», «<» hay «`»;
       - đường kẻ «---» đúng ba dấu, đứng sau một dòng trống;
       - trong dòng: chữ đậm «**…**»; mã «`…`» với số dấu ` chẵn, không dính liền chữ ở mặt ngoài; dấu «_» ngoài mã chỉ
-        trong khóa sổ dạng chữ thường không dấu «a_b_1» nằm trong một nhãn, trong mã chỉ khi nằm giữa hai chữ (tên tệp).
+        trong khóa sổ dạng chữ thường không dấu «a_b_1» nằm trong một nhãn, trong mã chỉ khi nằm giữa hai chữ (tên tệp);
+      - dấu định dạng không đổi con số (_dd_so): chữ đậm và mã mở, đóng trên cùng một dòng, không có dấu cách sát mép
+        trong, bọc trọn con số (cả dấu âm, ngoặc, dấu %); trong mã không có dấu *.
     Không cho phép: dấu cách khác dấu cách thường (tab, dấu cách cứng…); ký tự định dạng vô hình (rộng 0, gạch nối mềm,
-    đổi chiều) và dấu kết hợp đứng riêng sau chuẩn hóa NFC (chữ Việt chuẩn luôn là chữ dựng sẵn); dấu «_» hay «*» để
+    đổi chiều), ký tự trống thuộc nhóm chữ hay ký hiệu (các ký tự «FILLER» của Hangul, ô Braille trống U+2800: dính liền
+    trước một con số thì con số thành mã, máy không đọc) và dấu kết hợp đứng riêng sau chuẩn hóa NFC (chữ Việt chuẩn luôn
+    là chữ dựng sẵn); dấu «_» hay «*» để
     nhấn mạnh; «~~»; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang; trích dẫn «>»; khối mã
     (```, ~~~ hay thụt lề); tiêu đề gạch chân (=== hay --- ngay dưới một dòng chữ); dòng thụt lề mà không phải mục liệt
     kê."""
@@ -260,7 +306,7 @@ def kiem_dinh_dang(text: str) -> list:
         bao = []
         for c in dong:
             if unicodedata.category(c) in ("Cf", "Cc", "Zl", "Zp", "Mn", "Mc", "Me") or (
-                    unicodedata.category(c) == "Zs" and c != " "):
+                    unicodedata.category(c) == "Zs" and c != " ") or c == "\u2800" or "FILLER" in unicodedata.name(c, ""):
                 bao.append(f"ký tự U+{ord(c):04X} ({unicodedata.name(c, 'không tên')})")
                 break
         than = dong
@@ -295,8 +341,10 @@ def kiem_dinh_dang(text: str) -> list:
                                  for a, b in zip(*[iter([i for i, c in enumerate(dong) if c == "`"])] * 2)):
             bao.append("mã «`…`» dính liền chữ ở mặt ngoài, hay dùng hai dấu ` liền nhau")
         else:
-            for k, doan in enumerate(dong.split("`")):
+            cac_doan = dong.split("`")
+            for k, doan in enumerate(cac_doan):
                 bao.extend(_dd_noi_dong(doan, trong_ma=k % 2 == 1))
+            bao.extend(_dd_so(dong, cac_doan))
         for b in dict.fromkeys(bao):
             loi.append(f"dòng {so}: định dạng ngoài bộ cho phép — {b}")
         truoc = dong
@@ -697,7 +745,13 @@ def kiem(ho_so_text: str, thu_muc=None) -> list:
     elif not (vi_tri["Một trang"] < vi_tri["Mục 1."] and vi_tri["Kết quả 15 điểm soi"] < vi_tri["Danh sách CHƯA BIẾT"]
               < vi_tri["Bảng nguồn"]):
         loi.append("khung: thứ tự phải là Một trang, Mục 1–12, Kết quả 15 điểm soi, Danh sách CHƯA BIẾT, Bảng nguồn")
-    than = {t: b for _, t, b in muc}
+    trung = [t for t in dict.fromkeys(ten) if ten.count(t) > 1]
+    if trung:                                                    # sửa theo bản chấm L-09 vòng 2 của ADR-0021, lỗi chặn 4
+        loi.append("khung: tiêu đề cấp hai xuất hiện hơn một lần: " + ", ".join(f"'## {t}'" for t in trung)
+                   + "; mỗi tiêu đề của khung chỉ được có một lần")
+    than = {}
+    for _, t, b in muc:
+        than.setdefault(t, b)                                    # tiêu đề lặp: xét thân của lần xuất hiện đầu tiên
 
     def than_cua(dau_ten):
         return next((b for t, b in than.items() if t.startswith(dau_ten)), "")
