@@ -1,5 +1,5 @@
 {
-  "as_of": "2026-11-25",
+  "as_of": "2026-11-26",
   "total_predictions": 16,
   "resolved": 0,
   "void_data_error": 0,
@@ -107,10 +107,10 @@
   },
   "procedures": {},
   "freshness": {
-    "report_as_of": "2026-11-25",
-    "generated_at": "2026-11-25T19:28:31Z",
-    "source_commit": "d9e831b9f20760f335515b8a819edea4f02f28df",
-    "data_as_of": "2026-11-25",
+    "report_as_of": "2026-11-26",
+    "generated_at": "2026-11-26T19:10:49Z",
+    "source_commit": "b0c004bb1d76f8628eb9a6a9ceb5c5fc9e7adf63",
+    "data_as_of": "2026-11-26",
     "sources": {
       "ledger/predictions.jsonl": {
         "rows": 16,
