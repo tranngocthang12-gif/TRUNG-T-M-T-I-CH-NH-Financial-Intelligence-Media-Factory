@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-11-27 — ADR-0023: bảng phơi nhiễm thời thế ở Mục 9 của hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+- Theo lệnh Owner ngày 27/11/2026 (16:47) «Bạn tự quyết công việc. Tôi chỉ nghiệm thu.» và gói giao Claude Code số 20. ADR-0023 ACCEPTED 27/11/2026, hiệu lực khi Owner gộp PR này.
+- `architecture/adr/ADR-0023-bang-phoi-nhiem-thoi-the.md` (mới); `architecture/adr/README.md` thêm dòng ADR-0023; `architecture/ARCHITECTURE.md`: dòng trạng thái thêm ADR-0023, đoạn «Từ ADR-0023» sau đoạn «Từ ADR-0022».
+- `docs/QUY_TRINH_HO_SO_MA.md`: chỗ để tệp ngoài `goc/ngoai/` (mục 1); tệp ngoài mã N (B2); cách viết Mục 9 (B5); câu hỏi bắt buộc thứ hai về Mục 9 (B7); hậu kiểm bảng thời thế (B8 bước 5). `templates/hoso/LENH_MAU.md` (mẫu B): câu hỏi bắt buộc thứ hai.
+- Không sửa `tools/`, `tests/`, hồ sơ mẫu `templates/hoso/vi_du/`, chữ của ADR-0001…ADR-0022 và §0–§10 của ARCHITECTURE.md.
+
 ## 2026-11-27 — ADR-0022: bảng chữ cho phép của hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 27/11/2026 (11:02) giao kiến trúc sư toàn quyền quyết định các việc còn mở sau PR #120, và gói giao Claude Code số 19. ADR-0022 ACCEPTED 27/11/2026, hiệu lực khi Owner gộp PR này.
 - `tools/hoso/kiem_luat.py`: bảng chữ cho phép (`CHU_CHO_PHEP`, `DAU_CHO_PHEP`, `_dd_bang_chu`); ngoặc vuông chỉ cho nhãn đúng dạng, trong mã không có `|`, `[`, `]` (`_dd_nhan`); không có địa chỉ web, mã biểu tượng, định nghĩa liên kết; cách viết số làm người đọc và máy đọc khác nhau là lỗi (`_dd_cach_viet_so`: chữ dính số, chữ O, o, I, l sau chữ số, dấu % sau chữ, dấu nháy giữa số, dấu trừ dính sau chữ hay dấu câu, trước ngoặc, cách con số, số tách nghìn bằng dấu cách). Cổng giá: số thứ tự chỉ bỏ ở đúng đầu mục liệt kê (chỗ hở có từ ADR-0020).

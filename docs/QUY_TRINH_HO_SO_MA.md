@@ -19,6 +19,7 @@ Thư mục mã có dạng:
 ```
 <MÃ>/
   goc/                 tệp gốc đã tải (PDF, CSV…), không sửa
+  goc/ngoai/           tệp ngoài cho Mục 9, mã N (ADR-0023 QĐ-T5)
   ma_nguon.csv         ghế phân tích viết: ma,tep,ten,kieu_so
   nguon.csv            máy sinh: thêm sha256, số trang, cách đọc
   trang/<mã nguồn>/    máy sinh: pNNN.txt cho từng trang, không sửa tay
@@ -46,6 +47,7 @@ Owner nêu mã. Ghế phân tích không tự chọn mã, trừ khi Owner giao v
 - Danh sách tối thiểu: báo cáo tài chính kiểm toán của ba năm (mới nhất, lùi hai năm, lùi bốn năm), báo cáo bán niên soát xét mới nhất, báo cáo quý mới nhất, báo cáo thường niên mới nhất, tài liệu đại hội cổ đông mới nhất, công bố giao dịch của người nội bộ trong 12 tháng, nghị quyết phát hành trong 12 tháng.
 - Nguồn: trang công bố của chính doanh nghiệp hoặc của sở giao dịch. Giá và số cổ phiếu lưu hành lấy từ một bảng giá, ghi rõ là nguồn phụ.
 - Mã nguồn: tệp giá thị trường (bảng giá, giá đóng cửa, khối lượng giao dịch) mang mã bắt đầu bằng chữ **G** (G1, G2…); báo cáo và tài liệu khác dùng chữ khác (D1, D2…). Cổng giá của phiếu máy dựa vào quy ước này: nhãn ĐÃ KIỂM dẫn một nguồn G là dấu hiệu ngữ cảnh giá (B5).
+- Tệp ngoài cho Mục 9 (ADR-0023 QĐ-T5): văn bản, bản tin, bảng số của cơ quan ban hành, cơ quan thống kê, ngân hàng trung ương, tổ chức quốc tế hay hiệp hội ngành về các biến thời thế của doanh nghiệp. Đặt trong `goc/ngoai/`, mang mã N (N1, N2…). Trang web không có tệp thì in thành PDF, giờ in hiện ở đầu trang. Trang viết lại tin của nơi khác và báo cáo của công ty chứng khoán không dùng làm nguồn ghim.
 - Ghế tìm nguồn (Grok) lập bảng đường dẫn. Cowork tải về máy Owner theo mẫu lệnh ở `templates/hoso/LENH_MAU.md` và báo sha256 từng tệp.
 - Thiếu tệp nào thì ghi vào danh sách CHƯA BIẾT. Không thay bằng số nhớ lại.
 
@@ -102,6 +104,14 @@ Lý do có bước này: ở hồ sơ đầu tiên máy đọc sai năm con số
 - Giá cổ phiếu, hệ số định giá (P/E, P/B, P/S, EV/EBITDA) và vốn hóa chỉ được nêu dưới dạng số quá khứ có nguồn: trong đoạn ĐÃ KIỂM, mọi chữ số có trên trang đã ghi (hoặc là dòng gốc của sổ), năm không vượt năm lớn nhất của trang đó, không kèm từ chỉ tương lai hay tín hiệu (dự báo, dự kiến, kỳ vọng, mục tiêu, sẽ, có thể, kịch bản, nếu, giả định, năm sau, ngắn hạn, nên, chờ, … tới, hỗ trợ, kháng cự…). Máy nhận ra "ngữ cảnh giá" qua: số mang đơn vị giá (đồng, nghìn đồng, VND, đ, "/cp", "30 nghìn mỗi cp"…); chữ "giá" (giá vốn, giá bán, đánh giá, "giá trị" thường… chỉ được bỏ qua khi phần chữ không có từ chỉ cổ phiếu: cổ phiếu, cổ phần, cp, "giá MAU"); hệ số định giá hay vốn hóa; nhãn ĐÃ KIỂM dẫn nguồn G. Từ tương lai đi cùng từ chỉ cổ phiếu là lỗi kể cả khi không có con số. Tiêu đề, hàng tiêu đề bảng và bảng nguồn không mang nhãn, nên không được nêu giá kèm số (năm đứng riêng thì được). Danh sách đầy đủ ở docstring `tools/hoso/kiem_luat.py`.
 - Bảng hay danh sách đặt ngay dưới một câu có chữ «giá», và mọi đoạn dưới một tiêu đề phụ có chữ «giá», sẽ bị xét như ngữ cảnh giá. Trong phần chữ nói về giá, mọi chữ số đều phải có trên trang nguồn: số thứ tự chỉ được bỏ qua khi cột đầu tên là #, STT, TT, Số TT hoặc Số thứ tự và đánh đúng 1, 2, …, n; «điểm 30», «12 tháng», «25/4» đều là con số.
 - Không viết khoảng giá trị hay giá mục tiêu ở bất kỳ mục nào khác, dù nhãn là gì. Máy bắt hai số nối bằng gạch ngang hoặc "đến/tới" kèm đơn vị tiền (đồng, nghìn đồng, VND, đ; trong bảng tính cả đơn vị ở tiêu đề cột), và các cụm "khoảng giá", "vùng giá", "mức giá", "giá mục tiêu", "giá trị nội tại", "giá trị một/mỗi cổ phiếu" đi với số. Chỉ giá quá khứ trong đoạn ĐÃ KIỂM, mọi số có trên trang đã ghi, mới được qua.
+- Mục 9 là bảng phơi nhiễm thời thế (ADR-0023):
+  - Mỗi biến một tiêu đề phụ `###`; dưới đó theo thứ tự: trạng thái ở ngày ghi theo tệp ngoài (mã N); mức phơi nhiễm theo tệp gốc của doanh nghiệp; giả thuyết nào ở Mục 11 dựa vào biến, qua dòng nào của báo cáo; điều kiện làm trạng thái đã ghi đổi. Sau các biến là bảng tóm tắt năm cột (biến, trạng thái đã ghim, phơi nhiễm từ tệp gốc, giả thuyết dựa vào, chấm được ở ngày xem lại) và một đoạn nói cách chấm ở ngày xem lại.
+  - Phơi nhiễm là quy mô, không phải độ nhạy: ghi rõ điều đó, và ghi độ nhạy của lợi nhuận là CHƯA BIẾT. Không viết câu «nếu biến đổi chừng này thì lợi nhuận đổi chừng kia». Được một phép thử cơ học cho mỗi biến, cú sốc đúng một đơn vị, là dòng tính trong sổ, kèm câu GIẢ ĐỊNH nêu giả định của phép thử.
+  - Điều kiện đổi trạng thái ghi rõ bốn thứ: văn bản hay bản tin dùng để chấm, chỉ tiêu, kỳ so sánh, ngưỡng. Trạng thái đã ghi viết thành một quan hệ; điều kiện là quan hệ đó không còn đúng; biến là khoảng thì xét cả hai đầu mút. Sự kiện pháp lý: chỉ văn bản có hiệu lực làm đổi, và ghi khi nào trạng thái giữ nguyên. Một dòng nhiều chỉ tiêu: ghi luật gộp. Thiếu một trong bốn thứ thì dòng ghi «chưa chấm được». Ngưỡng viết bằng chữ, dưới nhãn GIẢ ĐỊNH.
+  - Không câu nào nêu hay ngụ ý biến sẽ đi hướng nào; không cộng các dòng thành điểm; không từ hành động.
+  - Giả thuyết dựa vào biên lợi nhuận thì bảng có biến phía chi phí lẫn phía doanh thu; thiếu nguồn thì vẫn lập dòng, ô trạng thái ghi «Chưa». Nguồn ngành chứa số của chính doanh nghiệp thì ghi «không độc lập với» doanh nghiệp. Quá tám dòng thì ghi một câu lý do.
+  - Tiêu đề phụ của Mục 9 không có chữ «giá». Số giá hàng hóa chỉ đứng trong đoạn ĐÃ KIỂM; điều kiện viết ở câu riêng, không có số giá.
+  - Mục 11 thêm dòng «Biến thời thế». Điều kiện sai ở Mục 11 cần báo cáo của kỳ nào thì ngày xem lại phải gồm ngày có báo cáo kỳ đó.
 - Mục 10 chỉ mô tả giá và khối lượng.
 - Mục 11: ba giả thuyết H1 (tốt), H2 (xấu), H0 (không có gì đặc biệt). Mỗi giả thuyết có điều kiện làm nó sai. Có ngày xem lại.
 - Hồ sơ kết bằng danh sách CHƯA BIẾT.
@@ -140,7 +150,8 @@ python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ng
    Gửi `…_BAN_PHAN_BIEN.md` cùng đường dẫn tệp gốc cho hai ghế khác hãng Anthropic, theo mẫu ở `templates/hoso/LENH_MAU.md`: một ghế viết bản phản biện bốn phần (QĐ-P7), một ghế đối chiếu số. Ghế đối chiếu số nhận thêm bảng định nghĩa và trả lời ba câu hỏi của bảng cho từng dòng.
 3. Bản trả lời phải mở đầu bằng **mã nhận tệp** in ở đầu bản phản biện. Không có mã: coi như ghế đó chưa đọc tệp, gửi lại.
 4. Ghế nào hết hạn mức thì chuyển sang ghế khác hãng còn lại (ChatGPT, Gemini, Grok). Không dùng Claude cho bước này.
-5. Chép nguyên văn bản trả lời vào `phan_bien/`. Ghi vào tệp niêm phong: ghế nào nhận được tệp, ghế nào bắt được lỗi gài.
+5. Lệnh phản biện có câu hỏi bắt buộc thứ hai về Mục 9 (ADR-0023 QĐ-T7, mẫu B).
+6. Chép nguyên văn bản trả lời vào `phan_bien/`. Ghi vào tệp niêm phong: ghế nào nhận được tệp, ghế nào bắt được lỗi gài.
 
 ### B8. Sửa, giao Owner, hậu kiểm
 
@@ -148,7 +159,7 @@ python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ng
 2. Chạy lại B6 cho bản đã sửa. Chạy `python tools/hoso/gai_loi.py kiem --ho-so … --niem-phong …` để chắc bản Owner không còn lỗi gài.
 3. Giao Owner ba thứ: hồ sơ, phiếu máy ĐẠT, bản phản biện. Owner tự mở ba con số mà phiếu máy chọn (ADR-0021 QĐ-K4, thay cách chọn «ba con số bất kỳ» của QĐ-P9); Owner muốn mở thêm số nào cũng được.
 4. Niêm phong bản đã giao (ADR-0021 QĐ-K5): ghế phân tích ghi phiếu máy ĐẠT, có sha256 của hồ sơ, vào tài liệu của Project ngay khi giao. Từ lúc đó không sửa bản đã giao; muốn sửa thì làm bản mới, có phiếu mới.
-5. Tới ngày xem lại ở Mục 11: mở đúng bản đã giao, kiểm sha256 của tệp khớp sha256 trên phiếu đã ghi vào Project. Lấy báo cáo mới, làm lại từ B2 cho phần mới. Với từng giả thuyết, chép nguyên văn điều kiện sai của bản đã giao, rồi ghi ĐÚNG, SAI hoặc CHƯA RÕ kèm bằng chứng có nhãn. Không chấm theo chữ của một bản sửa sau.
+5. Tới ngày xem lại ở Mục 11: mở đúng bản đã giao, kiểm sha256 của tệp khớp sha256 trên phiếu đã ghi vào Project. Lấy báo cáo mới, làm lại từ B2 cho phần mới. Với từng giả thuyết, chép nguyên văn điều kiện sai của bản đã giao, rồi ghi ĐÚNG, SAI hoặc CHƯA RÕ kèm bằng chứng có nhãn. Không chấm theo chữ của một bản sửa sau. Với bảng thời thế ở Mục 9 (ADR-0023 QĐ-T6): mỗi dòng ghi ĐỔI, ĐỔI MỘT PHẦN, GIỮ NGUYÊN hay CHƯA CHẤM ĐƯỢC theo đúng điều kiện riêng của dòng; mỗi giả thuyết ghi nguyên nhân TRONG BẢNG, NGOÀI BẢNG hay CHƯA RÕ, và «nguyên nhân do doanh nghiệp nêu» kèm mã tệp và trang khi báo cáo tự nêu; báo cáo quy thay đổi lợi nhuận cho một yếu tố không có dòng trong bảng và không có trong CHƯA BIẾT thì ghi một lần «không báo».
 6. Sửa quá ba vòng phản biện mà chưa hội tụ: dừng, báo Owner.
 
 ## 3. Khi nào dừng và báo Owner
