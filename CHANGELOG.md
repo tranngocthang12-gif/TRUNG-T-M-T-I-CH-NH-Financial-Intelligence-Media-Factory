@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-28 — ADR-0024: năm năng lực kiểm chứng được — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+
+- Theo lệnh Owner ngày 28/11/2026 (00:12) giao toàn quyền đưa năm năng lực vào kiến trúc. Bản nháp qua ba vòng phản biện ChatGPT (OpenAI): PB-ADR24-V1 (mười một lỗi chặn), PB-ADR24-V2 (chín lỗi chặn), PB-ADR24-V3 (một lỗi chặn, C18). Owner chọn sửa C18 đúng theo cách ghế phản biện ghi rồi đi tiếp; PR này là bản đã sửa.
+- `architecture/adr/ADR-0024-nam-nang-luc-kiem-chung.md` (mới): sổ thành tích nhiều ghế (QĐ-N1: sổ câu hỏi khóa trước, ghế dự án cố định, Grok là ghế độc lập, lịch chính thức hay lịch suy ra, ghi A và B cùng ngày, dạng cố định của `library_refs` không có sha256 hồ sơ, cặp chấm được, bootstrap theo cụm, ba mốc đọc); bản đồ phơi nhiễm nhiều mã (QĐ-N2); độ phủ báo cáo công khai (QĐ-N3); chống lỗi hành vi và hậu kiểm theo sự kiện (QĐ-N4); sổ bất đồng và sổ lỗi đã xác minh (QĐ-N5); phạm vi mở lại và ranh giới (QĐ-N6); thứ tự thi công và cổng sang Pha 2 (QĐ-N7); tám điều kiện hoàn tác. L-02 và `governance/LAWS.md` không đổi.
+- `templates/hoso/TU_DIEN_BIEN_THOI_THE.md` (mới): mười bốn biến có mã cố định và cột tên cũ.
+- `templates/hoso/LENH_MAU.md`: thêm mẫu D (lệnh dự báo chỉ tiêu cho ghế dự án) và mẫu E (lệnh cho ghế độc lập duyệt sổ câu hỏi và đọc lịch công bố).
+- `templates/ky_luat/MAU_KY_LUAT_TRONG.md`: phiếu trước quyết định thêm câu 11 với năm câu trả lời chuẩn.
+- `docs/QUY_TRINH_HO_SO_MA.md`: Mục 9 dùng tên biến của từ điển; B7 bước 7 chỉ ghi ứng viên bất đồng; B8 bước 5 trỏ tới hậu kiểm theo sự kiện; B8 bước 7; mục 5 mới (việc sau khi giao).
+- `architecture/ARCHITECTURE.md`, `architecture/adr/README.md`: thêm ADR-0024.
+- Không chạm `tools/`, `tests/`, `ledger/`, `governance/`, `paper/`, `research/`, `engine/`, `data/`.
+
 ## 2026-11-27 — ADR-0023: bảng phơi nhiễm thời thế ở Mục 9 của hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 27/11/2026 (16:47) «Bạn tự quyết công việc. Tôi chỉ nghiệm thu.» và gói giao Claude Code số 20. ADR-0023 ACCEPTED 27/11/2026, hiệu lực khi Owner gộp PR này.
 - `architecture/adr/ADR-0023-bang-phoi-nhiem-thoi-the.md` (mới); `architecture/adr/README.md` thêm dòng ADR-0023; `architecture/ARCHITECTURE.md`: dòng trạng thái thêm ADR-0023, đoạn «Từ ADR-0023» sau đoạn «Từ ADR-0022».

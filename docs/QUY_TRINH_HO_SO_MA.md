@@ -1,4 +1,4 @@
-# Quy trình làm một hồ sơ mã (ADR-0019, ADR-0020, ADR-0021)
+# Quy trình làm một hồ sơ mã (ADR-0019, ADR-0020, ADR-0021, ADR-0024)
 
 Tệp này là việc phải làm theo thứ tự của **ghế phân tích**. Ghế phân tích là một phiên Claude trong Project TTC, đã đọc tệp này và ADR-0019, ADR-0020 ở `main` mới nhất. Sản phẩm chỉ được gọi là "hồ sơ mã của dự án" khi có phiếu máy ĐẠT đi kèm.
 
@@ -11,6 +11,7 @@ Hồ sơ là phân tích cho Owner đọc. Hồ sơ không nêu hành động n�
 | Công cụ, quy trình, mẫu, ví dụ số liệu bịa | Kho này: `tools/hoso/`, `docs/`, `templates/hoso/`, `templates/ky_luat/` | Công khai, có test |
 | **Thư mục mã**: tệp gốc, văn bản từng trang, sổ số liệu, hồ sơ, phiếu máy, bản phản biện | Máy của Owner, ví dụ `Downloads\TTC_HO_SO\<MÃ>\`; bản đọc để trong Project | Riêng tư (ADR-0019 QĐ-P13, L-03, L-04) |
 | Bản quy tắc riêng, phiếu trước quyết định, nhật ký của Owner | Chỉ ở chỗ Owner | L-03. Ghế phân tích không hỏi và không ghi các con số này |
+| Sổ câu hỏi, bằng chứng trước hạn và bản nguyên văn của các ghế dự báo, bảng chấm, bản đồ phơi nhiễm nhiều mã, sổ độ phủ, sổ bất đồng, sổ lỗi đã xác minh | Project | ADR-0024; riêng tư như hồ sơ. Dòng sổ dự báo vào kho qua Issue, chỉ chứa câu hỏi về chỉ tiêu và xác suất (QĐ-N6) |
 
 Không đưa thư mục mã, hồ sơ thật hay tệp gốc vào kho. Không mở PR chứa chúng.
 
@@ -105,6 +106,7 @@ Lý do có bước này: ở hồ sơ đầu tiên máy đọc sai năm con số
 - Bảng hay danh sách đặt ngay dưới một câu có chữ «giá», và mọi đoạn dưới một tiêu đề phụ có chữ «giá», sẽ bị xét như ngữ cảnh giá. Trong phần chữ nói về giá, mọi chữ số đều phải có trên trang nguồn: số thứ tự chỉ được bỏ qua khi cột đầu tên là #, STT, TT, Số TT hoặc Số thứ tự và đánh đúng 1, 2, …, n; «điểm 30», «12 tháng», «25/4» đều là con số.
 - Không viết khoảng giá trị hay giá mục tiêu ở bất kỳ mục nào khác, dù nhãn là gì. Máy bắt hai số nối bằng gạch ngang hoặc "đến/tới" kèm đơn vị tiền (đồng, nghìn đồng, VND, đ; trong bảng tính cả đơn vị ở tiêu đề cột), và các cụm "khoảng giá", "vùng giá", "mức giá", "giá mục tiêu", "giá trị nội tại", "giá trị một/mỗi cổ phiếu" đi với số. Chỉ giá quá khứ trong đoạn ĐÃ KIỂM, mọi số có trên trang đã ghi, mới được qua.
 - Mục 9 là bảng phơi nhiễm thời thế (ADR-0023):
+  - Tên biến lấy đúng chữ ở cột «Tên biến» của `templates/hoso/TU_DIEN_BIEN_THOI_THE.md` (ADR-0024 QĐ-N2). Biến chưa có thì thêm một dòng vào từ điển bằng PR chữ, trước hoặc cùng lúc với hồ sơ đầu tiên dùng nó.
   - Mỗi biến một tiêu đề phụ `###`; dưới đó theo thứ tự: trạng thái ở ngày ghi theo tệp ngoài (mã N); mức phơi nhiễm theo tệp gốc của doanh nghiệp; giả thuyết nào ở Mục 11 dựa vào biến, qua dòng nào của báo cáo; điều kiện làm trạng thái đã ghi đổi. Sau các biến là bảng tóm tắt năm cột (biến, trạng thái đã ghim, phơi nhiễm từ tệp gốc, giả thuyết dựa vào, chấm được ở ngày xem lại) và một đoạn nói cách chấm ở ngày xem lại.
   - Phơi nhiễm là quy mô, không phải độ nhạy: ghi rõ điều đó, và ghi độ nhạy của lợi nhuận là CHƯA BIẾT. Không viết câu «nếu biến đổi chừng này thì lợi nhuận đổi chừng kia». Được một phép thử cơ học cho mỗi biến, cú sốc đúng một đơn vị, là dòng tính trong sổ, kèm câu GIẢ ĐỊNH nêu giả định của phép thử.
   - Điều kiện đổi trạng thái ghi rõ bốn thứ: văn bản hay bản tin dùng để chấm, chỉ tiêu, kỳ so sánh, ngưỡng. Trạng thái đã ghi viết thành một quan hệ; điều kiện là quan hệ đó không còn đúng; biến là khoảng thì xét cả hai đầu mút. Sự kiện pháp lý: chỉ văn bản có hiệu lực làm đổi, và ghi khi nào trạng thái giữ nguyên. Một dòng nhiều chỉ tiêu: ghi luật gộp. Thiếu một trong bốn thứ thì dòng ghi «chưa chấm được». Ngưỡng viết bằng chữ, dưới nhãn GIẢ ĐỊNH.
@@ -152,6 +154,7 @@ python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ng
 4. Ghế nào hết hạn mức thì chuyển sang ghế khác hãng còn lại (ChatGPT, Gemini, Grok). Không dùng Claude cho bước này.
 5. Lệnh phản biện có câu hỏi bắt buộc thứ hai về Mục 9 (ADR-0023 QĐ-T7, mẫu B).
 6. Chép nguyên văn bản trả lời vào `phan_bien/`. Ghi vào tệp niêm phong: ghế nào nhận được tệp, ghế nào bắt được lỗi gài.
+7. Điểm nào ghế phản biện kết luận ngược hồ sơ mà phân định được bằng báo cáo sau này: ghi vào danh sách ứng viên bất đồng ở Project, gồm nguyên văn hai lập luận, ghế của mỗi bên, mã hồ sơ và bản, nhãn loại lập luận chốt lúc ghi. Chưa soạn câu hỏi, chưa hỏi ghế nào; việc đó làm sau khi giao, ở mục 5 (ADR-0024 QĐ-N5). Lỗi xác minh được ngay bằng tài liệu thì sửa ở B8 và ghi vào sổ lỗi đã xác minh, không phải ứng viên bất đồng.
 
 ### B8. Sửa, giao Owner, hậu kiểm
 
@@ -159,8 +162,9 @@ python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ng
 2. Chạy lại B6 cho bản đã sửa. Chạy `python tools/hoso/gai_loi.py kiem --ho-so … --niem-phong …` để chắc bản Owner không còn lỗi gài.
 3. Giao Owner ba thứ: hồ sơ, phiếu máy ĐẠT, bản phản biện. Owner tự mở ba con số mà phiếu máy chọn (ADR-0021 QĐ-K4, thay cách chọn «ba con số bất kỳ» của QĐ-P9); Owner muốn mở thêm số nào cũng được.
 4. Niêm phong bản đã giao (ADR-0021 QĐ-K5): ghế phân tích ghi phiếu máy ĐẠT, có sha256 của hồ sơ, vào tài liệu của Project ngay khi giao. Từ lúc đó không sửa bản đã giao; muốn sửa thì làm bản mới, có phiếu mới.
-5. Tới ngày xem lại ở Mục 11: mở đúng bản đã giao, kiểm sha256 của tệp khớp sha256 trên phiếu đã ghi vào Project. Lấy báo cáo mới, làm lại từ B2 cho phần mới. Với từng giả thuyết, chép nguyên văn điều kiện sai của bản đã giao, rồi ghi ĐÚNG, SAI hoặc CHƯA RÕ kèm bằng chứng có nhãn. Không chấm theo chữ của một bản sửa sau. Với bảng thời thế ở Mục 9 (ADR-0023 QĐ-T6): mỗi dòng ghi ĐỔI, ĐỔI MỘT PHẦN, GIỮ NGUYÊN hay CHƯA CHẤM ĐƯỢC theo đúng điều kiện riêng của dòng; mỗi giả thuyết ghi nguyên nhân TRONG BẢNG, NGOÀI BẢNG hay CHƯA RÕ, và «nguyên nhân do doanh nghiệp nêu» kèm mã tệp và trang khi báo cáo tự nêu; báo cáo quy thay đổi lợi nhuận cho một yếu tố không có dòng trong bảng và không có trong CHƯA BIẾT thì ghi một lần «không báo».
+5. Tới ngày xem lại ở Mục 11: mở đúng bản đã giao, kiểm sha256 của tệp khớp sha256 trên phiếu đã ghi vào Project. Lấy báo cáo mới, làm lại từ B2 cho phần mới. Với từng giả thuyết, chép nguyên văn điều kiện sai của bản đã giao, rồi ghi ĐÚNG, SAI hoặc CHƯA RÕ kèm bằng chứng có nhãn. Không chấm theo chữ của một bản sửa sau. Với bảng thời thế ở Mục 9 (ADR-0023 QĐ-T6): mỗi dòng ghi ĐỔI, ĐỔI MỘT PHẦN, GIỮ NGUYÊN hay CHƯA CHẤM ĐƯỢC theo đúng điều kiện riêng của dòng; mỗi giả thuyết ghi nguyên nhân TRONG BẢNG, NGOÀI BẢNG hay CHƯA RÕ, và «nguyên nhân do doanh nghiệp nêu» kèm mã tệp và trang khi báo cáo tự nêu; báo cáo quy thay đổi lợi nhuận cho một yếu tố không có dòng trong bảng và không có trong CHƯA BIẾT thì ghi một lần «không báo». Doanh nghiệp công bố báo cáo tài chính trước ngày xem lại thì chạy hậu kiểm theo sự kiện ở mục 5.4 (ADR-0024 QĐ-N4).
 6. Sửa quá ba vòng phản biện mà chưa hội tụ: dừng, báo Owner.
+7. Sau khi niêm phong ở bước 4: làm các việc ở mục 5 (ADR-0024). Hồ sơ trước, đo sau: không hoãn hay rút bước nào ở trên để kịp vòng dự báo.
 
 ## 3. Khi nào dừng và báo Owner
 
@@ -184,3 +188,34 @@ python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ng
   5. chữ không dấu ngoài bốn cụm «gia co phieu», «gia co phan», «gia cp», «thi gia» (ký tự thay cho chữ số bị bảng chữ của ADR-0022 chặn);
   6. tệp giá không đặt mã G thì nhãn dẫn nguồn giá không được nhận ra.
 - Các việc máy không bắt thuộc ghế phản biện khác hãng (B7, có câu hỏi bắt buộc về giá tương lai), Owner, và hậu kiểm theo thời gian.
+
+## 5. Việc sau khi giao (ADR-0024)
+
+Chỉ dùng hồ sơ đã giao và đã niêm phong. Bản thử không dùng cho mục này. Trước khi ghi một câu vào sổ, mở một Issue, hay gửi Owner bất kỳ đầu ra nào dưới đây, soát chữ theo L-02 (không lời hành động, không giá cổ phiếu, không khoảng giá trị) và L-03 (ADR-0024 QĐ-N6).
+
+### 5.1 Sổ độ phủ và bản đồ
+
+1. Ghi sổ độ phủ của mã theo ADR-0024 QĐ-N3: thanh khoản ba tháng từ tệp G1, số báo cáo phân tích công khai theo quy tắc đếm đã ghi ở Project, nhãn ĐỘ PHỦ THẤP hay ĐỘ PHỦ KHÔNG THẤP chốt khi lập, ghi ngày lập thật.
+2. Thêm cột của mã vào bản đồ phơi nhiễm theo QĐ-N2: mỗi ô một trong sáu trạng thái, ghi bản hồ sơ và sha256; hồ sơ có Mục 9 viết trước ADR-0023 thì ô ghi CHƯA PHÂN TÍCH.
+
+### 5.2 Vòng dự báo của sổ thành tích
+
+1. Kiểm đầu vào: bản đã giao, sha256 khớp phiếu đã niêm phong ở Project, bản không còn lỗi gài.
+2. Lập sổ câu hỏi ở Project theo QĐ-N1 điểm 1 và 2: lấy hết điều kiện sai ở Mục 11 chấm được bằng báo cáo của kỳ được hỏi; dòng Mục 9 chỉ khi điều kiện nói về kết quả của chính doanh nghiệp; thêm ứng viên bất đồng còn lại sau khi giao (5.3).
+3. Gửi sổ câu hỏi cho ghế độc lập theo mẫu E của `templates/hoso/LENH_MAU.md`. Sửa câu bị ghi SỬA, gửi lại phần đó. Câu có lịch KHÔNG ĐỦ BẰNG CHỨNG thì rời vòng, ghi lý do. Khi mọi câu còn lại ĐẠT: khóa sổ. Owner mở Issue «Calendar» bằng nội dung ghế độc lập trả, lịch chính thức hay lịch suy ra đúng theo QĐ-N1 điểm 6; chờ dấu nhận của robot.
+4. Ngày thu xác suất, trước `info_lock_at`: ghế phân tích trả lời mẫu D và ghi vào Project; Owner gửi mẫu D cho ChatGPT và Gemini, mỗi ghế một cuộc chat mới, và gửi prompt chuẩn `governance/CONTROL_B_PROMPT.md` cho ghế B. Chép nguyên văn mọi trả lời vào Project, kèm giờ gửi và giờ trả lời.
+5. Kiểm và tổng hợp theo QĐ-N1 điểm 4 và 7: bỏ phần trả lời không hợp lệ; tính dòng A; tính sha256 của tệp nguyên văn; soát chữ; kiểm bản nháp không có sha256 hồ sơ; chạy cục bộ `parse_issue_form` và `forecast_error` của `tools/ledger_intake.py` trên bản nháp hai Issue, không sửa mã.
+6. Owner mở hai Issue «Forecast», dòng A và dòng B, trong cùng một ngày giờ Việt Nam; kiểm dấu nhận của cả hai dòng.
+7. Khi thấy kết quả đã công bố: ghế độc lập ghi bằng chứng công bố ngay, Owner mở Issue «Publication»; `published_at` phải có giờ và múi giờ, nguồn chỉ có ngày thì không tự điền giờ. Tới `resolve_at`: ghế độc lập phân định theo ADR-0003, Owner mở Issue «Resolution».
+8. Cập nhật bảng chấm ở Project theo QĐ-N1 điểm 9, đếm trên cặp chấm được. Khoảng tin cậy tính bằng đoạn mã cục bộ ngoài kho; lưu đoạn mã, phiên bản, dữ liệu vào và kết quả. Chỉ đọc kết luận ở ba mốc của ADR-0024; ở mỗi mốc, ghế độc lập tính lại từ sổ công khai.
+
+### 5.3 Sổ bất đồng và sổ lỗi
+
+1. Sau khi niêm phong, xét danh sách ứng viên ghi ở B7 bước 7: bỏ ứng viên là lỗi gài, lỗi số liệu, hay điểm đã giải quyết bằng sửa hồ sơ. Ứng viên còn lại vào sổ câu hỏi của vòng kế tiếp và vào sổ bất đồng theo QĐ-N5; trùng một câu đã có thì trỏ tới mã câu đó, không tạo câu thứ hai.
+2. Lỗi đã sửa ở B8 ghi vào sổ lỗi đã xác minh: loại lỗi, đã có quy tắc ngăn loại lỗi đó chưa, số ngày từ lúc bắt tới lúc sửa.
+
+### 5.4 Hậu kiểm theo sự kiện và bản đồ
+
+1. Ghế phân tích giữ ở Project lịch theo dõi của từng mã, lập từ hạn công bố báo cáo tài chính theo quy định và từ dòng lịch của vòng dự báo. Trong tuần sau mỗi hạn, Owner mở một phiên Project và gõ «hậu kiểm theo sự kiện <MÃ>»; Owner thấy báo cáo mới sớm hơn thì gõ ngay.
+2. Ghế phân tích chạy B8 bước 5 cho báo cáo mới, đúng chữ của bản đã giao; ghi ngày công bố, ngày phát hiện, ngày gửi. Trong 7 ngày kể từ ngày phát hiện, gửi Owner danh sách điều kiện đã chạm, chưa chạm, chưa chấm được. Phát hiện sau ngày công bố quá 14 ngày thì ghi «phát hiện muộn». Lần chạy theo sự kiện không thay lần chạy định kỳ: điều kiện đã chấm đủ nguồn và đúng kỳ giữ kết quả, ghi ngày đã chấm; điều kiện còn CHƯA CHẤM ĐƯỢC hay CHƯA RÕ được chấm lại ở ngày xem lại đã niêm phong (ADR-0023 QĐ-T6).
+3. Dòng nào của Mục 9 ghi ĐỔI hay ĐỔI MỘT PHẦN: trong 7 ngày báo Owner các mã khác có ô CÓ PHƠI NHIỄM với cùng biến trên bản đồ, đề nghị xem lại sớm; mỗi cặp biến và mã là một cảnh báo, ghi ngày báo. Khi ghi nguyên nhân TRONG BẢNG ở bất kỳ hậu kiểm nào, ghi tên dòng là nguyên nhân. Ở hậu kiểm kế tiếp của mã được báo, chấm cảnh báo theo năm bước của QĐ-N2 điểm 5 (HỮU ÍCH, KHÔNG HỮU ÍCH, KHÔNG XÁC NHẬN, CHƯA ĐỦ BẰNG CHỨNG); ghi cả trường hợp BỎ SÓT.
