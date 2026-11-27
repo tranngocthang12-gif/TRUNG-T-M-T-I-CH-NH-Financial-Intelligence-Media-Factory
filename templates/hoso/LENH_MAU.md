@@ -33,6 +33,8 @@ Viết bốn phần:
 
 Sau bốn phần, trả lời câu hỏi bắt buộc (máy chỉ bắt câu giá theo dấu hiệu, không bắt hết): **Liệt kê mọi câu trong hồ sơ nêu hoặc ngụ ý giá tương lai, khoảng giá trị, hệ số định giá mục tiêu, hay hành động với cổ phiếu. Không có thì ghi "không có".**
 
+Câu hỏi bắt buộc thứ hai (ADR-0023): **Với từng điều kiện đổi trạng thái ở Mục 9, hai người đọc độc lập cùng một văn bản có thể chấm khác nhau không? Có câu nào ở Mục 9 nêu hay ngụ ý biến sẽ đi hướng nào, cộng các biến thành điểm, hay viết tác động có điều kiện lên lợi nhuận không? Không có thì ghi "không có".**
+
 Luật:
 
 - Không nêu hành động nào với cổ phiếu. Không nêu khoảng giá trị hay mức giá nào.
