@@ -36,7 +36,7 @@ Ngày lập: ……  Ngày sửa gần nhất: ……  Lý do sửa: ……
 
 ---
 
-## Mẫu 2. Phiếu trước quyết định (mười câu)
+## Mẫu 2. Phiếu trước quyết định (mười một câu)
 
 Điền mỗi lần định mua mới hoặc mua thêm. Một câu trả lời "chưa" hoặc "vượt" thì dừng, không đặt lệnh hôm đó.
 
@@ -54,6 +54,7 @@ Ngày: ……  Mã: ……  Nhãn vị thế: ……
 | 8 | Lệnh này có dùng tiền vay không? Có vượt dòng 6 không? | |
 | 9 | Điều gì khiến tôi muốn làm hôm nay: hồ sơ, hay giá vừa tăng và tin vừa nghe? | |
 | 10 | Tôi đã chờ đủ thời gian ở dòng 10 chưa? | |
+| 11 | Từ ngày giao hồ sơ, điều kiện sai nào ở Mục 11 hay điều kiện đổi trạng thái nào ở Mục 9 đã chạm? Tôi đã đọc hậu kiểm của điều kiện đó chưa? Ghi một trong năm: KHÔNG CÓ ĐIỀU KIỆN NÀO CHẠM; ĐÃ CHẠM, ĐÃ ĐỌC HẬU KIỂM; ĐÃ CHẠM, CÓ HẬU KIỂM NHƯNG CHƯA ĐỌC; ĐÃ CHẠM, CHƯA CÓ HẬU KIỂM; CHƯA ĐỦ BẰNG CHỨNG. Ba câu sau tính là «chưa». Nhiều điều kiện thì ghi trạng thái kém nhất. Không biết thì không ghi KHÔNG CÓ ĐIỀU KIỆN NÀO CHẠM (ADR-0024 QĐ-N4) | |
 
 Kết quả phiếu: ĐƯỢC ĐI TIẾP / DỪNG. Câu làm dừng (nếu có): ……
 
