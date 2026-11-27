@@ -6,6 +6,10 @@
    giữa chữ…) bị chặn trước khi cổng giá đọc chữ. Tiêu đề cấp hai phải đúng từng chữ một tên của khung (TIEU_DE_CAP_HAI),
    nên tiêu đề khung không chở được dấu hiệu giá. Dấu định dạng cũng không được đổi con số (_dd_so; sửa theo bản chấm
    L-09 vòng 2 của ADR-0021): chữ đậm và mã phải bọc trọn con số, kể cả dấu âm, ngoặc và dấu %.
+   ADR-0022 khép bộ này ở mức ký tự: mỗi ký tự của hồ sơ phải thuộc bảng chữ cho phép (CHU_CHO_PHEP, chữ số 0–9,
+   DAU_CHO_PHEP, sáu dấu Markdown | * ` _ [ ], và dấu \\ trong mã); ngoặc vuông chỉ dùng cho nhãn đúng dạng (_dd_nhan);
+   không có địa chỉ web hay mã biểu tượng; và các cách viết làm người đọc thấy một con số hay một dấu âm mà máy không đọc
+   là lỗi (_dd_cach_viet_so). Mục đích: không còn danh sách cấm để vá dần; mọi cách viết ngoài bộ đã liệt kê bị chặn.
 1. L-02: không cụm từ khuyến nghị nào ở bất kỳ dòng nào. Dùng đúng bộ mẫu của tools/laws_checks.py, thêm vài cụm
    riêng của hồ sơ mã. Kiểm cứng, không xét ngữ cảnh: câu phủ định có cụm cấm cũng bị bắt — đổi cách viết.
 2. Khung: đủ mười hai mục theo thứ tự; có "Một trang", "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn". Mỗi
@@ -68,7 +72,7 @@
      3. ý tương lai viết bằng từ ngoài TU_TUONG_LAI, với số quá khứ có nguồn (hay số phần trăm, số tính kèm «lần») và
         năm không vượt nguồn;
      4. số viết bằng chữ, khi phần chữ không có từ chỉ cổ phiếu và không có từ chỉ tương lai;
-     5. chữ không dấu ngoài bốn cụm đã liệt kê; ký tự thay cho chữ số;
+     5. chữ không dấu ngoài bốn cụm đã liệt kê (ký tự thay cho chữ số bị bảng chữ của ADR-0022 chặn);
      6. tệp giá không đặt mã G thì dấu hiệu (d) không nhận ra.
    Lớp bắt các việc này là ghế phản biện khác hãng (B7), với câu hỏi bắt buộc ở templates/hoso/LENH_MAU.md.
 4. Mục 11 có giả thuyết H0, H1, H2, điều kiện làm giả thuyết sai và ngày xem lại.
@@ -216,8 +220,144 @@ _DD_TIEU_DE = re.compile(r"#{1,6} \S")
 _DD_MUC = re.compile(r"(?P<thut>(?:  )*)(?:- |\d{1,2}\. )(?P<noi>.*)")
 _DD_THUC_THE = re.compile(r"&(?:[A-Za-z][A-Za-z0-9]*|#[0-9]+|#[xX][0-9A-Fa-f]+);")
 _DD_THE = re.compile(r"<[A-Za-z!/?]")
-_DD_LIEN_KET = re.compile(r"\]\(|\]\[|!\[|\[\^|^\s*\[[^\]]*\]:")
+_DD_LIEN_KET = re.compile(r"\]\(|\]\[|\]:|!\[|\[\^|^\s*\[[^\]]*\]:")
 _DD_KHOA = re.compile(r"(?<![\w])[a-z0-9]+(?:_[a-z0-9]+)+(?!\w)")
+
+# ADR-0022: bảng chữ cho phép. Mỗi ký tự của hồ sơ phải thuộc bảng này; ký tự ngoài bảng là lỗi định dạng, bất kể nghĩa.
+# Chữ: 26 chữ Latin hoa và thường, Đ đ, và các nguyên âm tiếng Việt có dấu (dựng sẵn, sau chuẩn hóa NFC). Chữ số: 0–9.
+# Dấu: DAU_CHO_PHEP. Sáu dấu Markdown còn hiệu lực, mỗi dấu một luật riêng: | * ` _ [ ]. Trong mã (giữa hai dấu `) thêm \.
+_NGUYEN_AM = "aăâeêioôơuưy"
+CHU_CHO_PHEP = frozenset("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzĐđ" + "".join(
+    unicodedata.normalize("NFC", v + t) for v in _NGUYEN_AM + _NGUYEN_AM.upper()
+    for t in ("", "\u0300", "\u0301", "\u0309", "\u0303", "\u0323")))
+DAU_CHO_PHEP = frozenset(" .,;:!?'\"“”‘’«»()/%+=×÷±≈≠≤≥→←…#&-–—−")
+DAU_MARKDOWN = frozenset("|*`_[]")
+THEM_TRONG_MA = frozenset("\\")
+_DD_EMOJI = re.compile(r":[A-Za-z0-9_+\-]+:")                   # «:one:», «:100:» hiện thành hình
+_DD_WEB = re.compile(r"://|(?<![\w.])www\.", re.IGNORECASE)      # trình dựng tự biến thành liên kết
+_DD_DINH = re.compile(r"(?<![^\W\d_])(?P<chu>[^\W\d_]+)(?P<so>\d+)(?P<sau>[.,]\d|\s?%)?")
+_DD_MA_CHO_PHEP = ("VN30", "VN100", "HNX30", "VNX50", "SHA256", "sha256", "CO2", "m2", "m3", "km2")
+_DD_KY = re.compile(r"(?:\d{1,2}[TM](?:19|20)\d{2}|(?:Q[1-4]|H[12])[./](?:19|20)\d{2})(?!\d|[.,]\d|\s?%)")
+#                                                                kỳ báo cáo: «9T2026», «6M2025», «Q3.2025», «H1/2025»
+_DD_GACH_SO = re.compile(r"[-−–](?=\(?\d)")
+_DD_GACH_CACH = re.compile(r"[-−–](?=\s+\d)")
+_DD_SO_CACH = re.compile(r"(?<![\d.,])\d{1,3}(?: \d{3})+(?![\d.,])")
+_DD_SO_CHU = re.compile(r"\d(?:[^\W\d_]+(?=[.,]?\d|\s?%)|[OoIl])")   # chữ kẹp giữa chữ số («5O,5%»), O o I l sau chữ số
+_DD_CHU_PT = re.compile(r"[^\W\d_]%")                           # «lO%»: chữ cái trông như chữ số đứng trước dấu %
+_DD_NHAY = re.compile(r"\d['’]\d")                              # «1'200»
+
+
+def _dd_bang_chu(dong: str) -> list:
+    """Bảng chữ cho phép (ADR-0022). Trả lỗi của ký tự đầu tiên ngoài bảng (một lỗi mỗi dòng)."""
+    trong_ma = False
+    for c in dong:
+        if c == "`":
+            trong_ma = not trong_ma
+            continue
+        ten = unicodedata.name(c, "không tên")
+        if unicodedata.category(c) in ("Cf", "Cc", "Zl", "Zp", "Mn", "Mc", "Me") or (
+                unicodedata.category(c) == "Zs" and c != " ") or c == "\u2800" or "FILLER" in ten:
+            return [f"ký tự U+{ord(c):04X} ({ten})"]
+        if not (c in CHU_CHO_PHEP or "0" <= c <= "9" or c in DAU_CHO_PHEP or c in DAU_MARKDOWN
+                or (trong_ma and c in THEM_TRONG_MA)):
+            return [f"ký tự «{c}» U+{ord(c):04X} ({ten}) ngoài bảng chữ cho phép (ADR-0022): chữ Latin và chữ Việt, chữ số "
+                    "0–9, dấu câu thường dùng; không dùng ~ $ < > \\ ^ @ { } và mọi ký hiệu khác"]
+    return []
+
+
+def _dd_nhan(dong: str) -> list:
+    """Ngoặc vuông chỉ dùng cho nhãn, và nhãn đúng dạng (ADR-0022). Đọc trên chữ hiển thị (bỏ ** và `; trong mã không có
+    ngoặc vuông, nên mọi ngoặc vuông của dòng đều nằm ngoài mã). Máy xếp nhãn theo loại đứng đầu (loai_nhan), nên:
+      - nhãn mở đầu ngay bằng một trong bốn loại: ĐÃ KIỂM, SUY LUẬN, GIẢ ĐỊNH, CHƯA BIẾT;
+      - «sổ số liệu» chỉ đứng trong nhãn SUY LUẬN (ở nhãn khác máy không đọc khóa);
+      - nhãn GIẢ ĐỊNH, CHƯA BIẾT không nhắc loại nào khác: máy không kiểm số của hai loại này, nên «[GIẢ ĐỊNH, SUY LUẬN,
+        sổ số liệu: …]» hay «[CHƯA BIẾT; ĐÃ KIỂM D1 tr.3]» cho người đọc tưởng số đã được kiểm. Nhãn ĐÃ KIỂM, SUY LUẬN
+        được nhắc loại khác trong ghi chú («[ĐÃ KIỂM D1 tr.1. Biên lợi nhuận gộp là SUY LUẬN, tính từ hai dòng trên]»): máy
+        kiểm số theo loại đứng đầu, là loại chặt hơn."""
+    hien = dong.replace("**", "").replace("`", "")
+    loi = []
+    con = _TAG.sub(" ", hien)
+    if "[" in con or "]" in con:
+        loi.append("ngoặc vuông «[ ]» ngoài nhãn (ngoặc vuông chỉ dùng cho nhãn ĐÃ KIỂM, SUY LUẬN, GIẢ ĐỊNH, CHƯA BIẾT; "
+                   "liên kết, chú thích chân trang, ô đánh dấu đều dùng ngoặc vuông)")
+    for m in _TAG.finditer(hien):
+        noi, nhan = m.group(0)[1:-1], m.group(0)[:60]
+        if "|" in noi:
+            loi.append(f"nhãn «{nhan}» chứa dấu «|» (trong bảng, dấu này tách ô và cắt đôi nhãn)")
+        elif not noi.startswith(NHAN):
+            loi.append(f"nhãn «{nhan}» phải mở đầu ngay bằng loại nhãn: ĐÃ KIỂM, SUY LUẬN, GIẢ ĐỊNH hay CHƯA BIẾT")
+        elif "sổ số liệu" in noi.casefold() and not noi.startswith("SUY LUẬN"):
+            loi.append(f"nhãn «{nhan}»: «sổ số liệu» chỉ đứng trong nhãn SUY LUẬN")
+        elif noi.startswith(("GIẢ ĐỊNH", "CHƯA BIẾT")) and sum(noi.count(x) for x in NHAN) > 1:
+            loi.append(f"nhãn «{nhan}»: nhãn GIẢ ĐỊNH, CHƯA BIẾT không nhắc loại nhãn khác (máy không kiểm số của hai loại "
+                       "này); tách phần chữ ra hai nhãn")
+    return loi
+
+
+def _dd_cach_viet_so(dong: str, cac_doan: list, dau_muc) -> list:
+    """Cách viết làm người đọc thấy một con số (hay một dấu âm) mà máy không đọc (ADR-0022). Xét chữ ngoài mã và ngoài
+    nhãn, sau khi bỏ dấu **. dau_muc: vị trí ký hiệu «- » của mục liệt kê (None nếu dòng không phải mục liệt kê «- »)."""
+    g = _TAG.sub(lambda m: " " * len(m.group(0)), "\x00".join(cac_doan[0::2]).replace("**", ""))
+    loi = []
+    for m in _DD_DINH.finditer(g):                               # chữ cái dính liền trước chữ số: máy coi là mã
+        dau, cuoi = m.start(), m.end("so")
+        while dau and (g[dau - 1].isalnum() or g[dau - 1] == "_"):
+            dau -= 1
+        while cuoi < len(g) and (g[cuoi].isalnum() or g[cuoi] == "_"):
+            cuoi += 1
+        tu, chu = g[dau:cuoi], m.group("chu")
+        ky = _DD_KY.match(g, dau)
+        if ky and ky.end() >= m.end():
+            continue                                             # kỳ báo cáo: «9T2026», «Q3.2025»
+        if not m.group("sau") and (re.fullmatch(r"[0-9a-fA-F]{7,64}", tu) or tu in _DD_MA_CHO_PHEP or (
+                re.fullmatch(r"[A-Z]", chu) and len(m.group("so")) <= 2 and g[m.start() - 1:m.start()] != "/")):
+            continue                                             # mã băm, mã nhận tệp, tên chỉ số, mã nguồn (D1, H0, Q3)
+        loi.append(f"con số dính liền sau chữ cái («{tu}{m.group('sau') or ''}»): máy coi cả cụm là một mã và không đọc "
+                   "con số; thêm dấu cách giữa chữ và số")
+        break
+    for m in _DD_GACH_SO.finditer(g):                            # dấu gạch sát trước chữ số
+        truoc = g[:m.start()]
+        if g[m.end()] == "(":
+            loi.append("dấu trừ đứng trước ngoặc («-(36,4%)»): máy không đọc dấu này; viết «-36,4%» hay «(36,4)»")
+            break
+        c = truoc[-1:]
+        if c in (".", ","):
+            loi.append("dấu trừ dính sau dấu chấm hay dấu phẩy («20,0%,-36,4%»): máy đọc số không dấu; thêm dấu cách")
+            break
+        if c.isalpha():
+            chu = re.search(r"[^\W\d_]+$", truoc).group(0)
+            sau = re.match(r"\d+([.,]\d|\s?%)?", g[m.end():])
+            if not (chu.upper() == chu and not sau.group(1)):   # mã viết hoa nối số nguyên: L-02, ADR-0019, PR-120
+                loi.append(f"dấu trừ dính sau chữ cái («{chu}{m.group(0)}…»): máy đọc số không dấu; thêm dấu cách trước "
+                           "dấu trừ")
+                break
+    for m in _DD_GACH_CACH.finditer(g):                          # dấu gạch đứng cách con số
+        if m.start() == dau_muc:
+            continue                                             # ký hiệu mục liệt kê «- »
+        c = g[:m.start()].rstrip()[-1:]
+        if not (c.isdigit() or c == "%"):                        # sau một con số là khoảng: «2020 - 2025»
+            loi.append("dấu trừ đứng cách con số («giảm - 36,4%»): máy đọc số không dấu; viết dấu trừ sát con số "
+                       "(«-36,4%») hay dùng chữ («giảm 36,4%»)")
+            break
+    for m in _DD_SO_CHU.finditer(g):                             # chữ cái dính sau chữ số mà người đọc có thể đọc thành số
+        dau, cuoi = m.start(), m.end()
+        while dau and (g[dau - 1].isalnum() or g[dau - 1] == "_"):
+            dau -= 1
+        while cuoi < len(g) and (g[cuoi].isalnum() or g[cuoi] == "_"):
+            cuoi += 1
+        ky = _DD_KY.match(g, dau)
+        if not (re.fullmatch(r"[0-9a-fA-F]{7,64}", g[dau:cuoi]) or (ky and ky.end() >= cuoi)):
+            loi.append(f"chữ cái dính sau chữ số («{g[dau:cuoi]}»): chữ như O, l, I trông như chữ số, và chữ kẹp giữa hai "
+                       "con số làm máy đọc khác người đọc; viết tách chữ và số")
+            break
+    if _DD_CHU_PT.search(g) or _DD_NHAY.search(g):
+        loi.append("dấu % đứng sát sau chữ cái, hay dấu nháy giữa hai chữ số («1'200»): người đọc thấy một con số mà máy "
+                   "không đọc; viết con số bằng chữ số 0–9 theo kiểu Việt Nam")
+    m = _DD_SO_CACH.search(g)
+    if m:
+        loi.append(f"số tách hàng nghìn bằng dấu cách («{m.group(0)}»): máy đọc thành nhiều số; viết «"
+                   + m.group(0).replace(" ", ".") + "»")
+    return loi
 
 
 def _dd_noi_dong(doan: str, trong_ma: bool) -> list:
@@ -227,6 +367,8 @@ def _dd_noi_dong(doan: str, trong_ma: bool) -> list:
         if any(c == "_" and not (0 < i < len(doan) - 1 and doan[i - 1].isalnum() and doan[i + 1].isalnum())
                for i, c in enumerate(doan)):
             loi.append("dấu _ trong mã không nằm giữa hai chữ")
+        if any(c in doan for c in "|[]"):                          # ADR-0022: bảng tách ô ở «|» kể cả trong mã
+            loi.append("trong mã không dùng «|», «[», «]»")
     elif "_" in _TAG.sub(lambda m: _DD_KHOA.sub("", m.group(0)), doan):   # ngoài mã: «_» chỉ trong khóa sổ trong nhãn
         loi.append("dấu _ ngoài khóa sổ trong nhãn (dấu nhấn mạnh hay chữ nối)")
     if "\\" in doan and not trong_ma:
@@ -242,7 +384,12 @@ def _dd_noi_dong(doan: str, trong_ma: bool) -> list:
     if _DD_THE.search(doan):
         loi.append("thẻ HTML hay chú thích HTML (<…)")
     if not trong_ma and _DD_LIEN_KET.search(doan):
-        loi.append("liên kết, ảnh hay chú thích chân trang")
+        loi.append("liên kết, ảnh, định nghĩa liên kết hay chú thích chân trang")
+    if not trong_ma:
+        for m in _DD_EMOJI.finditer(doan):                       # ADR-0022: mã biểu tượng; giờ «10:30:45» thì được
+            if not (m.group(0)[1:-1].isdigit() and doan[m.start() - 1:m.start()].isdigit()):
+                loi.append(f"mã biểu tượng «{m.group(0)}» (trình dựng hiện thành hình)")
+                break
     return loi
 
 
@@ -313,12 +460,16 @@ def kiem_dinh_dang(text: str) -> list:
       - trong dòng: chữ đậm «**…**»; mã «`…`» với số dấu ` chẵn, không dính liền chữ ở mặt ngoài; dấu «_» ngoài mã chỉ
         trong khóa sổ dạng chữ thường không dấu «a_b_1» nằm trong một nhãn, trong mã chỉ khi nằm giữa hai chữ (tên tệp);
       - dấu định dạng không đổi con số (_dd_so): chữ đậm và mã mở, đóng trên cùng một dòng, không có dấu cách sát mép
-        trong, bọc trọn con số (cả dấu âm, ngoặc, dấu %); trong mã không có dấu *.
+        trong, bọc trọn con số (cả dấu âm, ngoặc, dấu %); trong mã không có dấu *;
+      - ADR-0022: mọi ký tự thuộc bảng chữ cho phép (_dd_bang_chu); ngoặc vuông chỉ dùng cho nhãn đúng dạng, trong mã
+        không có «|», «[», «]» (_dd_nhan); không có «://», «www.», mã biểu tượng «:x:»; cách viết số và dấu âm theo
+        _dd_cach_viet_so.
     Không cho phép: dấu cách khác dấu cách thường (tab, dấu cách cứng…); ký tự định dạng vô hình (rộng 0, gạch nối mềm,
     đổi chiều), ký tự trống thuộc nhóm chữ hay ký hiệu (các ký tự «FILLER» của Hangul, ô Braille trống U+2800: dính liền
     trước một con số thì con số thành mã, máy không đọc) và dấu kết hợp đứng riêng sau chuẩn hóa NFC (chữ Việt chuẩn luôn
     là chữ dựng sẵn); dấu «_» hay «*» để
-    nhấn mạnh; «~~»; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết, ảnh, chú thích chân trang; trích dẫn «>»; khối mã
+    nhấn mạnh; «~» (kể cả một dấu), «$», «<», «>», «^», «@», «{», «}»; dấu \\ ngoài mã; thực thể và thẻ HTML; liên kết,
+    định nghĩa liên kết, ảnh, chú thích chân trang, ô đánh dấu; trích dẫn «>»; khối mã
     (```, ~~~ hay thụt lề); tiêu đề gạch chân (=== hay --- ngay dưới một dòng chữ); dòng thụt lề mà không phải mục liệt
     kê."""
     loi, truoc, bang = [], "", []
@@ -331,13 +482,10 @@ def kiem_dinh_dang(text: str) -> list:
             bang = []
         if so > len(cac_dong):
             break
-        bao = []
-        for c in dong:
-            if unicodedata.category(c) in ("Cf", "Cc", "Zl", "Zp", "Mn", "Mc", "Me") or (
-                    unicodedata.category(c) == "Zs" and c != " ") or c == "\u2800" or "FILLER" in unicodedata.name(c, ""):
-                bao.append(f"ký tự U+{ord(c):04X} ({unicodedata.name(c, 'không tên')})")
-                break
-        than = dong
+        bao = _dd_bang_chu(dong)                                 # ADR-0022: bảng chữ cho phép
+        if _DD_WEB.search(dong):
+            bao.append("địa chỉ web («://», «www.»): trình dựng biến thành liên kết, máy bỏ qua chữ số trong đó")
+        than, dau_muc = dong, None
         if not dong.strip():
             pass
         elif dong.startswith("#"):
@@ -355,6 +503,7 @@ def kiem_dinh_dang(text: str) -> list:
             m = _DD_MUC.fullmatch(dong)
             if m:
                 than = m.group("noi")
+                dau_muc = len(m.group("thut")) if dong[len(m.group("thut"))] == "-" else None
                 if than[:1] in ("#", ">", "|", "<", "`") or not than.strip():
                     bao.append("nội dung mục liệt kê không được là tiêu đề, trích dẫn, bảng, HTML, mã hay trống")
             elif dong[:1].isspace():
@@ -373,6 +522,8 @@ def kiem_dinh_dang(text: str) -> list:
             for k, doan in enumerate(cac_doan):
                 bao.extend(_dd_noi_dong(doan, trong_ma=k % 2 == 1))
             bao.extend(_dd_so(dong, cac_doan))
+            bao.extend(_dd_nhan(dong))                           # ADR-0022: ngoặc vuông chỉ cho nhãn đúng dạng
+            bao.extend(_dd_cach_viet_so(dong, cac_doan, dau_muc))   # ADR-0022: số người đọc thấy mà máy không đọc
         for b in dict.fromkeys(bao):
             loi.append(f"dòng {so}: định dạng ngoài bộ cho phép — {b}")
         truoc = dong
@@ -617,8 +768,9 @@ def kiem_cong_gia(text: str, kho=None) -> list:
                     gop[x] = nguon
         dh_khoi[b] = list(gop.items())
         for p in ds:
-            if p["_dh_tat_ca"]:
-                loi.extend(_kiem_phan(p, kho, so_lieu, so_dau.get(b, False), lead, tren[id(p)], nho))
+            if p["_dh_tat_ca"]:                                 # số thứ tự chỉ bỏ ở đúng đầu mục liệt kê (ADR-0022)
+                dau_muc = p["stt_dau"] or (p["loai"] == "ngoai" and p is ds[0])
+                loi.extend(_kiem_phan(p, kho, so_lieu, so_dau.get(b, False) and dau_muc, lead, tren[id(p)], nho))
     return loi
 
 
