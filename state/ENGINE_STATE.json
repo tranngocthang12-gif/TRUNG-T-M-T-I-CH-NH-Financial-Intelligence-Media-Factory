@@ -366,15 +366,13 @@
     "flags_window": []
   },
   "data_ingest": {
-    "at": "2026-11-27T19:05:43.843769",
+    "at": "2026-11-27T21:57:49.938517",
     "end": "2026-11-27",
     "sources": [
       "yahoo"
     ],
-    "new_rows": 35,
-    "rows_by_source": {
-      "yahoo": 35
-    },
+    "new_rows": 0,
+    "rows_by_source": {},
     "tickers_no_new_data": [],
     "errors": [],
     "last_date_by_ticker": {
