@@ -3,7 +3,15 @@
 Hồ sơ là tệp Markdown. Mỗi đoạn kết bằng một nhãn trong ngoặc vuông:
     [ĐÃ KIỂM D1 tr.12]   [ĐÃ KIỂM D1 tr.8–11; D5 tr.3]   [SUY LUẬN, tính từ D1 tr.12]   [GIẢ ĐỊNH]   [CHƯA BIẾT]
 Nhãn phủ phần chữ từ nhãn trước (hoặc đầu đoạn) tới nó. Nhãn đứng ở dòng ngay trước một bảng, hoặc đứng đầu dòng
-ngay sau bảng, phủ cả bảng. Giữa nhãn đứng trước và bảng chỉ được có dòng trống: nhãn không phủ bảng qua một tiêu đề.
+ngay sau bảng, phủ các hàng dữ liệu của bảng. Giữa nhãn (đứng trước hay đứng sau) và bảng chỉ được có dòng trống: nhãn
+không phủ bảng qua một tiêu đề hay một dòng chữ khác. Một hàng bảng chỉ mang được một nhãn; hàng có hơn một nhãn là lỗi.
+Hàng tiêu đề của bảng và tiêu đề phụ («###» trở xuống) không mang nhãn: số liệu viết ở đó là lỗi CHƯA GẮN NHÃN.
+Cụm chữ số không đọc được theo kiểu số Việt Nam («63.4», «1,234,567», «31.12.2025») ở đoạn SUY LUẬN, ở đoạn không nhãn,
+ở hàng tiêu đề bảng hay tiêu đề phụ là lỗi; ở đoạn GIẢ ĐỊNH, CHƯA BIẾT máy chỉ đếm; ở đoạn ĐÃ KIỂM máy không đọc.
+Máy đọc số trên chữ người đọc thấy (chu_hien): dấu đậm «**» và dấu backtick được bỏ, không chèn gì vào chỗ đó, nên dấu
+định dạng không tách được dấu âm, ngoặc, phần lẻ hay dấu % khỏi con số và không cắt một con số làm hai. Số đứng đầu một
+mục liệt kê («12. ») chỉ là số thứ tự, không phải số liệu, khi nó dưới 10 hoặc danh sách được đánh đúng 1, 2, …, n; và
+chỉ ở đúng đầu mục, không ở giữa đoạn hay trong ô bảng.
 Ô đầu hàng bảng chỉ là số thứ tự (không phải số liệu) khi tiêu đề cột đầu, bỏ dấu đậm và khoảng trắng thừa, là một trong
 TIEU_DE_SO_THU_TU (#, STT, TT, Số TT, Số thứ tự) và các ô của cột đó đúng là 1, 2, …, n theo thứ tự. Thiếu một trong hai
 điều thì ô đầu là số liệu như mọi ô khác.
@@ -19,26 +27,45 @@ Mỗi con số trong đoạn ĐÃ KIỂM phải lần ra được theo một tro
 Không theo đường nào: KHÔNG LẦN RA — hồ sơ chưa đạt. Không có đường ngoại lệ (ADR-0020, sửa theo bản chấm L-09 vòng 2):
 con số máy không lần ra thì không mang nhãn ĐÃ KIỂM. Thư mục mã còn tệp ngoai_le.csv thì báo lỗi: tệp không còn dùng.
 so_can_kiem bỏ qua số nguyên dưới 10, năm và số trong dấu backtick. Trong đoạn ĐÃ KIỂM, các số đó vẫn phải có trên trang
-đã ghi hoặc là dòng gốc của sổ (lượt 4); không thì KHÔNG LẦN RA. Ngày tháng, số mục, mã tài liệu, địa chỉ trang và số
-đếm thời gian ("9 tháng", "66 ngày") không được coi là con số và không bị đối chiếu.
+đã ghi hoặc là dòng gốc của sổ (lượt 4); không thì KHÔNG LẦN RA. Ở đoạn không phải ĐÃ KIỂM, số trong dấu backtick được
+xét như số ngoài backtick. Ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian ("9 tháng", "66 ngày")
+không được coi là con số và không bị đối chiếu. Dạng ngày tháng máy nhận: «ngày 31 tháng 12 năm 2025», «31/12/2025»,
+«12/2025», «31/12», «tháng 12», «quý 4», «năm 2025»; dạng khác («31-12-2025») máy đọc thành con số.
 
 Dấu: số viết có dấu âm rõ ràng (−, -, hoặc trong ngoặc đơn) chỉ khớp số âm trên trang hay trong sổ, và không đi đường
 TÍNH bằng phép cộng, nhân, chia. Số viết không dấu khớp theo trị tuyệt đối, vì văn xuôi thường bỏ dấu ("lỗ 1.193 tỷ").
 
-Đoạn SUY LUẬN, GIẢ ĐỊNH, CHƯA BIẾT: máy chỉ đếm; số nào trùng số đã lần ra thì ghi NHẮC LẠI.
+Đoạn SUY LUẬN (ADR-0021 QĐ-K1): nhãn gọi tên khóa sổ sau «sổ số liệu:», cách nhau bằng dấu phẩy, tới dấu «;» hoặc hết
+nhãn; chữ sau dấu «;» là ghi chú, máy không đọc. «a05 tới a09» là dãy khóa cùng phần chữ, phần số tăng từng một, giữ số
+chữ số. Khóa không có trong sổ, hay phần không phải tên khóa trước dấu «;», là lỗi. Mỗi con số trong đoạn phải:
+    KHÓA      khớp giá trị của một khóa nhãn gọi tên (làm tròn tới số chữ số đã viết, đổi đơn vị 10^3, 10^6, 10^9); hoặc
+    HẰNG SỐ   khớp một hằng số viết trong công thức của một khóa nhãn gọi tên (ví dụ 49 trong «a * 49 / 100»); hoặc
+    NHẮC LẠI  khớp một con số ĐÃ KIỂM đã lần ra trong hồ sơ.
+Không theo đường nào: KHÔNG GẮN KHÓA — hồ sơ chưa đạt. Đoạn SUY LUẬN không gọi khóa nào thì mọi con số phải là NHẮC LẠI
+(QĐ-H4 của ADR-0020: không tính nhẩm). Phạm vi: mỗi LẦN XUẤT HIỆN của một nhãn là một phạm vi riêng (pham_vi_nhan), nhận
+ra bằng vị trí của nhãn chứ không bằng chữ của nhãn: phần chữ kết bằng nhãn đó, cộng các hàng dữ liệu của bảng mà đúng
+lần xuất hiện đó phủ; hàng bảng có nhãn trong ô là phạm vi riêng. Chiều ngược: phạm vi có số liệu (co_so_lieu) thì mỗi
+khóa nhãn gọi tên phải khớp ít nhất một con số trong đó; khóa chỉ dùng làm căn cứ mà không in số thì đặt sau dấu «;».
+Ở chiều ngược, máy đọc cả số nhỏ, năm và số đếm thời gian («66 ngày»). «Có số liệu» là có một con số chiều xuôi xét,
+hoặc một số đếm thời gian từ 10 trở lên; ngày tháng («tháng 12 năm 2025») được bỏ trước khi tìm số đếm thời gian. Câu
+dẫn hay câu định tính không có số liệu thì chiều ngược không xét.
+Đoạn GIẢ ĐỊNH, CHƯA BIẾT: máy chỉ đếm; số nào trùng số đã lần ra thì ghi NHẮC LẠI.
 Đoạn có số mà không có nhãn: CHƯA GẮN NHÃN — hồ sơ chưa đạt, kể cả khi số đó trùng số đã lần ra hay trùng sổ.
 
-Giới hạn, nói thẳng: máy chỉ bắt được con số KHÔNG có trên trang và phép tính KHÔNG khớp. Máy không biết con số có
-đúng ô hay không, và không kiểm lập luận. Việc đó thuộc ghế phản biện khác hãng và Owner (QĐ-P9 lớp 2, 3).
+Giới hạn, nói thẳng: máy chỉ bắt được con số KHÔNG có trên trang, phép tính KHÔNG khớp, và số SUY LUẬN không khớp khóa
+nhãn gọi tên. Máy không biết con số có đúng ô hay không, công thức có đúng nghĩa không, và không kiểm lập luận. Việc đó
+thuộc ghế phản biện khác hãng (có bảng định nghĩa, ADR-0021 QĐ-K2) và Owner (QĐ-P9 lớp 2, 3).
 
 Chạy: python tools/hoso/kiem_trich_dan.py --thu-muc <thư mục mã> --ho-so <tệp .md>
 """
 import argparse
+import ast
 import itertools
 import pathlib
 import re
 import sys
 from collections import Counter
+from decimal import Decimal
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2]))
 from tools.hoso.chung import NHAN, KhoTrang, khop_co_dau, nfc, nua_don_vi, tim_so  # noqa: E402
@@ -46,27 +73,55 @@ from tools.hoso.kiem_so_lieu import doc_so_lieu  # noqa: E402
 
 _TAG = re.compile(r"\[[^\[\]]*(?:" + "|".join(NHAN) + r")[^\[\]]*\]")
 _DIA_CHI = re.compile(r"(?<![\w.])([A-Z]\d{1,2})(?!\w)|tr\.\s*(\d+)(?:\s*[–-]\s*(\d+))?")
-NGOAI_PHAM_VI = ("Cách đọc", "Bảng nguồn", "Lịch sử sửa", "Phiếu máy")
+NGOAI_PHAM_VI = ("Trạng thái kiểm", "Cách đọc", "Bảng nguồn", "Lịch sử sửa", "Phiếu máy")
+_KHOA_NHAN = re.compile(r"sổ số liệu\s*:\s*([^;\]]*)")
+_KHOA_TEN = re.compile(r"[a-z][a-z0-9_]*")
+_KHOA_DAY = re.compile(r"([a-z][a-z0-9_]*?)(\d+)\s+tới\s+([a-z][a-z0-9_]*?)(\d+)")
 TIEU_DE_SO_THU_TU = ("#", "STT", "TT", "Số TT", "Số thứ tự")
 
-# Những thứ có chữ số nhưng không phải số liệu: bỏ trước khi tìm số.
+# Những thứ có chữ số nhưng không phải số liệu: bỏ trước khi tìm số. Từ vòng sửa 2 của ADR-0021, mẫu ngày tháng, giờ và
+# năm chỉ nhận giá trị hợp lệ (ngày 1–31, tháng 1–12, quý 1–4, năm 1900–2099, giờ 0–23), số mục không nhận số kèm «%»,
+# số trang không nhận số có phần lẻ hay kèm «%» và khoảng trang viết liền («tr.8–11»), mã tài liệu chỉ nhận L-, ADR-,
+# QĐ-, PR- viết hoa: «mỗi quý 63%», «cả năm 1300 tỷ», «63:37», «45/55», «phải thu-63,4%», «LNST-999», «tr. 63,4%»,
+# «tr.1 – 999 tỷ» là con số. Phần tử đầu là backtick, phần tử cuối là số đếm thời gian.
+_NGAY, _THANG, _NAM = r"(?:0?[1-9]|[12]\d|3[01])", r"(?:0?[1-9]|1[0-2])", r"(?:19|20)\d{2}"
+_TRANG = r"\d+\b(?![.,]\d)(?!\s*%)"
+_KHONG_LE = r"\b(?![.,/]\d)(?!\s*%)"
 _BO = [re.compile(m, re.I) for m in (
     r"`[^`]*`", r"https?://\S+",
-    r"[A-Z]\d{1,2}\s+tr\.\s*\d+(?:\s*[–-]\s*\d+)?(?:\s*,\s*tr\.\s*\d+(?:\s*[–-]\s*\d+)?)*", r"\btr\.\s*\d+(?:\s*[–-]\s*\d+)?",
-    r"\bngày\s+\d{1,2}\s+tháng\s+\d{1,2}(?:\s+năm\s+\d{4})?", r"\b\d{1,2}/\d{1,2}/\d{4}\b", r"\b\d{1,2}/\d{4}\b",
-    r"\b\d{1,2}/\d{1,2}\b", r"\b\d{1,2}:\d{2}\b",
-    r"\b[A-ZĐ]{1,4}-[A-Z]?\d+\b",
-    r"\b(?:mục|điểm soi|điểm|bản|vòng|quý|tháng|đợt|lớp|bước|ngày|lần thứ)\s+\d{1,2}\b(?![.,/]\d)", r"\bnăm\s+\d{4}\b(?![.,]\d)",
+    rf"[A-Z]\d{{1,2}}\s+tr\.\s*{_TRANG}(?:[–-]{_TRANG})?(?:\s*,\s*tr\.\s*{_TRANG}(?:[–-]{_TRANG})?)*",
+    rf"\btr\.\s*{_TRANG}(?:[–-]{_TRANG})?",
+    rf"\bngày\s+{_NGAY}\s+tháng\s+{_THANG}(?:\s+năm\s+{_NAM})?\b", rf"\b{_NGAY}/{_THANG}/{_NAM}\b", rf"\b{_THANG}/{_NAM}\b",
+    rf"\b{_NGAY}/{_THANG}\b(?![/.,]\d)", r"\b(?:[01]?\d|2[0-3]):[0-5]\d\b",
+    r"\b(?-i:(?:L|ADR|QĐ|QD|PR)-[A-Z]?\d+)\b",
+    rf"\b(?:mục|điểm soi|điểm|bản|vòng|đợt|lớp|bước|lần thứ)\s+\d{{1,2}}{_KHONG_LE}",
+    rf"\bquý\s+[1-4]{_KHONG_LE}", rf"\btháng\s+{_THANG}{_KHONG_LE}", rf"\bngày\s+{_NGAY}{_KHONG_LE}",
+    rf"\bnăm\s+{_NAM}\b(?![.,]\d)",
     r"(?<![\d.,])\d{1,4}\s*(?:[–-]\s*\d{1,4}\s*)?(?:tháng|năm|quý|ngày|tuần|phiên|kỳ|trang|tệp|dòng|câu)\b",
 )]
 
 
-def so_can_kiem(text: str) -> list:
+_DAU_DONG = re.compile(r"^\s*(?:[-*]\s+)?\d+\.\s")
+
+
+def chu_hien(text: str) -> str:
+    """Chữ người đọc thấy sau khi Markdown dựng: bỏ dấu đậm «**» và dấu backtick, không chèn gì vào chỗ đó. Máy đọc số
+    trên chữ này, nên dấu định dạng không tách được dấu âm, ngoặc, phần lẻ hay dấu % khỏi con số, và không cắt một con số
+    làm hai (vòng sửa 2 theo bản chấm L-09, lỗi chặn 1). kiem_luat.kiem_dinh_dang chặn mọi dòng mà cách đọc này khác cách
+    đọc khi thay dấu định dạng bằng dấu cách."""
+    return " ".join(text.replace("**", "").replace("`", "").split())     # trình dựng gộp khoảng trắng: «5  %» hiện «5 %»
+
+
+def so_can_kiem(text: str, dau_muc: bool = False) -> list:
     """Các con số là số liệu trong một đoạn chữ. Đã bỏ: ngày tháng, số mục, mã tài liệu, năm, số đếm thời gian
-    ("9 tháng", "66 ngày"), và số nguyên dưới 10 không kèm % (máy không kiểm các số này)."""
+    ("9 tháng", "66 ngày"), số trong dấu backtick, và số nguyên dưới 10 không kèm % (máy không kiểm các số này).
+    Dấu đậm «**» được bỏ trước khi đọc, nên không cắt được con số. dau_muc: text bắt đầu đúng ở đầu một mục liệt kê; chỉ
+    khi đó số thứ tự đầu dòng («12. ») mới bị bỏ, xét trên chữ gốc (đoạn «**63.** …» không phải mục liệt kê)."""
+    if dau_muc:
+        text = _DAU_DONG.sub(" ", text, count=1)
+    text = " ".join(text.replace("**", "").split())
     for mau in _BO:
         text = mau.sub(" ", text)
-    text = re.sub(r"^\s*(?:[-*]\s+)?\d+\.\s", " ", text)
     kq = []
     for s in tim_so(text):
         nguyen = s.raw.replace(".", "")
@@ -77,20 +132,19 @@ def so_can_kiem(text: str) -> list:
     return kq
 
 
-_DAU_DONG = re.compile(r"^\s*(?:[-*]\s+)?\d+\.\s")
-
-
 def lam_sach(text: str) -> str:
-    """Bỏ dấu backtick, ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian (thay bằng khoảng trắng)."""
-    text = text.replace("`", " ")
+    """Bỏ dấu đậm và dấu backtick (chu_hien); thay ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian
+    bằng khoảng trắng."""
+    text = chu_hien(text)
     for mau in _BO:
         text = mau.sub(" ", text)
     return text
 
 
 def so_tho(text: str) -> list:
-    """Mọi con số trong một đoạn chữ, chỉ bỏ ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian. KHÔNG bỏ
-    số nguyên nhỏ, năm hay số trong dấu backtick. Dùng cho phép kiểm phải chặt hơn đối chiếu trích dẫn (khoảng giá)."""
+    """Mọi con số trong một đoạn chữ, đọc trên chữ hiển thị; chỉ bỏ ngày tháng, số mục, mã tài liệu, địa chỉ trang và số
+    đếm thời gian. KHÔNG bỏ số nguyên nhỏ, năm hay số trong dấu backtick. Dùng cho phép kiểm phải chặt hơn đối chiếu
+    trích dẫn (khoảng giá, lượt 4 của đoạn ĐÃ KIỂM)."""
     return tim_so(lam_sach(text))
 
 
@@ -112,10 +166,119 @@ def loai_nhan(nhan: str) -> str:
     return min(vi_tri)[1] if vi_tri else ""
 
 
+def doc_khoa(nhan: str, trong_so) -> tuple:
+    """Khóa sổ mà nhãn gọi tên (ADR-0021 QĐ-K1): «sổ số liệu:» phải đứng trước dấu «;» đầu tiên của nhãn; danh sách là phần
+    sau nó tới dấu «;» hoặc hết nhãn, cách nhau bằng dấu phẩy. «a05 tới a09» là dãy khóa cùng phần chữ, phần số tăng từng một, giữ số chữ số. trong_so: tập khóa của sổ.
+    Trả (danh sách khóa theo thứ tự, không trùng; danh sách lỗi)."""
+    nhan = chu_hien(nhan)                                      # đọc nhãn trên chữ hiển thị, như đọc số
+    m = _KHOA_NHAN.search(nhan.split(";", 1)[0])              # chữ sau dấu «;» là ghi chú, kể cả khi có «sổ số liệu:»
+    if not m:
+        if _KHOA_NHAN.search(nhan):
+            return [], ["«sổ số liệu:» đứng sau dấu «;» nên là ghi chú, nhãn không gọi khóa nào; "
+                        "muốn gọi khóa thì đặt «sổ số liệu:» trước dấu «;» đầu tiên"]
+        return [], []
+    khoa, loi = [], []
+    for phan in m.group(1).split(","):
+        phan = " ".join(phan.split()).rstrip(".")
+        day = _KHOA_DAY.fullmatch(phan)
+        if day:
+            p1, s1, p2, s2 = day.groups()
+            if p1 != p2 or len(s1) != len(s2) or len(s1) > 9 or int(s1) > int(s2):
+                loi.append(f"dãy «{phan}» không hợp lệ: hai đầu phải cùng phần chữ, cùng số chữ số, đầu không lớn hơn cuối")
+                continue
+            if int(s2) - int(s1) >= 1000:
+                loi.append(f"dãy «{phan}» quá dài: một dãy không quá 1000 khóa")
+                continue
+            ds = [f"{p1}{n:0{len(s1)}d}" for n in range(int(s1), int(s2) + 1)]
+        elif _KHOA_TEN.fullmatch(phan):
+            ds = [phan]
+        else:
+            loi.append(f"«{phan}» không phải tên khóa sổ (chữ thường, số, gạch dưới); ghi chú đặt sau dấu «;»")
+            continue
+        for k in ds:
+            if k not in trong_so:
+                loi.append(f"khóa {k} không có trong sổ số liệu")
+            elif k not in khoa:
+                khoa.append(k)
+    return khoa, loi
+
+
+def hang_so_cong_thuc(cong_thuc: str) -> list:
+    """Các hằng số viết trong công thức của một dòng tính (ví dụ 49 và 100 trong «a * 49 / 100»)."""
+    try:
+        cay = ast.parse(cong_thuc.strip(), mode="eval") if cong_thuc and cong_thuc.strip() else None
+    except SyntaxError:
+        return []
+    return [Decimal(str(n.value)) for n in ast.walk(cay) if isinstance(n, ast.Constant)
+            and isinstance(n.value, (int, float)) and not isinstance(n.value, bool)] if cay else []
+
+
+def _gon_so(v) -> str:
+    """Giá trị của một khóa sổ, viết gọn để in lỗi."""
+    return f"{v:.0f}" if abs(v) >= 1000 else f"{v:.4f}".rstrip("0").rstrip(".")
+
+
+def so_hien(text: str) -> list:
+    """Mọi con số hiện trong một phần chữ, đọc trên chữ hiển thị (chu_hien), kể cả số nhỏ, năm, số đếm thời gian
+    («66 ngày») và số viết trong backtick; chỉ bỏ địa chỉ trang, mã tài liệu, ngày tháng, số mục và URL. Số thứ tự đầu
+    mục liệt kê do _chu_xet bỏ trước. Dùng cho chiều ngược của QĐ-K1: khóa nhãn gọi tên có hiện số không."""
+    text = chu_hien(text)
+    for mau in _BO[1:-1]:                                        # _BO[0] là backtick (đã bỏ dấu), _BO[-1] là số đếm thời gian
+        text = mau.sub(" ", text)
+    return tim_so(text)
+
+
+def so_lieu_hien(text: str) -> list:
+    """Con số là số liệu của một phần chữ, đọc trên chữ hiển thị: như so_can_kiem, cộng số viết trong backtick (vòng sửa 1
+    theo bản chấm L-09, lỗi chặn 1) và không để dấu định dạng đổi con số (vòng sửa 2, lỗi chặn 1). Số nhỏ, năm, số mục
+    và số đếm thời gian vẫn bỏ như so_can_kiem. Dùng cho mọi đoạn không phải ĐÃ KIỂM."""
+    return so_can_kiem(chu_hien(text))
+
+
+def so_khong_doc_duoc(text: str) -> list:
+    """Cụm chữ số đứng ở vị trí một con số mà máy không đọc được theo kiểu số Việt Nam (dấu chấm tách hàng nghìn, dấu
+    phẩy là phần lẻ): «63.4», «1,234,567», «31.12.2025», «4.3», «0.005», và con số đứng sát sau một dấu chấm hay dấu phẩy
+    («20,0%,63,4%», «36 ,9%», «1 .300»). chung.tim_so bỏ qua hay đọc sai các cụm này, nên không có hàm này thì
+    một con số viết kiểu Anh không bị xét (sửa cùng loại với lỗi chặn 1 của bản chấm L-09 vòng 2). Đọc trên chữ hiển
+    thị, sau khi bỏ ngày tháng, số mục, mã tài liệu, địa chỉ trang và số đếm thời gian như so_can_kiem."""
+    text = lam_sach(text)
+    doc = {x.vi_tri: x for x in tim_so(text)}
+    kq = []
+    for m in re.finditer(r"[\w.,]+", text):                      # từng cụm chữ, số, dấu chấm, dấu phẩy viết liền
+        cum = m.group(0).strip(".,")
+        if not re.fullmatch(r"\d[\d.,]*", cum):                  # có chữ cái: mã («VN30», «kq25_dt»), không phải con số
+            continue
+        x = doc.get(m.start() + len(m.group(0)) - len(m.group(0).lstrip(".,")))
+        if x is None or len(x.raw) != len(cum) or re.match(r"0\d*\.", cum):   # «0.005» không phải số tách hàng nghìn
+            kq.append(cum)
+    return kq
+
+
+def co_so_lieu(text: str) -> bool:
+    """Phần chữ có số liệu không (chiều ngược chỉ xét phạm vi có số liệu): một con số so_lieu_hien đếm, hoặc một số đếm
+    thời gian từ 10 trở lên hay có phần lẻ («95 ngày»). Năm, số nhỏ, số thứ tự đầu mục và số thứ tự trong bảng không tính
+    (vòng sửa 1, lỗi chặn 4). Ngày tháng, số mục và địa chỉ trang được bỏ TRƯỚC khi tìm số đếm thời gian, đúng thứ tự
+    của so_can_kiem: «tháng 12 năm 2025» không phải «12 năm» (vòng sửa 2, lỗi chặn 3). Một năm đứng trước «dòng», «kỳ»,
+    «ngày» («cuối 2025 dòng tiền…») cũng không phải số đếm thời gian."""
+    if so_lieu_hien(text) or so_khong_doc_duoc(text):
+        return True
+    text = chu_hien(text)
+    for mau in _BO[1:-1]:
+        text = mau.sub(" ", text)
+    return any((s.tuyet_doi >= 10 or s.so_le > 0) and not re.fullmatch(_NAM, s.raw)       # «cuối 2025 dòng tiền…»
+               for m in _BO[-1].finditer(text) for s in tim_so(m.group(0)))
+
+
 # ---------- tách hồ sơ thành đoạn ----------
 def _gom_khoi(dong: list) -> list:
     """Gom các dòng trong phạm vi kiểm thành khối: bảng, hoặc đoạn/mục liệt kê; gắn nhãn cho bảng.
-    Mỗi khối: {'bang', 'dong' (số dòng đầu), 'dong_chu', 'nhan' (bảng), 'bo_dau' (đoạn mở đầu bằng nhãn của bảng trước)}."""
+    Mỗi khối: {'bang', 'dong' (số dòng đầu), 'dong_chu', 'nhan' (bảng), 'nhan_cua' (bảng: lần xuất hiện của nhãn phủ nó,
+    là (số dòng đầu của khối chữ chứa nhãn, thứ tự của nhãn trong khối đó); None nếu bảng không có nhãn), 'bo_dau' (đoạn
+    mở đầu bằng nhãn của bảng trước), 'ds' (khối là mục liệt kê), 'stt_dau' (mục liệt kê mở đầu bằng một số thứ tự thật),
+    'stt_sai' (số đầu mục từ 10 trở lên mà danh sách không đánh đúng)}. Giữa bảng và nhãn của nó chỉ được có dòng trống.
+    Số đầu mục liệt kê là số thứ tự thật khi nó dưới 10, hoặc khi dãy mục liệt kê liền nhau cùng mức thụt lề (chỉ cách
+    nhau bằng dòng trống hay danh sách con) được đánh đúng 1, 2, …, n; «63. » đứng một mình là con số. Như trình dựng
+    Markdown, dòng «63. …» ngay dưới một dòng chữ thường không mở danh sách mà nối vào đoạn đó."""
     trong_pham_vi, khoi, hien = False, [], None
     for i, d in enumerate(dong, 1):                              # gom dòng thành khối: bảng, hoặc đoạn/mục liệt kê
         if d.startswith("## "):
@@ -128,33 +291,62 @@ def _gom_khoi(dong: list) -> list:
             continue
         la_bang = d.lstrip().startswith("|")
         la_muc = re.match(r"\s*(?:[-*]|\d+\.)\s", d) is not None
+        so_dau = re.match(r"\s*0*(\d+)\.\s", d)
+        if la_muc and hien and not hien["bang"] and not hien["ds"] and so_dau and so_dau.group(1) != "1":
+            la_muc = False                                       # «63. …» không ngắt được một đoạn: chỉ «1. » mới mở danh sách
         if hien and hien["bang"] == la_bang and not (la_muc and not la_bang):
             hien["dong_chu"].append(d)
         else:
-            hien = {"bang": la_bang, "dong": i, "dong_chu": [d]}
+            hien = {"bang": la_bang, "dong": i, "dong_chu": [d], "ds": la_muc and not la_bang}
             khoi.append(hien)
     for j, k in enumerate(khoi):                                 # nhãn của bảng: dòng ngay sau, hoặc dòng ngay trước
         if not k["bang"]:
             continue
-        k["nhan"] = ""
-        if j + 1 < len(khoi) and not khoi[j + 1]["bang"]:
-            m = _TAG.match(khoi[j + 1]["dong_chu"][0].lstrip())
+        k["nhan"], k["nhan_cua"] = "", None
+        het = k["dong"] - 1 + len(k["dong_chu"])                 # chỉ số của dòng ngay sau bảng
+        if j + 1 < len(khoi) and not khoi[j + 1]["bang"] and not any(d.strip() for d in dong[het:khoi[j + 1]["dong"] - 1]):
+            dau = khoi[j + 1]["dong_chu"][0]
+            dam = 2 if dau.lstrip().startswith("**") else 0      # nhãn in đậm «**[…]**» vẫn là nhãn của bảng
+            m = _TAG.match(dau.lstrip()[dam:])
             if m:
-                k["nhan"] = m.group(0)
-                khoi[j + 1]["bo_dau"] = len(khoi[j + 1]["dong_chu"][0]) - len(khoi[j + 1]["dong_chu"][0].lstrip()) + m.end()
+                k["nhan"], k["nhan_cua"] = m.group(0), (khoi[j + 1]["dong"], 0)
+                khoi[j + 1]["bo_dau"] = len(dau) - len(dau.lstrip()) + dam + m.end()
         giua = dong[khoi[j - 1]["dong"] - 1 + len(khoi[j - 1]["dong_chu"]):k["dong"] - 1] if j else []
         if not k["nhan"] and j and not khoi[j - 1]["bang"] and not any(d.strip() for d in giua):   # không qua tiêu đề
             truoc = " ".join(khoi[j - 1]["dong_chu"]).rstrip()
             cac = list(_TAG.finditer(truoc))
+            truoc = truoc[:-2].rstrip() if truoc.endswith("**") else truoc
             if cac and cac[-1].end() == len(truoc):
-                k["nhan"] = cac[-1].group(0)
+                k["nhan"], k["nhan_cua"] = cac[-1].group(0), (khoi[j - 1]["dong"], len(cac) - 1)
+    chuoi, het = {}, None                                        # số đầu mục của dãy mục liệt kê liền nhau, theo mức thụt lề
+
+    def chot(muc=-1):
+        """Khép các danh sách thụt sâu hơn muc (mặc định: mọi danh sách) và xét từng dãy có đúng 1, 2, …, n không."""
+        for t in [t for t in chuoi if t > muc]:
+            ds = chuoi.pop(t)
+            dung = [n for _, n in ds] == list(range(1, len(ds) + 1))
+            for x, n in ds:
+                x["stt_dau"], x["stt_sai"] = dung or n < 10, not (dung or n < 10)
+    for k in khoi:
+        if not (k.get("ds") and het is not None and not any(d.strip() for d in dong[het:k["dong"] - 1])):
+            chot()
+        het = k["dong"] - 1 + len(k["dong_chu"]) if k.get("ds") else None
+        if not k.get("ds"):
+            continue
+        thut = len(k["dong_chu"][0]) - len(k["dong_chu"][0].lstrip())
+        chot(thut)                                               # mục ở mức nông hơn khép các danh sách con
+        m = _DAU_DONG.match(k["dong_chu"][0])
+        if m:
+            so = re.search(r"\d+", m.group(0)).group(0)
+            chuoi.setdefault(thut, []).append((k, int(so) if len(so) <= 9 else 10 ** 9))
+    chot()
     return khoi
 
 
 def _hang_bang(k: dict) -> list:
     """[(số dòng, ô)] của một khối bảng, bỏ dòng kẻ; phần tử đầu là hàng tiêu đề cột."""
     hang = [[c.strip() for c in d.strip().strip("|").split("|")] for d in k["dong_chu"]]
-    return [(k["dong"] + n, h) for n, h in enumerate(hang) if not all(set(c) <= set("-: ") for c in h)]
+    return [(k["dong"] + n, h) for n, h in enumerate(hang) if not all(re.fullmatch(r":?-+:?", c) for c in h)]
 
 
 def cot_so_thu_tu(hang: list) -> bool:
@@ -195,8 +387,9 @@ def tach_doan(text: str) -> list:
         dau = 0
         for m in list(_TAG.finditer(chu)) + [None]:
             phan = chu[dau:m.start()] if m else chu[dau:]
-            cung = list(range(len(doan), len(doan) + len(so_can_kiem(phan))))
-            for i, s in zip(cung, so_can_kiem(phan)):
+            so = so_can_kiem(phan, dau_muc=dau == 0 and not k.get("bo_dau") and k.get("stt_dau", False))
+            cung = list(range(len(doan), len(doan) + len(so)))
+            for i, s in zip(cung, so):
                 doan.append({"dong": k["dong"], "chu": phan.strip(), "nhan": m.group(0) if m else "", "so": s,
                              "hang": [j for j in cung if j != i], "cot": []})
             if m:
@@ -206,7 +399,12 @@ def tach_doan(text: str) -> list:
 
 def cac_phan_chu(text: str) -> list:
     """MỌI phần chữ của hồ sơ, kèm nhãn phủ nó: [{'dong', 'chu', 'nhan', 'o', 'tieu_de', 'loai', 'muc', 'khoi', 'kieu_khoi',
-    'cap', 'stt'}]. Phần nằm trong phạm vi đối chiếu trích dẫn được gắn nhãn đúng như tach_doan. Hàng tiêu đề của bảng, chữ
+    'cap', 'stt', 'stt_dau', 'stt_sai', 'ma_nhan'}]. Phần nằm trong phạm vi đối chiếu trích dẫn được gắn nhãn đúng như
+    tach_doan. 'stt_sai': phần chữ mở đầu một mục liệt kê có số đầu mục từ 10 trở lên mà danh sách không đánh đúng.
+    'stt_dau': phần chữ mở đầu bằng số thứ tự thật của một mục liệt kê (xem _gom_khoi); chỉ khi đó «12. » mới bị bỏ.
+    'ma_nhan': định danh LẦN XUẤT HIỆN của nhãn phủ phần chữ — ('nhan', số dòng đầu của khối chữ chứa nhãn, thứ tự của
+    nhãn trong khối) cho đoạn và cho hàng bảng nhận nhãn của cả bảng; ('hang', số dòng) cho hàng bảng có nhãn trong ô;
+    None khi không có nhãn. Hai phần có cùng 'ma_nhan' là cùng một phạm vi nhãn (pham_vi_nhan). Hàng tiêu đề của bảng, chữ
     nằm trong chính nhãn, tiêu đề mục và các mục ngoài phạm vi có nhãn ''. Với hàng dữ liệu của bảng: 'o' là các ô (đã bỏ
     nhãn), 'tieu_de' là các ô tiêu đề cột, 'stt' cho biết cột đầu có phải số thứ tự thật (cot_so_thu_tu).
     'loai': hang_bang, tieu_de_bang, doan, nhan (chữ nằm trong chính nhãn), tieu_de (dòng '#'), ngoai (mục ngoài phạm vi
@@ -223,9 +421,10 @@ def cac_phan_chu(text: str) -> list:
     kq, phu = [], set()
     la_muc = re.compile(r"\s*(?:[-*]|\d+\.)\s")
 
-    def them(so_dong, chu, nhan, loai, khoi, kieu, o=(), tieu_de=(), stt=False):
+    def them(so_dong, chu, nhan, loai, khoi, kieu, o=(), tieu_de=(), stt=False, stt_dau=False, ma_nhan=None, stt_sai=False):
         kq.append({"dong": so_dong, "chu": chu, "nhan": nhan, "o": list(o), "tieu_de": list(tieu_de), "loai": loai,
-                   "muc": muc_cua.get(so_dong, ""), "khoi": khoi, "kieu_khoi": kieu, "cap": 0, "stt": stt})
+                   "muc": muc_cua.get(so_dong, ""), "khoi": khoi, "kieu_khoi": kieu, "cap": 0, "stt": stt,
+                   "stt_dau": stt_dau, "ma_nhan": ma_nhan, "stt_sai": stt_sai})
         return kq[-1]
     for k in _gom_khoi(dong):
         phu.update(range(k["dong"], k["dong"] + len(k["dong_chu"])))
@@ -239,8 +438,9 @@ def cac_phan_chu(text: str) -> list:
                 if n == 0:
                     them(so_dong, " | ".join(o), "", "tieu_de_bang", k["dong"], "bang")
                 else:
+                    ca_bang = ("nhan",) + k["nhan_cua"] if k["nhan_cua"] else None
                     them(so_dong, " | ".join(o), rieng.group(0) if rieng else k["nhan"], "hang_bang", k["dong"], "bang", o,
-                         tieu_de, stt)
+                         tieu_de, stt, ma_nhan=("hang", so_dong) if rieng else ca_bang)
                 for m in _TAG.finditer(" | ".join(h)):
                     them(so_dong, m.group(0), "", "nhan", k["dong"], "bang")
             continue
@@ -250,8 +450,10 @@ def cac_phan_chu(text: str) -> list:
         if bo:
             them(k["dong"], chu[:bo], "", "nhan", k["dong"], kieu)
         chu, dau = chu[bo:], 0
-        for m in list(_TAG.finditer(chu)) + [None]:
-            them(k["dong"], chu[dau:m.start()] if m else chu[dau:], m.group(0) if m else "", "doan", k["dong"], kieu)
+        for n, m in enumerate(list(_TAG.finditer(chu)) + [None], 1 if bo else 0):   # nhãn đã bỏ ở đầu là nhãn thứ 0
+            them(k["dong"], chu[dau:m.start()] if m else chu[dau:], m.group(0) if m else "", "doan", k["dong"], kieu,
+                 stt_dau=dau == 0 and not bo and k.get("stt_dau", False),
+                 ma_nhan=("nhan", k["dong"], n) if m else None, stt_sai=dau == 0 and not bo and k.get("stt_sai", False))
             if m:
                 them(k["dong"], m.group(0), "", "nhan", k["dong"], kieu)
                 dau = m.end()
@@ -353,21 +555,49 @@ def tinh_duoc(d, hang: list, cot: list = ()) -> str:
 
 
 # ---------- kiểm ----------
+def _chu_xet(p: dict) -> list:
+    """Chữ của một phần (cac_phan_chu) để xét số: hàng bảng là các ô, bỏ ô số thứ tự thật; đoạn là chữ, bỏ số thứ tự đầu
+    dòng khi phần chữ mở đầu bằng số thứ tự thật của một mục liệt kê ('stt_dau'). Phần chữ đứng sau một nhãn giữa đoạn,
+    ô bảng, hay mục «63. » không thuộc danh sách đánh 1, 2, …, n thì không có số thứ tự: «63. » ở đó là con số."""
+    if p["loai"] == "hang_bang":
+        o = list(p["o"])
+        if o and p["stt"]:
+            o[0] = ""
+        return o
+    return [_DAU_DONG.sub(" ", p["chu"], count=1) if p["stt_dau"] else p["chu"]]
+
+
+def pham_vi_nhan(cac: list) -> dict:
+    """Phạm vi của từng LẦN XUẤT HIỆN một nhãn SUY LUẬN. cac: cac_phan_chu. Các phần cùng 'ma_nhan' là một phạm vi:
+    - mỗi phần đoạn kết bằng một nhãn là phạm vi của lần xuất hiện đó, kể cả khi hai nhãn cùng chữ đứng trong một đoạn
+      (vòng sửa 1 theo bản chấm L-09, lỗi chặn 2);
+    - hàng bảng có nhãn nằm trong ô: phạm vi riêng của hàng đó;
+    - các hàng dữ liệu của bảng thuộc phạm vi của đúng lần xuất hiện nhãn phủ bảng: nhãn đầu dòng ngay sau bảng, hoặc nhãn
+      cuối của đoạn ngay trước bảng (khi đó phạm vi gồm cả phần đoạn kết bằng nhãn ấy). Máy nhận lần xuất hiện bằng vị
+      trí _gom_khoi đã ghi, không so chữ của nhãn: một nhãn cùng chữ ở chỗ khác không gộp vào (vòng sửa 2, lỗi chặn 2).
+    Trả {mã phạm vi: [phần]} theo thứ tự trong hồ sơ, chỉ gồm phần có nhãn SUY LUẬN."""
+    nhom = {}
+    for p in cac:
+        if p["loai"] in ("doan", "hang_bang") and p["ma_nhan"] is not None and loai_nhan(p["nhan"]) == "SUY LUẬN":
+            nhom.setdefault(p["ma_nhan"], []).append(p)
+    return nhom
+
+
 def kiem(thu_muc, ho_so_text: str) -> dict:
     kho = KhoTrang(thu_muc)
-    so_lieu = doc_so_lieu(kho)["dong"] if (kho.thu_muc / "so_lieu.csv").is_file() else []
+    so = doc_so_lieu(kho) if (kho.thu_muc / "so_lieu.csv").is_file() else {"bien": {}, "dong": []}
+    so_lieu, bien = so["dong"], so["bien"]
+    hang_so = {d["khoa"]: hang_so_cong_thuc(d.get("cong_thuc", "")) for d in so_lieu}
     doan = tach_doan(ho_so_text)
-    kq = {"dem": Counter(), "loi": [], "khong_kiem": [], "so_con_so": len(doan)}
+    kq = {"dem": Counter(), "loi": [], "khong_kiem": [], "so_con_so": len(doan), "lan_ra": [], "khoa_dung": []}
     if (kho.thu_muc / "ngoai_le.csv").is_file():
         kq["loi"].append("ngoai_le.csv: tệp không còn được dùng — ADR-0020 (sửa theo bản chấm L-09 vòng 2) bỏ hẳn ngoại lệ; "
                          "con số máy không lần ra thì không mang nhãn ĐÃ KIỂM. Xóa tệp này")
 
-    def trong_so(s, dia_chi=None) -> bool:
-        """dia_chi (đoạn ĐÃ KIỂM): chỉ dòng gốc có đúng nguồn, đúng trang của nhãn, dòng sửa phải đã chứng minh.
-        None (đoạn không phải ĐÃ KIỂM, chỉ để đếm): mọi dòng của sổ."""
-        if dia_chi is not None:
-            return khop_dong_goc(so_lieu, s, dia_chi)
-        return any(khop_co_dau(s, [d["gia_tri"]]) for d in so_lieu)
+    def trong_so(s, dia_chi) -> bool:
+        """Đoạn ĐÃ KIỂM: chỉ dòng gốc có đúng nguồn, đúng trang của nhãn, dòng sửa phải đã chứng minh. (Từ ADR-0021, đoạn
+        SUY LUẬN không còn khớp «mọi dòng của sổ»: số phải khớp đúng khóa nhãn gọi tên.)"""
+        return khop_dong_goc(so_lieu, s, dia_chi)
 
     loai = [""] * len(doan)
     cho = []                                                     # con số ĐÃ KIỂM chưa neo được vào trang hay sổ
@@ -407,31 +637,116 @@ def kiem(thu_muc, ho_so_text: str) -> dict:
                          f"không tính ra được từ các số đã lần ra cùng đoạn {d['nhan']}")
     da_lan_ra = {(doan[i]["so"].tuyet_doi, doan[i]["so"].so_le) for i, x in enumerate(loai)
                  if x in ("TRANG", "SỔ", "TÍNH")}
-    for i, d in enumerate(doan):                                 # lượt 3: đoạn không phải ĐÃ KIỂM
-        if loai[i]:
-            continue
-        s, loai_n = d["so"], loai_nhan(d["nhan"])
+    gia_tri_lan_ra = {doan[i]["so"].gia_tri for i, x in enumerate(loai) if x in ("TRANG", "SỔ", "TÍNH")}
+
+    def xep_suy_luan(s, nhan, dong) -> str:
+        """Chiều xuôi của QĐ-K1 cho một con số trong phần chữ SUY LUẬN: KHÓA, HẰNG SỐ, NHẮC LẠI, hoặc KHÔNG GẮN KHÓA (lỗi)."""
+        khoa = doc_khoa(nhan, bien)[0]
+        if any(khop_co_dau(s, [bien[k]]) for k in khoa):
+            return "KHÓA"
+        if any(khop_co_dau(s, hang_so.get(k, ())) for k in khoa):
+            return "HẰNG SỐ"
+        if khop_co_dau(s, gia_tri_lan_ra):
+            return "NHẮC LẠI"
+        kq["loi"].append(
+            f"dòng {dong}: {s.raw}{'%' if s.pt else ''} — đoạn SUY LUẬN: số không khớp khóa nào nhãn gọi tên"
+            f" ({', '.join(khoa) if khoa else 'nhãn không gọi khóa nào'}), không phải hằng số trong công thức của"
+            f" các khóa đó, không trùng số ĐÃ KIỂM nào đã lần ra {nhan}")
+        return "KHÔNG GẮN KHÓA"
+    kq["lan_ra"] = [{"dong": d["dong"], "raw": d["so"].raw + ("%" if d["so"].pt else ""), "loai": loai[i],
+                     "nhan": d["nhan"]} for i, d in enumerate(doan) if loai[i] in ("TRANG", "SỔ")]
+
+    def xep(s, nhan, dong) -> str:
+        """Xếp một con số của đoạn không phải ĐÃ KIỂM."""
+        loai_n = loai_nhan(nhan)
         if not loai_n:
-            loai[i] = "CHƯA GẮN NHÃN"
-            kq["loi"].append(f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} — đoạn có số mà không có nhãn")
-        elif (s.tuyet_doi, s.so_le) in da_lan_ra:
-            loai[i] = "NHẮC LẠI"
-        elif trong_so(s):
-            loai[i] = "SỔ"
-        else:
-            loai[i] = "MÁY KHÔNG KIỂM"
-            kq["khong_kiem"].append(f"dòng {d['dong']}: {s.raw}{'%' if s.pt else ''} [{loai_n}]")
+            kq["loi"].append(f"dòng {dong}: {s.raw}{'%' if s.pt else ''} — đoạn có số mà không có nhãn")
+            return "CHƯA GẮN NHÃN"
+        if loai_n == "SUY LUẬN":                                 # ADR-0021 QĐ-K1: số SUY LUẬN gắn đúng khóa nhãn gọi tên
+            return xep_suy_luan(s, nhan, dong)
+        if (s.tuyet_doi, s.so_le) in da_lan_ra:
+            return "NHẮC LẠI"
+        kq["khong_kiem"].append(f"dòng {dong}: {s.raw}{'%' if s.pt else ''} [{loai_n}]")
+        return "MÁY KHÔNG KIỂM"
+
+    def xep_la(cum, nhan, dong) -> str:
+        """Xếp một cụm chữ số máy không đọc được (so_khong_doc_duoc) của đoạn không phải ĐÃ KIỂM."""
+        loai_n = loai_nhan(nhan)
+        dau = (f"dòng {dong}: «{cum}» — cụm chữ số không đọc được theo kiểu số Việt Nam (dấu chấm tách hàng nghìn, dấu "
+               "phẩy là phần lẻ)")
+        if not loai_n:
+            kq["loi"].append(dau + "; đoạn có số mà không có nhãn")
+            return "CHƯA GẮN NHÃN"
+        if loai_n == "SUY LUẬN":
+            kq["loi"].append(dau + f", nên không đối chiếu được với khóa nào; viết lại theo kiểu Việt Nam {nhan}")
+            return "KHÔNG GẮN KHÓA"
+        kq["khong_kiem"].append(f"dòng {dong}: {cum} [{loai_n}]")
+        return "MÁY KHÔNG KIỂM"
+    for i, d in enumerate(doan):                                 # lượt 3: đoạn không phải ĐÃ KIỂM
+        if not loai[i]:
+            loai[i] = xep(d["so"], d["nhan"], d["dong"])
+    cac = cac_phan_chu(ho_so_text)
+    for p in cac:                                                # lượt 3b: số chỉ hiện ra khi đọc chữ hiển thị (trong backtick)
+        if p["loai"] not in ("doan", "hang_bang") or loai_nhan(p["nhan"]) == "ĐÃ KIỂM":
+            continue                                             # đoạn ĐÃ KIỂM: lượt 4 đối chiếu với trang
+        for c in _chu_xet(p):
+            thuong = Counter((s.raw, s.gia_tri, s.pt) for s in so_can_kiem(c))
+            for s in so_lieu_hien(c):
+                if thuong[(s.raw, s.gia_tri, s.pt)] > 0:         # số ngoài backtick: lượt 3 đã xét
+                    thuong[(s.raw, s.gia_tri, s.pt)] -= 1
+                    continue
+                loai.append(xep(s, p["nhan"], p["dong"]))
+            loai.extend(xep_la(cum, p["nhan"], p["dong"]) for cum in so_khong_doc_duoc(c))
+    for p in cac:                                                # tiêu đề phụ và hàng tiêu đề bảng không mang nhãn
+        ngoai = not p["muc"] or any(p["muc"].startswith(x) for x in NGOAI_PHAM_VI)
+        if not (p["loai"] == "tieu_de_bang" or (p["loai"] == "tieu_de" and p["cap"] >= 3 and not ngoai)):
+            continue
+        cho = "hàng tiêu đề bảng" if p["loai"] == "tieu_de_bang" else "tiêu đề phụ"
+        for c in _TAG.sub(" ", p["chu"]).lstrip("#").split("|"):
+            for x in [s.raw + ("%" if s.pt else "") for s in so_lieu_hien(c)] + so_khong_doc_duoc(c):
+                loai.append("CHƯA GẮN NHÃN")
+                kq["loi"].append(f"dòng {p['dong']}: {x} — số liệu ở {cho}: chỗ này không mang nhãn; đưa con số xuống "
+                                 "hàng dữ liệu hay đoạn chữ có nhãn")
     kq["dem"].update(loai)
-    for p in cac_phan_chu(ho_so_text):                           # lượt 4: số so_can_kiem bỏ qua, trong đoạn ĐÃ KIỂM
+    for p in cac:                                                # số đầu mục mà trình dựng không hiện đúng như viết
+        if p["stt_sai"]:
+            kq["loi"].append(f"dòng {p['dong']}: mục liệt kê mở đầu bằng «{_DAU_DONG.match(p['chu']).group(0).strip()}» nhưng "
+                             "danh sách không được đánh đúng 1, 2, …, n: trình dựng Markdown không hiện đúng số đã viết, và "
+                             "máy đọc nó là con số; đánh lại danh sách, hoặc viết con số vào trong câu")
+    nhan_hang = Counter((p["khoi"], p["dong"]) for p in cac if p["loai"] == "nhan" and p["kieu_khoi"] == "bang")
+    for p in cac:                                                # một hàng bảng chỉ mang được một nhãn
+        if p["loai"] == "hang_bang" and nhan_hang[(p["khoi"], p["dong"])] > 1:
+            kq["loi"].append(f"dòng {p['dong']}: hàng bảng có {nhan_hang[(p['khoi'], p['dong'])]} nhãn; một hàng chỉ mang "
+                             "được một nhãn, nhãn thứ hai trở đi không phủ ô nào — tách thành nhiều hàng, hoặc dùng một "
+                             "nhãn cho cả hàng")
+    for cac_phan in pham_vi_nhan(cac).values():                 # QĐ-K1, chiều ngược: khóa gọi tên phải hiện số
+        nhan, dong_dau = cac_phan[0]["nhan"], cac_phan[0]["dong"]
+        khoa, loi_khoa = doc_khoa(nhan, bien)
+        if not khoa and not loi_khoa:
+            continue
+        kq["loi"].extend(f"dòng {dong_dau}: nhãn {nhan}: {x}" for x in loi_khoa)
+        if khoa and not any(re.search(r"\w", chu_hien(c)) for p in cac_phan for c in _chu_xet(p)):
+            kq["loi"].append(f"dòng {dong_dau}: nhãn gọi khóa ({', '.join(khoa)}) nhưng không phủ chữ nào; nhãn phủ phần chữ "
+                             f"đứng trước nó (tới nhãn liền trước), hoặc bảng ngay sát nó {nhan}")
+            continue
+        hien = {p["dong"]: [] for p in cac_phan}
+        for p in cac_phan:
+            hien[p["dong"]] += [s for c in _chu_xet(p) for s in so_hien(c)]
+        dung = {k: sorted(dg for dg, ds in hien.items() if any(khop_co_dau(s, [bien[k]]) for s in ds)) for k in khoa}
+        kq["khoa_dung"].append({"dong": dong_dau, "nhan": nhan, "khoa": khoa, "dong_khoa": dung})
+        if not any(co_so_lieu(c) for p in cac_phan for c in _chu_xet(p)):
+            continue                                             # câu dẫn hay câu định tính không có số liệu: không xét
+        for k in khoa:
+            if not dung[k]:
+                kq["loi"].append(f"dòng {dong_dau}: nhãn gọi khóa {k} (sổ: {_gon_so(bien[k])}) nhưng phần chữ nhãn phủ không có "
+                                 f"con số nào khớp khóa này; khóa chỉ dùng làm căn cứ thì đặt sau dấu «;» {nhan}")
+    for p in cac:                                                # lượt 4: số so_can_kiem bỏ qua, trong đoạn ĐÃ KIỂM
         if p["loai"] not in ("doan", "hang_bang") or loai_nhan(p["nhan"]) != "ĐÃ KIỂM":
             continue
-        o = list(p["o"]) if p["loai"] == "hang_bang" else [_DAU_DONG.sub(" ", p["chu"])]
-        if p["loai"] == "hang_bang" and o and p["stt"]:
-            o[0] = ""
         dia_chi = doc_dia_chi(p["nhan"])
         dung = bool(dia_chi) and all(ma in kho.nguon for ma in dia_chi) and all(
             t in kho.cac_trang(ma) for ma, tr in dia_chi.items() if tr is not None for t in tr)
-        for c in o:
+        for c in _chu_xet(p):
             con = Counter((s.raw, s.gia_tri, s.pt) for s in so_can_kiem(c))
             for s in so_tho(c):
                 if con[(s.raw, s.gia_tri, s.pt)] > 0:

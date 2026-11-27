@@ -11,6 +11,10 @@ cộng trừ chứng minh (phiếu in tên đẳng thức), mỗi con số ĐÃ 
 không phạm L-02, và giá cổ phiếu chỉ được nêu dưới dạng số quá khứ có nguồn.
 Phiếu ĐẠT KHÔNG có nghĩa là lập luận đúng: việc đó thuộc ghế phản biện khác hãng và Owner.
 
+Cuối phiếu có mục «Owner tự mở ba số» (ADR-0021 QĐ-K4): máy chọn ba con số theo sha256 của hồ sơ, nên cùng một hồ sơ luôn
+ra cùng ba số và ghế phân tích không chọn trực tiếp; sửa hồ sơ một chữ thì ba số đổi theo. Mục này không ảnh hưởng kết luận
+ĐẠT hay CHƯA ĐẠT.
+
 Mã thoát: 0 nếu ĐẠT, 1 nếu CHƯA ĐẠT. Phiếu được ghi cạnh hồ sơ: PHIEU_MAY_<tên hồ sơ>.txt
 """
 import argparse
@@ -79,12 +83,81 @@ def lap_phieu(thu_muc, ho_so) -> tuple:
         f"trong đó {ngoai} hàng ở trang hồ sơ không dùng")
 
     dem = td["dem"]
-    thu_tu = ("TRANG", "SỔ", "TÍNH", "NHẮC LẠI", "MÁY KHÔNG KIỂM", "KHÔNG LẦN RA", "CHƯA GẮN NHÃN", "ĐỊA CHỈ SAI")
+    thu_tu = ("TRANG", "SỔ", "TÍNH", "KHÓA", "HẰNG SỐ", "NHẮC LẠI", "MÁY KHÔNG KIỂM", "KHÔNG LẦN RA", "KHÔNG GẮN KHÓA",
+              "CHƯA GẮN NHÃN", "ĐỊA CHỈ SAI")
     muc("4. Trích dẫn", td["loi"], ", ".join(f"{k} {dem.get(k, 0)}" for k in thu_tu) + "; không có đường ngoại lệ")
 
     muc("5. Luật và khung", kiem_luat.kiem(text, thu_muc),
-        "L-02, cổng giá cổ phiếu, khoảng giá ở mọi mục, mười hai mục, mục 8 đúng câu cố định, giả thuyết, bảng nguồn")
+        "L-02, cổng giá cổ phiếu, khoảng giá ở mọi mục, trạng thái kiểm, mười hai mục, mục 8 đúng câu cố định, giả thuyết, "
+        "bảng nguồn")
+    dong.extend(["", *ba_so(text, td, sl, sha256_tep(ho_so))])
     return _dong_goi(ho_so, dong, tong_loi == 0), tong_loi == 0
+
+
+def _muc_cua(text: str) -> dict:
+    """Số dòng → tiêu đề cấp hai đang chứa dòng đó."""
+    muc, kq = "", {}
+    for i, d in enumerate(text.splitlines(), 1):
+        if d.startswith("## "):
+            muc = d[3:].strip()
+        kq[i] = muc
+    return kq
+
+
+def ba_so(text: str, td: dict, sl: dict, sha: str) -> list:
+    """Ba con số Owner tự mở (ADR-0021 QĐ-K4, sửa cách chọn ở QĐ-P9 của ADR-0019). Máy chọn theo sha256 của hồ sơ:
+    1) một số ĐÃ KIỂM ở «Một trang» (không có thì ở bất kỳ mục nào);
+    2) một dòng máy đọc sai đã được sửa và chứng minh (không có thì một số ĐÃ KIỂM khác);
+    3) một dòng gốc sau một khóa SUY LUẬN ở «Một trang» (không có thì sau bất kỳ khóa SUY LUẬN nào; vẫn không có thì một
+       số ĐÃ KIỂM khác)."""
+    muc = _muc_cua(text)
+    hat = int(sha, 16)
+
+    def chon(ds):
+        nonlocal hat
+        if not ds:
+            return None
+        x = ds[hat % len(ds)]
+        hat //= len(ds)
+        return x
+
+    da_kiem = td.get("lan_ra", [])
+    mot_trang = [x for x in da_kiem if muc.get(x["dong"]) == "Một trang"]
+    kq = ["OWNER TỰ MỞ BA SỐ (ADR-0021 QĐ-K4; máy chọn theo sha256 hồ sơ, không ảnh hưởng kết luận):"]
+    so1 = chon(mot_trang or da_kiem)
+    con_lai = [x for x in da_kiem if so1 is None or x["raw"] != so1["raw"]]
+    if so1:
+        kq.append(f"1. Số ĐÃ KIỂM «{so1['raw']}» ở dòng {so1['dong']} ({muc.get(so1['dong']) or 'đầu hồ sơ'}). "
+                  f"Mở đúng nguồn và trang trong nhãn {so1['nhan']}; tìm con số và tên khoản mục.")
+    else:
+        kq.append("1. Hồ sơ không có số ĐÃ KIỂM nào lần ra được.")
+    sua = chon([d for d in sl.get("dong", []) if d.get("sua") and d.get("chung_minh")])
+    if sua:
+        kq.append(f"2. Dòng máy đọc sai đã sửa: khóa {sua['khoa']} — máy đọc «{sua['chuoi_goc']}», sổ ghi «{sua['gia_tri_ghi']}». "
+                  f"Mở {sua['nguon']} tr.{sua['trang']}, xem ảnh trang in số nào.")
+    else:
+        so2 = chon(con_lai)
+        con_lai = [x for x in con_lai if x["raw"] != so2["raw"]] if so2 else con_lai
+        kq.append(f"2. Không có dòng sửa; thêm một số ĐÃ KIỂM: «{so2['raw']}» ở dòng {so2['dong']}, nhãn {so2['nhan']}."
+                  if so2 else "2. Không có dòng sửa và không còn số ĐÃ KIỂM nào khác.")
+    theo_khoa = {d["khoa"]: d for d in sl.get("dong", [])}
+    khoa_mt = [k for x in td.get("khoa_dung", []) if muc.get(x["dong"]) == "Một trang" for k in x["khoa"]]
+    khoa_all = [k for x in td.get("khoa_dung", []) for k in x["khoa"]]
+    goc = []
+    for k in (khoa_mt or khoa_all):
+        for d in kiem_so_lieu.cac_dong_goc(k, theo_khoa):
+            if all(d is not g for g, _ in goc):
+                goc.append((d, k))
+    pick = chon(goc)
+    if pick:
+        d, k = pick
+        kq.append(f"3. Dòng gốc khóa {d['khoa']} (dùng cho khóa {k}): sổ ghi «{d['chuoi_goc']}». Mở {d['nguon']} "
+                  f"tr.{d['trang']}; xem dòng này có đúng là khoản mục mà câu trong hồ sơ nói tới không.")
+    else:
+        so3 = chon(con_lai)
+        kq.append(f"3. Không có khóa SUY LUẬN; thêm một số ĐÃ KIỂM: «{so3['raw']}» ở dòng {so3['dong']}, nhãn {so3['nhan']}."
+                  if so3 else "3. Không có khóa SUY LUẬN và không còn số ĐÃ KIỂM nào khác.")
+    return kq
 
 
 def _dong_goi(ho_so, dong, dat) -> str:
