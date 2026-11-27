@@ -615,7 +615,7 @@ class CongGiaVong3Tests(HoSoBase):
         2: ("Giá cổ phiếu MAU như sau.\n\nTốt: 30. [GIẢ ĐỊNH]",),
         3: ("Giá cổ phiếu MAU còn dư địa về 26,10 nghìn đồng. [ĐÃ KIỂM G1]", "Giá cổ phiếu MAU tăng 25%. [ĐÃ KIỂM G1]"),
         4: ("Giá ba mươi nghìn đồng. [GIẢ ĐỊNH]",),
-        5: ("Gia ban co phieu MAU ky toi la 31,70. [GIẢ ĐỊNH]", "Giá cổ phiếu MAU: ³¹ nghìn đồng. [GIẢ ĐỊNH]"),
+        5: ("Gia ban co phieu MAU ky toi la 31,70. [GIẢ ĐỊNH]",),   # «³¹» (ký tự thay chữ số): ADR-0022 chặn ở bảng chữ
     }
 
     def chen(self, cau):
@@ -1029,6 +1029,187 @@ class DinhDangTests(HoSoBase):
         self.assertTrue(k("dòng đầu\n## Mục 9. Giá"))
         self.assertEqual(k("dòng đầu\n## Mục 9. Thị trường chung và chu kỳ"), [])
         self.assertEqual(kiem_luat.TIEU_DE_CAP_HAI[:2], ("Cách đọc", "Một trang"))
+
+
+L22 = "[SUY LUẬN, sổ số liệu: phai_thu_tang_25]"
+G22 = "[GIẢ ĐỊNH]"
+B22 = "| Chỉ tiêu | Tỷ lệ |\n|---|---:|\n| Phải thu tăng | %s |"
+
+
+class BangChuTests(HoSoBase):
+    """ADR-0022: bảng chữ cho phép và cách viết số, để chữ người đọc thấy là chữ máy đọc. Mỗi đầu vào chèn ngay dưới tiêu
+    đề Mục 9 của hồ sơ mẫu, chạy phiếu máy toàn trình. Sổ của hồ sơ mẫu: phai_thu_tang_25 = 36,36…% (viết đúng là 36,4%).
+    Nhóm A–K (64 đầu vào) phải ra CHƯA ĐẠT; trên main 2ca1c55, 36 đầu vào trong số đó cho phiếu ĐẠT. Nhóm Z (20 đầu vào)
+    là cách viết hợp lệ, phải ĐẠT. A: ba cách viết của PR #119; B: HTML, thực thể, thoát; C: Unicode; D: chữ dính số;
+    E: dấu trừ; F: số tách nghìn bằng dấu cách; G: địa chỉ web; H: mã biểu tượng; I: nhãn; J: cổng giá, số đứng đầu phần
+    chữ sau nhãn; K: số kiểu Anh ở đoạn ĐÃ KIỂM."""
+
+    CA = [
+        # A. ba cách viết của PR #119 và họ hàng
+        ("A", "gạch bỏ một dấu ~ cắt số", "Phải thu khách hàng tăng 5~5~,5%. " + L22, False),
+        ("A", "gạch bỏ một dấu ~ quanh số sai", "Phải thu khách hàng tăng ~55,5%~ 36,4%. " + L22, False),
+        ("A", "gạch bỏ ~~ quanh số", "Phải thu khách hàng tăng ~~55,5%~~ 36,4%. " + L22, False),
+        ("A", "công thức $…$ cắt số", "Phải thu khách hàng tăng 5$5$,5%. " + L22, False),
+        ("A", "công thức $`…`$", "Phải thu khách hàng tăng $`55,5`$%. " + L22, False),
+        ("A", "định nghĩa liên kết trong mục liệt kê", "- [Gi]: x\n\n[Gi]á cổ phiếu MAU năm tới là 30. " + G22, False),
+        ("A", "định nghĩa liên kết sau nhãn", "Phải thu khách hàng tăng 36,4%. " + L22 + ": x", False),
+        ("A", "chú thích chân trang", "Phải thu khách hàng tăng 36,4%[^1]. " + L22 + "\n\n[^1]: thật ra 55,5%", False),
+        ("A", "ô đánh dấu", "- [x] Phải thu khách hàng tăng 36,4%. " + L22, False),
+        ("A", "ngoặc vuông thường", "Phải thu khách hàng [năm 2025] tăng 36,4%. " + L22, False),
+        # B. HTML, thực thể, thoát
+        ("B", "thẻ <s>", "Phải thu khách hàng tăng <s>55,5%</s> 36,4%. " + L22, False),
+        ("B", "chú thích HTML cắt số", "Phải thu khách hàng tăng 5<!-- -->5,5%. " + L22, False),
+        ("B", "thực thể số", "Phải thu khách hàng tăng &#53;5,5%. " + L22, False),
+        ("B", "thoát dấu phẩy", "Phải thu khách hàng tăng 55\\,5%. " + L22, False),
+        ("B", "dấu > so sánh", "Phải thu khách hàng tăng > 36,4%. " + L22, False),
+        # C. Unicode
+        ("C", "chữ số toàn khổ", "Phải thu khách hàng tăng \uff15\uff15,\uff15%. " + L22, False),
+        ("C", "chữ số A-rập", "Phải thu khách hàng tăng \u0665\u0665,\u0665%. " + L22, False),
+        ("C", "chữ số mũ", "Phải thu khách hàng tăng \u2075\u2075,\u2075%. " + L22, False),
+        ("C", "chữ số khoanh", "Phải thu khách hàng tăng \u2464\u2464,\u2464%. " + L22, False),
+        ("C", "chữ Kirin trong chữ giá", "Gi\u0430 cổ phiếu MAU năm tới là 30. " + G22, False),
+        ("C", "dấu phẩy toàn khổ", "Phải thu khách hàng tăng 55\uff0c5%. " + L22, False),
+        ("C", "dấu % toàn khổ", "Phải thu khách hàng tăng 55,5\uff05. " + L22, False),
+        ("C", "gạch nhỏ trước số", "Phải thu khách hàng giảm \ufe6355,5%. " + L22, False),
+        ("C", "dấu cách hẹp giữa số", "Phải thu khách hàng tăng 55\u202f5,5%. " + L22, False),
+        ("C", "chữ nhân thay x", "Phải thu khách hàng tăng gấp ×55,5%. " + L22, False),
+        # D. chữ dính số
+        ("D", "chữ thường dính số", "Phải thu khách hàng tăng55,5%. " + L22, False),
+        ("D", "x dính số", "Phải thu khách hàng tăng x55,5%. " + L22, False),
+        ("D", "chữ hoa dính phần trăm", "Phải thu khách hàng tăng PT55,5%. " + L22, False),
+        ("D", "mã một chữ hoa dính phần trăm", "Phải thu khách hàng tăng X55%. " + L22, False),
+        ("D", "P/E dính số", "Hệ số P/E15 lần của cổ phiếu MAU năm tới. " + G22, False),
+        ("D", "giá dính số", "Giá cổ phiếu MAU năm tới là giá30. " + G22, False),
+        ("D", "từ hex dính số lẻ", "Phải thu khách hàng tăng decade55,5%. " + L22, False),
+        ("D", "chữ đậm dán số vào chữ", "Phải thu khách hàng tăng**55,5%**. " + L22, False),
+        ("D", "chữ O thay số 0", "Phải thu khách hàng tăng 5O,5%. " + L22, False),
+        ("D", "chữ O thay số 0 trước %", "Phải thu khách hàng tăng 5O%. " + L22, False),
+        ("D", "chữ l và O thay cả số", "Phải thu khách hàng tăng lO%. " + L22, False),
+        ("D", "chữ l thay số 1", "Doanh thu thuần năm 2025 là 1.2OO tỷ đồng. [ĐÃ KIỂM D1 tr.1]", False),
+        ("D", "dấu nháy tách nghìn", "Doanh thu thuần năm 2025 là 1'555 tỷ đồng. [ĐÃ KIỂM D1 tr.1]", False),
+        ("D", "nhãn chứa dấu | trong bảng", "| Chỉ tiêu | Tỷ lệ |\n|---|---:|\n| Phải thu tăng | 55,5% [GIẢ ĐỊNH | SUY LUẬN] |", False),
+        # E. dấu trừ
+        ("E", "dấu trừ dính sau chữ", "Phải thu khách hàng giảm-36,4%. " + L22, False),
+        ("E", "dấu trừ cách số", "Phải thu khách hàng biến động - 36,4%. " + L22, False),
+        ("E", "dấu trừ trước ngoặc", "Phải thu khách hàng biến động -(36,4%). " + L22, False),
+        ("E", "dấu trừ sau dấu phẩy", "Phải thu biến động 20,0%,-36,4%. " + L22, False),
+        ("E", "gạch dài dính số", "Phải thu biến động —36,4%. " + L22, False),
+        ("E", "dấu trừ cách số trong ô bảng", B22 % "- 36,4%" + "\n\n" + L22, False),
+        # F. số tách nghìn bằng dấu cách
+        ("F", "số tách nghìn bằng dấu cách", "Doanh thu thuần năm 2025 là 1 200 tỷ đồng. [ĐÃ KIỂM D1 tr.1]", False),
+        # G. địa chỉ web
+        ("G", "số trong địa chỉ web", "Phải thu khách hàng tăng https://55,5% so với năm trước. " + L22, False),
+        ("G", "www", "Phải thu khách hàng tăng 36,4%, xem www.55,5.vn. " + L22, False),
+        ("G", "địa chỉ web trong mã", "Phải thu khách hàng tăng 36,4%, xem `https://x.vn/55`. " + L22, False),
+        # H. mã biểu tượng
+        ("H", "mã biểu tượng chữ số", "Phải thu khách hàng tăng :five::five:,:five:%. " + L22, False),
+        ("H", "mã biểu tượng 100", "Phải thu khách hàng tăng :100:%. " + L22, False),
+        # I. nhãn
+        ("I", "nhãn GIẢ ĐỊNH gọi khóa", "Phải thu khách hàng tăng 55,5%. [GIẢ ĐỊNH, SUY LUẬN, sổ số liệu: phai_thu_tang_25]", False),
+        ("I", "nhãn CHƯA BIẾT gọi khóa", "Phải thu khách hàng tăng 55,5%. [CHƯA BIẾT; SUY LUẬN, sổ số liệu: phai_thu_tang_25]", False),
+        ("I", "nhãn GIẢ ĐỊNH viện ĐÃ KIỂM", "Doanh thu thuần năm 2025 là 1.555 tỷ đồng. [GIẢ ĐỊNH; ĐÃ KIỂM D1 tr.1]", False),
+        ("I", "nhãn GIẢ ĐỊNH có sổ số liệu", "Phải thu khách hàng tăng 55,5%. [GIẢ ĐỊNH, sổ số liệu: phai_thu_tang_25]", False),
+        ("I", "nhãn mở đầu bằng chữ khác", "Phải thu khách hàng tăng 55,5%. [Theo sổ: GIẢ ĐỊNH]", False),
+        ("I", "nhãn lồng ngoặc", "Phải thu khách hàng tăng 36,4%. [SUY LUẬN, sổ số liệu: phai_thu_tang_25 [x]]", False),
+        ("I", "mã chứa ngoặc", "Phải thu khách hàng tăng 36,4%, `[a]`. " + L22, False),
+        ("I", "mã chứa dấu |", B22 % "`36|4`" + "\n\n" + L22, False),
+        # J. cổng giá, số đứng đầu phần chữ sau nhãn
+        ("J", "giá sau nhãn trong mục đánh số", "1. Doanh thu ổn định. [CHƯA BIẾT] 30. Đó là giá cổ phiếu MAU, nghìn đồng. " + G22, False),
+        ("J", "giá sau nhãn trong mục đánh số, số có hai chữ số", "1. Doanh thu ổn định. [CHƯA BIẾT] 31. Giá cổ phiếu MAU kỳ tới. " + G22, False),
+        ("J", "giá sau nhãn, mục thứ hai", "1. Doanh thu ổn định. [CHƯA BIẾT]\n2. Lãi gộp ổn định. [CHƯA BIẾT] 30. Đó là giá cổ phiếu MAU. " + G22, False),
+        # K. số kiểu Anh ở đoạn ĐÃ KIỂM
+        ("K", "số kiểu Anh ở đoạn ĐÃ KIỂM", "Doanh thu thuần năm 2025 là 1,555.5 tỷ đồng. [ĐÃ KIỂM D1 tr.1]", False),
+        ("K", "số kiểu Anh 63.4 ở đoạn ĐÃ KIỂM", "Biên lợi nhuận gộp là 63.4%. [ĐÃ KIỂM D1 tr.1]", False),
+        # Z. cách viết hợp lệ: phải ĐẠT
+        ("Z", "đối chứng: số đúng", "Phải thu khách hàng tăng 36,4%. " + L22, True),
+        ("Z", "khoảng năm gạch nối", "Giai đoạn 2020–2025 phải thu tăng 36,4%. " + L22, True),
+        ("Z", "khoảng năm gạch có dấu cách", "Giai đoạn 2020 - 2025 phải thu tăng 36,4%. " + L22, True),
+        ("Z", "quý, mã nguồn, mã giả thuyết", "Theo H1 và D1, quý 3 và Q3/2025 phải thu tăng 36,4%. " + L22, True),
+        ("Z", "mã tài liệu", "Theo ADR-0019 QĐ-P13 và L-02, phải thu tăng 36,4%. " + L22, True),
+        ("Z", "rổ VN30", "Cổ phiếu MAU không thuộc rổ VN30. " + "[CHƯA BIẾT]", True),
+        ("Z", "giờ", "Phiên lúc 10:30:45 không có gì đặc biệt. [CHƯA BIẾT]", True),
+        ("Z", "dấu trừ đúng cách", "Phải thu khách hàng giảm -36,4% nếu viết ngược chiều. " + "[GIẢ ĐỊNH]", True),
+        ("Z", "số âm trong ngoặc kép", "Biến động «-36,4%» là giả định. [GIẢ ĐỊNH]", True),
+        ("Z", "mục gạch đầu dòng mở bằng số", "- 36,4% là mức tăng của phải thu khách hàng. " + L22, True),
+        ("Z", "ký hiệu toán cho phép", "Phải thu tăng 36,4%, ≈ một phần ba, ≥ mức tăng doanh thu → cần theo dõi. " + L22, True),
+        ("Z", "nhãn ĐÃ KIỂM nhắc SUY LUẬN", "Doanh thu thuần năm 2025 là 1.200 tỷ đồng. [ĐÃ KIỂM D1 tr.1; tỷ lệ ở Mục 7 là SUY LUẬN]", True),
+        ("Z", "nhãn SUY LUẬN nhắc ĐÃ KIỂM", "Phải thu khách hàng tăng 36,4%. [SUY LUẬN, sổ số liệu: phai_thu_tang_25; từ số ĐÃ KIỂM D1]", True),
+        ("Z", "nhãn in đậm", "Phải thu khách hàng tăng 36,4%. **" + L22 + "**", True),
+        ("Z", "tên tệp trong mã", "Xem `gia/MAU_lich_su_gia.csv` và `Downloads\\TTC\\goc`. [CHƯA BIẾT]", True),
+        ("Z", "R&D và M&A", "Doanh nghiệp không công bố chi R&D hay M&A. [CHƯA BIẾT]", True),
+        ("Z", "câu hỏi và chấm than", "Phải thu tăng 36,4%, nhanh hơn doanh thu! Vì sao? " + L22, True),
+        ("Z", "đơn vị và tên dính số", "Mạng 5G và 4G chưa có số liệu; mã D2b, SHA256 không có. [CHƯA BIẾT]", True),
+        ("Z", "giá có nguồn trong mục đánh số", "1. Giá đóng cửa hai phiên gần nhất là 25,40 và 26,10 nghìn đồng. [ĐÃ KIỂM G1]", True),
+        ("Z", "danh sách đánh số đúng có giá", "1. Doanh thu ổn định. [CHƯA BIẾT]\n2. Giá đóng cửa là 25,40 nghìn đồng. [ĐÃ KIỂM G1]", True),
+    ]
+    # Giới hạn còn lại, đã công bố ở mục 4 của quy trình: máy chưa bắt, phiếu ĐẠT. Nếu một ngày máy bắt được thì sửa test
+    # này và bỏ giới hạn tương ứng khỏi danh sách.
+    GIOI_HAN = {
+        "mã một chữ hoa với số nguyên": "Phải thu khách hàng tăng X55. " + L22,
+        "chữ cái trông như chữ số viết thay cả con số": "Phải thu khách hàng tăng lO phần trăm. " + L22,
+        "mã viết hoa nối gạch với số nguyên": "Phải thu khách hàng theo PR-55 tăng 36,4%. " + L22,
+    }
+
+    def chen(self, doan):
+        goc = (VI_DU / "HO_SO_MAU.md").read_text(encoding="utf-8")
+        self.ho_so.write_text(goc.replace(MUC_9, MUC_9 + "\n\n" + doan, 1), encoding="utf-8")
+
+    def test_tung_dau_vao(self):
+        self.assertEqual(len(self.CA), 84)
+        for nhom, ten, doan, phai_dat in self.CA:
+            with self.subTest(nhom=nhom, ten=ten):
+                self.chen(doan)
+                phieu, dat = self.phieu()
+                self.assertEqual(dat, phai_dat, f"{ten}\n{phieu}")
+
+    def test_gioi_han_da_cong_bo(self):
+        for ten, doan in self.GIOI_HAN.items():
+            with self.subTest(ten):
+                self.chen(doan)
+                phieu, dat = self.phieu()
+                self.assertTrue(dat, f"{ten}\n{phieu}")
+
+    def test_bang_chu(self):
+        k = kiem_luat.kiem_dinh_dang
+        self.assertEqual(len(kiem_luat.CHU_CHO_PHEP), 186)
+        self.assertTrue(all(len(c) == 1 for c in kiem_luat.CHU_CHO_PHEP))
+        self.assertEqual(k("Ăn ơn ưng Đức ỹ Ỵ àÁ ầẪ ộỚ ừỰ, (1.193) và -4,5%; «x» “y” ‘z’ … ≈ ≠ ≥ ≤ → ← × ÷ ± = + / # & ! ?"),
+                         [])
+        self.assertEqual(k("Xem `Downloads\\TTC\\goc` và `a_b.csv`."), [])        # trong mã được thêm dấu \\
+        for c in "~$<>\\^@{}\u00b2\u2460\uff15\u0665\u0430\u03b1\u201a\uff0c\uff05\ufe63\u2010\u2012\u00b7\u00b0":
+            with self.subTest(hex(ord(c))):
+                self.assertTrue(k(f"Phải thu tăng 3{c}6,4%."), repr(c))
+        for c in "~$<>^@{}|[]":
+            with self.subTest(trong_ma=c):
+                self.assertTrue(k(f"Xem `a{c}b`."), repr(c))
+
+    def test_nhan_dung_dang(self):
+        k = kiem_luat.kiem_dinh_dang
+        for hop_le in ("Số 1. [ĐÃ KIỂM D1 tr.1]", "Số 1. [ĐÃ KIỂM D1 tr.1. Biên lợi nhuận gộp là SUY LUẬN, tính từ hai dòng trên]",
+                       "Số 36,4%. [SUY LUẬN, sổ số liệu: a_b; từ số ĐÃ KIỂM D1]", "Ý này. **[GIẢ ĐỊNH]**", "Chưa rõ. [CHƯA BIẾT]",
+                       "Khóa `a_b` trong nhãn. [SUY LUẬN, sổ số liệu: `a_b`]"):
+            with self.subTest(hop_le):
+                self.assertEqual(k(hop_le), [])
+        for sai in ("Số. [GIẢ ĐỊNH, SUY LUẬN, sổ số liệu: a]", "Số. [CHƯA BIẾT; ĐÃ KIỂM D1 tr.1]", "Số. [GIẢ ĐỊNH, sổ số liệu: a]",
+                    "Số. [ĐÃ KIỂM D1 tr.1; sổ số liệu: a]", "Số. [Theo sổ: GIẢ ĐỊNH]", "Số. [ GIẢ ĐỊNH]", "Số [x].",
+                    "Số. [GIẢ ĐỊNH]: x", "- [x] số", "[^1]: y", "Số. [GIẢ ĐỊNH | x]", "Số. [SUY LUẬN [x]]"):
+            with self.subTest(sai):
+                self.assertTrue(k(sai))
+
+    def test_cach_viet_so(self):
+        k = kiem_luat.kiem_dinh_dang
+        for hop_le in ("Q3/2025, Q3.2025, H1/2025, 9T2026, 6M2025, D1, H0, E12, QĐ-P13, ADR-0019, L-02, PR-120, VN30.",
+                       "Giai đoạn 2020–2025 và 2020 - 2025, 20,0–30,0%, 5% - 10%, lúc 10:30:45.",
+                       "Mạng 5G, 36,4tỷ, mã D2b, SHA256 81d6e892ed48, sha256 và mã nhận A1B2C3D4.",
+                       "Diện tích 1.200 m2, 30 m3, 5 km2, phát thải CO2, chỉ số ≠ 0.",
+                       "- 36,4% là mục liệt kê.", "  - 36,4% là mục con.", "Giảm -36,4% và (1.193) và «-36,4%» và +5%."):
+            with self.subTest(hop_le):
+                self.assertEqual(k(hop_le), [])
+        for sai in ("tăng63,4%", "tăng x2", "ROE15%", "P/E15 lần", "X55%", "decade55,5%", "giảm-36,4%",
+                    "biến động - 36,4%", "biến động -(36,4%)", "20,0%,-36,4%", "1 200 tỷ", "5O,5%", "1O tỷ", "lO%",
+                    "1'200", "9T20265", "Q5.2025", "https://a.vn", "www.a.vn", ":one:", ":100:", "| - 36,4 |"):
+            with self.subTest(sai):
+                self.assertTrue(k(sai), sai)
 
 
 if __name__ == "__main__":

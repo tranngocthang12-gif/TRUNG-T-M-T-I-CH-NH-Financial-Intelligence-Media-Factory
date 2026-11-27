@@ -7,7 +7,8 @@ ngay sau bảng, phủ các hàng dữ liệu của bảng. Giữa nhãn (đứn
 không phủ bảng qua một tiêu đề hay một dòng chữ khác. Một hàng bảng chỉ mang được một nhãn; hàng có hơn một nhãn là lỗi.
 Hàng tiêu đề của bảng và tiêu đề phụ («###» trở xuống) không mang nhãn: số liệu viết ở đó là lỗi CHƯA GẮN NHÃN.
 Cụm chữ số không đọc được theo kiểu số Việt Nam («63.4», «1,234,567», «31.12.2025») ở đoạn SUY LUẬN, ở đoạn không nhãn,
-ở hàng tiêu đề bảng hay tiêu đề phụ là lỗi; ở đoạn GIẢ ĐỊNH, CHƯA BIẾT máy chỉ đếm; ở đoạn ĐÃ KIỂM máy không đọc.
+ở hàng tiêu đề bảng hay tiêu đề phụ là lỗi; từ ADR-0022, ở đoạn ĐÃ KIỂM cũng là lỗi (KHÔNG LẦN RA: máy không đối chiếu
+được với trang); ở đoạn GIẢ ĐỊNH, CHƯA BIẾT máy chỉ đếm.
 Máy đọc số trên chữ người đọc thấy (chu_hien): dấu đậm «**» và dấu backtick được bỏ, không chèn gì vào chỗ đó, nên dấu
 định dạng không tách được dấu âm, ngoặc, phần lẻ hay dấu % khỏi con số và không cắt một con số làm hai. Số đứng đầu một
 mục liệt kê («12. ») chỉ là số thứ tự, không phải số liệu, khi nó dưới 10 hoặc danh sách được đánh đúng 1, 2, …, n; và
@@ -758,6 +759,11 @@ def kiem(thu_muc, ho_so_text: str) -> dict:
                 kq["dem"]["KHÔNG LẦN RA"] += 1
                 kq["loi"].append(f"dòng {p['dong']}: {s.raw}{'%' if s.pt else ''} — số nhỏ, năm hay số trong backtick "
                                  f"ở đoạn ĐÃ KIỂM không có trên trang đã ghi hay dòng gốc của sổ {p['nhan']}")
+            for cum in so_khong_doc_duoc(c):                     # ADR-0022: số viết kiểu Anh ở đoạn ĐÃ KIỂM
+                kq["dem"]["KHÔNG LẦN RA"] += 1
+                kq["loi"].append(f"dòng {p['dong']}: «{cum}» — cụm chữ số không đọc được theo kiểu số Việt Nam (dấu chấm "
+                                 "tách hàng nghìn, dấu phẩy là phần lẻ) ở đoạn ĐÃ KIỂM: máy không đối chiếu được với "
+                                 f"trang; viết lại theo kiểu Việt Nam {p['nhan']}")
     kq["trang_da_dung"] = sorted({(ma, t) for d in doan if loai_nhan(d["nhan"]) == "ĐÃ KIỂM"
                                   for ma, trang in doc_dia_chi(d["nhan"]).items() if ma in kho.nguon
                                   for t in (trang if trang is not None else kho.cac_trang(ma))})

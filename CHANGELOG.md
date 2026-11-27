@@ -1,5 +1,13 @@
 # Changelog
 
+## 2026-11-27 — ADR-0022: bảng chữ cho phép của hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+- Theo lệnh Owner ngày 27/11/2026 (11:02) giao kiến trúc sư toàn quyền quyết định các việc còn mở sau PR #120, và gói giao Claude Code số 19. ADR-0022 ACCEPTED 27/11/2026, hiệu lực khi Owner gộp PR này.
+- `tools/hoso/kiem_luat.py`: bảng chữ cho phép (`CHU_CHO_PHEP`, `DAU_CHO_PHEP`, `_dd_bang_chu`); ngoặc vuông chỉ cho nhãn đúng dạng, trong mã không có `|`, `[`, `]` (`_dd_nhan`); không có địa chỉ web, mã biểu tượng, định nghĩa liên kết; cách viết số làm người đọc và máy đọc khác nhau là lỗi (`_dd_cach_viet_so`: chữ dính số, chữ O, o, I, l sau chữ số, dấu % sau chữ, dấu nháy giữa số, dấu trừ dính sau chữ hay dấu câu, trước ngoặc, cách con số, số tách nghìn bằng dấu cách). Cổng giá: số thứ tự chỉ bỏ ở đúng đầu mục liệt kê (chỗ hở có từ ADR-0020).
+- `tools/hoso/kiem_trich_dan.py`: cụm chữ số không đọc được theo kiểu Việt Nam ở đoạn ĐÃ KIỂM là KHÔNG LẦN RA.
+- `docs/QUY_TRINH_HO_SO_MA.md` (B5, mục 4: bỏ các giới hạn đã đóng, thêm phần còn lại và vạch đích của bản chấm). `tests/test_hoso.py`: lớp `BangChuTests` (84 đầu vào chạy phiếu máy toàn trình, giới hạn còn lại, bảng chữ, nhãn, cách viết số); `CongGiaVong3Tests.GIOI_HAN` bỏ ca «³¹» vì bảng chữ đã chặn.
+- `architecture/adr/ADR-0022-bang-chu-cho-phep.md`; `architecture/adr/README.md` thêm dòng ADR-0022; `architecture/ARCHITECTURE.md`: dòng trạng thái thêm ADR-0022, đoạn «Từ ADR-0022» sau đoạn «Từ ADR-0021». Chữ của §0–§10 và của ADR-0001…ADR-0021 giữ nguyên.
+- Không chạm `governance/`, `ledger/`, `paper/`, `research/`, `data/`, `engine/`. Không đưa hồ sơ thật, tệp gốc thật hay tên mã nào vào kho.
+
 ## 2026-11-27 — ADR-0021: số SUY LUẬN gắn đúng khóa sổ, lớp định nghĩa, trạng thái kiểm — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 - Theo lệnh Owner ngày 26/11/2026 (23:53) và gói giao Claude Code số 16. ADR-0021 ACCEPTED 27/11/2026, hiệu lực khi Owner gộp PR này.
 - `tools/hoso/kiem_trich_dan.py`: đọc khóa trong nhãn SUY LUẬN (dấu phẩy, dãy «a05 tới a09», ghi chú sau «;»); số SUY LUẬN phải khớp khóa nhãn gọi tên, hằng số trong công thức của khóa, hay số ĐÃ KIỂM nhắc lại (KHÓA, HẰNG SỐ, NHẮC LẠI; không thì KHÔNG GẮN KHÓA); chiều ngược: phần chữ có chữ số thì mỗi khóa gọi tên phải hiện số; khóa lạ, dãy sai là lỗi; mục «Trạng thái kiểm» ngoài phạm vi đối chiếu. Đoạn GIẢ ĐỊNH, CHƯA BIẾT không còn đi đường «SỔ».
