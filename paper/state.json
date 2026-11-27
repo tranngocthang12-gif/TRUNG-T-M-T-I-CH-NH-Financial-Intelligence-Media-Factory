@@ -5,19 +5,19 @@
   "last_rebalance": "2026-11-20",
   "costs_paid": 0.0,
   "n_rebalance": 0,
-  "last_date": "2026-11-26",
+  "last_date": "2026-11-27",
   "dd": {
     "peak": 1000000000.0,
     "peak_date": null,
-    "checked_through": "2026-11-26",
+    "checked_through": "2026-11-27",
     "runs": [
       {
-        "date": "2026-11-26",
+        "date": "2026-11-27",
         "positions": {},
         "cash": 1000000000
       }
     ],
     "nav": 1000000000.0,
-    "nav_date": "2026-11-26"
+    "nav_date": "2026-11-27"
   }
 }
