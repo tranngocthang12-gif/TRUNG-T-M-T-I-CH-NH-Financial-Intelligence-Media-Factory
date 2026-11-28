@@ -4,6 +4,7 @@
 - Bản đã điền giữ ở nơi riêng tư do Owner chọn. Không đưa bản đã điền vào kho công khai (L-03).
 - Ghi bằng tỷ lệ phần trăm. Không ghi số tiền.
 - Không phải lời khuyên đầu tư.
+- Giải thích bằng lời thường từng dòng và từng câu: `templates/ky_luat/GIAI_THICH_MAU_KY_LUAT.md` (ADR-0026 QĐ-B6).
 
 ---
 
@@ -31,7 +32,7 @@ Ngày lập: ……  Ngày sửa gần nhất: ……  Lý do sửa: ……
 
 | Nhãn | Thoát khi |
 |---|---|
-| Giá trị–dài hạn | Điều kiện sai của luận điểm xảy ra, hoặc giá vượt khoảng giá trị trong hồ sơ |
+| Giá trị–dài hạn | Điều kiện sai của luận điểm xảy ra, hoặc giá vượt khoảng giá trị do Owner tự lập và tự ghi ở chỗ riêng. Hồ sơ mã không có khoảng giá trị: Mục 8 đang khóa (ADR-0019 QĐ-P13) |
 | Tăng trưởng–xu hướng | Chạm mức lỗ ở dòng 7b, hoặc quy tắc xu hướng Owner đã viết bị phá |
 
 ---

@@ -1,5 +1,16 @@
 # Changelog
 
+## 2026-11-28 — ADR-0026: cổng bằng chứng, thu gọn phần đo và sổ kết quả — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+
+- Theo lệnh Owner ngày 28/11/2026 (19:29 và 20:34) giao kiến trúc sư lập kế hoạch cải tổ và quyết sau khi hội đồng AI phản biện. Hội đồng: ChatGPT (OpenAI), Gemini (Google), Grok (xAI), mỗi ghế hai tin. Phản biện bản nháp: vòng 1 ChatGPT (OpenAI), vòng 2 và vòng 3 Grok (xAI); sau vòng 3 Owner quyết sửa đúng ba lỗi chặn còn lại (C26–C28) theo cách ghế phản biện ghi rồi đi tiếp, không có vòng thứ tư; kết quả từng vòng ghi ở đầu ADR-0026 và ở thân PR.
+- `architecture/adr/ADR-0026-cong-bang-chung-va-thu-gon.md` (mới): cổng bằng chứng, danh sách đóng NL-01 tới NL-11, tập ba hồ sơ và năm điều mở cổng, phép thử tay và phiếu thử, chín phép lọc cho ý mới (QĐ-B1); ngừng hai phép thống kê của ADR-0024 (QĐ-B2); cách đọc sổ thành tích (QĐ-B3); sổ kết quả, loại nguyên nhân chính khi SAI, đối chiếu khác hãng và ba bảng đếm (QĐ-B4); tiểu mục tổng kết và điều kiện sai đủ bốn thứ (QĐ-B5); kỷ luật và dòng «đã đọc» (QĐ-B6); đồng bộ giấy tờ và ngoại lệ hẹp về `model_cutoff` (QĐ-B7); điều không đưa vào (QĐ-B8); tám điều kiện hoàn tác. L-02 và `governance/LAWS.md` không đổi.
+- `BOOT.md`: viết lại theo phạm vi đang hiệu lực; thứ tự đọc mới, có `state/PROJECT_STATE.yaml` cho việc kiến trúc; bảng các thứ đã ngừng tách khỏi bảng các thứ vẫn vận hành trong phạm vi hẹp; bỏ bảng lệnh và nguyên lý của kiến trúc trước ADR-0019.
+- `docs/QUY_TRINH_HO_SO_MA.md`: tiểu mục tổng kết và điều kiện sai đủ bốn thứ (B5); câu hỏi bắt buộc thứ tư (B7 bước 5); B7 bước 7 không ghi nhãn; dòng «đã đọc» (B8 bước 3); loại nguyên nhân chính khi SAI (B8 bước 5); nhãn độ phủ chỉ là mô tả (5.1); `model_cutoff` và `resolution_rule` (5.2); sổ bất đồng không nhãn (5.3); mục 5.5 sổ kết quả; mục 6 cổng bằng chứng; ba điều dừng ở mục 3.
+- `templates/hoso/LENH_MAU.md`: mẫu B thêm câu hỏi bắt buộc thứ tư về tiểu mục tổng kết.
+- `templates/ky_luat/MAU_KY_LUAT_TRONG.md`: sửa điều kiện thoát của nhãn «Giá trị–dài hạn». `templates/ky_luat/GIAI_THICH_MAU_KY_LUAT.md` (mới): giải thích từng dòng, từng câu và từng cột, không gợi ý con số.
+- `state/PROJECT_STATE.yaml`: ghi tình trạng tới ADR-0026. `architecture/ARCHITECTURE.md`, `architecture/adr/README.md`: thêm ADR-0026.
+- Không chạm `tools/`, `tests/`, `ledger/`, `governance/`, `templates/hoso/vi_du/`, `paper/`, `research/`, `engine/`, `data/`.
+
 ## 2026-11-28 — ADR-0025: nhìn ngược và loại trừ trong hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 
 - Theo lệnh Owner ngày 28/11/2026 (01:35) «bạn thấy ý trên kiến trúc mình cần và phù hợp thì bạn ghép vào kiến trúc». Gộp sau ADR-0024. Bản nháp qua ba vòng phản biện ChatGPT (OpenAI): PB-ADR25-V1 (mười ba lỗi chặn), PB-ADR25-V2 (ba lỗi chặn), PB-ADR25-V3 (ĐẠT, không còn lỗi chặn). PR này là bản v3, chỉ thêm dòng ghi kết quả vòng 3 vào đầu ADR.
