@@ -37,6 +37,8 @@ Câu hỏi bắt buộc thứ hai (ADR-0023): **Với từng điều kiện đ�
 
 Câu hỏi bắt buộc thứ ba (ADR-0025): **Giả sử tới ngày xem lại, nhận định ND-1 ở tiểu mục «Khám nghiệm trước» (cuối Mục 11) đã bị bác. Nêu tối đa ba lý do về kinh doanh, tài chính hay kế toán mà tiểu mục chưa có, mỗi lý do nêu cơ chế (khoản mục nào của báo cáo, đổi theo chiều nào) và mã tệp, trang làm căn cứ. Với «Điểm cờ đỏ kế toán» ở Mục 6, có tỷ số nào lấy nhầm dòng của báo cáo không? Không có thì ghi "không có".**
 
+Câu hỏi bắt buộc thứ tư (ADR-0026): **Kiểm từng dòng của tiểu mục «Tổng kết: điểm mạnh, điểm yếu, điểm nghi vấn» ở cuối «Một trang», và kiểm cả tiểu mục khi đọc liền, theo sáu loại lỗi: (i) dòng không có mệnh đề gốc ở mục được ghi tên, hay thêm dữ kiện mới; (ii) dòng bỏ điều kiện, phạm vi, kỳ, nguồn hay mức bất định của câu gốc, hay nâng nhãn; (iii) câu kết luận chung tốt hay xấu về doanh nghiệp hay về mã, điểm số, thứ hạng, hay so với mã khác; (iv) nêu hay ngụ ý hành động với cổ phiếu, giá tương lai, khoảng giá trị hay hệ số định giá mục tiêu; (v) nêu giá cổ phiếu, hệ số định giá hay vốn hóa, kể cả số quá khứ có nguồn; (vi) nhắc điểm F, điểm M, điểm Z hay trạng thái cờ của chúng, kể cả bằng chữ không có số. Ghi từng dòng có lỗi kèm loại lỗi; không có thì ghi "không có". Hồ sơ không có tiểu mục này thì ghi "không áp dụng".**
+
 Luật:
 
 - Không nêu hành động nào với cổ phiếu. Không nêu khoảng giá trị hay mức giá nào.
