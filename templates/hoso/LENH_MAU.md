@@ -35,6 +35,8 @@ Sau bốn phần, trả lời câu hỏi bắt buộc (máy chỉ bắt câu gi�
 
 Câu hỏi bắt buộc thứ hai (ADR-0023): **Với từng điều kiện đổi trạng thái ở Mục 9, hai người đọc độc lập cùng một văn bản có thể chấm khác nhau không? Có câu nào ở Mục 9 nêu hay ngụ ý biến sẽ đi hướng nào, cộng các biến thành điểm, hay viết tác động có điều kiện lên lợi nhuận không? Không có thì ghi "không có".**
 
+Câu hỏi bắt buộc thứ ba (ADR-0025): **Giả sử tới ngày xem lại, nhận định ND-1 ở tiểu mục «Khám nghiệm trước» (cuối Mục 11) đã bị bác. Nêu tối đa ba lý do về kinh doanh, tài chính hay kế toán mà tiểu mục chưa có, mỗi lý do nêu cơ chế (khoản mục nào của báo cáo, đổi theo chiều nào) và mã tệp, trang làm căn cứ. Với «Điểm cờ đỏ kế toán» ở Mục 6, có tỷ số nào lấy nhầm dòng của báo cáo không? Không có thì ghi "không có".**
+
 Luật:
 
 - Không nêu hành động nào với cổ phiếu. Không nêu khoảng giá trị hay mức giá nào.
@@ -68,6 +70,8 @@ Bảng phải phủ mọi mục có nhãn ĐÃ KIỂM của hồ sơ, mỗi mụ
 1. Công thức có tính đúng điều câu hồ sơ ở cột «Dùng ở» nói không?
 2. Cùng một chỉ tiêu ở các kỳ khác nhau có cùng công thức, cùng phạm vi không?
 3. Dòng gốc có đúng là khoản mục câu hồ sơ nói tới không? Mở trang để xem tên dòng in trên báo cáo.
+
+**Việc thứ ba (ADR-0025): điểm cờ đỏ kế toán ở Mục 6.** Định nghĩa ở `templates/hoso/DIEM_CO_DO_KE_TOAN.md` của kho (ghế phân tích gửi kèm tệp này). Với từng đầu vào: dòng gốc có đúng khoản mục, kỳ, phạm vi tệp mẫu đòi không. Với điểm F: từng tiêu chí đạt hay không, và tổng. Với điểm M và điểm Z: công thức các dòng tính có đúng tệp mẫu không. Ghi KHỚP hoặc LỆCH kèm một câu lý do. Phiếu máy ĐẠT không thay phần kiểm này.
 
 Tệp gốc nào bạn không mở được thì ghi rõ tên tệp; không ghi KHỚP cho dòng dựa vào tệp đó.
 

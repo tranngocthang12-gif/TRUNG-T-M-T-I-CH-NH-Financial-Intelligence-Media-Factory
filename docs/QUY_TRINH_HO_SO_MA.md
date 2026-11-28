@@ -1,4 +1,4 @@
-# Quy trình làm một hồ sơ mã (ADR-0019, ADR-0020, ADR-0021, ADR-0024)
+# Quy trình làm một hồ sơ mã (ADR-0019, ADR-0020, ADR-0021, ADR-0024, ADR-0025)
 
 Tệp này là việc phải làm theo thứ tự của **ghế phân tích**. Ghế phân tích là một phiên Claude trong Project TTC, đã đọc tệp này và ADR-0019, ADR-0020 ở `main` mới nhất. Sản phẩm chỉ được gọi là "hồ sơ mã của dự án" khi có phiếu máy ĐẠT đi kèm.
 
@@ -83,6 +83,9 @@ python tools/hoso/kiem_so_lieu.py --thu-muc <TM> --soat-bang
 
 Lý do có bước này: ở hồ sơ đầu tiên máy đọc sai năm con số trên hai trang. Số sai vẫn "có trên trang" nên phép đối chiếu trích dẫn không bắt được. Chỉ phép tính của chính hàng đó bắt được.
 
+6. Ba điểm cờ đỏ kế toán (ADR-0025 QĐ-L2): cần báo cáo năm t và năm t − 1 kèm thuyết minh; thiếu thì quay lại B2. Chép đầu vào thành dòng gốc; `ghi_chu` ghi chế độ kế toán, tên khoản mục, mã số chỉ tiêu, kỳ, đơn vị, hợp nhất hay riêng. Mỗi tỷ số, điểm M và điểm Z là dòng tính theo đúng `templates/hoso/DIEM_CO_DO_KE_TOAN.md`. Mẫu số bằng không hay thiếu đầu vào thì không lập dòng tính đó, ghi CHƯA BIẾT kèm lý do. Điểm F không là dòng tính. Doanh nghiệp tài chính: không tính. Thêm xong thì chạy lại bước 3.
+7. Trước B5, tính độ phủ doanh thu (ADR-0025 QĐ-L3). Tử số: tổng các khoản doanh thu từ bên ngoài trong một bảng chia duy nhất của tệp gốc đã ghim (theo mảng, theo sản phẩm hay dịch vụ, hay theo nhóm khách hàng; không trộn hai bảng), cùng kỳ và cùng phạm vi hợp nhất hay riêng với mẫu số. Mẫu số: doanh thu thuần năm gần nhất; doanh nghiệp tài chính dùng tổng thu nhập hoạt động ở cả tử và mẫu. Đầu vào là dòng gốc; tử số và tỷ lệ là dòng tính; chạy lại bước 3. Tỷ lệ dưới ba phần tư, hoặc không tính được: dừng, báo Owner «chưa đủ tài liệu để hiểu doanh nghiệp kiếm tiền từ đâu» kèm tỷ lệ và danh sách tài liệu còn thiếu, chờ Owner chọn tìm thêm, đi tiếp hay bỏ mã; ghi ở Project tỷ lệ trước, tài liệu thêm, tỷ lệ sau và lựa chọn của Owner. Không ghi CHƯA BIẾT để đi tiếp.
+
 ### B5. Viết hồ sơ
 
 - Chép khung từ `templates/hoso/vi_du/HO_SO_MAU.md`: đầu hồ sơ, "Cách đọc", "Một trang", Mục 1 tới Mục 12, "Kết quả 15 điểm soi", "Danh sách CHƯA BIẾT", "Bảng nguồn", "Lịch sử sửa".
@@ -115,7 +118,9 @@ Lý do có bước này: ở hồ sơ đầu tiên máy đọc sai năm con số
   - Tiêu đề phụ của Mục 9 không có chữ «giá». Số giá hàng hóa chỉ đứng trong đoạn ĐÃ KIỂM; điều kiện viết ở câu riêng, không có số giá.
   - Mục 11 thêm dòng «Biến thời thế». Điều kiện sai ở Mục 11 cần báo cáo của kỳ nào thì ngày xem lại phải gồm ngày có báo cáo kỳ đó.
 - Mục 10 chỉ mô tả giá và khối lượng.
+- Mục 6 có tiêu đề phụ «### Điểm cờ đỏ kế toán» (ADR-0025 QĐ-L2), viết theo mục «Cách viết trong hồ sơ» của `templates/hoso/DIEM_CO_DO_KE_TOAN.md`: mở bằng câu cố định của tệp mẫu; điểm M, điểm Z và các tỷ số dưới nhãn SUY LUẬN gọi khóa; ngưỡng và chỗ ánh xạ dưới nhãn GIẢ ĐỊNH; điểm F ghi đạt hay không của từng tiêu chí kèm khóa của tỷ số, tổng và cờ chỉ khi đủ chín tiêu chí. Cờ bật thì nêu các tỷ số đóng góp lớn nhất và khoản mục cần soi, nối với điểm soi tương ứng; không gọi đó là nguyên nhân, không viết doanh nghiệp làm đẹp lợi nhuận, gian lận hay sắp vỡ nợ. Không xếp hạng, không cộng các điểm, không đưa điểm vào câu đánh giá doanh nghiệp, câu về giá cổ phiếu, khoảng giá trị hay lời hành động. Doanh nghiệp tài chính ghi «không áp dụng».
 - Mục 11: ba giả thuyết H1 (tốt), H2 (xấu), H0 (không có gì đặc biệt). Mỗi giả thuyết có điều kiện làm nó sai. Có ngày xem lại.
+- Cuối Mục 11 là tiêu đề phụ «### Khám nghiệm trước» (ADR-0025 QĐ-L1). Ghi nhận định được khám nghiệm, mã ND-1: chỉ rõ câu quan trọng nhất của «Một trang» (gạch đầu dòng thứ mấy), nêu lại nó trong một câu không có con số, kèm giả thuyết của Mục 11 mà nó dựa vào; điều kiện sai của giả thuyết đó là điều kiện bác ND-1 và phải bác được thật nhận định đó. Mã viết có gạch nối (ND-1, LD-1), vì máy chặn chữ dính số. Rồi ba lý do chính LD-1, LD-2, LD-3: mỗi lý do nêu cơ chế làm ND-1 sai (khoản mục nào của báo cáo, đổi theo chiều nào) và chỗ chấm được: một điều kiện sai ở Mục 11, một điều kiện đổi trạng thái ở Mục 9, một điểm soi, hay một dòng CHƯA BIẾT; không có chỗ chấm thì thêm dòng vào danh sách CHƯA BIẾT. Viết dưới nhãn GIẢ ĐỊNH, không thêm con số mới. Lý do liên quan tới biến thời thế chỉ trỏ tới điều kiện ở Mục 9, không nêu biến sẽ đi hướng nào. Không lý do nào nói về giá cổ phiếu, khoảng giá trị hay hành động với cổ phiếu.
 - Hồ sơ kết bằng danh sách CHƯA BIẾT.
 - Sách và báo cáo có bản quyền: chỉ ghi địa chỉ trang và trích không quá 15 từ (L-04).
 
@@ -152,17 +157,17 @@ python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ng
    Gửi `…_BAN_PHAN_BIEN.md` cùng đường dẫn tệp gốc cho hai ghế khác hãng Anthropic, theo mẫu ở `templates/hoso/LENH_MAU.md`: một ghế viết bản phản biện bốn phần (QĐ-P7), một ghế đối chiếu số. Ghế đối chiếu số nhận thêm bảng định nghĩa và trả lời ba câu hỏi của bảng cho từng dòng.
 3. Bản trả lời phải mở đầu bằng **mã nhận tệp** in ở đầu bản phản biện. Không có mã: coi như ghế đó chưa đọc tệp, gửi lại.
 4. Ghế nào hết hạn mức thì chuyển sang ghế khác hãng còn lại (ChatGPT, Gemini, Grok). Không dùng Claude cho bước này.
-5. Lệnh phản biện có câu hỏi bắt buộc thứ hai về Mục 9 (ADR-0023 QĐ-T7, mẫu B).
+5. Lệnh phản biện có câu hỏi bắt buộc thứ hai về Mục 9 (ADR-0023 QĐ-T7, mẫu B) và câu hỏi bắt buộc thứ ba về lý do thất bại hồ sơ chưa lường trước (ADR-0025 QĐ-L1).
 6. Chép nguyên văn bản trả lời vào `phan_bien/`. Ghi vào tệp niêm phong: ghế nào nhận được tệp, ghế nào bắt được lỗi gài.
 7. Điểm nào ghế phản biện kết luận ngược hồ sơ mà phân định được bằng báo cáo sau này: ghi vào danh sách ứng viên bất đồng ở Project, gồm nguyên văn hai lập luận, ghế của mỗi bên, mã hồ sơ và bản, nhãn loại lập luận chốt lúc ghi. Chưa soạn câu hỏi, chưa hỏi ghế nào; việc đó làm sau khi giao, ở mục 5 (ADR-0024 QĐ-N5). Lỗi xác minh được ngay bằng tài liệu thì sửa ở B8 và ghi vào sổ lỗi đã xác minh, không phải ứng viên bất đồng.
 
 ### B8. Sửa, giao Owner, hậu kiểm
 
-1. Với từng điểm ghế khác hãng nêu: mở trang gốc kiểm lại. Đúng thì sửa hồ sơ và sổ; không đúng thì ghi lý do. Ghi vào "Lịch sử sửa". Viết lại mục «Trạng thái kiểm»: ghế nào đối chiếu số và kết quả (số dòng KHỚP, LỆCH, có bắt được lỗi gài không); ghế nào phản biện; tệp gốc nào mỗi ghế không mở được; ý nào ở «Một trang» chưa được ghế khác hãng nào đối chiếu.
+1. Với từng điểm ghế khác hãng nêu: mở trang gốc kiểm lại. Đúng thì sửa hồ sơ và sổ; không đúng thì ghi lý do. Lý do thất bại mới ghế phản biện thêm mà ghế phân tích nhận thì đưa vào «Khám nghiệm trước» với mã LD-4 trở đi, ghi «từ phản biện»; ba lý do chính giữ mã, lỗi đã xác minh trong ND-1 hay trong lý do thì sửa như mọi lỗi khác. Ghi vào "Lịch sử sửa". Viết lại mục «Trạng thái kiểm»: ghế nào đối chiếu số và kết quả (số dòng KHỚP, LỆCH, có bắt được lỗi gài không); ghế nào phản biện; tệp gốc nào mỗi ghế không mở được; ý nào ở «Một trang» chưa được ghế khác hãng nào đối chiếu.
 2. Chạy lại B6 cho bản đã sửa. Chạy `python tools/hoso/gai_loi.py kiem --ho-so … --niem-phong …` để chắc bản Owner không còn lỗi gài.
 3. Giao Owner ba thứ: hồ sơ, phiếu máy ĐẠT, bản phản biện. Owner tự mở ba con số mà phiếu máy chọn (ADR-0021 QĐ-K4, thay cách chọn «ba con số bất kỳ» của QĐ-P9); Owner muốn mở thêm số nào cũng được.
 4. Niêm phong bản đã giao (ADR-0021 QĐ-K5): ghế phân tích ghi phiếu máy ĐẠT, có sha256 của hồ sơ, vào tài liệu của Project ngay khi giao. Từ lúc đó không sửa bản đã giao; muốn sửa thì làm bản mới, có phiếu mới.
-5. Tới ngày xem lại ở Mục 11: mở đúng bản đã giao, kiểm sha256 của tệp khớp sha256 trên phiếu đã ghi vào Project. Lấy báo cáo mới, làm lại từ B2 cho phần mới. Với từng giả thuyết, chép nguyên văn điều kiện sai của bản đã giao, rồi ghi ĐÚNG, SAI hoặc CHƯA RÕ kèm bằng chứng có nhãn. Không chấm theo chữ của một bản sửa sau. Với bảng thời thế ở Mục 9 (ADR-0023 QĐ-T6): mỗi dòng ghi ĐỔI, ĐỔI MỘT PHẦN, GIỮ NGUYÊN hay CHƯA CHẤM ĐƯỢC theo đúng điều kiện riêng của dòng; mỗi giả thuyết ghi nguyên nhân TRONG BẢNG, NGOÀI BẢNG hay CHƯA RÕ, và «nguyên nhân do doanh nghiệp nêu» kèm mã tệp và trang khi báo cáo tự nêu; báo cáo quy thay đổi lợi nhuận cho một yếu tố không có dòng trong bảng và không có trong CHƯA BIẾT thì ghi một lần «không báo». Doanh nghiệp công bố báo cáo tài chính trước ngày xem lại thì chạy hậu kiểm theo sự kiện ở mục 5.4 (ADR-0024 QĐ-N4).
+5. Tới ngày xem lại ở Mục 11: mở đúng bản đã giao, kiểm sha256 của tệp khớp sha256 trên phiếu đã ghi vào Project. Lấy báo cáo mới, làm lại từ B2 cho phần mới. Với từng giả thuyết, chép nguyên văn điều kiện sai của bản đã giao, rồi ghi ĐÚNG, SAI hoặc CHƯA RÕ kèm bằng chứng có nhãn. Không chấm theo chữ của một bản sửa sau. Với bảng thời thế ở Mục 9 (ADR-0023 QĐ-T6): mỗi dòng ghi ĐỔI, ĐỔI MỘT PHẦN, GIỮ NGUYÊN hay CHƯA CHẤM ĐƯỢC theo đúng điều kiện riêng của dòng; mỗi giả thuyết ghi nguyên nhân TRONG BẢNG, NGOÀI BẢNG hay CHƯA RÕ, và «nguyên nhân do doanh nghiệp nêu» kèm mã tệp và trang khi báo cáo tự nêu; báo cáo quy thay đổi lợi nhuận cho một yếu tố không có dòng trong bảng và không có trong CHƯA BIẾT thì ghi một lần «không báo». Doanh nghiệp công bố báo cáo tài chính trước ngày xem lại thì chạy hậu kiểm theo sự kiện ở mục 5.4 (ADR-0024 QĐ-N4). Với hồ sơ thuộc phạm vi ADR-0025 (giao sau ngày gộp ADR đó): nếu điều kiện bác ND-1 đã xảy ra, ghi ĐÃ LƯỜNG TRƯỚC (trùng cơ chế của một LD: cùng khoản mục, cùng chiều, có bằng chứng kèm mã tệp và trang), KHÔNG LƯỜNG TRƯỚC hay CHƯA RÕ; giả thuyết cạnh tranh bị loại mà ND-1 không bị bác thì không chấm. Ghi các sự cố mới phát sinh hay lần đầu được công bố trong kỳ theo dõi (từ ngày giao tới ngày xem lại cuối cùng đã niêm phong ở Mục 11) theo danh sách đóng của ADR-0025 QĐ-L2 điểm 5, mỗi sự cố kèm loại, mã tệp, trang, ngày phát sinh, ngày công bố, ngày phát hiện; kỳ theo dõi đóng ở hậu kiểm định kỳ tại ngày xem lại. Điểm và cờ lấy từ bản đã niêm phong, không tính lại. Mỗi kết quả chỉ đếm một lần dù nhắc lại ở hậu kiểm theo sự kiện và định kỳ. Hồ sơ niêm phong trước ADR-0025 không ghi các trường này.
 6. Sửa quá ba vòng phản biện mà chưa hội tụ: dừng, báo Owner.
 7. Sau khi niêm phong ở bước 4: làm các việc ở mục 5 (ADR-0024). Hồ sơ trước, đo sau: không hoãn hay rút bước nào ở trên để kịp vòng dự báo.
 
@@ -173,6 +178,7 @@ python tools/hoso/bang_dinh_nghia.py --thu-muc <TM> --ho-so <TM>/HO_SO_<MÃ>_<ng
 - Có hơn mười con số trên trang mà máy không đọc được sau khi đã đọc lại.
 - Hai ghế khác hãng cùng không nhận được tệp, hoặc cùng hết hạn mức.
 - Việc được giao đòi nêu hành động với cổ phiếu, khoảng giá trị, hoặc số vốn của Owner.
+- Độ phủ doanh thu bằng tệp gốc dưới ba phần tư, hoặc không tính được (B4 bước 7, ADR-0025 QĐ-L3).
 
 ## 4. Giới hạn của máy
 

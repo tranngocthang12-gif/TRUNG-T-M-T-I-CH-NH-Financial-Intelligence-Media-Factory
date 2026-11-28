@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-11-28 — ADR-0025: nhìn ngược và loại trừ trong hồ sơ mã — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
+
+- Theo lệnh Owner ngày 28/11/2026 (01:35) «bạn thấy ý trên kiến trúc mình cần và phù hợp thì bạn ghép vào kiến trúc». Gộp sau ADR-0024. Bản nháp qua ba vòng phản biện ChatGPT (OpenAI): PB-ADR25-V1 (mười ba lỗi chặn), PB-ADR25-V2 (ba lỗi chặn), PB-ADR25-V3 (ĐẠT, không còn lỗi chặn). PR này là bản v3, chỉ thêm dòng ghi kết quả vòng 3 vào đầu ADR.
+- `architecture/adr/ADR-0025-nhin-nguoc-va-loai-tru.md` (mới): khám nghiệm trước (QĐ-L1), điểm cờ đỏ kế toán (QĐ-L2), dừng khi chưa hiểu doanh nghiệp từ tệp gốc (QĐ-L3), điều không đưa vào (QĐ-L4), ranh giới và thi công (QĐ-L5); số đo, mốc đọc và năm điều kiện hoàn tác. L-02 và `governance/LAWS.md` không đổi.
+- `templates/hoso/DIEM_CO_DO_KE_TOAN.md` (mới): định nghĩa điểm F, điểm M, điểm Z, luật dùng và nguồn.
+- `templates/hoso/LENH_MAU.md`: mẫu B thêm câu hỏi bắt buộc thứ ba; mẫu C thêm việc thứ ba (kiểm điểm cờ đỏ kế toán).
+- `docs/QUY_TRINH_HO_SO_MA.md`: B4 bước 6 (điểm cờ đỏ) và 7 (độ phủ doanh thu); hai gạch đầu dòng ở B5; B7 bước 5; B8 bước 1 và 5; một điều dừng ở mục 3.
+- `architecture/ARCHITECTURE.md`, `architecture/adr/README.md`: thêm ADR-0025.
+- Không chạm `tools/`, `tests/`, `ledger/`, `governance/`, `templates/hoso/vi_du/`, `paper/`, `research/`, `engine/`, `data/`.
+
 ## 2026-11-28 — ADR-0024: năm năng lực kiểm chứng được — Claude Project TTC (Anthropic) soạn; Claude Code (Anthropic) chép
 
 - Theo lệnh Owner ngày 28/11/2026 (00:12) giao toàn quyền đưa năm năng lực vào kiến trúc. Bản nháp qua ba vòng phản biện ChatGPT (OpenAI): PB-ADR24-V1 (mười một lỗi chặn), PB-ADR24-V2 (chín lỗi chặn), PB-ADR24-V3 (một lỗi chặn, C18). Owner chọn sửa C18 đúng theo cách ghế phản biện ghi rồi đi tiếp; PR này là bản đã sửa.
